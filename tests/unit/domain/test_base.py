@@ -29,7 +29,7 @@ from robot_optimizer_core.domain.base import (
 class Money(ValueObject):
     """Test value object."""
     amount: Decimal = Field(ge=0)
-    currency: str = Field(regex="^[A-Z]{3}$")
+    currency: str = Field(pattern="^[A-Z]{3}$")
 
 
 class Address(ValueObject):
