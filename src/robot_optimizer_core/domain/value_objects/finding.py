@@ -1,0 +1,196 @@
+# src/robot_optimizer/domain/value_objects/finding.py
+"""Finding value object for representing optimization findings.
+
+100% Pydantic v2 compliant implementation.
+"""
+from typing import Optional, Dict, Any
+from uuid import UUID, uuid4
+
+from pydantic import Field, field_validator, computed_field, model_serializer
+
+from ..base import ValueObject
+from .severity import Severity
+from .location import Location
+from .pattern import Pattern
+
+
+class Finding(ValueObject):
+    """Represents a single optimization finding in a test file.
+
+    A finding is an immutable record of a detected pattern in a Robot Framework
+    file, including its location, severity, and contextual information.
+    """
+
+    id: UUID = Field(
+        default_factory=uuid4, description="Unique finding ID"
+    )
+    pattern: Pattern = Field(
+        ..., description="The pattern that was matched"
+    )
+    severity: Severity = Field(..., description="Severity level")
+    location: Location = Field(..., description="Location in the file")
+    message: str = Field(
+        ..., min_length=1, description="Human-readable message"
+    )
+    context: Optional[Dict[str, Any]] = Field(
+        default=None, description="Additional context"
+    )
+
+    @field_validator('message')
+    @classmethod
+    def validate_message(cls, v: str) -> str:
+        """Ensure message is not empty.
+
+        Args:
+            v: The message to validate
+
+        Returns:
+            The validated message
+
+        Raises:
+            ValueError: If message is empty or only whitespace
+        """
+        if not v.strip():
+            raise ValueError("Finding message cannot be empty")
+        return v.strip()
+
+    @field_validator('context')
+    @classmethod
+    def ensure_context_copy(
+        cls, v: Optional[Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
+        """Ensure context is a copy to maintain immutability.
+
+        Args:
+            v: The context dictionary
+
+        Returns:
+            A copy of the context dict or None
+        """
+        return dict(v) if v is not None else None
+
+    @classmethod
+    def create(
+        cls,
+        pattern: Pattern,
+        severity: Severity,
+        location: Location,
+        message: str,
+        **context: Any
+    ) -> 'Finding':
+        """Factory method to create a finding with context.
+
+        Uses Pydantic v2 model_validate for construction.
+
+        Args:
+            pattern: The pattern that was matched
+            severity: Severity level of the finding
+            location: Location in the file
+            message: Human-readable message
+            **context: Additional context as keyword arguments
+
+        Returns:
+            A new Finding instance
+        """
+        return cls.model_validate({
+            'pattern': pattern,
+            'severity': severity,
+            'location': location,
+            'message': message,
+            'context': context if context else None
+        })
+
+    # Pydantic v2: computed fields for derived properties
+    @computed_field  # type: ignore[misc]
+    @property
+    def file_path(self) -> str:
+        """Get the file path as a string."""
+        # pylint: disable=no-member
+        return str(self.location.file_path)
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def line_number(self) -> int:
+        """Get the line number."""
+        # pylint: disable=no-member
+        return self.location.line
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def is_auto_fixable(self) -> bool:
+        """Check if this finding can be automatically fixed."""
+        # pylint: disable=no-member
+        return self.pattern.auto_fixable
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def has_context(self) -> bool:
+        """Check if finding has additional context."""
+        return self.context is not None and len(self.context) > 0
+
+    def format_for_console(self) -> str:
+        """Format the finding for console output.
+
+        Returns:
+            A formatted string suitable for console display
+        """
+        # pylint: disable=no-member
+        location = self.location.range_str
+        severity_emoji = self.severity.emoji
+
+        # Build the main message
+        lines = [
+            f"{severity_emoji} {self.pattern.name}",
+            f"   {location}",
+            f"   {self.message}"
+        ]
+
+        # Add recommendation if different from message
+        if self.pattern.recommendation != self.message:
+            lines.append(f"   💡 {self.pattern.recommendation}")
+
+        # Add context if available
+        if self.context:
+            for key, value in self.context.items():
+                lines.append(f"   {key}: {value}")
+
+        return "\n".join(lines)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert finding to a dictionary for serialization.
+
+        Uses Pydantic v2 model_dump internally.
+
+        Returns:
+            Dictionary representation of the finding
+        """
+        # Use model_dump with mode='json' for proper serialization
+        base_dict = self.model_dump(mode='json')
+
+        # pylint: disable=no-member
+        # Add computed fields manually since they're excluded by default
+        return {
+            **base_dict,
+            "file_path": self.file_path,
+            "line_number": self.line_number,
+            "is_auto_fixable": self.is_auto_fixable,
+            "pattern_type": self.pattern.type.name,
+            "pattern_name": self.pattern.name,
+            "recommendation": self.pattern.recommendation,
+        }
+
+    @model_serializer
+    def serialize_model(self) -> Dict[str, Any]:
+        """Custom serializer for Finding model.
+
+        Pydantic v2 feature for custom serialization logic.
+        """
+        # pylint: disable=no-member
+        return {
+            "id": str(self.id),
+            "pattern": self.pattern.model_dump(),
+            "severity": self.severity,  # Already an int due to use_enum_values=True
+            "location": self.location.model_dump(),
+            "message": self.message,
+            "context": self.context
+        }

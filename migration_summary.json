@@ -1,0 +1,23 @@
+{
+  "core_files": {
+    "domain": {
+      "base.py": "\u2705 Kept",
+      "entities/test_file.py": "\u2705 Kept",
+      "entities/analysis.py": "\u27a1\ufe0f Moved to Pro",
+      "value_objects": "\u2705 Basic ones kept, advanced moved to Pro",
+      "repositories": "\u2705 Interfaces kept",
+      "events.py": "\u27a1\ufe0f Moved to Pro"
+    },
+    "analyzers": {
+      "base_analyzer.py": "\u2705 Created",
+      "dead_code.py": "\u2705 Simplified",
+      "sleep_detector.py": "\u2705 Created",
+      "flakiness.py": "\u2705 Simplified"
+    },
+    "parsers": "\u2705 Basic AST parser kept",
+    "discovery": "\u2705 File finder moved from infrastructure",
+    "config": "\u2705 Settings moved from infrastructure"
+  },
+  "pro_files_saved": "\u2705 All advanced features saved in pro_files/",
+  "tests": "\u26a0\ufe0f Need to update test imports after migration"
+}
