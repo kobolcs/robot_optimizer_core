@@ -1,0 +1,336 @@
+# src/robot_optimizer_core/analyzers/registry.py
+"""Analyzer registry for managing and discovering analyzers.
+
+This module provides the registry system that tracks all available
+analyzers, including built-in and plugin-provided analyzers.
+
+Example:
+    Registering and using analyzers::
+    
+        from robot_optimizer_core.analyzers import register_analyzer, get_analyzer
+        
+        # Register a custom analyzer
+        register_analyzer("custom", CustomAnalyzer)
+        
+        # Get analyzer instance
+        analyzer = get_analyzer("custom")
+        
+        # List all available analyzers
+        analyzers = list_analyzers()
+"""
+from __future__ import annotations
+
+from typing import Dict, List, Optional, Type, Union
+
+from ..di import get_container
+from ..exceptions import PluginError
+from ..logging import get_logger
+from ..plugin import get_plugin_registry
+from .base import BaseAnalyzer
+
+logger = get_logger(__name__)
+
+
+class AnalyzerRegistry:
+    """Registry for managing analyzers.
+    
+    This registry tracks all available analyzers and provides
+    methods for registration, discovery, and instantiation.
+    
+    Attributes:
+        analyzers: Dictionary of registered analyzer classes.
+        instances: Cache of analyzer instances.
+        default_analyzers: List of analyzer names to use by default.
+    """
+    
+    def __init__(self) -> None:
+        """Initialize the analyzer registry."""
+        self.analyzers: Dict[str, Type[BaseAnalyzer]] = {}
+        self.instances: Dict[str, BaseAnalyzer] = {}
+        self.default_analyzers: List[str] = [
+            "dead_code",
+            "sleep_detector",
+            "flakiness"
+        ]
+    
+    def register(
+        self,
+        name: str,
+        analyzer_class: Type[BaseAnalyzer],
+        override: bool = False
+    ) -> None:
+        """Register an analyzer.
+        
+        Args:
+            name: Unique name for the analyzer.
+            analyzer_class: The analyzer class.
+            override: Whether to override existing analyzer.
+            
+        Raises:
+            PluginError: If analyzer already exists and override is False.
+        """
+        if name in self.analyzers and not override:
+            raise PluginError(
+                f"Analyzer already registered: {name}",
+                plugin_name=name,
+                plugin_type="analyzer"
+            )
+        
+        # Validate it's a proper analyzer
+        if not issubclass(analyzer_class, BaseAnalyzer):
+            raise PluginError(
+                f"Analyzer must inherit from BaseAnalyzer: {analyzer_class}",
+                plugin_name=name,
+                plugin_type="analyzer"
+            )
+        
+        self.analyzers[name] = analyzer_class
+        
+        # Clear cached instance if overriding
+        if override and name in self.instances:
+            del self.instances[name]
+        
+        logger.info(
+            "Analyzer registered",
+            extra={
+                "name": name,
+                "class": analyzer_class.__name__,
+                "override": override
+            }
+        )
+    
+    def get(self, name: str) -> BaseAnalyzer:
+        """Get an analyzer instance.
+        
+        This method returns a cached instance if available,
+        otherwise creates a new instance.
+        
+        Args:
+            name: Analyzer name.
+            
+        Returns:
+            Analyzer instance.
+            
+        Raises:
+            PluginError: If analyzer not found.
+        """
+        # Return cached instance
+        if name in self.instances:
+            return self.instances[name]
+        
+        # Check built-in analyzers
+        if name not in self.analyzers:
+            # Try plugin registry
+            plugin_registry = get_plugin_registry()
+            try:
+                analyzer_class = plugin_registry.get("analyzers", name)
+                self.analyzers[name] = analyzer_class
+            except PluginError:
+                raise PluginError(
+                    f"Analyzer not found: {name}",
+                    plugin_name=name,
+                    plugin_type="analyzer",
+                    details={"available": self.list()}
+                )
+        
+        # Create instance
+        analyzer_class = self.analyzers[name]
+        
+        # Try dependency injection
+        container = get_container()
+        if container.has_service(f"analyzer.{name}"):
+            instance = container.resolve(f"analyzer.{name}")
+        else:
+            # Create with default config
+            instance = analyzer_class()
+        
+        # Cache instance
+        self.instances[name] = instance
+        
+        return instance
+    
+    def list(self) -> List[str]:
+        """List all registered analyzer names.
+        
+        Returns:
+            List of analyzer names.
+        """
+        # Get built-in analyzers
+        names = set(self.analyzers.keys())
+        
+        # Add plugin analyzers
+        plugin_registry = get_plugin_registry()
+        names.update(plugin_registry.list_components("analyzers"))
+        
+        return sorted(names)
+    
+    def get_info(self, name: str) -> Dict[str, str]:
+        """Get information about an analyzer.
+        
+        Args:
+            name: Analyzer name.
+            
+        Returns:
+            Dictionary with analyzer information.
+        """
+        analyzer = self.get(name)
+        
+        return {
+            "name": analyzer.name,
+            "description": analyzer.description,
+            "version": analyzer.version,
+            "class": analyzer.__class__.__name__,
+            "module": analyzer.__class__.__module__,
+            "supports_auto_fix": str(analyzer.supports_auto_fix),
+            "tags": ", ".join(analyzer.tags) if analyzer.tags else ""
+        }
+    
+    def get_default_analyzers(self) -> List[BaseAnalyzer]:
+        """Get default analyzer instances.
+        
+        Returns:
+            List of default analyzer instances.
+        """
+        return [self.get(name) for name in self.default_analyzers]
+    
+    def set_default_analyzers(self, names: List[str]) -> None:
+        """Set the default analyzers.
+        
+        Args:
+            names: List of analyzer names to use by default.
+        """
+        # Validate all names exist
+        available = set(self.list())
+        invalid = set(names) - available
+        
+        if invalid:
+            raise PluginError(
+                f"Invalid analyzer names: {invalid}",
+                plugin_type="analyzer",
+                details={"available": sorted(available)}
+            )
+        
+        self.default_analyzers = names
+    
+    def clear_cache(self) -> None:
+        """Clear the instance cache.
+        
+        This forces new instances to be created on next access.
+        """
+        self.instances.clear()
+    
+    def unregister(self, name: str) -> None:
+        """Unregister an analyzer.
+        
+        Args:
+            name: Analyzer name to remove.
+        """
+        self.analyzers.pop(name, None)
+        self.instances.pop(name, None)
+        
+        # Also remove from plugin registry
+        plugin_registry = get_plugin_registry()
+        plugin_registry.unregister("analyzers", name)
+
+
+# Global registry instance
+_analyzer_registry: Optional[AnalyzerRegistry] = None
+
+
+def get_analyzer_registry() -> AnalyzerRegistry:
+    """Get the global analyzer registry.
+    
+    Returns:
+        The global analyzer registry instance.
+    """
+    global _analyzer_registry
+    if _analyzer_registry is None:
+        _analyzer_registry = AnalyzerRegistry()
+        _register_built_in_analyzers(_analyzer_registry)
+    return _analyzer_registry
+
+
+def _register_built_in_analyzers(registry: AnalyzerRegistry) -> None:
+    """Register built-in analyzers.
+    
+    Args:
+        registry: The analyzer registry.
+    """
+    # Import here to avoid circular imports
+    from .dead_code import DeadCodeAnalyzer
+    from .sleep_detector import SleepDetector
+    from .flakiness import FlakinessAnalyzer
+    
+    registry.register("dead_code", DeadCodeAnalyzer)
+    registry.register("sleep_detector", SleepDetector)
+    registry.register("flakiness", FlakinessAnalyzer)
+    
+    logger.debug("Built-in analyzers registered")
+
+
+# Public API functions
+def register_analyzer(
+    name: str,
+    analyzer_class: Type[BaseAnalyzer],
+    override: bool = False
+) -> None:
+    """Register an analyzer in the global registry.
+    
+    Args:
+        name: Unique name for the analyzer.
+        analyzer_class: The analyzer class.
+        override: Whether to override existing analyzer.
+        
+    Example:
+        >>> register_analyzer("custom", CustomAnalyzer)
+    """
+    registry = get_analyzer_registry()
+    registry.register(name, analyzer_class, override)
+
+
+def get_analyzer(name: str) -> BaseAnalyzer:
+    """Get an analyzer instance from the global registry.
+    
+    Args:
+        name: Analyzer name.
+        
+    Returns:
+        Analyzer instance.
+        
+    Example:
+        >>> analyzer = get_analyzer("dead_code")
+    """
+    registry = get_analyzer_registry()
+    return registry.get(name)
+
+
+def list_analyzers() -> List[str]:
+    """List all available analyzer names.
+    
+    Returns:
+        List of analyzer names.
+        
+    Example:
+        >>> analyzers = list_analyzers()
+        >>> print(analyzers)
+        ['dead_code', 'flakiness', 'sleep_detector']
+    """
+    registry = get_analyzer_registry()
+    return registry.list()
+
+
+def get_analyzer_info(name: str) -> Dict[str, str]:
+    """Get information about an analyzer.
+    
+    Args:
+        name: Analyzer name.
+        
+    Returns:
+        Dictionary with analyzer information.
+        
+    Example:
+        >>> info = get_analyzer_info("dead_code")
+        >>> print(info["description"])
+    """
+    registry = get_analyzer_registry()
+    return registry.get_info(name)

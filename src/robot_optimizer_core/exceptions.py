@@ -1,0 +1,331 @@
+# src/robot_optimizer_core/exceptions.py
+"""Custom exception hierarchy for Robot Framework Optimizer Core.
+
+This module defines the exception hierarchy used throughout the Core package.
+All exceptions inherit from RobotOptimizerError for easy catching.
+
+Example:
+    Catching specific exceptions::
+    
+        from robot_optimizer_core import analyze_file, AnalysisError
+        
+        try:
+            findings = analyze_file("test.robot")
+        except AnalysisError as e:
+            print(f"Analysis failed: {e}")
+            print(f"File: {e.file_path}")
+            print(f"Details: {e.details}")
+"""
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Dict, Optional, Type
+
+
+class RobotOptimizerError(Exception):
+    """Base exception for all Robot Framework Optimizer errors.
+    
+    All custom exceptions in this package inherit from this class,
+    making it easy to catch all optimizer-related errors.
+    
+    Attributes:
+        message: Human-readable error message.
+        details: Additional error details as key-value pairs.
+    """
+    
+    def __init__(
+        self, 
+        message: str, 
+        details: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """Initialize the exception.
+        
+        Args:
+            message: Human-readable error message.
+            details: Additional error details.
+        """
+        super().__init__(message)
+        self.message = message
+        self.details = details or {}
+    
+    def __str__(self) -> str:
+        """Return string representation of the error.
+        
+        Returns:
+            Error message with details if available.
+        """
+        if self.details:
+            details_str = ", ".join(f"{k}={v}" for k, v in self.details.items())
+            return f"{self.message} ({details_str})"
+        return self.message
+
+
+class AnalysisError(RobotOptimizerError):
+    """Raised when analysis of a test file fails.
+    
+    This exception indicates that the analysis process encountered
+    an error while processing a specific file.
+    
+    Attributes:
+        file_path: Path to the file that caused the error.
+        analyzer: Name of the analyzer that failed (if applicable).
+    """
+    
+    def __init__(
+        self,
+        message: str,
+        file_path: Optional[Path] = None,
+        analyzer: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """Initialize the analysis error.
+        
+        Args:
+            message: Error description.
+            file_path: Path to the problematic file.
+            analyzer: Name of the analyzer that failed.
+            details: Additional error details.
+        """
+        super().__init__(message, details)
+        self.file_path = file_path
+        self.analyzer = analyzer
+        
+        # Add to details for consistency
+        if file_path:
+            self.details["file_path"] = str(file_path)
+        if analyzer:
+            self.details["analyzer"] = analyzer
+
+
+class ParsingError(AnalysisError):
+    """Raised when parsing a Robot Framework file fails.
+    
+    This is a specific type of AnalysisError that occurs during
+    the parsing phase of analysis.
+    
+    Attributes:
+        line_number: Line number where parsing failed (if known).
+        column: Column number where parsing failed (if known).
+    """
+    
+    def __init__(
+        self,
+        message: str,
+        file_path: Path,
+        line_number: Optional[int] = None,
+        column: Optional[int] = None,
+        details: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """Initialize the parsing error.
+        
+        Args:
+            message: Error description.
+            file_path: Path to the file being parsed.
+            line_number: Line where error occurred.
+            column: Column where error occurred.
+            details: Additional error details.
+        """
+        super().__init__(message, file_path, details=details)
+        self.line_number = line_number
+        self.column = column
+        
+        if line_number:
+            self.details["line_number"] = line_number
+        if column:
+            self.details["column"] = column
+
+
+class ConfigurationError(RobotOptimizerError):
+    """Raised when configuration is invalid or missing.
+    
+    This exception indicates problems with settings, environment
+    variables, or configuration files.
+    
+    Attributes:
+        config_key: The configuration key that caused the error.
+        provided_value: The invalid value that was provided.
+    """
+    
+    def __init__(
+        self,
+        message: str,
+        config_key: Optional[str] = None,
+        provided_value: Any = None,
+        details: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """Initialize the configuration error.
+        
+        Args:
+            message: Error description.
+            config_key: Configuration key that failed.
+            provided_value: The invalid value.
+            details: Additional error details.
+        """
+        super().__init__(message, details)
+        self.config_key = config_key
+        self.provided_value = provided_value
+        
+        if config_key:
+            self.details["config_key"] = config_key
+        if provided_value is not None:
+            self.details["provided_value"] = provided_value
+
+
+class PluginError(RobotOptimizerError):
+    """Raised when plugin loading or execution fails.
+    
+    This exception covers errors in the plugin system, including
+    loading, registration, and execution failures.
+    
+    Attributes:
+        plugin_name: Name of the plugin that caused the error.
+        plugin_type: Type of plugin (e.g., 'analyzer', 'parser').
+    """
+    
+    def __init__(
+        self,
+        message: str,
+        plugin_name: Optional[str] = None,
+        plugin_type: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """Initialize the plugin error.
+        
+        Args:
+            message: Error description.
+            plugin_name: Name of the problematic plugin.
+            plugin_type: Type of the plugin.
+            details: Additional error details.
+        """
+        super().__init__(message, details)
+        self.plugin_name = plugin_name
+        self.plugin_type = plugin_type
+        
+        if plugin_name:
+            self.details["plugin_name"] = plugin_name
+        if plugin_type:
+            self.details["plugin_type"] = plugin_type
+
+
+class ValidationError(RobotOptimizerError):
+    """Raised when data validation fails.
+    
+    This exception is used when domain objects or configurations
+    fail validation rules.
+    
+    Attributes:
+        field_name: Name of the field that failed validation.
+        invalid_value: The value that failed validation.
+        validation_rule: Description of the validation rule.
+    """
+    
+    def __init__(
+        self,
+        message: str,
+        field_name: Optional[str] = None,
+        invalid_value: Any = None,
+        validation_rule: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """Initialize the validation error.
+        
+        Args:
+            message: Error description.
+            field_name: Field that failed validation.
+            invalid_value: The invalid value.
+            validation_rule: Rule that was violated.
+            details: Additional error details.
+        """
+        super().__init__(message, details)
+        self.field_name = field_name
+        self.invalid_value = invalid_value
+        self.validation_rule = validation_rule
+        
+        if field_name:
+            self.details["field_name"] = field_name
+        if invalid_value is not None:
+            self.details["invalid_value"] = invalid_value
+        if validation_rule:
+            self.details["validation_rule"] = validation_rule
+
+
+class FileNotFoundError(AnalysisError):
+    """Raised when a required file cannot be found.
+    
+    This is a specific type of AnalysisError for missing files.
+    """
+    
+    def __init__(
+        self,
+        file_path: Path,
+        details: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """Initialize the file not found error.
+        
+        Args:
+            file_path: Path to the missing file.
+            details: Additional error details.
+        """
+        message = f"File not found: {file_path}"
+        super().__init__(message, file_path, details=details)
+
+
+class RepositoryError(RobotOptimizerError):
+    """Raised when repository operations fail.
+    
+    This exception indicates problems with data persistence or retrieval.
+    
+    Attributes:
+        repository_name: Name of the repository that failed.
+        operation: The operation that failed (e.g., 'save', 'load').
+    """
+    
+    def __init__(
+        self,
+        message: str,
+        repository_name: Optional[str] = None,
+        operation: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """Initialize the repository error.
+        
+        Args:
+            message: Error description.
+            repository_name: Repository that failed.
+            operation: Operation that failed.
+            details: Additional error details.
+        """
+        super().__init__(message, details)
+        self.repository_name = repository_name
+        self.operation = operation
+        
+        if repository_name:
+            self.details["repository_name"] = repository_name
+        if operation:
+            self.details["operation"] = operation
+
+
+def create_error(
+    error_class: Type[RobotOptimizerError],
+    message: str,
+    **kwargs: Any
+) -> RobotOptimizerError:
+    """Factory function to create errors with consistent formatting.
+    
+    Args:
+        error_class: The error class to instantiate.
+        message: Error message.
+        **kwargs: Additional arguments for the error class.
+        
+    Returns:
+        An instance of the specified error class.
+        
+    Example:
+        >>> error = create_error(
+        ...     AnalysisError,
+        ...     "Failed to analyze file",
+        ...     file_path=Path("test.robot"),
+        ...     analyzer="DeadCodeAnalyzer"
+        ... )
+    """
+    return error_class(message, **kwargs)

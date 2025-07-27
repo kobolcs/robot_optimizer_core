@@ -1,0 +1,182 @@
+# mkdocs.yml
+site_name: Robot Framework Optimizer Core
+site_description: Core analysis engine for Robot Framework test optimization
+site_author: RF Optimizer Team
+site_url: https://rf-optimizer.github.io/robot-framework-optimizer-core
+
+repo_url: https://github.com/rf-optimizer/robot-framework-optimizer-core
+repo_name: rf-optimizer/core
+edit_uri: edit/main/docs/
+
+copyright: Copyright &copy; 2024 Robot Framework Optimizer Team
+
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - navigation.prune
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - toc.follow
+    - toc.integrate
+    - search.suggest
+    - search.highlight
+    - search.share
+    - header.autohide
+    - announce.dismiss
+    - content.tabs.link
+    - content.code.annotate
+    - content.code.copy
+    - content.tooltips
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Roboto
+    code: Roboto Mono
+  favicon: assets/favicon.png
+  logo: assets/logo.png
+
+plugins:
+  - search:
+      separator: '[\s\-,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+      lang: en
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            docstring_section_style: table
+            show_source: true
+            show_bases: true
+            show_signature_annotations: true
+            separate_signature: true
+            members_order: source
+            merge_init_into_class: true
+            filters: ["!^_"]
+            inherited_members: true
+            summary: true
+            show_labels: true
+            annotations_path: brief
+  - autorefs
+  - git-revision-date-localized:
+      enable_creation_date: true
+      type: timeago
+  - minify:
+      minify_html: true
+      minify_js: true
+      minify_css: true
+      htmlmin_opts:
+        remove_comments: true
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+      toc_depth: 4
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+extra:
+  version:
+    provider: mike
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/rf-optimizer
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/robot-framework-optimizer-core/
+  analytics:
+    provider: google
+    property: G-XXXXXXXXXX
+
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/extra.js
+
+nav:
+  - Home: 
+    - index.md
+    - getting-started.md
+    - changelog.md
+  - User Guide:
+    - guide/index.md
+    - guide/installation.md
+    - guide/basic-usage.md
+    - guide/configuration.md
+    - guide/analyzers.md
+    - guide/findings.md
+  - API Reference:
+    - api/index.md
+    - api/analyzers.md
+    - api/domain.md
+    - api/exceptions.md
+    - api/plugin.md
+    - api/di.md
+    - api/metrics.md
+    - api/logging.md
+  - Extending:
+    - extending/index.md
+    - extending/custom-analyzers.md
+    - extending/plugins.md
+    - extending/pro-features.md
+  - Development:
+    - dev/contributing.md
+    - dev/architecture.md
+    - dev/testing.md
+    - dev/releasing.md
+
+watch:
+  - src/robot_optimizer_core
+  - docs

@@ -1,70 +1,417 @@
 # src/robot_optimizer_core/analyzers/flakiness.py
-"""Basic flakiness analyzer for Robot Framework tests."""
-from typing import List
+"""Flakiness analyzer for detecting intermittently failing tests.
 
-from .base_analyzer import BaseAnalyzer
+This analyzer identifies tests that fail inconsistently, which
+indicates timing issues, race conditions, or environmental dependencies.
+
+Example:
+    Using the flakiness analyzer::
+    
+        from robot_optimizer_core.analyzers import FlakinessAnalyzer
+        from robot_optimizer_core import TestFile
+        from robot_optimizer_core.repositories import TestResultRepository
+        
+        repo = TestResultRepository()  # Your implementation
+        analyzer = FlakinessAnalyzer(test_result_repository=repo)
+        
+        test_file = TestFile.from_path("tests/login.robot")
+        findings = analyzer.analyze(test_file)
+        
+        for finding in findings:
+            failure_rate = finding.context['failure_rate']
+            print(f"Flaky test: {failure_rate:.1%} failure rate")
+"""
+from __future__ import annotations
+
+from typing import Dict, List, Optional
+
+from ..config import get_settings
+from ..di import get_container
 from ..domain.entities import TestFile
-from ..domain.value_objects import Finding, Pattern, PatternType, Severity, Location
 from ..domain.repositories import TestResultRepository
+from ..domain.value_objects import (
+    Finding,
+    FlakinessStats,
+    Location,
+    Pattern,
+    PatternType,
+    Severity,
+)
+from ..exceptions import ConfigurationError
+from .base import BaseAnalyzer
 
 
 class FlakinessAnalyzer(BaseAnalyzer):
-    """Basic analyzer for detecting flaky tests.
+    """Analyzer for detecting flaky tests.
     
-    This Core version provides basic flakiness detection.
-    The Pro version adds trend analysis and root cause detection.
+    This analyzer uses historical test results to identify tests
+    that fail intermittently. The Pro version extends this with
+    root cause analysis and trend detection.
+    
+    Configuration:
+        days_back: Number of days of history to analyze (default: 30).
+        failure_threshold: Failure rate to consider flaky (default: 0.05).
+        min_runs: Minimum runs to determine flakiness (default: 4).
+        severity_thresholds: Dict mapping failure rate to severity.
     """
     
-    def __init__(self, test_result_repository: TestResultRepository):
-        self.test_result_repository = test_result_repository
+    def __init__(
+        self,
+        test_result_repository: Optional[TestResultRepository] = None,
+        config: Dict[str, any] = None
+    ) -> None:
+        """Initialize the analyzer.
+        
+        Args:
+            test_result_repository: Repository for test results.
+            config: Analyzer configuration.
+        """
+        super().__init__(config)
+        
+        # Get repository from DI if not provided
+        if test_result_repository is None:
+            container = get_container()
+            if container.has_service("test_result_repository"):
+                test_result_repository = container.resolve("test_result_repository")
+            else:
+                raise ConfigurationError(
+                    "TestResultRepository not provided and not found in DI container",
+                    config_key="test_result_repository"
+                )
+        
+        self._repository = test_result_repository
+        
+        # Get settings
+        settings = get_settings()
+        
+        # Configuration
+        self._days_back = self.get_config_value("days_back", 30)
+        self._failure_threshold = self.get_config_value(
+            "failure_threshold",
+            settings.flakiness_threshold
+        )
+        self._min_runs = self.get_config_value(
+            "min_runs",
+            settings.flakiness_min_runs
+        )
+        
+        # Severity thresholds
+        self._severity_thresholds = self.get_config_value(
+            "severity_thresholds",
+            {
+                "info": 0.05,     # 5% failure rate
+                "warning": 0.15,  # 15% failure rate
+                "error": 0.30     # 30% failure rate
+            }
+        )
     
     @property
     def name(self) -> str:
-        return "Flakiness Analyzer"
+        """Get analyzer name.
+        
+        Returns:
+            Analyzer name.
+        """
+        return "flakiness"
     
     @property
     def description(self) -> str:
+        """Get analyzer description.
+        
+        Returns:
+            Analyzer description.
+        """
         return "Detects tests that fail intermittently"
     
+    @property
+    def tags(self) -> List[str]:
+        """Get analyzer tags.
+        
+        Returns:
+            List of tags.
+        """
+        return ["stability", "reliability", "test-quality"]
+    
     def analyze(self, test_file: TestFile) -> List[Finding]:
-        """Analyze test file for flaky tests."""
+        """Analyze test file for flaky tests.
+        
+        Args:
+            test_file: The test file to analyze.
+            
+        Returns:
+            List of findings.
+        """
         findings = []
         
-        # Get flakiness statistics
-        stats_list = self.test_result_repository.get_flakiness_stats(
-            test_file.path, days_back=30
-        )
+        # Get flakiness statistics from repository
+        try:
+            stats_list = self._repository.get_flakiness_stats(
+                test_file.path,
+                days_back=self._days_back
+            )
+        except Exception as e:
+            self._logger.error(
+                f"Failed to get flakiness stats: {e}",
+                extra={"file": str(test_file.path)},
+                exc_info=True
+            )
+            # Return empty list on error - don't fail analysis
+            return findings
         
+        # Analyze each test's flakiness
         for stats in stats_list:
-            if stats.is_flaky and stats.failure_rate > 0.05:
-                severity = self._determine_severity(stats.failure_rate)
-                
-                pattern = Pattern(
-                    type=PatternType.INEFFICIENT_WAIT,
-                    name="Flaky Test",
-                    description=f"Test '{stats.test_name}' fails inconsistently",
-                    recommendation="Add explicit waits or fix race conditions",
-                    auto_fixable=False
-                )
-                
-                finding = Finding.create(
-                    pattern=pattern,
-                    severity=severity,
-                    location=Location(file_path=test_file.path, line=1),
-                    message=f"Flaky test: {stats.failure_rate:.1%} failure rate",
-                    test_name=stats.test_name,
-                    failure_rate=stats.failure_rate,
-                    total_runs=stats.total_runs
-                )
+            if self._is_flaky(stats):
+                finding = self._create_finding(stats, test_file)
                 findings.append(finding)
         
         return findings
     
+    def _is_flaky(self, stats: FlakinessStats) -> bool:
+        """Determine if test statistics indicate flakiness.
+        
+        Args:
+            stats: Test statistics.
+            
+        Returns:
+            True if test is flaky.
+        """
+        # Need minimum runs
+        if stats.total_runs < self._min_runs:
+            return False
+        
+        # Check failure rate
+        if stats.failure_rate <= 0 or stats.failure_rate >= 1:
+            # Always fails or always passes - not flaky
+            return False
+        
+        # Check against threshold
+        return stats.failure_rate >= self._failure_threshold
+    
+    def _create_finding(
+        self,
+        stats: FlakinessStats,
+        test_file: TestFile
+    ) -> Finding:
+        """Create a finding from flakiness statistics.
+        
+        Args:
+            stats: Flakiness statistics.
+            test_file: The test file.
+            
+        Returns:
+            Finding object.
+        """
+        severity = self._determine_severity(stats.failure_rate)
+        
+        # Create pattern
+        pattern = Pattern(
+            type=PatternType.INEFFICIENT_WAIT,  # Often the cause
+            name="Flaky Test",
+            description=f"Test '{stats.test_name}' fails inconsistently",
+            recommendation=self._get_recommendation(stats),
+            auto_fixable=False  # Can't auto-fix flakiness
+        )
+        
+        # Build detailed message
+        message_parts = [
+            f"Flaky test: {stats.failure_rate:.1%} failure rate",
+            f"({stats.failures}/{stats.total_runs} runs)"
+        ]
+        
+        if stats.last_failure:
+            message_parts.append(f"Last failed: {stats.last_failure.date()}")
+        
+        # Estimate time wasted
+        avg_investigation_hours = 0.25  # 15 minutes per failure
+        time_wasted = stats.failures * avg_investigation_hours
+        message_parts.append(f"Est. {time_wasted:.1f} hours wasted on failures")
+        
+        message = " - ".join(message_parts)
+        
+        # Try to find test location in file
+        line_number = self._find_test_line(test_file, stats.test_name)
+        
+        return Finding.create(
+            pattern=pattern,
+            severity=severity,
+            location=Location(
+                file_path=test_file.path,
+                line=line_number or 1
+            ),
+            message=message,
+            test_name=stats.test_name,
+            failure_rate=stats.failure_rate,
+            total_runs=stats.total_runs,
+            failures=stats.failures,
+            last_failure=stats.last_failure.isoformat() if stats.last_failure else None,
+            time_wasted_hours=time_wasted,
+            flakiness_category=self._categorize_flakiness(stats, test_file)
+        )
+    
     def _determine_severity(self, failure_rate: float) -> Severity:
-        """Determine severity based on failure rate."""
-        if failure_rate > 0.15:
+        """Determine severity based on failure rate.
+        
+        Args:
+            failure_rate: Test failure rate (0-1).
+            
+        Returns:
+            Severity level.
+        """
+        if failure_rate >= self._severity_thresholds["error"]:
             return Severity.ERROR
-        elif failure_rate > 0.05:
+        elif failure_rate >= self._severity_thresholds["warning"]:
             return Severity.WARNING
         else:
             return Severity.INFO
+    
+    def _get_recommendation(self, stats: FlakinessStats) -> str:
+        """Get recommendation based on flakiness pattern.
+        
+        Args:
+            stats: Flakiness statistics.
+            
+        Returns:
+            Recommendation text.
+        """
+        rate = stats.failure_rate
+        
+        if rate > 0.5:
+            return (
+                "Test fails more often than passes - investigate test logic "
+                "and prerequisites"
+            )
+        elif rate > 0.2:
+            return (
+                "High failure rate suggests timing issues - add explicit waits "
+                "and check test isolation"
+            )
+        elif rate > 0.1:
+            return (
+                "Moderate flakiness - check for race conditions and "
+                "environmental dependencies"
+            )
+        else:
+            return (
+                "Low but persistent flakiness - review wait conditions "
+                "and external dependencies"
+            )
+    
+    def _find_test_line(self, test_file: TestFile, test_name: str) -> Optional[int]:
+        """Find the line number where a test is defined.
+        
+        Args:
+            test_file: The test file.
+            test_name: Name of the test.
+            
+        Returns:
+            Line number or None if not found.
+        """
+        lines = test_file.content.splitlines()
+        in_test_cases = False
+        
+        for line_num, line in enumerate(lines, 1):
+            # Check for test cases section
+            if line.strip().startswith('***') and 'test case' in line.lower():
+                in_test_cases = True
+                continue
+            
+            # Check for other sections
+            if line.strip().startswith('***') and 'test case' not in line.lower():
+                in_test_cases = False
+                continue
+            
+            # Look for test name
+            if in_test_cases and not line.startswith((' ', '\t')):
+                if line.strip() == test_name:
+                    return line_num
+        
+        return None
+    
+    def _categorize_flakiness(
+        self,
+        stats: FlakinessStats,
+        test_file: TestFile
+    ) -> str:
+        """Categorize the type of flakiness.
+        
+        This is a simple categorization. The Pro version provides
+        more sophisticated root cause analysis.
+        
+        Args:
+            stats: Flakiness statistics.
+            test_file: The test file.
+            
+        Returns:
+            Flakiness category.
+        """
+        rate = stats.failure_rate
+        
+        # High failure rate - likely logic issue
+        if rate > 0.5:
+            return "logic_issue"
+        
+        # Check test name for hints
+        test_lower = stats.test_name.lower()
+        
+        if any(word in test_lower for word in ['ui', 'click', 'element', 'page']):
+            return "ui_timing"
+        
+        if any(word in test_lower for word in ['api', 'request', 'response']):
+            return "api_timing"
+        
+        if any(word in test_lower for word in ['database', 'db', 'query']):
+            return "database_timing"
+        
+        if any(word in test_lower for word in ['file', 'upload', 'download']):
+            return "file_operation"
+        
+        # Default
+        return "timing_issue"
+    
+    def validate_config(self) -> None:
+        """Validate analyzer configuration.
+        
+        Raises:
+            ConfigurationError: If configuration is invalid.
+        """
+        # Validate days_back
+        if self._days_back < 1:
+            raise ConfigurationError(
+                "days_back must be at least 1",
+                config_key="days_back",
+                provided_value=self._days_back
+            )
+        
+        # Validate failure_threshold
+        if not 0 < self._failure_threshold < 1:
+            raise ConfigurationError(
+                "failure_threshold must be between 0 and 1",
+                config_key="failure_threshold",
+                provided_value=self._failure_threshold
+            )
+        
+        # Validate min_runs
+        if self._min_runs < 2:
+            raise ConfigurationError(
+                "min_runs must be at least 2",
+                config_key="min_runs",
+                provided_value=self._min_runs
+            )
+        
+        # Validate severity thresholds
+        thresholds = self._severity_thresholds
+        
+        for key in ["info", "warning", "error"]:
+            if key not in thresholds:
+                raise ConfigurationError(
+                    f"Missing severity threshold: {key}",
+                    config_key="severity_thresholds"
+                )
+            
+            value = thresholds[key]
+            if not 0 < value <= 1:
+                raise ConfigurationError(
+                    f"Severity threshold '{key}' must be between 0 and 1",
+                    config_key=f"severity_thresholds.{key}",
+                    provided_value=value
+                )
