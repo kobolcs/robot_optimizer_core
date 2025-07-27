@@ -24,13 +24,39 @@ from __future__ import annotations
 
 import fnmatch
 import os
+from collections.abc import Iterator
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator, List, Optional, Set
+from typing import TypeGuard, Protocol, runtime_checkable
 
 from ..config import get_settings
 from ..exceptions import FileNotFoundError as RFFileNotFoundError
 from ..logging import get_logger
 from ..metrics import get_metrics
+
+
+@runtime_checkable
+class AnalyzableFile(Protocol):
+    """Protocol for files that can be analyzed."""
+    
+    def exists(self) -> bool: ...
+    def is_file(self) -> bool: ...
+    def stat(self) -> os.stat_result: ...
+    def __str__(self) -> str: ...
+
+
+@dataclass(slots=True)
+class FileStats:
+    """Statistics about discovered files."""
+    total_files: int = 0
+    total_size_bytes: int = 0
+    excluded_files: int = 0
+    invalid_files: int = 0
+    
+    @property
+    def total_size_mb(self) -> float:
+        """Get total size in megabytes."""
+        return self.total_size_bytes / (1024 * 1024)
 
 
 class FileDiscoveryService:
@@ -46,9 +72,11 @@ class FileDiscoveryService:
         settings: Configuration settings.
     """
     
+    __slots__ = ('settings', 'logger', 'metrics', '_stats')
+    
     def __init__(
         self,
-        settings: Optional["Settings"] = None
+        settings: Settings | None = None
     ) -> None:
         """Initialize the file discovery service.
         
@@ -58,16 +86,17 @@ class FileDiscoveryService:
         self.settings = settings or get_settings()
         self.logger = get_logger(__name__)
         self.metrics = get_metrics()
+        self._stats = FileStats()
     
     def find_files(
         self,
         root_path: Path,
-        patterns: Optional[List[str]] = None,
-        exclude_patterns: Optional[List[str]] = None,
+        patterns: list[str] | None = None,
+        exclude_patterns: list[str] | None = None,
         recursive: bool = True,
         follow_symlinks: bool = False,
-        max_depth: Optional[int] = None
-    ) -> List[Path]:
+        max_depth: int | None = None
+    ) -> list[Path]:
         """Find all matching files in a directory.
         
         Args:
@@ -84,16 +113,16 @@ class FileDiscoveryService:
         Raises:
             FileNotFoundError: If root path doesn't exist.
         """
+        # Reset stats
+        self._stats = FileStats()
+        
         # Validate root path
         if not root_path.exists():
             raise RFFileNotFoundError(root_path)
         
         # Use default patterns if not provided
-        if patterns is None:
-            patterns = self.settings.file_patterns
-        
-        if exclude_patterns is None:
-            exclude_patterns = self.settings.exclude_patterns
+        patterns = patterns or self.settings.file_patterns
+        exclude_patterns = exclude_patterns or self.settings.exclude_patterns
         
         self.logger.info(
             "Starting file discovery",
@@ -122,22 +151,28 @@ class FileDiscoveryService:
             "File discovery complete",
             extra={
                 "root": str(root_path),
-                "files_found": len(files)
+                "files_found": len(files),
+                "stats": {
+                    "total_size_mb": self._stats.total_size_mb,
+                    "excluded": self._stats.excluded_files,
+                    "invalid": self._stats.invalid_files
+                }
             }
         )
         
         self.metrics.gauge("discovery.files_found", len(files))
+        self.metrics.gauge("discovery.total_size_mb", self._stats.total_size_mb)
         
         return files
     
     def _discover_files(
         self,
         root_path: Path,
-        patterns: List[str],
-        exclude_patterns: List[str],
+        patterns: list[str],
+        exclude_patterns: list[str],
         recursive: bool,
         follow_symlinks: bool,
-        max_depth: Optional[int],
+        max_depth: int | None,
         current_depth: int = 0
     ) -> Iterator[Path]:
         """Discover files matching patterns.
@@ -180,14 +215,19 @@ class FileDiscoveryService:
                     f"Excluded: {entry}",
                     extra={"path": str(entry)}
                 )
+                self._stats.excluded_files += 1
                 continue
             
             # Process files
             if entry.is_file():
                 if self._matches_patterns(entry, patterns):
                     if self._is_valid_file(entry):
+                        self._stats.total_files += 1
+                        if stat := self._safe_stat(entry):
+                            self._stats.total_size_bytes += stat.st_size
                         yield entry
                     else:
+                        self._stats.invalid_files += 1
                         self.logger.debug(
                             f"Skipped invalid file: {entry}",
                             extra={"path": str(entry)}
@@ -210,7 +250,7 @@ class FileDiscoveryService:
                     current_depth + 1
                 )
     
-    def _matches_patterns(self, path: Path, patterns: List[str]) -> bool:
+    def _matches_patterns(self, path: Path, patterns: list[str]) -> bool:
         """Check if file matches any of the patterns.
         
         Args:
@@ -223,16 +263,17 @@ class FileDiscoveryService:
         name = path.name
         
         for pattern in patterns:
+            # Standard match
             if fnmatch.fnmatch(name, pattern):
                 return True
             
-            # Also check with case-insensitive matching
+            # Case-insensitive match
             if fnmatch.fnmatch(name.lower(), pattern.lower()):
                 return True
         
         return False
     
-    def _should_exclude(self, path: Path, exclude_patterns: List[str]) -> bool:
+    def _should_exclude(self, path: Path, exclude_patterns: list[str]) -> bool:
         """Check if path should be excluded.
         
         Args:
@@ -251,9 +292,8 @@ class FileDiscoveryService:
                 return True
             
             # Check against relative path parts
-            for part in path.parts:
-                if fnmatch.fnmatch(part, pattern):
-                    return True
+            if any(fnmatch.fnmatch(part, pattern) for part in path.parts):
+                return True
             
             # Special handling for directory patterns
             if path.is_dir() and pattern.endswith("/"):
@@ -272,74 +312,98 @@ class FileDiscoveryService:
         Returns:
             True if file is valid.
         """
-        try:
-            # Check file size
-            size = path.stat().st_size
+        # Check file size
+        if stat := self._safe_stat(path):
             max_size = self.settings.max_file_size_bytes
             
-            if size > max_size:
+            if stat.st_size > max_size:
                 self.logger.warning(
-                    f"File too large: {path} ({size} bytes)",
+                    f"File too large: {path} ({stat.st_size} bytes)",
                     extra={
                         "path": str(path),
-                        "size": size,
+                        "size": stat.st_size,
                         "max_size": max_size
                     }
                 )
                 return False
+        
+        # Check if file is readable
+        if not os.access(path, os.R_OK):
+            self.logger.warning(
+                f"File not readable: {path}",
+                extra={"path": str(path)}
+            )
+            return False
+        
+        # Quick content check - ensure it's a text file
+        if not self._is_text_file(path):
+            return False
+        
+        return True
+    
+    def _safe_stat(self, path: Path) -> os.stat_result | None:
+        """Safely get file stats.
+        
+        Args:
+            path: File path.
             
-            # Check if file is readable
-            if not os.access(path, os.R_OK):
-                self.logger.warning(
-                    f"File not readable: {path}",
-                    extra={"path": str(path)}
-                )
-                return False
+        Returns:
+            File stats or None if error.
+        """
+        try:
+            return path.stat()
+        except Exception as e:
+            self.logger.error(
+                f"Error getting file stats: {path}",
+                extra={"path": str(path), "error": str(e)}
+            )
+            return None
+    
+    def _is_text_file(self, path: Path) -> bool:
+        """Check if file is a text file.
+        
+        Args:
+            path: File path to check.
             
-            # Quick content check - ensure it's a text file
-            try:
-                with open(path, 'rb') as f:
-                    # Read first 1KB
-                    chunk = f.read(1024)
-                    
-                    # Check for null bytes (binary file)
-                    if b'\x00' in chunk:
+        Returns:
+            True if file appears to be text.
+        """
+        try:
+            with open(path, 'rb') as f:
+                # Read first 1KB
+                chunk = f.read(1024)
+                
+                # Check for null bytes (binary file)
+                if b'\x00' in chunk:
+                    self.logger.debug(
+                        f"Binary file detected: {path}",
+                        extra={"path": str(path)}
+                    )
+                    return False
+                
+                # Try to decode as UTF-8
+                try:
+                    chunk.decode('utf-8')
+                except UnicodeDecodeError:
+                    # Try other encodings
+                    for encoding in ['latin-1', 'utf-16']:
+                        try:
+                            chunk.decode(encoding)
+                            break
+                        except UnicodeDecodeError:
+                            continue
+                    else:
                         self.logger.debug(
-                            f"Binary file detected: {path}",
+                            f"Unable to decode file: {path}",
                             extra={"path": str(path)}
                         )
                         return False
-                    
-                    # Try to decode as UTF-8
-                    try:
-                        chunk.decode('utf-8')
-                    except UnicodeDecodeError:
-                        # Try other encodings
-                        for encoding in ['latin-1', 'utf-16']:
-                            try:
-                                chunk.decode(encoding)
-                                break
-                            except UnicodeDecodeError:
-                                continue
-                        else:
-                            self.logger.debug(
-                                f"Unable to decode file: {path}",
-                                extra={"path": str(path)}
-                            )
-                            return False
-            
-            except Exception as e:
-                self.logger.error(
-                    f"Error checking file content: {path}",
-                    extra={"path": str(path), "error": str(e)}
-                )
-                return False
             
             return True
             
         except Exception as e:
             self.logger.error(
-                f"Error validating file: {path}",
+                f"Error checking file content: {path}",
                 extra={"path": str(path), "error": str(e)}
             )
             return False
@@ -347,8 +411,8 @@ class FileDiscoveryService:
     def count_files(
         self,
         root_path: Path,
-        patterns: Optional[List[str]] = None,
-        exclude_patterns: Optional[List[str]] = None,
+        patterns: list[str] | None = None,
+        exclude_patterns: list[str] | None = None,
         recursive: bool = True
     ) -> int:
         """Count matching files without loading them.
@@ -364,19 +428,16 @@ class FileDiscoveryService:
         Returns:
             Number of matching files.
         """
-        count = 0
-        
-        for _ in self._discover_files(
-            root_path,
-            patterns or self.settings.file_patterns,
-            exclude_patterns or self.settings.exclude_patterns,
-            recursive,
-            follow_symlinks=False,
-            max_depth=None
-        ):
-            count += 1
-        
-        return count
+        return sum(
+            1 for _ in self._discover_files(
+                root_path,
+                patterns or self.settings.file_patterns,
+                exclude_patterns or self.settings.exclude_patterns,
+                recursive,
+                follow_symlinks=False,
+                max_depth=None
+            )
+        )
     
     def estimate_analysis_time(
         self,
@@ -408,3 +469,33 @@ class FileDiscoveryService:
         )
         
         return file_count * time_per_file
+
+
+def is_robot_file(path: Path) -> TypeGuard[Path]:
+    """Type guard to check if path is a Robot Framework file.
+    
+    Args:
+        path: Path to check.
+        
+    Returns:
+        True if path is a .robot or .resource file.
+    """
+    return path.suffix.lower() in {'.robot', '.resource'}
+
+
+def get_file_stats(files: list[Path]) -> FileStats:
+    """Get statistics about a list of files.
+    
+    Args:
+        files: List of file paths.
+        
+    Returns:
+        File statistics.
+    """
+    stats = FileStats(total_files=len(files))
+    
+    for file in files:
+        if file.exists():
+            stats.total_size_bytes += file.stat().st_size
+    
+    return stats

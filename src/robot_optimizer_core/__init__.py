@@ -25,12 +25,12 @@ Example:
 
 Attributes:
     __version__ (str): The version of the Core package.
-    __all__ (List[str]): Public API exports.
+    __all__ (list[str]): Public API exports.
 
 """
 from __future__ import annotations
 
-from typing import List, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 # Version
 from .__version__ import __version__, __version_info__
@@ -170,7 +170,7 @@ __all__ = [
 ]
 
 
-def __dir__() -> List[str]:
+def __dir__() -> list[str]:
     """Return list of public attributes.
     
     Returns:

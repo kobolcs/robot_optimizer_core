@@ -23,23 +23,27 @@ from __future__ import annotations
 
 import inspect
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Optional, Type, TypeVar, Union
+from dataclasses import dataclass, field
+from enum import StrEnum, auto
+from typing import Any, Callable, TypeVar, TypeAlias
 
 from .exceptions import ConfigurationError
 from .logging import get_logger
 
 T = TypeVar("T")
+ServiceFactory: TypeAlias = type[Any] | Callable[..., Any]
 
 logger = get_logger(__name__)
 
 
-class ServiceLifetime:
+class ServiceLifetime(StrEnum):
     """Service lifetime options for dependency injection."""
-    TRANSIENT = "transient"  # New instance each time
-    SINGLETON = "singleton"  # Single instance for container lifetime
-    SCOPED = "scoped"       # Single instance per scope (Pro feature)
+    TRANSIENT = auto()  # New instance each time
+    SINGLETON = auto()  # Single instance for container lifetime
+    SCOPED = auto()     # Single instance per scope (Pro feature)
 
 
+@dataclass
 class ServiceDescriptor:
     """Describes a registered service.
     
@@ -49,24 +53,10 @@ class ServiceDescriptor:
         lifetime: Service lifetime (transient, singleton, scoped).
         instance: Cached instance for singletons.
     """
-    
-    def __init__(
-        self,
-        service_type: str,
-        implementation: Union[Type[Any], Callable[..., Any]],
-        lifetime: str = ServiceLifetime.TRANSIENT
-    ) -> None:
-        """Initialize the service descriptor.
-        
-        Args:
-            service_type: Service key or interface name.
-            implementation: Implementation class or factory function.
-            lifetime: Service lifetime.
-        """
-        self.service_type = service_type
-        self.implementation = implementation
-        self.lifetime = lifetime
-        self.instance: Optional[Any] = None
+    service_type: str
+    implementation: ServiceFactory
+    lifetime: ServiceLifetime = ServiceLifetime.TRANSIENT
+    instance: Any | None = field(default=None, init=False)
 
 
 class Container:
@@ -81,21 +71,23 @@ class Container:
         resolving: Stack to detect circular dependencies.
     """
     
-    def __init__(self, parent: Optional["Container"] = None) -> None:
+    __slots__ = ('services', 'parent', 'resolving')
+    
+    def __init__(self, parent: Container | None = None) -> None:
         """Initialize the container.
         
         Args:
             parent: Parent container for hierarchical resolution.
         """
-        self.services: Dict[str, ServiceDescriptor] = {}
+        self.services: dict[str, ServiceDescriptor] = {}
         self.parent = parent
         self.resolving: list[str] = []
     
     def register(
         self,
         service_type: str,
-        implementation: Union[Type[Any], Callable[..., Any]],
-        lifetime: str = ServiceLifetime.TRANSIENT,
+        implementation: ServiceFactory,
+        lifetime: ServiceLifetime = ServiceLifetime.TRANSIENT,
         override: bool = False
     ) -> None:
         """Register a service.
@@ -135,7 +127,7 @@ class Container:
     def register_singleton(
         self,
         service_type: str,
-        implementation: Union[Type[Any], Callable[..., Any]],
+        implementation: ServiceFactory,
         override: bool = False
     ) -> None:
         """Register a singleton service.
@@ -167,8 +159,10 @@ class Container:
         if service_type in self.services:
             self.services[service_type].instance = instance
     
-    def resolve(self, service_type: str) -> Any:
-        """Resolve a service.
+    def resolve[T](self, service_type: str) -> T:
+        """Resolve a service with type safety.
+        
+        Uses PEP 695 type parameters for better type inference.
         
         Args:
             service_type: Service key to resolve.
@@ -180,7 +174,7 @@ class Container:
             ConfigurationError: If service not found or circular dependency detected.
             
         Example:
-            >>> analyzer = container.resolve("analyzer")
+            >>> analyzer = container.resolve[BaseAnalyzer]("analyzer")
         """
         # Check for circular dependencies
         if service_type in self.resolving:
@@ -228,7 +222,7 @@ class Container:
         finally:
             self.resolving.remove(service_type)
     
-    def resolve_optional(self, service_type: str, default: Any = None) -> Any:
+    def resolve_optional[T](self, service_type: str, default: T | None = None) -> T | None:
         """Resolve a service or return default if not found.
         
         Args:
@@ -267,7 +261,7 @@ class Container:
             services.extend(self.parent.list_services())
         return sorted(set(services))
     
-    def create_scope(self) -> "Container":
+    def create_scope(self) -> Container:
         """Create a child container scope.
         
         The child container inherits registrations from the parent
@@ -304,7 +298,7 @@ class Container:
         # Otherwise, just return it
         return implementation
     
-    def _create_with_injection(self, cls: Type[T]) -> T:
+    def _create_with_injection[T](self, cls: type[T]) -> T:
         """Create an instance with constructor injection.
         
         This is a basic implementation that tries to resolve
@@ -345,7 +339,7 @@ class Container:
 
 
 # Global container instance
-_container: Optional[Container] = None
+_container: Container | None = None
 
 
 def get_container() -> Container:

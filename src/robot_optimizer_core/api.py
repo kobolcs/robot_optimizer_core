@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Any, TYPE_CHECKING
 
 from .analyzers import get_analyzer, list_analyzers
 from .config import get_settings
@@ -38,14 +38,18 @@ from .logging import get_logger, log_analysis_complete, log_analysis_start
 from .metrics import get_metrics
 from .parsers import RobotASTParser
 
+if TYPE_CHECKING:
+    from .analyzers import BaseAnalyzer
+    from .config import Settings
+
 logger = get_logger(__name__)
 
 
 def analyze_file(
-    file_path: Union[str, Path],
-    analyzers: Optional[List[Union[str, "BaseAnalyzer"]]] = None,
-    settings: Optional["Settings"] = None
-) -> List[Finding]:
+    file_path: str | Path,
+    analyzers: list[str | BaseAnalyzer] | None = None,
+    settings: Settings | None = None
+) -> list[Finding]:
     """Analyze a single Robot Framework file.
     
     This is the main entry point for analyzing individual files.
@@ -95,7 +99,7 @@ def analyze_file(
     analyzer_instances = _get_analyzer_instances(analyzers, settings)
     
     # Run analysis
-    all_findings: List[Finding] = []
+    all_findings: list[Finding] = []
     
     for analyzer in analyzer_instances:
         analyzer_name = analyzer.name
@@ -138,14 +142,14 @@ def analyze_file(
 
 
 def analyze_directory(
-    directory_path: Union[str, Path],
-    patterns: Optional[List[str]] = None,
-    exclude_patterns: Optional[List[str]] = None,
+    directory_path: str | Path,
+    patterns: list[str] | None = None,
+    exclude_patterns: list[str] | None = None,
     recursive: bool = True,
-    analyzers: Optional[List[Union[str, "BaseAnalyzer"]]] = None,
-    settings: Optional["Settings"] = None,
+    analyzers: list[str | BaseAnalyzer] | None = None,
+    settings: Settings | None = None,
     fail_fast: bool = False
-) -> Dict[Path, List[Finding]]:
+) -> dict[Path, list[Finding]]:
     """Analyze all Robot Framework files in a directory.
     
     This function discovers and analyzes all matching files in a directory,
@@ -217,8 +221,8 @@ def analyze_directory(
     )
     
     # Analyze each file
-    results: Dict[Path, List[Finding]] = {}
-    errors: List[tuple[Path, Exception]] = []
+    results: dict[Path, list[Finding]] = {}
+    errors: list[tuple[Path, Exception]] = []
     
     for file_path in files:
         try:
@@ -254,14 +258,22 @@ def analyze_directory(
     metrics.gauge("batch.files_failed", len(errors))
     metrics.gauge("batch.total_findings", total_findings)
     
+    # Use ExceptionGroup for multiple errors (Python 3.11+)
+    if errors and hasattr(builtins, 'ExceptionGroup'):
+        error_messages = [f"{path}: {e}" for path, e in errors]
+        raise ExceptionGroup(
+            f"Analysis failed for {len(errors)} files", 
+            [e for _, e in errors]
+        )
+    
     return results
 
 
 def analyze_suite(
-    suite_path: Union[str, Path],
-    analyzers: Optional[List[Union[str, "BaseAnalyzer"]]] = None,
-    settings: Optional["Settings"] = None
-) -> Dict[str, Any]:
+    suite_path: str | Path,
+    analyzers: list[str | BaseAnalyzer] | None = None,
+    settings: Settings | None = None
+) -> dict[str, Any]:
     """Analyze a Robot Framework test suite with AST parsing.
     
     This function provides more detailed analysis using the AST parser,
@@ -286,14 +298,15 @@ def analyze_suite(
     path = Path(suite_path)
     
     # Single file or directory?
-    if path.is_file():
-        files = [path]
-    else:
+    files = [path] if path.is_file() else None
+    
+    if files is None:
         container = get_container()
         discovery = container.resolve("file_discovery")
         files = discovery.find_files(path)
     
     # Parse suite structure
+    container = get_container()
     parser = container.resolve("parser")
     suite_info = {
         "files": len(files),
@@ -303,8 +316,8 @@ def analyze_suite(
     }
     
     # Analyze files and collect suite info
-    all_findings: List[Finding] = []
-    file_findings: Dict[Path, List[Finding]] = {}
+    all_findings: list[Finding] = []
+    file_findings: dict[Path, list[Finding]] = {}
     
     for file_path in files:
         # Load and parse
@@ -362,9 +375,9 @@ def analyze_suite(
 
 
 def _get_analyzer_instances(
-    analyzers: Optional[List[Union[str, "BaseAnalyzer"]]],
-    settings: "Settings"
-) -> List["BaseAnalyzer"]:
+    analyzers: list[str | BaseAnalyzer] | None,
+    settings: Settings
+) -> list[BaseAnalyzer]:
     """Get analyzer instances from names or objects.
     
     Args:
@@ -381,11 +394,12 @@ def _get_analyzer_instances(
     
     instances = []
     for analyzer in analyzers:
-        if isinstance(analyzer, str):
-            # Get by name
-            instances.append(get_analyzer(analyzer))
-        else:
-            # Already an instance
-            instances.append(analyzer)
+        match analyzer:
+            case str():
+                # Get by name
+                instances.append(get_analyzer(analyzer))
+            case _:
+                # Already an instance
+                instances.append(analyzer)
     
     return instances

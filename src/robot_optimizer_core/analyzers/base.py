@@ -19,7 +19,7 @@ Example:
             def description(self) -> str:
                 return "My custom analyzer"
             
-            def analyze(self, test_file: TestFile) -> List[Finding]:
+            def analyze(self, test_file: TestFile) -> list[Finding]:
                 findings = []
                 # Analysis logic here
                 return findings
@@ -27,7 +27,7 @@ Example:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ..domain.entities import TestFile
 from ..domain.value_objects import Finding
@@ -50,9 +50,11 @@ class BaseAnalyzer(ABC):
         metrics_enabled: Whether to collect metrics for this analyzer.
     """
     
+    __slots__ = ('config', 'metrics_enabled', '_metrics', '_logger')
+    
     def __init__(
         self,
-        config: Optional[Dict[str, Any]] = None,
+        config: dict[str, Any] | None = None,
         metrics_enabled: bool = True
     ) -> None:
         """Initialize the analyzer.
@@ -106,7 +108,7 @@ class BaseAnalyzer(ABC):
         return "1.0.0"
     
     @property
-    def tags(self) -> List[str]:
+    def tags(self) -> list[str]:
         """Get analyzer tags for categorization.
         
         Subclasses can override this to provide tags.
@@ -128,7 +130,7 @@ class BaseAnalyzer(ABC):
         return False
     
     @abstractmethod
-    def analyze(self, test_file: TestFile) -> List[Finding]:
+    def analyze(self, test_file: TestFile) -> list[Finding]:
         """Analyze a test file and return findings.
         
         This is the main method that subclasses must implement.
@@ -161,8 +163,8 @@ class BaseAnalyzer(ABC):
     def post_analyze(
         self,
         test_file: TestFile,
-        findings: List[Finding]
-    ) -> List[Finding]:
+        findings: list[Finding]
+    ) -> list[Finding]:
         """Hook called after analysis.
         
         Subclasses can override this to perform cleanup or
@@ -189,7 +191,7 @@ class BaseAnalyzer(ABC):
         """
         pass
     
-    def safe_analyze(self, test_file: TestFile) -> List[Finding]:
+    def safe_analyze(self, test_file: TestFile) -> list[Finding]:
         """Safely analyze a file with full error handling.
         
         This method wraps the analyze() method with error handling,
@@ -269,9 +271,9 @@ class BaseAnalyzer(ABC):
     
     def _validate_findings(
         self,
-        findings: List[Finding],
+        findings: list[Finding],
         test_file: TestFile
-    ) -> List[Finding]:
+    ) -> list[Finding]:
         """Validate findings from analysis.
         
         This ensures all findings have correct file paths and
@@ -313,16 +315,16 @@ class BaseAnalyzer(ABC):
         
         return validated
     
-    def get_config_value(
+    def get_config_value[T](
         self,
         key: str,
-        default: Any = None,
+        default: T | None = None,
         required: bool = False
-    ) -> Any:
-        """Get a configuration value.
+    ) -> T | Any:
+        """Get a configuration value with type safety.
         
         Convenience method for accessing configuration with
-        defaults and validation.
+        defaults and validation. Uses PEP 695 type parameters.
         
         Args:
             key: Configuration key.

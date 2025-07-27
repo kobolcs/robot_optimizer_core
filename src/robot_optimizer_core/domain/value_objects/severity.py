@@ -75,11 +75,14 @@ class Severity(IntEnum):
             >>> print(f"{Severity.ERROR.emoji} Critical issue")
             ❌ Critical issue
         """
-        return {
-            Severity.ERROR: "❌",
-            Severity.WARNING: "⚠️",
-            Severity.INFO: "ℹ️"
-        }[self]
+        # Using pattern matching (Python 3.10+)
+        match self:
+            case Severity.ERROR:
+                return "❌"
+            case Severity.WARNING:
+                return "⚠️"
+            case Severity.INFO:
+                return "ℹ️"
     
     @property
     def color(self) -> str:
@@ -90,11 +93,13 @@ class Severity(IntEnum):
         Returns:
             Color name for this severity.
         """
-        return {
-            Severity.ERROR: "red",
-            Severity.WARNING: "yellow",
-            Severity.INFO: "blue"
-        }[self]
+        match self:
+            case Severity.ERROR:
+                return "red"
+            case Severity.WARNING:
+                return "yellow"
+            case Severity.INFO:
+                return "blue"
     
     @property
     def ansi_code(self) -> str:
@@ -103,11 +108,13 @@ class Severity(IntEnum):
         Returns:
             ANSI escape code for this severity's color.
         """
-        return {
-            Severity.ERROR: "\033[91m",    # Bright red
-            Severity.WARNING: "\033[93m",  # Bright yellow
-            Severity.INFO: "\033[94m"      # Bright blue
-        }[self]
+        match self:
+            case Severity.ERROR:
+                return "\033[91m"    # Bright red
+            case Severity.WARNING:
+                return "\033[93m"    # Bright yellow
+            case Severity.INFO:
+                return "\033[94m"    # Bright blue
     
     @property
     def priority(self) -> int:
@@ -129,20 +136,22 @@ class Severity(IntEnum):
         Returns:
             Description of what this severity level means.
         """
-        return {
-            Severity.ERROR: (
-                "Critical issues that break best practices, "
-                "cause test failures, or significantly impact quality"
-            ),
-            Severity.WARNING: (
-                "Important issues that should be addressed to improve "
-                "test reliability and maintainability"
-            ),
-            Severity.INFO: (
-                "Minor improvements and suggestions that can enhance "
-                "test suite quality"
-            )
-        }[self]
+        match self:
+            case Severity.ERROR:
+                return (
+                    "Critical issues that break best practices, "
+                    "cause test failures, or significantly impact quality"
+                )
+            case Severity.WARNING:
+                return (
+                    "Important issues that should be addressed to improve "
+                    "test reliability and maintainability"
+                )
+            case Severity.INFO:
+                return (
+                    "Minor improvements and suggestions that can enhance "
+                    "test suite quality"
+                )
     
     @property
     def exit_code(self) -> int:
@@ -154,11 +163,13 @@ class Severity(IntEnum):
         Returns:
             Suggested exit code.
         """
-        return {
-            Severity.ERROR: 2,    # Errors found
-            Severity.WARNING: 1,  # Warnings found
-            Severity.INFO: 0      # Only info, success
-        }[self]
+        match self:
+            case Severity.ERROR:
+                return 2    # Errors found
+            case Severity.WARNING:
+                return 1    # Warnings found
+            case Severity.INFO:
+                return 0    # Only info, success
     
     @classmethod
     def from_string(cls, value: str) -> Severity:

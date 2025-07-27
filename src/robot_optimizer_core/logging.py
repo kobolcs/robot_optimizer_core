@@ -19,11 +19,16 @@ from __future__ import annotations
 import json
 import logging
 import sys
+from contextvars import ContextVar
 from datetime import datetime, timezone
+from functools import cache
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 from .metrics import get_metrics
+
+# Context variable for logging context
+logging_context: ContextVar[dict[str, Any]] = ContextVar('logging_context', default={})
 
 
 class StructuredFormatter(logging.Formatter):
@@ -56,6 +61,10 @@ class StructuredFormatter(logging.Formatter):
         # Add exception info if present
         if record.exc_info:
             log_entry["exception"] = self.formatException(record.exc_info)
+        
+        # Add context from context variable
+        if context := logging_context.get():
+            log_entry["context"] = context
         
         # Add extra fields
         extra_fields = {
@@ -105,7 +114,9 @@ class LoggerAdapter(logging.LoggerAdapter):
     included in all log messages.
     """
     
-    def __init__(self, logger: logging.Logger, extra: Dict[str, Any]) -> None:
+    __slots__ = ('logger', 'extra', '_context')
+    
+    def __init__(self, logger: logging.Logger, extra: dict[str, Any]) -> None:
         """Initialize the adapter.
         
         Args:
@@ -121,7 +132,7 @@ class LoggerAdapter(logging.LoggerAdapter):
         Args:
             **kwargs: Context key-value pairs.
         """
-        self._context.update(kwargs)
+        self._context |= kwargs  # Dictionary merge operator
         self.extra = self._context.copy()
     
     def remove_context(self, *keys: str) -> None:
@@ -134,7 +145,7 @@ class LoggerAdapter(logging.LoggerAdapter):
             self._context.pop(key, None)
         self.extra = self._context.copy()
     
-    def with_context(self, **kwargs: Any) -> "LoggerAdapter":
+    def with_context(self, **kwargs: Any) -> LoggerAdapter:
         """Create a new adapter with additional context.
         
         Args:
@@ -143,22 +154,20 @@ class LoggerAdapter(logging.LoggerAdapter):
         Returns:
             New adapter with combined context.
         """
-        new_context = self._context.copy()
-        new_context.update(kwargs)
+        new_context = self._context | kwargs  # Dictionary merge
         return LoggerAdapter(self.logger, new_context)
 
 
 # Global logging configuration
-_loggers: Dict[str, LoggerAdapter] = {}
 _root_logger_configured = False
 
 
 def configure_logging(
-    level: Union[str, int] = logging.INFO,
+    level: str | int = logging.INFO,
     format_json: bool = True,
-    log_file: Optional[Path] = None,
+    log_file: Path | None = None,
     enable_metrics: bool = True,
-    extra_handlers: Optional[list[logging.Handler]] = None
+    extra_handlers: list[logging.Handler] | None = None
 ) -> None:
     """Configure the logging system.
     
@@ -228,14 +237,16 @@ def configure_logging(
     _root_logger_configured = True
 
 
+@cache
 def get_logger(
     name: str,
-    context: Optional[Dict[str, Any]] = None
+    context: dict[str, Any] | None = None
 ) -> LoggerAdapter:
     """Get a logger with optional context.
     
     This function returns a logger adapter that can include persistent
-    context in all log messages. The logger is cached for efficiency.
+    context in all log messages. The logger is cached for efficiency
+    using functools.cache (Python 3.9+).
     
     Args:
         name: Logger name (usually __name__).
@@ -252,17 +263,9 @@ def get_logger(
     if not _root_logger_configured:
         configure_logging()
     
-    # Return cached logger if exists
-    if name in _loggers and not context:
-        return _loggers[name]
-    
     # Create new logger
     logger = logging.getLogger(name)
     adapter = LoggerAdapter(logger, context or {})
-    
-    # Cache if no context
-    if not context:
-        _loggers[name] = adapter
     
     return adapter
 
@@ -270,7 +273,7 @@ def get_logger(
 def log_analysis_start(
     file_path: Path,
     analyzer: str,
-    logger: Optional[LoggerAdapter] = None
+    logger: LoggerAdapter | None = None
 ) -> None:
     """Log the start of file analysis.
     
@@ -300,7 +303,7 @@ def log_analysis_complete(
     analyzer: str,
     findings_count: int,
     duration_seconds: float,
-    logger: Optional[LoggerAdapter] = None
+    logger: LoggerAdapter | None = None
 ) -> None:
     """Log the completion of file analysis.
     
@@ -330,8 +333,8 @@ def log_analysis_complete(
 
 def log_error(
     error: Exception,
-    context: Dict[str, Any],
-    logger: Optional[LoggerAdapter] = None
+    context: dict[str, Any],
+    logger: LoggerAdapter | None = None
 ) -> None:
     """Log an error with context.
     
