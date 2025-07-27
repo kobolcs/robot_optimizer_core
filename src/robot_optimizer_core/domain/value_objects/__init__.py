@@ -1,4 +1,9 @@
-"""Core value objects."""
+# src/robot_optimizer_core/domain/value_objects/__init__.py
+"""Core value objects for Robot Framework Optimizer.
+
+These immutable objects represent core concepts in the domain.
+Advanced value objects like OptimizationSuggestion are in the Pro package.
+"""
 from .severity import Severity
 from .location import Location
 from .pattern import Pattern, PatternType

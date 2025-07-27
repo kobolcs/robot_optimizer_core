@@ -1,4 +1,4 @@
-# src/robot_optimizer/infrastructure/parsers/robot_ast_parser.py
+# src/robot_optimizer_core/parsers/robot_ast_parser.py
 """Robot Framework AST parser using official robot.parsing library."""
 from io import StringIO
 from pathlib import Path

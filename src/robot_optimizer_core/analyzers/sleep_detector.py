@@ -1,3 +1,4 @@
+# src/robot_optimizer_core/analyzers/sleep_detector.py
 """Sleep pattern detector for Robot Framework tests."""
 import re
 from decimal import Decimal
@@ -19,24 +20,27 @@ class SleepDetector(BaseAnalyzer):
     def description(self) -> str:
         return "Finds Sleep keyword usage that makes tests slow and fragile"
     
+    def __init__(self):
+        # Pattern to match Sleep keyword usage
+        self.sleep_pattern = re.compile(
+            r'^\s*Sleep\s+(\d+(?:\.\d+)?)\s*(s|seconds?|m|minutes?|ms|milliseconds?)?',
+            re.IGNORECASE
+        )
+    
     def analyze(self, test_file: TestFile) -> List[Finding]:
         """Find all sleep patterns in the test file."""
         findings = []
         lines = test_file.content.splitlines()
         
-        # Pattern to match Sleep keyword usage
-        sleep_pattern = re.compile(
-            r'^\s*Sleep\s+(\d+(?:\.\d+)?)\s*(s|seconds?|m|minutes?|ms|milliseconds?)?',
-            re.IGNORECASE
-        )
-        
         for line_num, line in enumerate(lines, 1):
-            match = sleep_pattern.match(line)
+            match = self.sleep_pattern.match(line)
             if match:
-                duration = Decimal(match.group(1))
+                duration_str = match.group(1)
                 unit = match.group(2) or 's'  # Default to seconds
                 
                 try:
+                    duration = Decimal(duration_str)
+                    
                     sleep = SleepPattern(
                         duration=duration,
                         unit=unit.lower(),
@@ -65,7 +69,7 @@ class SleepDetector(BaseAnalyzer):
                     )
                     findings.append(finding)
                     
-                except ValueError:
+                except (ValueError, Decimal.InvalidOperation):
                     # Skip invalid sleep patterns
                     pass
         

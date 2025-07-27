@@ -1,3 +1,5 @@
+
+# src/robot_optimizer_core/analyzers/base_analyzer.py
 """Base analyzer interface for Robot Framework analysis."""
 from abc import ABC, abstractmethod
 from typing import List
@@ -32,3 +34,5 @@ class BaseAnalyzer(ABC):
     def description(self) -> str:
         """Get the analyzer description."""
         pass
+
+
