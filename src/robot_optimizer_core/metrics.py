@@ -1,5 +1,5 @@
-# src/robot_optimizer_core/metrics_safe.py
-"""Memory-safe metrics collection with automatic cleanup."""
+# src/robot_optimizer_core/metrics.py
+"""Modern memory-safe metrics collection with GDPR compliance."""
 from __future__ import annotations
 
 import time
@@ -20,7 +20,7 @@ logger = get_logger(__name__)
 class TimingStats:
     """Statistics for timing metrics with bounded memory."""
     count: int = 0
-    sum: float = 0.0
+    total: float = 0.0
     min: float = float('inf')
     max: float = 0.0
     samples: deque[tuple[float, datetime]] = field(default_factory=lambda: deque(maxlen=100))
@@ -28,12 +28,17 @@ class TimingStats:
     @property
     def mean(self) -> float:
         """Calculate mean timing."""
-        return self.sum / self.count if self.count > 0 else 0.0
+        return self.total / self.count if self.count > 0 else 0.0
+    
+    @property
+    def last(self) -> float | None:
+        """Get the last recorded value."""
+        return self.samples[-1][0] if self.samples else None
     
     def add(self, value: float) -> None:
-        """Add a timing value with automatic cleanup."""
+        """Add a timing value."""
         self.count += 1
-        self.sum += value
+        self.total += value
         self.min = min(self.min, value)
         self.max = max(self.max, value)
         self.samples.append((value, datetime.now(timezone.utc)))
@@ -45,128 +50,163 @@ class TimingStats:
             self.samples.popleft()
 
 
-class BoundedInMemoryBackend:
-    """Memory-bounded metrics backend with automatic cleanup."""
+class MetricsCollector:
+    """Modern metrics collector with memory safety and GDPR compliance.
+    
+    Features:
+    - Bounded memory usage with automatic cleanup
+    - GDPR-compliant filtering of personal data
+    - Thread-safe operations
+    - Efficient storage with automatic eviction
+    """
     
     def __init__(
         self,
+        enabled: bool = True,
         max_counters: int = 10000,
         max_gauges: int = 5000,
-        max_timing_samples: int = 1000,
-        max_timing_stats: int = 1000,
+        max_timings: int = 1000,
         cleanup_interval: int = 300  # 5 minutes
     ):
-        """Initialize with memory bounds."""
+        """Initialize metrics collector."""
+        self.enabled = enabled
         self.max_counters = max_counters
         self.max_gauges = max_gauges
-        self.max_timing_samples = max_timing_samples
-        self.max_timing_stats = max_timing_stats
+        self.max_timings = max_timings
         
-        # Use bounded collections
-        self.counters: dict[str, int] = {}
-        self.gauges: dict[str, float] = {}
-        self.timing_stats: dict[str, TimingStats] = {}
+        # Metrics storage
+        self._counters: dict[str, int] = {}
+        self._gauges: dict[str, float] = {}
+        self._timings: dict[str, TimingStats] = {}
         
         # Thread safety
         self._lock = threading.RLock()
         self._start_time = time.time()
         
-        # Cleanup tracking
+        # Access tracking for LRU eviction
         self._access_counts: dict[str, int] = defaultdict(int)
         self._last_cleanup = time.time()
         self.cleanup_interval = cleanup_interval
         
-        # Start cleanup thread
-        self._cleanup_thread = threading.Thread(
-            target=self._cleanup_loop,
-            daemon=True,
-            name="metrics-cleanup"
-        )
-        self._cleanup_thread.start()
+        # GDPR compliance
+        self._gdpr_filter = self._create_gdpr_filter()
+        
+        # Start cleanup thread if enabled
+        if enabled:
+            self._cleanup_thread = threading.Thread(
+                target=self._cleanup_loop,
+                daemon=True,
+                name="metrics-cleanup"
+            )
+            self._cleanup_thread.start()
     
     def increment(self, metric: str, value: int = 1, tags: dict[str, str] | None = None) -> None:
-        """Increment a counter with bounds checking."""
+        """Increment a counter metric."""
+        if not self.enabled or not self._gdpr_filter(metric):
+            return
+        
+        self._validate_tags(tags)
         key = self._make_key(metric, tags)
         
         with self._lock:
             # Check bounds
-            if key not in self.counters and len(self.counters) >= self.max_counters:
+            if key not in self._counters and len(self._counters) >= self.max_counters:
                 self._evict_least_used_counter()
             
-            self.counters[key] = self.counters.get(key, 0) + value
+            self._counters[key] = self._counters.get(key, 0) + value
             self._access_counts[key] += 1
     
     def gauge(self, metric: str, value: float, tags: dict[str, str] | None = None) -> None:
-        """Set a gauge with bounds checking."""
+        """Set a gauge metric."""
+        if not self.enabled or not self._gdpr_filter(metric):
+            return
+        
+        self._validate_tags(tags)
         key = self._make_key(metric, tags)
         
         with self._lock:
             # Check bounds
-            if key not in self.gauges and len(self.gauges) >= self.max_gauges:
+            if key not in self._gauges and len(self._gauges) >= self.max_gauges:
                 self._evict_least_used_gauge()
             
-            self.gauges[key] = value
+            self._gauges[key] = value
             self._access_counts[key] += 1
     
     def timing(self, metric: str, value: float, tags: dict[str, str] | None = None) -> None:
-        """Record timing with bounded storage."""
+        """Record a timing metric."""
+        if not self.enabled or not self._gdpr_filter(metric):
+            return
+        
+        self._validate_tags(tags)
         key = self._make_key(metric, tags)
         
         with self._lock:
             # Check bounds
-            if key not in self.timing_stats and len(self.timing_stats) >= self.max_timing_stats:
+            if key not in self._timings and len(self._timings) >= self.max_timings:
                 self._evict_least_used_timing()
             
-            if key not in self.timing_stats:
-                self.timing_stats[key] = TimingStats()
+            if key not in self._timings:
+                self._timings[key] = TimingStats()
             
-            stats = self.timing_stats[key]
-            stats.add(value)
+            self._timings[key].add(value)
             self._access_counts[key] += 1
     
+    @contextmanager
+    def timer(self, metric: str, tags: dict[str, str] | None = None) -> Generator[None, None, None]:
+        """Context manager for timing operations."""
+        start_time = time.perf_counter()
+        try:
+            yield
+        finally:
+            duration = time.perf_counter() - start_time
+            self.timing(metric, duration, tags)
+    
     def get_metrics(self) -> dict[str, Any]:
-        """Get all metrics with cleanup."""
+        """Get all metrics as a dictionary."""
         with self._lock:
-            # Cleanup if needed
+            # Trigger cleanup if needed
             if time.time() - self._last_cleanup > self.cleanup_interval:
                 self._cleanup()
             
             return {
-                "counters": dict(self.counters),
-                "gauges": dict(self.gauges),
+                "counters": dict(self._counters),
+                "gauges": dict(self._gauges),
                 "timings": {
                     metric: {
                         "count": stats.count,
-                        "sum": stats.sum,
+                        "total": stats.total,
                         "mean": stats.mean,
                         "min": stats.min if stats.min != float('inf') else 0,
                         "max": stats.max,
-                        "recent_samples": len(stats.samples)
+                        "last": stats.last,
+                        "samples": len(stats.samples)
                     }
-                    for metric, stats in self.timing_stats.items()
+                    for metric, stats in self._timings.items()
                 },
-                "memory_usage": {
-                    "counters": len(self.counters),
-                    "gauges": len(self.gauges),
-                    "timing_stats": len(self.timing_stats),
-                    "total_access_counts": len(self._access_counts)
-                },
-                "uptime_seconds": time.time() - self._start_time
+                "system": {
+                    "uptime_seconds": time.time() - self._start_time,
+                    "total_metrics": len(self._counters) + len(self._gauges) + len(self._timings),
+                    "memory_usage": {
+                        "counters": len(self._counters),
+                        "gauges": len(self._gauges),
+                        "timings": len(self._timings)
+                    }
+                }
             }
     
     def reset(self) -> None:
         """Reset all metrics."""
         with self._lock:
-            self.counters.clear()
-            self.gauges.clear()
-            self.timing_stats.clear()
+            self._counters.clear()
+            self._gauges.clear()
+            self._timings.clear()
             self._access_counts.clear()
             self._start_time = time.time()
             self._last_cleanup = time.time()
     
     def _cleanup_loop(self) -> None:
         """Background cleanup thread."""
-        while True:
+        while self.enabled:
             try:
                 time.sleep(self.cleanup_interval)
                 with self._lock:
@@ -178,80 +218,70 @@ class BoundedInMemoryBackend:
         """Perform cleanup of old data."""
         # Clean old timing samples
         max_age = timedelta(hours=1)
-        for stats in self.timing_stats.values():
+        for stats in self._timings.values():
             stats.cleanup_old_samples(max_age)
         
-        # Remove metrics with zero access in last period
+        # Remove metrics with zero recent access
         zero_access = [k for k, v in self._access_counts.items() if v == 0]
         for key in zero_access:
-            self.counters.pop(key, None)
-            self.gauges.pop(key, None)
-            self.timing_stats.pop(key, None)
+            self._counters.pop(key, None)
+            self._gauges.pop(key, None)
+            self._timings.pop(key, None)
             del self._access_counts[key]
         
-        # Reset access counts for next period
+        # Decay access counts for next period
         for key in self._access_counts:
-            self._access_counts[key] = 0
+            self._access_counts[key] = self._access_counts[key] // 2
         
         self._last_cleanup = time.time()
         
-        logger.debug(
-            "Metrics cleanup completed",
-            extra={
-                "removed": len(zero_access),
-                "remaining": {
-                    "counters": len(self.counters),
-                    "gauges": len(self.gauges),
-                    "timings": len(self.timing_stats)
+        if zero_access:
+            logger.debug(
+                "Metrics cleanup completed",
+                extra={
+                    "removed": len(zero_access),
+                    "remaining": len(self._counters) + len(self._gauges) + len(self._timings)
                 }
-            }
-        )
+            )
     
     def _evict_least_used_counter(self) -> None:
         """Evict least recently used counter."""
-        if not self.counters:
+        if not self._counters:
             return
         
-        # Find least accessed
         least_used = min(
-            (k for k in self.counters if k in self._access_counts),
-            key=lambda k: self._access_counts[k],
-            default=None
+            self._counters.keys(),
+            key=lambda k: self._access_counts.get(k, 0)
         )
         
-        if least_used:
-            del self.counters[least_used]
-            self._access_counts.pop(least_used, None)
+        del self._counters[least_used]
+        self._access_counts.pop(least_used, None)
     
     def _evict_least_used_gauge(self) -> None:
         """Evict least recently used gauge."""
-        if not self.gauges:
+        if not self._gauges:
             return
         
         least_used = min(
-            (k for k in self.gauges if k in self._access_counts),
-            key=lambda k: self._access_counts[k],
-            default=None
+            self._gauges.keys(),
+            key=lambda k: self._access_counts.get(k, 0)
         )
         
-        if least_used:
-            del self.gauges[least_used]
-            self._access_counts.pop(least_used, None)
+        del self._gauges[least_used]
+        self._access_counts.pop(least_used, None)
     
     def _evict_least_used_timing(self) -> None:
-        """Evict least recently used timing stats."""
-        if not self.timing_stats:
+        """Evict least recently used timing."""
+        if not self._timings:
             return
         
         least_used = min(
-            (k for k in self.timing_stats if k in self._access_counts),
-            key=lambda k: self._access_counts[k],
-            default=None
+            self._timings.keys(),
+            key=lambda k: self._access_counts.get(k, 0)
         )
         
-        if least_used:
-            del self.timing_stats[least_used]
-            self._access_counts.pop(least_used, None)
+        del self._timings[least_used]
+        self._access_counts.pop(least_used, None)
     
     def _make_key(self, metric: str, tags: dict[str, str] | None = None) -> str:
         """Create a metric key with tags."""
@@ -260,92 +290,14 @@ class BoundedInMemoryBackend:
         
         tag_str = ",".join(f"{k}={v}" for k, v in sorted(tags.items()))
         return f"{metric}{{{tag_str}}}"
-
-
-class MemorySafeMetricsCollector:
-    """Memory-safe metrics collector."""
-    
-    def __init__(
-        self,
-        backend: BoundedInMemoryBackend | None = None,
-        enabled: bool = True,
-        max_metrics: int = 10000
-    ):
-        """Initialize with memory bounds."""
-        self.backend = backend or BoundedInMemoryBackend()
-        self.enabled = enabled
-        self.max_metrics = max_metrics
-        
-        # GDPR compliance
-        self._gdpr_filter = self._create_gdpr_filter()
-    
-    def increment(self, metric: str, value: int = 1, tags: dict[str, str] | None = None) -> None:
-        """Increment counter with memory safety."""
-        if not self.enabled or not self._gdpr_filter(metric):
-            return
-        
-        self._validate_tags(tags)
-        self.backend.increment(metric, value, tags)
-    
-    def gauge(self, metric: str, value: float, tags: dict[str, str] | None = None) -> None:
-        """Set gauge with memory safety."""
-        if not self.enabled or not self._gdpr_filter(metric):
-            return
-        
-        self._validate_tags(tags)
-        self.backend.gauge(metric, value, tags)
-    
-    def timing(self, metric: str, value: float, tags: dict[str, str] | None = None) -> None:
-        """Record timing with memory safety."""
-        if not self.enabled or not self._gdpr_filter(metric):
-            return
-        
-        self._validate_tags(tags)
-        self.backend.timing(metric, value, tags)
-    
-    @contextmanager
-    def timer(self, metric: str, tags: dict[str, str] | None = None) -> Generator[None, None, None]:
-        """Time operations with memory safety."""
-        start_time = time.time()
-        try:
-            yield
-        finally:
-            duration = time.time() - start_time
-            self.timing(metric, duration, tags)
-    
-    def get_metrics(self) -> dict[str, Any]:
-        """Get metrics with memory info."""
-        if not self.enabled:
-            return {}
-        
-        metrics = self.backend.get_metrics()
-        
-        # Add memory warnings
-        memory_usage = metrics.get("memory_usage", {})
-        total_metrics = sum(memory_usage.values())
-        
-        if total_metrics > self.max_metrics * 0.8:
-            logger.warning(
-                "Metrics memory usage high",
-                extra={
-                    "total": total_metrics,
-                    "limit": self.max_metrics,
-                    "usage_percent": (total_metrics / self.max_metrics) * 100
-                }
-            )
-        
-        return metrics
-    
-    def reset(self) -> None:
-        """Reset all metrics."""
-        self.backend.reset()
     
     def _create_gdpr_filter(self) -> Callable[[str], bool]:
         """Create GDPR compliance filter."""
         blocked_patterns = [
-            "user.", "email.", "name.", "path.full",
-            "file.absolute", "personal.", "private.",
-            "ip.", "host.", "machine.", "username."
+            "user.", "email.", "name.", "password.", "token.",
+            "path.full", "file.absolute", "personal.", "private.",
+            "ip.", "host.", "machine.", "username.", "address.",
+            "phone.", "ssn.", "credit", "account."
         ]
         
         def filter_func(metric: str) -> bool:
@@ -359,38 +311,42 @@ class MemorySafeMetricsCollector:
         if not tags:
             return
         
-        blocked_keys = {"user", "email", "name", "ip", "host", "username", "path"}
+        blocked_keys = {
+            "user", "email", "name", "password", "token",
+            "ip", "host", "username", "path", "address",
+            "phone", "ssn", "account"
+        }
         
         for key in tags:
             if key.lower() in blocked_keys:
                 raise ValueError(
-                    f"Tag '{key}' may contain personal data and is not allowed"
+                    f"Tag '{key}' may contain personal data and is not allowed. "
+                    f"Use anonymized identifiers instead."
                 )
 
 
-# Example: Memory-safe domain events
-class BoundedEventStore:
-    """Bounded event store for aggregates."""
+# Global metrics instance
+_global_metrics: MetricsCollector | None = None
+_metrics_lock = threading.Lock()
+
+
+def get_metrics() -> MetricsCollector:
+    """Get the global metrics collector instance."""
+    global _global_metrics
     
-    def __init__(self, max_events_per_aggregate: int = 100):
-        """Initialize with bounds."""
-        self.max_events = max_events_per_aggregate
-        self._events: dict[str, deque] = defaultdict(lambda: deque(maxlen=self.max_events))
-        self._lock = threading.Lock()
+    if _global_metrics is None:
+        with _metrics_lock:
+            if _global_metrics is None:
+                _global_metrics = MetricsCollector()
     
-    def add_event(self, aggregate_id: str, event: Any) -> None:
-        """Add event with automatic cleanup."""
-        with self._lock:
-            self._events[aggregate_id].append(event)
+    return _global_metrics
+
+
+def configure_metrics(**kwargs: Any) -> MetricsCollector:
+    """Configure the global metrics collector."""
+    global _global_metrics
     
-    def pull_events(self, aggregate_id: str) -> list[Any]:
-        """Pull and clear events for aggregate."""
-        with self._lock:
-            events = list(self._events[aggregate_id])
-            self._events[aggregate_id].clear()
-            return events
+    with _metrics_lock:
+        _global_metrics = MetricsCollector(**kwargs)
     
-    def get_event_count(self, aggregate_id: str) -> int:
-        """Get pending event count."""
-        with self._lock:
-            return len(self._events.get(aggregate_id, []))
+    return _global_metrics
