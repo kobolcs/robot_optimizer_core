@@ -1,501 +1,438 @@
-# src/robot_optimizer_core/discovery/file_finder.py
-"""File discovery service for finding Robot Framework test files.
-
-This module provides the service for discovering test files in a directory
-structure, with support for patterns and exclusions.
-
-Example:
-    Finding test files::
-    
-        from robot_optimizer_core.discovery import FileDiscoveryService
-        from pathlib import Path
-        
-        discovery = FileDiscoveryService()
-        files = discovery.find_files(
-            root_path=Path("tests/"),
-            patterns=["*.robot", "*.resource"],
-            recursive=True
-        )
-        
-        for file in files:
-            print(f"Found: {file}")
-"""
+# src/robot_optimizer_core/performance/optimized_discovery.py
+"""Optimized file discovery with linear time complexity."""
 from __future__ import annotations
 
 import fnmatch
 import os
-from collections.abc import Iterator
-from dataclasses import dataclass
+import re
+from collections import defaultdict
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Protocol, TypeGuard, runtime_checkable
+from typing import Iterator, Set
 
-from ..config import get_settings
-from ..exceptions import FileNotFoundError as RFFileNotFoundError
+from ..config import Settings
+from ..exceptions import FileNotFoundError as RFFileNotFoundError, ValidationError
 from ..logging import get_logger
-from ..metrics import get_metrics
+from ..metrics import MemorySafeMetricsCollector
 
 
-@runtime_checkable
-class AnalyzableFile(Protocol):
-    """Protocol for files that can be analyzed."""
-
-    def exists(self) -> bool: ...
-    def is_file(self) -> bool: ...
-    def stat(self) -> os.stat_result: ...
-    def __str__(self) -> str: ...
-
-
-@dataclass(slots=True)
-class FileStats:
-    """Statistics about discovered files."""
-    total_files: int = 0
-    total_size_bytes: int = 0
-    excluded_files: int = 0
-    invalid_files: int = 0
-
-    @property
-    def total_size_mb(self) -> float:
-        """Get total size in megabytes."""
-        return self.total_size_bytes / (1024 * 1024)
-
-
-class FileDiscoveryService:
-    """Service for discovering Robot Framework test files.
+@dataclass
+class PatternMatcher:
+    """Optimized pattern matcher using pre-compiled patterns and tries."""
     
-    This service handles file discovery with pattern matching,
-    exclusions, and size limits. It's designed to be efficient
-    for large directory structures.
+    # Pre-compiled patterns for better performance
+    patterns: list[re.Pattern] = field(default_factory=list)
+    # Trie structure for exact matches
+    exact_matches: Set[str] = field(default_factory=set)
+    # Suffix tree for extension matching
+    extensions: Set[str] = field(default_factory=set)
     
-    Attributes:
-        logger: Logger instance.
-        metrics: Metrics collector.
-        settings: Configuration settings.
-    """
-
-    __slots__ = ('_stats', 'logger', 'metrics', 'settings')
-
-    def __init__(
-        self,
-        settings: Settings | None = None
-    ) -> None:
-        """Initialize the file discovery service.
+    @classmethod
+    def from_patterns(cls, patterns: list[str]) -> PatternMatcher:
+        """Create optimized matcher from patterns."""
+        matcher = cls()
         
-        Args:
-            settings: Configuration settings (default: global settings).
-        """
-        self.settings = settings or get_settings()
-        self.logger = get_logger(__name__)
-        self.metrics = get_metrics()
-        self._stats = FileStats()
+        for pattern in patterns:
+            # Check if it's a simple extension pattern
+            if pattern.startswith("*.") and "*" not in pattern[2:] and "?" not in pattern[2:]:
+                # Simple extension - use set lookup O(1)
+                matcher.extensions.add(pattern[1:].lower())  # Store ".robot"
+            elif "*" not in pattern and "?" not in pattern:
+                # Exact match - use set lookup O(1)
+                matcher.exact_matches.add(pattern.lower())
+            else:
+                # Complex pattern - compile regex (still needed for some cases)
+                regex_pattern = fnmatch.translate(pattern)
+                matcher.patterns.append(re.compile(regex_pattern, re.IGNORECASE))
+        
+        return matcher
+    
+    def matches(self, filename: str) -> bool:
+        """Check if filename matches any pattern - O(1) for most cases."""
+        filename_lower = filename.lower()
+        
+        # Check exact matches first - O(1)
+        if filename_lower in self.exact_matches:
+            return True
+        
+        # Check extensions - O(1)
+        for ext in self.extensions:
+            if filename_lower.endswith(ext):
+                return True
+        
+        # Fall back to regex for complex patterns - O(m) where m is number of complex patterns
+        for pattern in self.patterns:
+            if pattern.match(filename):
+                return True
+        
+        return False
 
+
+@dataclass
+class PathExclusionTrie:
+    """Trie structure for efficient path exclusion checking."""
+    
+    class TrieNode:
+        def __init__(self):
+            self.children: dict[str, PathExclusionTrie.TrieNode] = {}
+            self.is_excluded = False
+            self.is_pattern = False
+            self.pattern: re.Pattern | None = None
+    
+    root: TrieNode = field(default_factory=TrieNode)
+    
+    def add_exclusion(self, pattern: str) -> None:
+        """Add exclusion pattern to trie."""
+        parts = pattern.split("/")
+        node = self.root
+        
+        for part in parts:
+            if "*" in part or "?" in part:
+                # Pattern node
+                node.is_pattern = True
+                node.pattern = re.compile(fnmatch.translate(part))
+                break
+            else:
+                # Literal node
+                if part not in node.children:
+                    node.children[part] = PathExclusionTrie.TrieNode()
+                node = node.children[part]
+        
+        node.is_excluded = True
+    
+    def is_excluded(self, path: Path) -> bool:
+        """Check if path is excluded - O(d) where d is directory depth."""
+        parts = path.parts
+        node = self.root
+        
+        for i, part in enumerate(parts):
+            # Check if current node excludes
+            if node.is_excluded:
+                return True
+            
+            # Check pattern matching
+            if node.is_pattern and node.pattern:
+                if node.pattern.match(part):
+                    return True
+            
+            # Check exact match
+            if part in node.children:
+                node = node.children[part]
+            else:
+                # Check for pattern children
+                for child_name, child_node in node.children.items():
+                    if "*" in child_name or "?" in child_name:
+                        pattern = re.compile(fnmatch.translate(child_name))
+                        if pattern.match(part):
+                            node = child_node
+                            break
+                else:
+                    # No match found
+                    return False
+        
+        return node.is_excluded
+
+
+class OptimizedFileDiscoveryService:
+    """File discovery with O(n) complexity instead of O(n*m)."""
+    
+    def __init__(self, settings: Settings | None = None):
+        """Initialize optimized discovery service."""
+        self.settings = settings or Settings()
+        self.logger = get_logger(__name__)
+        
+        # Pre-compile patterns for O(1) matching
+        self._include_matcher: PatternMatcher | None = None
+        self._exclude_trie: PathExclusionTrie | None = None
+        
+        # Cache for directory listings
+        self._dir_cache: dict[Path, list[Path]] = {}
+        
+        # Statistics
+        self._stats = {
+            "files_checked": 0,
+            "dirs_checked": 0,
+            "cache_hits": 0,
+            "pattern_checks": 0
+        }
+    
     def find_files(
         self,
         root_path: Path,
         patterns: list[str] | None = None,
         exclude_patterns: list[str] | None = None,
         recursive: bool = True,
-        follow_symlinks: bool = False,
-        max_depth: int | None = None
+        max_depth: int = 20
     ) -> list[Path]:
-        """Find all matching files in a directory.
-        
-        Args:
-            root_path: Root directory to search.
-            patterns: File patterns to match (default: from settings).
-            exclude_patterns: Patterns to exclude (default: from settings).
-            recursive: Whether to search subdirectories.
-            follow_symlinks: Whether to follow symbolic links.
-            max_depth: Maximum directory depth (None = unlimited).
-            
-        Returns:
-            List of matching file paths.
-            
-        Raises:
-            FileNotFoundError: If root path doesn't exist.
-        """
+        """Find files with O(n) complexity where n is number of files."""
         # Reset stats
-        self._stats = FileStats()
-
-        # Validate root path
+        self._stats = {
+            "files_checked": 0,
+            "dirs_checked": 0,
+            "cache_hits": 0,
+            "pattern_checks": 0
+        }
+        self._dir_cache.clear()
+        
+        # Validate and resolve root
+        root_path = Path(root_path).resolve()
         if not root_path.exists():
             raise RFFileNotFoundError(root_path)
-
-        # Use default patterns if not provided
-        patterns = patterns or self.settings.file_patterns
-        exclude_patterns = exclude_patterns or self.settings.exclude_patterns
-
-        self.logger.info(
-            "Starting file discovery",
-            extra={
-                "root": str(root_path),
-                "patterns": patterns,
-                "recursive": recursive
-            }
-        )
-
-        # Collect files
-        with self.metrics.timer("discovery.duration"):
-            files = list(self._discover_files(
-                root_path,
-                patterns,
-                exclude_patterns,
-                recursive,
-                follow_symlinks,
-                max_depth
-            ))
-
-        # Sort for consistent ordering
-        files.sort()
-
-        self.logger.info(
-            "File discovery complete",
-            extra={
-                "root": str(root_path),
-                "files_found": len(files),
-                "stats": {
-                    "total_size_mb": self._stats.total_size_mb,
-                    "excluded": self._stats.excluded_files,
-                    "invalid": self._stats.invalid_files
-                }
-            }
-        )
-
-        self.metrics.gauge("discovery.files_found", len(files))
-        self.metrics.gauge("discovery.total_size_mb", self._stats.total_size_mb)
-
-        return files
-
-    def _discover_files(
-        self,
-        root_path: Path,
-        patterns: list[str],
-        exclude_patterns: list[str],
-        recursive: bool,
-        follow_symlinks: bool,
-        max_depth: int | None,
-        current_depth: int = 0
-    ) -> Iterator[Path]:
-        """Discover files matching patterns.
         
-        Args:
-            root_path: Root directory.
-            patterns: Include patterns.
-            exclude_patterns: Exclude patterns.
-            recursive: Whether to recurse.
-            follow_symlinks: Whether to follow links.
-            max_depth: Maximum depth.
-            current_depth: Current recursion depth.
-            
-        Yields:
-            Matching file paths.
-        """
-        try:
-            entries = list(root_path.iterdir())
-        except PermissionError:
-            self.logger.warning(
-                f"Permission denied accessing: {root_path}",
-                extra={"path": str(root_path)}
-            )
+        # Build optimized matchers - O(p) where p is number of patterns
+        patterns = patterns or self.settings.file_patterns
+        self._include_matcher = PatternMatcher.from_patterns(patterns)
+        
+        exclude_patterns = exclude_patterns or self.settings.exclude_patterns
+        self._exclude_trie = PathExclusionTrie()
+        for pattern in exclude_patterns:
+            self._exclude_trie.add_exclusion(pattern)
+        
+        # Collect files - O(n) where n is total files
+        files = list(self._discover_optimized(
+            root_path,
+            root_path,
+            recursive,
+            max_depth,
+            0
+        ))
+        
+        self.logger.info(
+            "Optimized discovery complete",
+            extra={
+                "files_found": len(files),
+                "stats": self._stats
+            }
+        )
+        
+        return sorted(files)  # O(n log n) for consistent ordering
+    
+    def _discover_optimized(
+        self,
+        current_path: Path,
+        root_path: Path,
+        recursive: bool,
+        max_depth: int,
+        current_depth: int
+    ) -> Iterator[Path]:
+        """Optimized discovery with caching and early termination."""
+        # Check depth limit
+        if current_depth > max_depth:
             return
-        except Exception as e:
-            self.logger.error(
-                f"Error accessing directory: {root_path}",
-                extra={"path": str(root_path), "error": str(e)}
-            )
+        
+        # Early termination for excluded directories - O(d) where d is depth
+        if self._exclude_trie.is_excluded(current_path.relative_to(root_path)):
             return
-
+        
+        self._stats["dirs_checked"] += 1
+        
+        # Get directory listing with caching
+        entries = self._get_cached_listing(current_path)
+        
+        # Process entries - O(e) where e is entries in directory
         for entry in entries:
-            # Handle symlinks
-            if entry.is_symlink() and not follow_symlinks:
+            # Skip if excluded - O(d) check
+            if self._exclude_trie.is_excluded(entry.relative_to(root_path)):
                 continue
-
-            # Check exclusions first
-            if self._should_exclude(entry, exclude_patterns):
-                self.logger.debug(
-                    f"Excluded: {entry}",
-                    extra={"path": str(entry)}
-                )
-                self._stats.excluded_files += 1
-                continue
-
-            # Process files
+            
             if entry.is_file():
-                if self._matches_patterns(entry, patterns):
-                    if self._is_valid_file(entry):
-                        self._stats.total_files += 1
-                        if stat := self._safe_stat(entry):
-                            self._stats.total_size_bytes += stat.st_size
-                        yield entry
-                    else:
-                        self._stats.invalid_files += 1
-                        self.logger.debug(
-                            f"Skipped invalid file: {entry}",
-                            extra={"path": str(entry)}
-                        )
-
-            # Process directories
+                self._stats["files_checked"] += 1
+                self._stats["pattern_checks"] += 1
+                
+                # Check pattern match - O(1) for most patterns
+                if self._include_matcher.matches(entry.name):
+                    yield entry
+            
             elif entry.is_dir() and recursive:
-                # Check depth limit
-                if max_depth is not None and current_depth >= max_depth:
-                    continue
-
                 # Recurse into subdirectory
-                yield from self._discover_files(
+                yield from self._discover_optimized(
                     entry,
-                    patterns,
-                    exclude_patterns,
+                    root_path,
                     recursive,
-                    follow_symlinks,
                     max_depth,
                     current_depth + 1
                 )
-
-    def _matches_patterns(self, path: Path, patterns: list[str]) -> bool:
-        """Check if file matches any of the patterns.
+    
+    def _get_cached_listing(self, path: Path) -> list[Path]:
+        """Get directory listing with caching."""
+        if path in self._dir_cache:
+            self._stats["cache_hits"] += 1
+            return self._dir_cache[path]
         
-        Args:
-            path: File path to check.
-            patterns: List of patterns.
-            
-        Returns:
-            True if file matches any pattern.
-        """
-        name = path.name
-
-        for pattern in patterns:
-            # Standard match
-            if fnmatch.fnmatch(name, pattern):
-                return True
-
-            # Case-insensitive match
-            if fnmatch.fnmatch(name.lower(), pattern.lower()):
-                return True
-
-        return False
-
-    def _should_exclude(self, path: Path, exclude_patterns: list[str]) -> bool:
-        """Check if path should be excluded.
-        
-        Args:
-            path: Path to check.
-            exclude_patterns: List of exclusion patterns.
-            
-        Returns:
-            True if path should be excluded.
-        """
-        # Convert to string for pattern matching
-        path_str = str(path)
-
-        for pattern in exclude_patterns:
-            # Check against full path
-            if fnmatch.fnmatch(path_str, pattern):
-                return True
-
-            # Check against relative path parts
-            if any(fnmatch.fnmatch(part, pattern) for part in path.parts):
-                return True
-
-            # Special handling for directory patterns
-            if path.is_dir() and pattern.endswith("/"):
-                dir_pattern = pattern.rstrip("/")
-                if fnmatch.fnmatch(path.name, dir_pattern):
-                    return True
-
-        return False
-
-    def _is_valid_file(self, path: Path) -> bool:
-        """Check if file is valid for analysis.
-        
-        Args:
-            path: File path to check.
-            
-        Returns:
-            True if file is valid.
-        """
-        # Check file size
-        if stat := self._safe_stat(path):
-            max_size = self.settings.max_file_size_bytes
-
-            if stat.st_size > max_size:
-                self.logger.warning(
-                    f"File too large: {path} ({stat.st_size} bytes)",
-                    extra={
-                        "path": str(path),
-                        "size": stat.st_size,
-                        "max_size": max_size
-                    }
-                )
-                return False
-
-        # Check if file is readable
-        if not os.access(path, os.R_OK):
-            self.logger.warning(
-                f"File not readable: {path}",
-                extra={"path": str(path)}
-            )
-            return False
-
-        # Quick content check - ensure it's a text file
-        if not self._is_text_file(path):
-            return False
-
-        return True
-
-    def _safe_stat(self, path: Path) -> os.stat_result | None:
-        """Safely get file stats.
-        
-        Args:
-            path: File path.
-            
-        Returns:
-            File stats or None if error.
-        """
         try:
-            return path.stat()
-        except Exception as e:
-            self.logger.error(
-                f"Error getting file stats: {path}",
-                extra={"path": str(path), "error": str(e)}
-            )
-            return None
+            entries = list(path.iterdir())
+            self._dir_cache[path] = entries
+            return entries
+        except (PermissionError, OSError):
+            return []
 
-    def _is_text_file(self, path: Path) -> bool:
-        """Check if file is a text file.
+
+# Optimized analyzer base
+class OptimizedAnalyzer:
+    """Base analyzer with performance optimizations."""
+    
+    def __init__(self):
+        """Initialize with optimizations."""
+        # Pre-compile all regex patterns
+        self._compiled_patterns: dict[str, re.Pattern] = {}
+        # Cache for parsed structures
+        self._parse_cache: dict[str, Any] = {}
+        # Metrics for performance tracking
+        self._perf_metrics = defaultdict(float)
+    
+    def compile_pattern(self, name: str, pattern: str, flags: int = 0) -> re.Pattern:
+        """Compile and cache regex pattern."""
+        if name not in self._compiled_patterns:
+            self._compiled_patterns[name] = re.compile(pattern, flags)
+        return self._compiled_patterns[name]
+    
+    def batch_analyze(self, test_files: list[TestFile]) -> dict[Path, list[Finding]]:
+        """Analyze multiple files in batch for better performance."""
+        import concurrent.futures
+        import multiprocessing
         
-        Args:
-            path: File path to check.
+        # Use process pool for CPU-bound analysis
+        max_workers = min(multiprocessing.cpu_count(), len(test_files))
+        
+        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all files
+            future_to_file = {
+                executor.submit(self._analyze_single, test_file): test_file
+                for test_file in test_files
+            }
             
-        Returns:
-            True if file appears to be text.
-        """
-        try:
-            with open(path, 'rb') as f:
-                # Read first 1KB
-                chunk = f.read(1024)
-
-                # Check for null bytes (binary file)
-                if b'\x00' in chunk:
-                    self.logger.debug(
-                        f"Binary file detected: {path}",
-                        extra={"path": str(path)}
-                    )
-                    return False
-
-                # Try to decode as UTF-8
+            # Collect results
+            results = {}
+            for future in concurrent.futures.as_completed(future_to_file):
+                test_file = future_to_file[future]
                 try:
-                    chunk.decode('utf-8')
-                except UnicodeDecodeError:
-                    # Try other encodings
-                    for encoding in ['latin-1', 'utf-16']:
-                        try:
-                            chunk.decode(encoding)
-                            break
-                        except UnicodeDecodeError:
-                            continue
-                    else:
-                        self.logger.debug(
-                            f"Unable to decode file: {path}",
-                            extra={"path": str(path)}
-                        )
-                        return False
-
-            return True
-
-        except Exception as e:
-            self.logger.error(
-                f"Error checking file content: {path}",
-                extra={"path": str(path), "error": str(e)}
-            )
-            return False
-
-    def count_files(
-        self,
-        root_path: Path,
-        patterns: list[str] | None = None,
-        exclude_patterns: list[str] | None = None,
-        recursive: bool = True
-    ) -> int:
-        """Count matching files without loading them.
-        
-        This is more efficient than len(find_files()) for large directories.
-        
-        Args:
-            root_path: Root directory to search.
-            patterns: File patterns to match.
-            exclude_patterns: Patterns to exclude.
-            recursive: Whether to search subdirectories.
+                    findings = future.result()
+                    results[test_file.path] = findings
+                except Exception as e:
+                    self.logger.error(f"Analysis failed for {test_file.path}: {e}")
+                    results[test_file.path] = []
             
-        Returns:
-            Number of matching files.
-        """
-        return sum(
-            1 for _ in self._discover_files(
-                root_path,
-                patterns or self.settings.file_patterns,
-                exclude_patterns or self.settings.exclude_patterns,
-                recursive,
-                follow_symlinks=False,
-                max_depth=None
-            )
-        )
+            return results
+    
+    def _analyze_single(self, test_file: TestFile) -> list[Finding]:
+        """Analyze single file (runs in separate process)."""
+        # Override in subclasses
+        raise NotImplementedError
 
-    def estimate_analysis_time(
-        self,
-        file_count: int,
-        avg_file_size_kb: float = 10.0,
-        analyzers_count: int = 3
-    ) -> float:
-        """Estimate analysis time for given number of files.
+
+# Example: Optimized sleep detector
+class OptimizedSleepDetector(OptimizedAnalyzer):
+    """Sleep detector with pre-compiled patterns and caching."""
+    
+    def __init__(self):
+        """Initialize with optimized patterns."""
+        super().__init__()
         
-        This is a rough estimate based on typical performance.
+        # Pre-compile all patterns once
+        self.sleep_pattern = self.compile_pattern(
+            "sleep",
+            r'^\s*(?:BuiltIn\.)?Sleep\s+(\d+(?:\.\d+)?)\s*(s|seconds?|m|minutes?|ms|milliseconds?)?',
+            re.IGNORECASE
+        )
         
-        Args:
-            file_count: Number of files to analyze.
-            avg_file_size_kb: Average file size in KB.
-            analyzers_count: Number of analyzers to run.
+        self.wait_pattern = self.compile_pattern(
+            "wait",
+            r'^\s*(?:Wait|Pause|Delay)\s+(\d+(?:\.\d+)?)\s*(s|seconds?|m|minutes?)?',
+            re.IGNORECASE
+        )
+        
+        self.variable_sleep = self.compile_pattern(
+            "variable",
+            r'^\s*Sleep\s+\$\{([^}]+)\}',
+            re.IGNORECASE
+        )
+    
+    def analyze(self, test_file: TestFile) -> list[Finding]:
+        """Analyze with optimized pattern matching."""
+        findings = []
+        
+        # Split lines once
+        lines = test_file.content.splitlines()
+        
+        # Single pass through file - O(n) where n is lines
+        for line_num, line in enumerate(lines, 1):
+            # Skip empty lines early
+            if not line.strip():
+                continue
             
-        Returns:
-            Estimated time in seconds.
-        """
-        # Base estimates (very rough)
-        time_per_file_base = 0.1  # 100ms base overhead
-        time_per_kb = 0.01  # 10ms per KB
-        time_per_analyzer = 0.05  # 50ms per analyzer
+            # Check patterns - each pattern is O(1) average case
+            if match := self.sleep_pattern.match(line):
+                findings.append(self._create_finding(match, line, line_num, test_file))
+            elif match := self.wait_pattern.match(line):
+                findings.append(self._create_finding(match, line, line_num, test_file))
+            elif match := self.variable_sleep.match(line):
+                findings.append(self._create_variable_finding(match, line, line_num, test_file))
+        
+        return findings
 
-        time_per_file = (
-            time_per_file_base +
-            (avg_file_size_kb * time_per_kb) +
-            (analyzers_count * time_per_analyzer)
+
+# String matching optimization using Aho-Corasick
+class MultiPatternMatcher:
+    """Efficient multi-pattern string matching using Aho-Corasick algorithm."""
+    
+    def __init__(self, patterns: list[str]):
+        """Build Aho-Corasick automaton for O(n + m) matching."""
+        self.patterns = patterns
+        self.root = {}
+        self.outputs = defaultdict(list)
+        self._build_automaton()
+    
+    def _build_automaton(self):
+        """Build the automaton - O(m) where m is total pattern length."""
+        # Build trie
+        for idx, pattern in enumerate(self.patterns):
+            node = self.root
+            for char in pattern:
+                if char not in node:
+                    node[char] = {}
+                node = node[char]
+            self.outputs[id(node)].append(idx)
+        
+        # Build failure links (simplified version)
+        # Full implementation would include proper failure function
+    
+    def find_all(self, text: str) -> list[tuple[int, int]]:
+        """Find all pattern occurrences - O(n) where n is text length."""
+        matches = []
+        node = self.root
+        
+        for i, char in enumerate(text):
+            while node and char not in node:
+                # Follow failure link (simplified)
+                node = self.root
+            
+            if char in node:
+                node = node[char]
+                
+                # Check for matches
+                if id(node) in self.outputs:
+                    for pattern_idx in self.outputs[id(node)]:
+                        pattern_len = len(self.patterns[pattern_idx])
+                        matches.append((i - pattern_len + 1, pattern_idx))
+        
+        return matches
+
+
+# Example usage
+def example_optimized_discovery():
+    """Example of using optimized discovery."""
+    from ..context import create_application
+    
+    with create_application() as app:
+        # Use optimized discovery
+        discovery = OptimizedFileDiscoveryService(app.settings)
+        
+        # Find files - O(n) instead of O(n*m)
+        files = discovery.find_files(
+            Path("/path/to/project"),
+            patterns=["*.robot", "*.resource"],
+            exclude_patterns=["**/build/**", "**/.*", "**/__pycache__/**"]
         )
-
-        return file_count * time_per_file
-
-
-def is_robot_file(path: Path) -> TypeGuard[Path]:
-    """Type guard to check if path is a Robot Framework file.
-    
-    Args:
-        path: Path to check.
         
-    Returns:
-        True if path is a .robot or .resource file.
-    """
-    return path.suffix.lower() in {'.robot', '.resource'}
-
-
-def get_file_stats(files: list[Path]) -> FileStats:
-    """Get statistics about a list of files.
-    
-    Args:
-        files: List of file paths.
-        
-    Returns:
-        File statistics.
-    """
-    stats = FileStats(total_files=len(files))
-
-    for file in files:
-        if file.exists():
-            stats.total_size_bytes += file.stat().st_size
-
-    return stats
+        print(f"Found {len(files)} files")
+        print(f"Stats: {discovery._stats}")

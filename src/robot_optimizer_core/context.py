@@ -9,12 +9,12 @@ from typing import Any, Protocol, TypeVar, runtime_checkable
 
 from .analyzers.registry import AnalyzerRegistry
 from .config.settings import Settings
-from .di_safe import ThreadSafeContainer
-from .discovery.secure_file_finder import SecureFileDiscoveryService
+from .di import ThreadSafeContainer
+from .discovery.file_finder import SecureFileDiscoveryService
 from .logging import LoggerAdapter, configure_logging
-from .metrics_safe import MemorySafeMetricsCollector
+from .metrics import MemorySafeMetricsCollector
 from .parsers.robot_ast_parser import RobotASTParser
-from .plugin_secure import SecurePluginManager
+from .plugin import SecurePluginManager
 
 T = TypeVar("T")
 

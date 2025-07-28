@@ -1,28 +1,11 @@
-# src/robot_optimizer_core/di.py
-"""Basic dependency injection container for Robot Framework Optimizer Core.
-
-This module provides a simple DI container that can be extended by the
-Pro version with more advanced features like scopes, decorators, and
-automatic injection.
-
-Example:
-    Using the DI container::
-    
-        from robot_optimizer_core import Container, get_container
-        
-        # Register dependencies
-        container = get_container()
-        container.register("parser", RobotASTParser)
-        container.register_singleton("logger", lambda: get_logger(__name__))
-        
-        # Resolve dependencies
-        parser = container.resolve("parser")
-        logger = container.resolve("logger")
-"""
+# src/robot_optimizer_core/di_safe.py
+"""Thread-safe dependency injection container."""
 from __future__ import annotations
 
 import inspect
+import threading
 from collections.abc import Callable
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import StrEnum, auto
 from typing import Any, TypeAlias, TypeVar
@@ -40,49 +23,66 @@ class ServiceLifetime(StrEnum):
     """Service lifetime options for dependency injection."""
     TRANSIENT = auto()  # New instance each time
     SINGLETON = auto()  # Single instance for container lifetime
-    SCOPED = auto()     # Single instance per scope (Pro feature)
+    SCOPED = auto()     # Single instance per scope
 
 
 @dataclass
 class ServiceDescriptor:
-    """Describes a registered service.
-    
-    Attributes:
-        service_type: The service interface or key.
-        implementation: The implementation class or factory.
-        lifetime: Service lifetime (transient, singleton, scoped).
-        instance: Cached instance for singletons.
-    """
+    """Thread-safe service descriptor."""
     service_type: str
     implementation: ServiceFactory
     lifetime: ServiceLifetime = ServiceLifetime.TRANSIENT
     instance: Any | None = field(default=None, init=False)
-
-
-class Container:
-    """Simple dependency injection container.
+    _lock: threading.RLock = field(default_factory=threading.RLock, init=False)
     
-    This container supports basic registration and resolution of dependencies
-    with transient and singleton lifetimes. The Pro version can extend this
-    with additional features.
-    
-    Attributes:
-        services: Registered service descriptors.
-        resolving: Stack to detect circular dependencies.
-    """
-
-    __slots__ = ('parent', 'resolving', 'services')
-
-    def __init__(self, parent: Container | None = None) -> None:
-        """Initialize the container.
+    def get_or_create_instance(self, factory: Callable[[], Any]) -> Any:
+        """Thread-safe instance creation for singletons."""
+        if self.lifetime != ServiceLifetime.SINGLETON:
+            return factory()
         
-        Args:
-            parent: Parent container for hierarchical resolution.
-        """
-        self.services: dict[str, ServiceDescriptor] = {}
-        self.parent = parent
-        self.resolving: list[str] = []
+        # Double-checked locking pattern
+        if self.instance is not None:
+            return self.instance
+        
+        with self._lock:
+            # Check again inside lock
+            if self.instance is not None:
+                return self.instance
+                
+            # Create instance
+            self.instance = factory()
+            return self.instance
 
+
+class ThreadSafeContainer:
+    """Thread-safe dependency injection container.
+    
+    This container uses fine-grained locking to ensure thread safety
+    while maintaining good performance.
+    """
+    
+    def __init__(self, parent: ThreadSafeContainer | None = None) -> None:
+        """Initialize the thread-safe container."""
+        self.parent = parent
+        self._services: dict[str, ServiceDescriptor] = {}
+        self._services_lock = threading.RLock()
+        self._resolving: threading.local = threading.local()
+        self._scoped_instances: threading.local = threading.local()
+    
+    @property
+    def _resolution_stack(self) -> list[str]:
+        """Get thread-local resolution stack."""
+        if not hasattr(self._resolving, 'stack'):
+            self._resolving.stack = []
+        return self._resolving.stack
+    
+    @property
+    def _scope_instances(self) -> dict[str, Any]:
+        """Get thread-local scoped instances."""
+        if not hasattr(self._scoped_instances, 'instances'):
+            self._scoped_instances.instances = {}
+        return self._scoped_instances.instances
+    
     def register(
         self,
         service_type: str,
@@ -90,234 +90,128 @@ class Container:
         lifetime: ServiceLifetime = ServiceLifetime.TRANSIENT,
         override: bool = False
     ) -> None:
-        """Register a service.
+        """Thread-safe service registration."""
+        with self._services_lock:
+            if service_type in self._services and not override:
+                raise ConfigurationError(
+                    f"Service already registered: {service_type}",
+                    config_key="di.service",
+                    provided_value=service_type
+                )
+            
+            descriptor = ServiceDescriptor(service_type, implementation, lifetime)
+            self._services[service_type] = descriptor
         
-        Args:
-            service_type: Service key or interface name.
-            implementation: Implementation class or factory.
-            lifetime: Service lifetime.
-            override: Whether to override existing registration.
-            
-        Raises:
-            ConfigurationError: If service already registered and override is False.
-            
-        Example:
-            >>> container.register("analyzer", DeadCodeAnalyzer)
-            >>> container.register("logger", lambda: get_logger(__name__))
-        """
-        if service_type in self.services and not override:
-            raise ConfigurationError(
-                f"Service already registered: {service_type}",
-                config_key="di.service",
-                provided_value=service_type
-            )
-
-        descriptor = ServiceDescriptor(service_type, implementation, lifetime)
-        self.services[service_type] = descriptor
-
         logger.debug(
             "Service registered",
             extra={
                 "service": service_type,
                 "lifetime": lifetime,
-                "override": override
+                "override": override,
+                "thread_id": threading.get_ident()
             }
         )
-
-    def register_singleton(
-        self,
-        service_type: str,
-        implementation: ServiceFactory,
-        override: bool = False
-    ) -> None:
-        """Register a singleton service.
-        
-        Convenience method for registering singletons.
-        
-        Args:
-            service_type: Service key or interface name.
-            implementation: Implementation class or factory.
-            override: Whether to override existing registration.
-        """
-        self.register(service_type, implementation, ServiceLifetime.SINGLETON, override)
-
-    def register_instance(
-        self,
-        service_type: str,
-        instance: Any,
-        override: bool = False
-    ) -> None:
-        """Register an existing instance as a singleton.
-        
-        Args:
-            service_type: Service key or interface name.
-            instance: The instance to register.
-            override: Whether to override existing registration.
-        """
-        self.register(service_type, lambda: instance, ServiceLifetime.SINGLETON, override)
-        # Pre-cache the instance
-        if service_type in self.services:
-            self.services[service_type].instance = instance
-
+    
     def resolve[T](self, service_type: str) -> T:
-        """Resolve a service with type safety.
-        
-        Uses PEP 695 type parameters for better type inference.
-        
-        Args:
-            service_type: Service key to resolve.
-            
-        Returns:
-            Service instance.
-            
-        Raises:
-            ConfigurationError: If service not found or circular dependency detected.
-            
-        Example:
-            >>> analyzer = container.resolve[BaseAnalyzer]("analyzer")
-        """
-        # Check for circular dependencies
-        if service_type in self.resolving:
-            cycle = " -> ".join(self.resolving + [service_type])
+        """Thread-safe service resolution."""
+        # Check for circular dependencies (thread-local)
+        if service_type in self._resolution_stack:
+            cycle = " -> ".join(self._resolution_stack + [service_type])
             raise ConfigurationError(
                 f"Circular dependency detected: {cycle}",
                 config_key="di.circular",
                 provided_value=service_type
             )
-
-        # Try to find service in this container
-        descriptor = self.services.get(service_type)
-
-        # If not found, try parent container
-        if descriptor is None and self.parent:
-            return self.parent.resolve(service_type)
-
+        
+        # Try to find service descriptor
+        descriptor = self._get_descriptor(service_type)
+        
         if descriptor is None:
-            available = list(self.services.keys())
-            if self.parent:
-                available.extend(self.parent.list_services())
-
+            available = self._list_all_services()
             raise ConfigurationError(
                 f"Service not registered: {service_type}",
                 config_key="di.service",
                 provided_value=service_type,
                 details={"available": available}
             )
-
-        # Return cached singleton
-        if descriptor.lifetime == ServiceLifetime.SINGLETON and descriptor.instance is not None:
-            return descriptor.instance
-
-        # Create new instance
-        self.resolving.append(service_type)
+        
+        # Add to resolution stack
+        self._resolution_stack.append(service_type)
         try:
-            instance = self._create_instance(descriptor)
-
-            # Cache singleton
-            if descriptor.lifetime == ServiceLifetime.SINGLETON:
-                descriptor.instance = instance
-
-            return instance
-
+            return self._create_instance_based_on_lifetime(descriptor)
         finally:
-            self.resolving.remove(service_type)
-
-    def resolve_optional[T](self, service_type: str, default: T | None = None) -> T | None:
-        """Resolve a service or return default if not found.
+            # Always remove from stack
+            self._resolution_stack.remove(service_type)
+    
+    def _get_descriptor(self, service_type: str) -> ServiceDescriptor | None:
+        """Get service descriptor with locking."""
+        # Check this container
+        with self._services_lock:
+            if service_type in self._services:
+                return self._services[service_type]
         
-        Args:
-            service_type: Service key to resolve.
-            default: Default value if service not found.
-            
-        Returns:
-            Service instance or default value.
-        """
-        try:
-            return self.resolve(service_type)
-        except ConfigurationError:
-            return default
-
-    def has_service(self, service_type: str) -> bool:
-        """Check if a service is registered.
-        
-        Args:
-            service_type: Service key to check.
-            
-        Returns:
-            True if service is registered.
-        """
-        if service_type in self.services:
-            return True
-        return self.parent.has_service(service_type) if self.parent else False
-
-    def list_services(self) -> list[str]:
-        """List all registered services.
-        
-        Returns:
-            List of service keys.
-        """
-        services = list(self.services.keys())
+        # Check parent container
         if self.parent:
-            services.extend(self.parent.list_services())
-        return sorted(set(services))
-
-    def create_scope(self) -> Container:
-        """Create a child container scope.
+            return self.parent._get_descriptor(service_type)
         
-        The child container inherits registrations from the parent
-        but can override them without affecting the parent.
+        return None
+    
+    def _list_all_services(self) -> list[str]:
+        """List all available services across hierarchy."""
+        services = set()
         
-        Returns:
-            Child container.
+        # This container's services
+        with self._services_lock:
+            services.update(self._services.keys())
+        
+        # Parent's services
+        if self.parent:
+            services.update(self.parent._list_all_services())
+        
+        return sorted(services)
+    
+    def _create_instance_based_on_lifetime(self, descriptor: ServiceDescriptor) -> Any:
+        """Create instance based on service lifetime."""
+        if descriptor.lifetime == ServiceLifetime.SINGLETON:
+            return descriptor.get_or_create_instance(
+                lambda: self._create_instance(descriptor)
+            )
+        elif descriptor.lifetime == ServiceLifetime.SCOPED:
+            # Check scoped instances
+            if descriptor.service_type in self._scope_instances:
+                return self._scope_instances[descriptor.service_type]
             
-        Example:
-            >>> child = container.create_scope()
-            >>> child.register("logger", CustomLogger)
-        """
-        return Container(parent=self)
-
+            # Create and cache in scope
+            instance = self._create_instance(descriptor)
+            self._scope_instances[descriptor.service_type] = instance
+            return instance
+        else:  # TRANSIENT
+            return self._create_instance(descriptor)
+    
     def _create_instance(self, descriptor: ServiceDescriptor) -> Any:
-        """Create an instance from a descriptor.
-        
-        Args:
-            descriptor: Service descriptor.
-            
-        Returns:
-            Service instance.
-        """
+        """Create an instance from a descriptor."""
         implementation = descriptor.implementation
-
+        
         # If it's a callable (factory), call it
         if callable(implementation) and not inspect.isclass(implementation):
             return implementation()
-
+        
         # If it's a class, try to auto-inject constructor parameters
         if inspect.isclass(implementation):
             return self._create_with_injection(implementation)
-
+        
         # Otherwise, just return it
         return implementation
-
+    
     def _create_with_injection[T](self, cls: type[T]) -> T:
-        """Create an instance with constructor injection.
-        
-        This is a basic implementation that tries to resolve
-        constructor parameters from the container.
-        
-        Args:
-            cls: Class to instantiate.
-            
-        Returns:
-            Class instance.
-        """
-        # Get constructor signature
+        """Create instance with constructor injection."""
         signature = inspect.signature(cls.__init__)
         kwargs = {}
-
+        
         for param_name, param in signature.parameters.items():
             if param_name == "self":
                 continue
-
+            
             # Try to resolve by parameter name
             if self.has_service(param_name):
                 kwargs[param_name] = self.resolve(param_name)
@@ -334,46 +228,118 @@ class Container:
                 logger.debug(
                     f"Cannot resolve parameter: {param_name} for {cls.__name__}"
                 )
-
-        return cls(**kwargs)
-
-
-# Global container instance
-_container: Container | None = None
-
-
-def get_container() -> Container:
-    """Get the global DI container.
-    
-    Returns:
-        The global container instance.
         
-    Example:
-        >>> container = get_container()
-        >>> container.register("parser", RobotASTParser)
-    """
-    global _container
-    if _container is None:
-        _container = Container()
-        _register_defaults(_container)
-    return _container
-
-
-def _register_defaults(container: Container) -> None:
-    """Register default services in the container.
+        return cls(**kwargs)
     
-    Args:
-        container: Container to configure.
-    """
+    def has_service(self, service_type: str) -> bool:
+        """Check if service is registered (thread-safe)."""
+        with self._services_lock:
+            if service_type in self._services:
+                return True
+        
+        return self.parent.has_service(service_type) if self.parent else False
+    
+    @contextmanager
+    def create_scope(self):
+        """Create a new resolution scope."""
+        # Save current scoped instances
+        old_instances = self._scope_instances.copy()
+        
+        # Clear scoped instances for new scope
+        self._scope_instances.clear()
+        
+        try:
+            yield self
+        finally:
+            # Restore previous scope
+            self._scope_instances.clear()
+            self._scope_instances.update(old_instances)
+    
+    def register_singleton(self, service_type: str, implementation: ServiceFactory, override: bool = False) -> None:
+        """Register a singleton service."""
+        self.register(service_type, implementation, ServiceLifetime.SINGLETON, override)
+    
+    def register_instance(self, service_type: str, instance: Any, override: bool = False) -> None:
+        """Register an existing instance as a singleton."""
+        with self._services_lock:
+            if service_type in self._services and not override:
+                raise ConfigurationError(
+                    f"Service already registered: {service_type}",
+                    config_key="di.service",
+                    provided_value=service_type
+                )
+            
+            # Create descriptor with pre-cached instance
+            descriptor = ServiceDescriptor(
+                service_type,
+                lambda: instance,
+                ServiceLifetime.SINGLETON
+            )
+            descriptor.instance = instance  # Pre-cache
+            self._services[service_type] = descriptor
+    
+    def clear(self) -> None:
+        """Clear all registrations and instances."""
+        with self._services_lock:
+            self._services.clear()
+        
+        # Clear thread-local data
+        if hasattr(self._resolving, 'stack'):
+            self._resolving.stack.clear()
+        if hasattr(self._scoped_instances, 'instances'):
+            self._scoped_instances.instances.clear()
+
+
+# Global container with thread safety
+_global_container: ThreadSafeContainer | None = None
+_global_container_lock = threading.RLock()
+
+
+def get_thread_safe_container() -> ThreadSafeContainer:
+    """Get the global thread-safe container."""
+    global _global_container
+    
+    if _global_container is None:
+        with _global_container_lock:
+            # Double-check pattern
+            if _global_container is None:
+                _global_container = ThreadSafeContainer()
+                _register_defaults(_global_container)
+    
+    return _global_container
+
+
+def _register_defaults(container: ThreadSafeContainer) -> None:
+    """Register default services in the container."""
     from .config import get_settings
     from .discovery import FileDiscoveryService
     from .metrics import get_metrics
     from .parsers import RobotASTParser
-
-    # Register core services
+    
+    # Register core services as singletons
     container.register_singleton("settings", get_settings)
     container.register_singleton("metrics", get_metrics)
     container.register("parser", RobotASTParser)
     container.register("file_discovery", FileDiscoveryService)
-
+    
     logger.debug("Default services registered")
+
+
+# Example usage with scoped resolution
+def example_scoped_usage():
+    """Example of using scoped services."""
+    container = get_thread_safe_container()
+    
+    # Register a scoped service
+    container.register("request_context", dict, ServiceLifetime.SCOPED)
+    
+    # Use in a scope
+    with container.create_scope():
+        ctx1 = container.resolve("request_context")
+        ctx2 = container.resolve("request_context")
+        assert ctx1 is ctx2  # Same instance within scope
+    
+    # Different scope gets different instance
+    with container.create_scope():
+        ctx3 = container.resolve("request_context")
+        assert ctx3 is not ctx1  # Different instance in new scope
