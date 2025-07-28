@@ -1,9 +1,11 @@
-# src/robot_optimizer/domain/value_objects/finding.py
+# src/robot_optimizer_core/domain/value_objects/finding.py
 """Finding value object for representing optimization findings.
 
-100% Pydantic v2 compliant implementation.
+100% Pydantic v2 compliant implementation with modern Python features.
 """
-from typing import Optional, Dict, Any
+from __future__ import annotations
+
+from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import Field, field_validator, computed_field, model_serializer
@@ -32,7 +34,7 @@ class Finding(ValueObject):
     message: str = Field(
         ..., min_length=1, description="Human-readable message"
     )
-    context: Optional[Dict[str, Any]] = Field(
+    context: dict[str, Any] | None = Field(
         default=None, description="Additional context"
     )
 
@@ -57,8 +59,8 @@ class Finding(ValueObject):
     @field_validator('context')
     @classmethod
     def ensure_context_copy(
-        cls, v: Optional[Dict[str, Any]]
-    ) -> Optional[Dict[str, Any]]:
+        cls, v: dict[str, Any] | None
+    ) -> dict[str, Any] | None:
         """Ensure context is a copy to maintain immutability.
 
         Args:
@@ -77,7 +79,7 @@ class Finding(ValueObject):
         location: Location,
         message: str,
         **context: Any
-    ) -> 'Finding':
+    ) -> Finding:
         """Factory method to create a finding with context.
 
         Uses Pydantic v2 model_validate for construction.
@@ -105,21 +107,18 @@ class Finding(ValueObject):
     @property
     def file_path(self) -> str:
         """Get the file path as a string."""
-        # pylint: disable=no-member
         return str(self.location.file_path)
 
     @computed_field  # type: ignore[misc]
     @property
     def line_number(self) -> int:
         """Get the line number."""
-        # pylint: disable=no-member
         return self.location.line
 
     @computed_field  # type: ignore[misc]
     @property
     def is_auto_fixable(self) -> bool:
         """Check if this finding can be automatically fixed."""
-        # pylint: disable=no-member
         return self.pattern.auto_fixable
 
     @computed_field  # type: ignore[misc]
@@ -134,7 +133,6 @@ class Finding(ValueObject):
         Returns:
             A formatted string suitable for console display
         """
-        # pylint: disable=no-member
         location = self.location.range_str
         severity_emoji = self.severity.emoji
 
@@ -156,7 +154,7 @@ class Finding(ValueObject):
 
         return "\n".join(lines)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert finding to a dictionary for serialization.
 
         Uses Pydantic v2 model_dump internally.
@@ -167,10 +165,8 @@ class Finding(ValueObject):
         # Use model_dump with mode='json' for proper serialization
         base_dict = self.model_dump(mode='json')
 
-        # pylint: disable=no-member
         # Add computed fields manually since they're excluded by default
-        return {
-            **base_dict,
+        return base_dict | {
             "file_path": self.file_path,
             "line_number": self.line_number,
             "is_auto_fixable": self.is_auto_fixable,
@@ -180,12 +176,11 @@ class Finding(ValueObject):
         }
 
     @model_serializer
-    def serialize_model(self) -> Dict[str, Any]:
+    def serialize_model(self) -> dict[str, Any]:
         """Custom serializer for Finding model.
 
         Pydantic v2 feature for custom serialization logic.
         """
-        # pylint: disable=no-member
         return {
             "id": str(self.id),
             "pattern": self.pattern.model_dump(),

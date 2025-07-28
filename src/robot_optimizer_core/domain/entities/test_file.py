@@ -1,10 +1,13 @@
+# src/robot_optimizer_core/domain/entities/test_file.py
 """Test file entity module for Robot Framework test file representation.
 
-100% Pydantic v2 compliant implementation.
+100% Pydantic v2 compliant implementation with modern Python features.
 """
+from __future__ import annotations
+
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Any, Dict
+from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import Field, field_validator, computed_field, model_validator
@@ -25,8 +28,8 @@ class TestFile(Entity[UUID]):
     size_bytes: int = Field(..., ge=0, description="File size in bytes")
     last_modified: datetime = Field(..., description="Last modification time")
     encoding: str = Field(default="utf-8", description="File encoding")
-    test_cases: List[str] = Field(default_factory=list, description="List of test case names")
-    keywords: List[str] = Field(default_factory=list, description="List of keyword names")
+    test_cases: list[str] = Field(default_factory=list, description="List of test case names")
+    keywords: list[str] = Field(default_factory=list, description="List of keyword names")
 
     @field_validator('path', mode='before')
     @classmethod
@@ -61,13 +64,12 @@ class TestFile(Entity[UUID]):
         return v.lower()
 
     @model_validator(mode='after')
-    def validate_content_size(self) -> 'TestFile':
+    def validate_content_size(self) -> TestFile:
         """Validate content size matches size_bytes approximately.
 
         Pydantic v2 model validator.
         """
         # Allow some variance due to encoding differences
-        # pylint: disable=no-member
         content_size = len(self.content.encode(self.encoding))
         if abs(content_size - self.size_bytes) > 100:  # 100 byte tolerance
             # Just log warning, don't fail - size might be from disk
@@ -75,7 +77,7 @@ class TestFile(Entity[UUID]):
         return self
 
     @classmethod
-    def from_path(cls, file_path: Path, content: Optional[str] = None) -> 'TestFile':
+    def from_path(cls, file_path: Path, content: str | None = None) -> TestFile:
         """Create a TestFile from a file path.
 
         Factory method using Pydantic v2 model_validate.
@@ -114,14 +116,12 @@ class TestFile(Entity[UUID]):
     @property
     def name(self) -> str:
         """Get the file name without extension."""
-        # pylint: disable=no-member
         return self.path.stem
 
     @computed_field  # type: ignore[misc]
     @property
     def extension(self) -> str:
         """Get the file extension."""
-        # pylint: disable=no-member
         return self.path.suffix
 
     @computed_field  # type: ignore[misc]
@@ -134,14 +134,12 @@ class TestFile(Entity[UUID]):
     @property
     def line_count(self) -> int:
         """Get the number of lines in the file."""
-        # pylint: disable=no-member
         return len(self.content.splitlines())
 
     @computed_field  # type: ignore[misc]
     @property
     def has_content(self) -> bool:
         """Check if file has any content."""
-        # pylint: disable=no-member
         return bool(self.content.strip())
 
     @computed_field  # type: ignore[misc]
@@ -150,7 +148,7 @@ class TestFile(Entity[UUID]):
         """Get file size in kilobytes."""
         return self.size_bytes / 1024.0
 
-    def get_lines(self, start: int, end: Optional[int] = None) -> List[str]:
+    def get_lines(self, start: int, end: int | None = None) -> list[str]:
         """Get specific lines from the file content.
 
         Args:
@@ -160,7 +158,6 @@ class TestFile(Entity[UUID]):
         Returns:
             List of lines
         """
-        # pylint: disable=no-member
         lines = self.content.splitlines()
         if end is None:
             end = start
@@ -171,7 +168,7 @@ class TestFile(Entity[UUID]):
 
         return lines[start_idx:end_idx]
 
-    def model_dump(self, **kwargs: Any) -> Dict[str, Any]:
+    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
         """Override to handle Path serialization.
 
         Pydantic v2 method.
@@ -183,7 +180,7 @@ class TestFile(Entity[UUID]):
         return data
 
     @classmethod
-    def get_schema(cls) -> Dict[str, Any]:
+    def get_schema(cls) -> dict[str, Any]:
         """Get the JSON schema for this model.
 
         Uses Pydantic v2's model_json_schema method.
