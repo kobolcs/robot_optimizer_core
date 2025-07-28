@@ -18,9 +18,8 @@ Example:
 """
 from __future__ import annotations
 
-import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pydantic import BaseSettings, Field, validator
 from pydantic.env_settings import SettingsSourceCallable
@@ -49,7 +48,7 @@ class Settings(BaseSettings):
         plugins_enabled: Whether to enable plugin loading.
         plugin_dirs: Directories to search for plugins.
     """
-    
+
     # File handling
     max_file_size_mb: float = Field(
         default=10.0,
@@ -57,13 +56,13 @@ class Settings(BaseSettings):
         ge=0.1,
         le=100.0
     )
-    
-    file_patterns: List[str] = Field(
+
+    file_patterns: list[str] = Field(
         default=["*.robot", "*.resource"],
         description="File patterns to include in analysis"
     )
-    
-    exclude_patterns: List[str] = Field(
+
+    exclude_patterns: list[str] = Field(
         default=[
             "**/.*",  # Hidden files
             "**/__pycache__/**",
@@ -77,7 +76,7 @@ class Settings(BaseSettings):
         ],
         description="File patterns to exclude from analysis"
     )
-    
+
     # Analysis settings
     max_line_length: int = Field(
         default=120,
@@ -85,21 +84,21 @@ class Settings(BaseSettings):
         ge=80,
         le=200
     )
-    
+
     max_test_case_lines: int = Field(
         default=50,
         description="Maximum lines for a test case",
         ge=20,
         le=200
     )
-    
+
     max_keyword_complexity: int = Field(
         default=10,
         description="Maximum cyclomatic complexity for keywords",
         ge=5,
         le=50
     )
-    
+
     # Sleep detection
     max_acceptable_sleep_seconds: float = Field(
         default=1.0,
@@ -107,7 +106,7 @@ class Settings(BaseSettings):
         ge=0.1,
         le=10.0
     )
-    
+
     # Flakiness detection
     flakiness_threshold: float = Field(
         default=0.05,
@@ -115,60 +114,60 @@ class Settings(BaseSettings):
         ge=0.01,
         le=0.5
     )
-    
+
     flakiness_min_runs: int = Field(
         default=4,
         description="Minimum test runs to determine flakiness",
         ge=3,
         le=100
     )
-    
+
     # System settings
     enable_metrics: bool = Field(
         default=True,
         description="Whether to enable metrics collection"
     )
-    
+
     log_level: str = Field(
         default="INFO",
         description="Logging level",
         regex="^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$"
     )
-    
+
     log_format_json: bool = Field(
         default=False,
         description="Whether to use JSON log formatting"
     )
-    
+
     # Plugin settings
     plugins_enabled: bool = Field(
         default=True,
         description="Whether to enable plugin loading"
     )
-    
-    plugin_dirs: List[Path] = Field(
+
+    plugin_dirs: list[Path] = Field(
         default_factory=list,
         description="Directories to search for plugins"
     )
-    
+
     # Pro version extension point
-    custom_settings: Dict[str, Any] = Field(
+    custom_settings: dict[str, Any] = Field(
         default_factory=dict,
         description="Custom settings for extensions"
     )
-    
+
     class Config:
         """Pydantic configuration."""
         env_prefix = "ROBOT_OPTIMIZER_"
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = False
-        
+
         # Allow extra fields for Pro extensions
         extra = "allow"
-    
+
     @validator("file_patterns", "exclude_patterns")
-    def validate_patterns(cls, v: List[str]) -> List[str]:
+    def validate_patterns(cls, v: list[str]) -> list[str]:
         """Validate file patterns.
         
         Args:
@@ -182,12 +181,12 @@ class Settings(BaseSettings):
         """
         if not v:
             raise ValueError("At least one pattern must be specified")
-        
+
         # Ensure patterns are strings
         return [str(p) for p in v]
-    
+
     @validator("plugin_dirs")
-    def validate_plugin_dirs(cls, v: List[Union[str, Path]]) -> List[Path]:
+    def validate_plugin_dirs(cls, v: list[str | Path]) -> list[Path]:
         """Validate and convert plugin directories to Path objects.
         
         Args:
@@ -206,7 +205,7 @@ class Settings(BaseSettings):
                 raise ValueError(f"Plugin path is not a directory: {path}")
             paths.append(path)
         return paths
-    
+
     @validator("log_level")
     def validate_log_level(cls, v: str) -> str:
         """Validate log level.
@@ -218,12 +217,12 @@ class Settings(BaseSettings):
             Uppercase log level.
         """
         return v.upper()
-    
+
     def get_custom_setting(
         self,
         key: str,
         default: Any = None,
-        setting_type: Optional[type] = None
+        setting_type: type | None = None
     ) -> Any:
         """Get a custom setting with type validation.
         
@@ -242,7 +241,7 @@ class Settings(BaseSettings):
             ConfigurationError: If type validation fails.
         """
         value = self.custom_settings.get(key, default)
-        
+
         if setting_type and value is not None:
             if not isinstance(value, setting_type):
                 raise ConfigurationError(
@@ -254,9 +253,9 @@ class Settings(BaseSettings):
                         "actual_type": type(value).__name__
                     }
                 )
-        
+
         return value
-    
+
     def set_custom_setting(self, key: str, value: Any) -> None:
         """Set a custom setting.
         
@@ -265,7 +264,7 @@ class Settings(BaseSettings):
             value: Setting value.
         """
         self.custom_settings[key] = value
-    
+
     def validate_settings(self) -> None:
         """Perform additional validation.
         
@@ -282,7 +281,7 @@ class Settings(BaseSettings):
                 config_key="max_file_size_mb",
                 provided_value=self.max_file_size_mb
             )
-        
+
         # Validate patterns don't conflict
         pattern_overlap = set(self.file_patterns) & set(self.exclude_patterns)
         if pattern_overlap:
@@ -291,7 +290,7 @@ class Settings(BaseSettings):
                 config_key="patterns",
                 provided_value=list(pattern_overlap)
             )
-    
+
     @property
     def max_file_size_bytes(self) -> int:
         """Get maximum file size in bytes.
@@ -300,15 +299,15 @@ class Settings(BaseSettings):
             Maximum file size in bytes.
         """
         return int(self.max_file_size_mb * 1024 * 1024)
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    def to_dict(self) -> dict[str, Any]:
         """Convert settings to dictionary.
         
         Returns:
             Dictionary of settings.
         """
         return self.dict(exclude_unset=False)
-    
+
     @classmethod
     def settings_customise_sources(
         cls,
@@ -342,7 +341,7 @@ class Settings(BaseSettings):
 
 
 # Global settings instance
-_settings: Optional[Settings] = None
+_settings: Settings | None = None
 
 
 def get_settings() -> Settings:

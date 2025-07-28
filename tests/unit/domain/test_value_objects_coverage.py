@@ -1,19 +1,23 @@
 # tests/unit/domain/test_value_objects_coverage.py
 """Additional tests for value objects to reach 90% coverage."""
-import pytest
-from pathlib import Path
-from decimal import Decimal
 from datetime import datetime
+from pathlib import Path
 
+import pytest
 from robot_optimizer.domain.value_objects import (
-    Location, Pattern, PatternType, Finding, Severity,
-    OptimizationSuggestion, OptimizationType
+    Finding,
+    Location,
+    OptimizationSuggestion,
+    OptimizationType,
+    Pattern,
+    PatternType,
+    Severity,
 )
 
 
 class TestLocationCoverage:
     """Complete coverage for Location value object."""
-    
+
     def test_location_contains_edge_cases(self):
         """Test all branches of contains method."""
         # Test with columns on end line
@@ -24,7 +28,7 @@ class TestLocationCoverage:
             end_line=15,
             end_column=20
         )
-        
+
         # Test point after end column on end line
         point = Location(
             file_path=Path("test.robot"),
@@ -32,14 +36,14 @@ class TestLocationCoverage:
             column=25
         )
         assert not outer.contains(point)
-        
+
         # Test with no column info
         loc_no_col = Location(
             file_path=Path("test.robot"),
             line=12
         )
         assert outer.contains(loc_no_col)
-    
+
     def test_location_range_str_variations(self):
         """Test all range_str format variations."""
         # With end line but no end column
@@ -54,7 +58,7 @@ class TestLocationCoverage:
 
 class TestFindingCoverage:
     """Complete coverage for Finding value object."""
-    
+
     def test_finding_format_console_no_recommendation_diff(self):
         """Test format_console when recommendation equals message."""
         pattern = Pattern(
@@ -63,18 +67,18 @@ class TestFindingCoverage:
             description="Duplicate found",
             recommendation="Duplicate found"  # Same as message
         )
-        
+
         finding = Finding.create(
             pattern=pattern,
             severity=Severity.ERROR,
             location=Location(Path("test.robot"), 10),
             message="Duplicate found"
         )
-        
+
         output = finding.format_for_console()
         assert output.count("Duplicate found") == 1  # Should not repeat
         assert "💡" not in output  # No recommendation emoji
-    
+
     def test_finding_to_dict_full(self):
         """Test to_dict with all fields populated."""
         pattern = Pattern.sleep_in_test("2s")
@@ -86,7 +90,7 @@ class TestFindingCoverage:
             duration="2s",
             line_text="Sleep    2s"
         )
-        
+
         data = finding.to_dict()
         assert data["pattern_type"] == "SLEEP_IN_TEST"
         assert data["pattern_name"] == pattern.name
@@ -97,7 +101,7 @@ class TestFindingCoverage:
 
 class TestOptimizationSuggestionCoverage:
     """Complete coverage for OptimizationSuggestion."""
-    
+
     def test_optimization_risk_levels(self):
         """Test all risk level calculations."""
         finding = Finding.create(
@@ -106,7 +110,7 @@ class TestOptimizationSuggestionCoverage:
             location=Location(Path("test.robot"), 1),
             message="Test"
         )
-        
+
         # High risk (not safe)
         high_risk = OptimizationSuggestion(
             finding_id=str(finding.id),
@@ -119,7 +123,7 @@ class TestOptimizationSuggestionCoverage:
             is_safe=False
         )
         assert high_risk.risk_level == "high"
-        
+
         # Medium risk (low confidence)
         medium_risk = OptimizationSuggestion(
             finding_id=str(finding.id),
@@ -132,7 +136,7 @@ class TestOptimizationSuggestionCoverage:
             is_safe=True
         )
         assert medium_risk.risk_level == "medium"
-        
+
         # Low risk
         low_risk = OptimizationSuggestion(
             finding_id=str(finding.id),
@@ -145,7 +149,7 @@ class TestOptimizationSuggestionCoverage:
             is_safe=True
         )
         assert low_risk.risk_level == "low"
-        
+
         # Minimal risk
         minimal_risk = OptimizationSuggestion(
             finding_id=str(finding.id),
@@ -158,7 +162,7 @@ class TestOptimizationSuggestionCoverage:
             is_safe=True
         )
         assert minimal_risk.risk_level == "minimal"
-    
+
     def test_optimization_model_dump_json_mode(self):
         """Test model_dump includes computed fields in JSON mode."""
         finding = Finding.create(
@@ -167,7 +171,7 @@ class TestOptimizationSuggestionCoverage:
             location=Location(Path("test.robot"), 1),
             message="Test"
         )
-        
+
         suggestion = OptimizationSuggestion(
             finding_id=str(finding.id),
             optimization_type=OptimizationType.REPLACE_SLEEP,
@@ -178,13 +182,13 @@ class TestOptimizationSuggestionCoverage:
             estimated_impact="High",
             prerequisites=["Import SeleniumLibrary"]
         )
-        
+
         # JSON mode should include computed fields
         json_data = suggestion.model_dump(mode='json')
         assert json_data['is_high_confidence'] is True
         assert json_data['requires_prerequisites'] is True
         assert json_data['risk_level'] == "minimal"
-        
+
         # Normal mode might not include them
         normal_data = suggestion.model_dump()
         assert 'finding_id' in normal_data
@@ -192,7 +196,7 @@ class TestOptimizationSuggestionCoverage:
 
 class TestPatternCoverage:
     """Complete coverage for Pattern value object."""
-    
+
     def test_pattern_all_categories(self):
         """Ensure all PatternType values have proper categories."""
         # Test patterns that might return "Other"
@@ -205,7 +209,7 @@ class TestPatternCoverage:
             )
             # All our pattern types should have defined categories
             assert pattern.category != "Other"
-    
+
     def test_pattern_factory_with_custom_threshold(self):
         """Test factory method with custom parameters."""
         pattern = Pattern.long_test_case(100, threshold=75)
@@ -215,11 +219,11 @@ class TestPatternCoverage:
 
 class TestFlakinessCoverage:
     """Additional tests for flakiness-related value objects."""
-    
+
     def test_flakiness_stats_edge_cases(self):
         """Test FlakinessStats edge cases."""
         from robot_optimizer.domain.value_objects.flakiness_stats import FlakinessStats
-        
+
         # Test with no failures but many runs
         stable = FlakinessStats(
             test_name="Stable Test",
@@ -230,7 +234,7 @@ class TestFlakinessCoverage:
         assert stable.failure_rate == 0.0
         assert not stable.is_flaky  # 0% failure rate is not flaky
         assert stable.severity_level == "INFO"
-        
+
         # Test 100% failure rate
         broken = FlakinessStats(
             test_name="Broken Test",
@@ -240,7 +244,7 @@ class TestFlakinessCoverage:
         )
         assert broken.failure_rate == 1.0
         assert not broken.is_flaky  # 100% failure rate is not flaky, it's broken
-        
+
         # Test with too few runs
         insufficient = FlakinessStats(
             test_name="New Test",
@@ -249,7 +253,7 @@ class TestFlakinessCoverage:
             failures=1
         )
         assert not insufficient.is_flaky  # Less than 4 runs
-        
+
         # Test severity boundaries
         low_flaky = FlakinessStats(
             test_name="Low Flaky",
@@ -258,7 +262,7 @@ class TestFlakinessCoverage:
             failures=3  # 3% failure rate
         )
         assert low_flaky.severity_level == "INFO"
-        
+
         medium_flaky = FlakinessStats(
             test_name="Medium Flaky",
             file_path=Path("test.robot"),
@@ -270,11 +274,11 @@ class TestFlakinessCoverage:
 
 class TestTestResultCoverage:
     """Complete coverage for TestResult value object."""
-    
+
     def test_test_result_skip_status(self):
         """Test SKIP status handling."""
         from robot_optimizer.domain.value_objects.test_result import TestResult
-        
+
         result = TestResult(
             test_name="Skipped Test",
             file_path=Path("test.robot"),
@@ -282,10 +286,10 @@ class TestTestResultCoverage:
             execution_time=0.0,
             timestamp=datetime.now()
         )
-        
+
         assert not result.is_failure
         assert not result.is_success
-        
+
         # Test with error message on skip
         result_with_msg = TestResult(
             test_name="Skipped Test",

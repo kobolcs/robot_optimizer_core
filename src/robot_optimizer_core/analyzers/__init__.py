@@ -34,6 +34,10 @@ from __future__ import annotations
 # Base classes
 from .base import BaseAnalyzer
 
+# Built-in analyzers
+from .dead_code import DeadCodeAnalyzer
+from .flakiness import FlakinessAnalyzer
+
 # Registry
 from .registry import (
     AnalyzerRegistry,
@@ -43,16 +47,12 @@ from .registry import (
     list_analyzers,
     register_analyzer,
 )
-
-# Built-in analyzers
-from .dead_code import DeadCodeAnalyzer
-from .flakiness import FlakinessAnalyzer
 from .sleep_detector import SleepDetector
 
 __all__ = [
     # Base
     "BaseAnalyzer",
-    
+
     # Registry
     "AnalyzerRegistry",
     "register_analyzer",
@@ -60,7 +60,7 @@ __all__ = [
     "list_analyzers",
     "get_analyzer_info",
     "get_analyzer_registry",
-    
+
     # Built-in analyzers
     "DeadCodeAnalyzer",
     "SleepDetector",

@@ -20,12 +20,11 @@ Example:
 from __future__ import annotations
 
 import time
-from abc import ABC, abstractmethod
 from collections import defaultdict
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Callable, Generator, Protocol, runtime_checkable
+from dataclasses import dataclass
+from typing import Any, Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -35,7 +34,7 @@ class MetricsBackend(Protocol):
     This protocol defines the interface that metrics backends must implement.
     The Pro version can provide additional backends like Prometheus or StatsD.
     """
-    
+
     def increment(self, metric: str, value: int = 1, tags: dict[str, str] | None = None) -> None:
         """Increment a counter metric.
         
@@ -45,7 +44,7 @@ class MetricsBackend(Protocol):
             tags: Optional tags for the metric.
         """
         ...
-    
+
     def gauge(self, metric: str, value: float, tags: dict[str, str] | None = None) -> None:
         """Set a gauge metric.
         
@@ -55,7 +54,7 @@ class MetricsBackend(Protocol):
             tags: Optional tags for the metric.
         """
         ...
-    
+
     def timing(self, metric: str, value: float, tags: dict[str, str] | None = None) -> None:
         """Record a timing metric.
         
@@ -65,7 +64,7 @@ class MetricsBackend(Protocol):
             tags: Optional tags for the metric.
         """
         ...
-    
+
     def get_metrics(self) -> dict[str, Any]:
         """Get all collected metrics.
         
@@ -73,7 +72,7 @@ class MetricsBackend(Protocol):
             Dictionary of metrics.
         """
         ...
-    
+
     def reset(self) -> None:
         """Reset all metrics."""
         ...
@@ -86,12 +85,12 @@ class TimingStats:
     sum: float = 0.0
     min: float = float('inf')
     max: float = 0.0
-    
+
     @property
     def mean(self) -> float:
         """Calculate mean timing."""
         return self.sum / self.count if self.count > 0 else 0.0
-    
+
     def add(self, value: float) -> None:
         """Add a timing value."""
         self.count += 1
@@ -111,31 +110,31 @@ class InMemoryBackend:
         gauges: Gauge metrics.
         timings: Timing metrics with statistics.
     """
-    
-    __slots__ = ('counters', 'gauges', 'timings', '_start_time')
-    
+
+    __slots__ = ('_start_time', 'counters', 'gauges', 'timings')
+
     def __init__(self) -> None:
         """Initialize the in-memory backend."""
         self.counters: dict[str, int] = defaultdict(int)
         self.gauges: dict[str, float] = {}
         self.timings: dict[str, list[float]] = defaultdict(list)
         self._start_time = time.time()
-    
+
     def increment(self, metric: str, value: int = 1, tags: dict[str, str] | None = None) -> None:
         """Increment a counter metric."""
         key = self._make_key(metric, tags)
         self.counters[key] += value
-    
+
     def gauge(self, metric: str, value: float, tags: dict[str, str] | None = None) -> None:
         """Set a gauge metric."""
         key = self._make_key(metric, tags)
         self.gauges[key] = value
-    
+
     def timing(self, metric: str, value: float, tags: dict[str, str] | None = None) -> None:
         """Record a timing metric."""
         key = self._make_key(metric, tags)
         self.timings[key].append(value)
-    
+
     def get_metrics(self) -> dict[str, Any]:
         """Get all collected metrics with statistics."""
         return {
@@ -153,14 +152,14 @@ class InMemoryBackend:
             },
             "uptime_seconds": time.time() - self._start_time,
         }
-    
+
     def reset(self) -> None:
         """Reset all metrics."""
         self.counters.clear()
         self.gauges.clear()
         self.timings.clear()
         self._start_time = time.time()
-    
+
     def _make_key(self, metric: str, tags: dict[str, str] | None = None) -> str:
         """Create a metric key with tags.
         
@@ -173,7 +172,7 @@ class InMemoryBackend:
         """
         if not tags:
             return metric
-        
+
         tag_str = ",".join(f"{k}={v}" for k, v in sorted(tags.items()))
         return f"{metric}{{{tag_str}}}"
 
@@ -189,9 +188,9 @@ class MetricsCollector:
         enabled: Whether metrics collection is enabled.
         filters: List of metric name filters.
     """
-    
+
     __slots__ = ('backend', 'enabled', 'filters')
-    
+
     def __init__(
         self,
         backend: MetricsBackend | None = None,
@@ -208,10 +207,10 @@ class MetricsCollector:
         self.backend = backend or InMemoryBackend()
         self.enabled = enabled
         self.filters = filters or []
-        
+
         # Add default GDPR filter
         self.filters.append(self._gdpr_filter)
-    
+
     def increment(self, metric: str, value: int = 1, tags: dict[str, str] | None = None) -> None:
         """Increment a counter metric.
         
@@ -225,10 +224,10 @@ class MetricsCollector:
         """
         if not self.enabled or not self._should_collect(metric):
             return
-        
+
         self._validate_tags(tags)
         self.backend.increment(metric, value, tags)
-    
+
     def gauge(self, metric: str, value: float, tags: dict[str, str] | None = None) -> None:
         """Set a gauge metric.
         
@@ -242,10 +241,10 @@ class MetricsCollector:
         """
         if not self.enabled or not self._should_collect(metric):
             return
-        
+
         self._validate_tags(tags)
         self.backend.gauge(metric, value, tags)
-    
+
     def timing(self, metric: str, value: float, tags: dict[str, str] | None = None) -> None:
         """Record a timing metric.
         
@@ -259,10 +258,10 @@ class MetricsCollector:
         """
         if not self.enabled or not self._should_collect(metric):
             return
-        
+
         self._validate_tags(tags)
         self.backend.timing(metric, value, tags)
-    
+
     @contextmanager
     def timer(self, metric: str, tags: dict[str, str] | None = None) -> Generator[None, None, None]:
         """Context manager for timing operations.
@@ -284,7 +283,7 @@ class MetricsCollector:
         finally:
             duration = time.time() - start_time
             self.timing(metric, duration, tags)
-    
+
     def get_metrics(self) -> dict[str, Any]:
         """Get all collected metrics.
         
@@ -294,11 +293,11 @@ class MetricsCollector:
         if not self.enabled:
             return {}
         return self.backend.get_metrics()
-    
+
     def reset(self) -> None:
         """Reset all metrics."""
         self.backend.reset()
-    
+
     def _should_collect(self, metric: str) -> bool:
         """Check if a metric should be collected.
         
@@ -309,7 +308,7 @@ class MetricsCollector:
             True if metric should be collected.
         """
         return all(f(metric) for f in self.filters)
-    
+
     def _gdpr_filter(self, metric: str) -> bool:
         """GDPR compliance filter.
         
@@ -327,10 +326,10 @@ class MetricsCollector:
             "user.", "email.", "name.", "path.full",
             "file.absolute", "personal.", "private."
         ]
-        
+
         metric_lower = metric.lower()
         return not any(pattern in metric_lower for pattern in blocked_patterns)
-    
+
     def _validate_tags(self, tags: dict[str, str] | None) -> None:
         """Validate that tags don't contain personal data.
         
@@ -342,9 +341,9 @@ class MetricsCollector:
         """
         if not tags:
             return
-        
+
         blocked_keys = {"user", "email", "name", "ip", "host", "username"}
-        
+
         for key in tags:
             if key.lower() in blocked_keys:
                 raise ValueError(

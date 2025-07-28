@@ -8,8 +8,7 @@ from ..value_objects.robot_ast import RobotSuite
 
 class RobotParserRepository(ABC):
     """Repository interface for parsing Robot Framework files."""
-    
+
     @abstractmethod
     def parse_suite(self, test_file: TestFile) -> RobotSuite:
         """Parse a test file into a RobotSuite."""
-        pass

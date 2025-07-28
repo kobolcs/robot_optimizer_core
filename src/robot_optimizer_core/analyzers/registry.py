@@ -21,7 +21,7 @@ Example:
 from __future__ import annotations
 
 from functools import cache
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from ..di import get_container
 from ..exceptions import PluginError
@@ -31,7 +31,7 @@ from .base import BaseAnalyzer
 
 if TYPE_CHECKING:
     from typing import TypeAlias
-    
+
     AnalyzerClass: TypeAlias = type[BaseAnalyzer]
 
 logger = get_logger(__name__)
@@ -48,9 +48,9 @@ class AnalyzerRegistry:
         instances: Cache of analyzer instances.
         default_analyzers: List of analyzer names to use by default.
     """
-    
-    __slots__ = ('analyzers', 'instances', 'default_analyzers')
-    
+
+    __slots__ = ('analyzers', 'default_analyzers', 'instances')
+
     def __init__(self) -> None:
         """Initialize the analyzer registry."""
         self.analyzers: dict[str, AnalyzerClass] = {}
@@ -60,7 +60,7 @@ class AnalyzerRegistry:
             "sleep_detector",
             "flakiness"
         ]
-    
+
     def register(
         self,
         name: str,
@@ -83,7 +83,7 @@ class AnalyzerRegistry:
                 plugin_name=name,
                 plugin_type="analyzer"
             )
-        
+
         # Validate it's a proper analyzer
         if not issubclass(analyzer_class, BaseAnalyzer):
             raise PluginError(
@@ -91,13 +91,13 @@ class AnalyzerRegistry:
                 plugin_name=name,
                 plugin_type="analyzer"
             )
-        
+
         self.analyzers[name] = analyzer_class
-        
+
         # Clear cached instance if overriding
         if override and name in self.instances:
             del self.instances[name]
-        
+
         logger.info(
             "Analyzer registered",
             extra={
@@ -106,7 +106,7 @@ class AnalyzerRegistry:
                 "override": override
             }
         )
-    
+
     def get(self, name: str) -> BaseAnalyzer:
         """Get an analyzer instance.
         
@@ -125,7 +125,7 @@ class AnalyzerRegistry:
         # Return cached instance
         if name in self.instances:
             return self.instances[name]
-        
+
         # Check built-in analyzers
         if name not in self.analyzers:
             # Try plugin registry
@@ -140,10 +140,10 @@ class AnalyzerRegistry:
                     plugin_type="analyzer",
                     details={"available": self.list()}
                 )
-        
+
         # Create instance
         analyzer_class = self.analyzers[name]
-        
+
         # Try dependency injection
         container = get_container()
         if container.has_service(f"analyzer.{name}"):
@@ -151,12 +151,12 @@ class AnalyzerRegistry:
         else:
             # Create with default config
             instance = analyzer_class()
-        
+
         # Cache instance
         self.instances[name] = instance
-        
+
         return instance
-    
+
     def list(self) -> list[str]:
         """List all registered analyzer names.
         
@@ -165,13 +165,13 @@ class AnalyzerRegistry:
         """
         # Get built-in analyzers
         names = set(self.analyzers.keys())
-        
+
         # Add plugin analyzers
         plugin_registry = get_plugin_registry()
         names.update(plugin_registry.list_components("analyzers"))
-        
+
         return sorted(names)
-    
+
     def get_info(self, name: str) -> dict[str, str]:
         """Get information about an analyzer.
         
@@ -182,7 +182,7 @@ class AnalyzerRegistry:
             Dictionary with analyzer information.
         """
         analyzer = self.get(name)
-        
+
         return {
             "name": analyzer.name,
             "description": analyzer.description,
@@ -192,7 +192,7 @@ class AnalyzerRegistry:
             "supports_auto_fix": str(analyzer.supports_auto_fix),
             "tags": ", ".join(analyzer.tags) if analyzer.tags else ""
         }
-    
+
     def get_default_analyzers(self) -> list[BaseAnalyzer]:
         """Get default analyzer instances.
         
@@ -200,7 +200,7 @@ class AnalyzerRegistry:
             List of default analyzer instances.
         """
         return [self.get(name) for name in self.default_analyzers]
-    
+
     def set_default_analyzers(self, names: list[str]) -> None:
         """Set the default analyzers.
         
@@ -215,16 +215,16 @@ class AnalyzerRegistry:
                 plugin_type="analyzer",
                 details={"available": sorted(available)}
             )
-        
+
         self.default_analyzers = names
-    
+
     def clear_cache(self) -> None:
         """Clear the instance cache.
         
         This forces new instances to be created on next access.
         """
         self.instances.clear()
-    
+
     def unregister(self, name: str) -> None:
         """Unregister an analyzer.
         
@@ -233,7 +233,7 @@ class AnalyzerRegistry:
         """
         self.analyzers.pop(name, None)
         self.instances.pop(name, None)
-        
+
         # Also remove from plugin registry
         plugin_registry = get_plugin_registry()
         plugin_registry.unregister("analyzers", name)
@@ -265,13 +265,13 @@ def _register_built_in_analyzers(registry: AnalyzerRegistry) -> None:
     """
     # Import here to avoid circular imports
     from .dead_code import DeadCodeAnalyzer
-    from .sleep_detector import SleepDetector
     from .flakiness import FlakinessAnalyzer
-    
+    from .sleep_detector import SleepDetector
+
     registry.register("dead_code", DeadCodeAnalyzer)
     registry.register("sleep_detector", SleepDetector)
     registry.register("flakiness", FlakinessAnalyzer)
-    
+
     logger.debug("Built-in analyzers registered")
 
 

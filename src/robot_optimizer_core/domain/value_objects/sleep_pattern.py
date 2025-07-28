@@ -4,9 +4,9 @@
 100% Pydantic v2 compliant implementation.
 """
 from decimal import Decimal
-from typing import Dict, Any
+from typing import Any
 
-from pydantic import Field, field_validator, computed_field, model_validator
+from pydantic import Field, computed_field, field_validator, model_validator
 
 from ..base import ValueObject
 from .pattern import Pattern
@@ -149,7 +149,7 @@ class SleepPattern(ValueObject):
         """Generate hash for the sleep pattern."""
         return hash((self.duration, self.unit, self.line_number))
 
-    def model_dump(self, **kwargs: Any) -> Dict[str, Any]:
+    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
         """Override to include computed fields in JSON mode.
 
         Pydantic v2 method.

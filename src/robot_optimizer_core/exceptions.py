@@ -35,12 +35,12 @@ class RobotOptimizerError(Exception):
         message: Human-readable error message.
         details: Additional error details as key-value pairs.
     """
-    
-    __slots__ = ('message', 'details')
-    
+
+    __slots__ = ('details', 'message')
+
     def __init__(
-        self, 
-        message: str, 
+        self,
+        message: str,
         details: dict[str, Any] | None = None
     ) -> None:
         """Initialize the exception.
@@ -52,7 +52,7 @@ class RobotOptimizerError(Exception):
         super().__init__(message)
         self.message = message
         self.details = details or {}
-    
+
     def __str__(self) -> str:
         """Return string representation of the error.
         
@@ -75,9 +75,9 @@ class AnalysisError(RobotOptimizerError):
         file_path: Path to the file that caused the error.
         analyzer: Name of the analyzer that failed (if applicable).
     """
-    
-    __slots__ = ('file_path', 'analyzer')
-    
+
+    __slots__ = ('analyzer', 'file_path')
+
     def __init__(
         self,
         message: str,
@@ -96,7 +96,7 @@ class AnalysisError(RobotOptimizerError):
         super().__init__(message, details)
         self.file_path = file_path
         self.analyzer = analyzer
-        
+
         # Add to details for consistency
         if file_path:
             self.details["file_path"] = str(file_path)
@@ -114,9 +114,9 @@ class ParsingError(AnalysisError):
         line_number: Line number where parsing failed (if known).
         column: Column number where parsing failed (if known).
     """
-    
-    __slots__ = ('line_number', 'column')
-    
+
+    __slots__ = ('column', 'line_number')
+
     def __init__(
         self,
         message: str,
@@ -137,7 +137,7 @@ class ParsingError(AnalysisError):
         super().__init__(message, file_path, details=details)
         self.line_number = line_number
         self.column = column
-        
+
         if line_number:
             self.details["line_number"] = line_number
         if column:
@@ -154,9 +154,9 @@ class ConfigurationError(RobotOptimizerError):
         config_key: The configuration key that caused the error.
         provided_value: The invalid value that was provided.
     """
-    
+
     __slots__ = ('config_key', 'provided_value')
-    
+
     def __init__(
         self,
         message: str,
@@ -175,7 +175,7 @@ class ConfigurationError(RobotOptimizerError):
         super().__init__(message, details)
         self.config_key = config_key
         self.provided_value = provided_value
-        
+
         if config_key:
             self.details["config_key"] = config_key
         if provided_value is not None:
@@ -192,9 +192,9 @@ class PluginError(RobotOptimizerError):
         plugin_name: Name of the plugin that caused the error.
         plugin_type: Type of plugin (e.g., 'analyzer', 'parser').
     """
-    
+
     __slots__ = ('plugin_name', 'plugin_type')
-    
+
     def __init__(
         self,
         message: str,
@@ -213,7 +213,7 @@ class PluginError(RobotOptimizerError):
         super().__init__(message, details)
         self.plugin_name = plugin_name
         self.plugin_type = plugin_type
-        
+
         if plugin_name:
             self.details["plugin_name"] = plugin_name
         if plugin_type:
@@ -231,9 +231,9 @@ class ValidationError(RobotOptimizerError):
         invalid_value: The value that failed validation.
         validation_rule: Description of the validation rule.
     """
-    
+
     __slots__ = ('field_name', 'invalid_value', 'validation_rule')
-    
+
     def __init__(
         self,
         message: str,
@@ -255,7 +255,7 @@ class ValidationError(RobotOptimizerError):
         self.field_name = field_name
         self.invalid_value = invalid_value
         self.validation_rule = validation_rule
-        
+
         if field_name:
             self.details["field_name"] = field_name
         if invalid_value is not None:
@@ -269,7 +269,7 @@ class FileNotFoundError(AnalysisError):
     
     This is a specific type of AnalysisError for missing files.
     """
-    
+
     def __init__(
         self,
         file_path: Path,
@@ -294,9 +294,9 @@ class RepositoryError(RobotOptimizerError):
         repository_name: Name of the repository that failed.
         operation: The operation that failed (e.g., 'save', 'load').
     """
-    
-    __slots__ = ('repository_name', 'operation')
-    
+
+    __slots__ = ('operation', 'repository_name')
+
     def __init__(
         self,
         message: str,
@@ -315,7 +315,7 @@ class RepositoryError(RobotOptimizerError):
         super().__init__(message, details)
         self.repository_name = repository_name
         self.operation = operation
-        
+
         if repository_name:
             self.details["repository_name"] = repository_name
         if operation:

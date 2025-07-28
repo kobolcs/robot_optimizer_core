@@ -1,11 +1,15 @@
 # tests/domain/test_value_objects.py
-import pytest
 from pathlib import Path
 from uuid import uuid4
-from pydantic import ValidationError
 
+import pytest
+from pydantic import ValidationError
 from robot_optimizer.domain.value_objects import (
-    Severity, Location, Pattern, PatternType, Finding
+    Finding,
+    Location,
+    Pattern,
+    PatternType,
+    Severity,
 )
 
 

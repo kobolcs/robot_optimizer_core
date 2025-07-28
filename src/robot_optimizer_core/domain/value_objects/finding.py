@@ -8,12 +8,12 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID, uuid4
 
-from pydantic import Field, field_validator, computed_field, model_serializer
+from pydantic import Field, computed_field, field_validator, model_serializer
 
 from ..base import ValueObject
-from .severity import Severity
 from .location import Location
 from .pattern import Pattern
+from .severity import Severity
 
 
 class Finding(ValueObject):

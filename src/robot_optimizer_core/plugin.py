@@ -33,9 +33,10 @@ from __future__ import annotations
 import importlib
 import importlib.util
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Type, TypeVar
+from typing import Any, TypeVar
 
 from .exceptions import PluginError
 from .logging import get_logger
@@ -66,16 +67,16 @@ class PluginMetadata:
     version: str
     description: str
     author: str
-    email: Optional[str] = None
-    url: Optional[str] = None
-    requires: List[str] = field(default_factory=list)
-    tags: List[str] = field(default_factory=list)
-    
+    email: str | None = None
+    url: str | None = None
+    requires: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
+
     def __post_init__(self) -> None:
         """Validate metadata after initialization."""
         if not self.name or not self.name.replace("-", "").replace("_", "").isalnum():
             raise ValueError(f"Invalid plugin name: {self.name}")
-        
+
         # Basic semver validation
         parts = self.version.split(".")
         if len(parts) != 3 or not all(p.isdigit() for p in parts):
@@ -91,16 +92,16 @@ class PluginRegistry:
     Attributes:
         components: Dictionary of component types and their instances.
     """
-    
+
     def __init__(self) -> None:
         """Initialize the plugin registry."""
-        self.components: Dict[str, Dict[str, Any]] = {
+        self.components: dict[str, dict[str, Any]] = {
             "analyzers": {},
             "parsers": {},
             "backends": {},
             "filters": {},
         }
-    
+
     def register(
         self,
         component_type: str,
@@ -124,13 +125,13 @@ class PluginRegistry:
                 f"Unknown component type: {component_type}",
                 details={"valid_types": list(self.components.keys())}
             )
-        
+
         if name in self.components[component_type] and not override:
             raise PluginError(
                 f"Component already registered: {component_type}.{name}",
                 details={"component_type": component_type, "name": name}
             )
-        
+
         self.components[component_type][name] = component
         logger.info(
             "Component registered",
@@ -140,7 +141,7 @@ class PluginRegistry:
                 "override": override
             }
         )
-    
+
     def get(self, component_type: str, name: str) -> Any:
         """Get a registered component.
         
@@ -156,7 +157,7 @@ class PluginRegistry:
         """
         if component_type not in self.components:
             raise PluginError(f"Unknown component type: {component_type}")
-        
+
         if name not in self.components[component_type]:
             raise PluginError(
                 f"Component not found: {component_type}.{name}",
@@ -166,10 +167,10 @@ class PluginRegistry:
                     "available": list(self.components[component_type].keys())
                 }
             )
-        
+
         return self.components[component_type][name]
-    
-    def list_components(self, component_type: str) -> List[str]:
+
+    def list_components(self, component_type: str) -> list[str]:
         """List all components of a given type.
         
         Args:
@@ -181,7 +182,7 @@ class PluginRegistry:
         if component_type not in self.components:
             return []
         return list(self.components[component_type].keys())
-    
+
     def unregister(self, component_type: str, name: str) -> None:
         """Unregister a component.
         
@@ -203,8 +204,8 @@ class Plugin(ABC):
         registry: The plugin registry for component registration.
         is_active: Whether the plugin is currently active.
     """
-    
-    def __init__(self, registry: Optional[PluginRegistry] = None) -> None:
+
+    def __init__(self, registry: PluginRegistry | None = None) -> None:
         """Initialize the plugin.
         
         Args:
@@ -212,7 +213,7 @@ class Plugin(ABC):
         """
         self.registry = registry or get_plugin_registry()
         self.is_active = False
-    
+
     @property
     @abstractmethod
     def metadata(self) -> PluginMetadata:
@@ -221,8 +222,7 @@ class Plugin(ABC):
         Returns:
             Plugin metadata instance.
         """
-        pass
-    
+
     @abstractmethod
     def activate(self) -> None:
         """Activate the plugin.
@@ -230,8 +230,7 @@ class Plugin(ABC):
         This method is called when the plugin is loaded. It should
         register all components provided by the plugin.
         """
-        pass
-    
+
     def deactivate(self) -> None:
         """Deactivate the plugin.
         
@@ -240,12 +239,11 @@ class Plugin(ABC):
         
         The default implementation does nothing.
         """
-        pass
-    
+
     def register_analyzer(
         self,
         name: str,
-        analyzer_class: Type[Any],
+        analyzer_class: type[Any],
         override: bool = False
     ) -> None:
         """Register an analyzer.
@@ -256,11 +254,11 @@ class Plugin(ABC):
             override: Whether to override existing analyzer.
         """
         self.registry.register("analyzers", name, analyzer_class, override)
-    
+
     def register_parser(
         self,
         name: str,
-        parser_class: Type[Any],
+        parser_class: type[Any],
         override: bool = False
     ) -> None:
         """Register a parser.
@@ -271,11 +269,11 @@ class Plugin(ABC):
             override: Whether to override existing parser.
         """
         self.registry.register("parsers", name, parser_class, override)
-    
+
     def register_metrics_backend(
         self,
         name: str,
-        backend_class: Type[Any],
+        backend_class: type[Any],
         override: bool = False
     ) -> None:
         """Register a metrics backend.
@@ -286,7 +284,7 @@ class Plugin(ABC):
             override: Whether to override existing backend.
         """
         self.registry.register("backends", name, backend_class, override)
-    
+
     def register_filter(
         self,
         name: str,
@@ -312,17 +310,17 @@ class PluginManager:
         registry: The plugin registry.
         plugins: Dictionary of loaded plugins.
     """
-    
-    def __init__(self, registry: Optional[PluginRegistry] = None) -> None:
+
+    def __init__(self, registry: PluginRegistry | None = None) -> None:
         """Initialize the plugin manager.
         
         Args:
             registry: Plugin registry to use.
         """
         self.registry = registry or get_plugin_registry()
-        self.plugins: Dict[str, Plugin] = {}
-    
-    def load_plugin(self, plugin_class: Type[Plugin]) -> None:
+        self.plugins: dict[str, Plugin] = {}
+
+    def load_plugin(self, plugin_class: type[Plugin]) -> None:
         """Load a plugin from a class.
         
         Args:
@@ -334,17 +332,17 @@ class PluginManager:
         try:
             plugin = plugin_class(self.registry)
             metadata = plugin.metadata
-            
+
             if metadata.name in self.plugins:
                 raise PluginError(
                     f"Plugin already loaded: {metadata.name}",
                     plugin_name=metadata.name
                 )
-            
+
             plugin.activate()
             plugin.is_active = True
             self.plugins[metadata.name] = plugin
-            
+
             logger.info(
                 "Plugin loaded",
                 extra={
@@ -352,13 +350,13 @@ class PluginManager:
                     "version": metadata.version
                 }
             )
-            
+
         except Exception as e:
             raise PluginError(
                 f"Failed to load plugin: {e}",
                 plugin_name=getattr(plugin_class, "__name__", "unknown")
             ) from e
-    
+
     def load_plugin_from_module(self, module_path: str) -> None:
         """Load a plugin from a Python module.
         
@@ -370,31 +368,31 @@ class PluginManager:
         """
         try:
             module = importlib.import_module(module_path)
-            
+
             # Find Plugin subclass in module
             plugin_class = None
             for attr_name in dir(module):
                 attr = getattr(module, attr_name)
-                if (isinstance(attr, type) and 
-                    issubclass(attr, Plugin) and 
+                if (isinstance(attr, type) and
+                    issubclass(attr, Plugin) and
                     attr is not Plugin):
                     plugin_class = attr
                     break
-            
+
             if not plugin_class:
                 raise PluginError(
                     f"No Plugin subclass found in module: {module_path}",
                     details={"module": module_path}
                 )
-            
+
             self.load_plugin(plugin_class)
-            
+
         except ImportError as e:
             raise PluginError(
                 f"Failed to import plugin module: {module_path}",
                 details={"error": str(e)}
             ) from e
-    
+
     def load_plugin_from_file(self, file_path: Path) -> None:
         """Load a plugin from a Python file.
         
@@ -409,35 +407,35 @@ class PluginManager:
                 f"Plugin file not found: {file_path}",
                 details={"path": str(file_path)}
             )
-        
+
         # Create module from file
         module_name = f"plugin_{file_path.stem}"
         spec = importlib.util.spec_from_file_location(module_name, file_path)
-        
+
         if not spec or not spec.loader:
             raise PluginError(f"Failed to load plugin spec from: {file_path}")
-        
+
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        
+
         # Find and load Plugin subclass
         plugin_class = None
         for attr_name in dir(module):
             attr = getattr(module, attr_name)
-            if (isinstance(attr, type) and 
-                issubclass(attr, Plugin) and 
+            if (isinstance(attr, type) and
+                issubclass(attr, Plugin) and
                 attr is not Plugin):
                 plugin_class = attr
                 break
-        
+
         if not plugin_class:
             raise PluginError(
                 f"No Plugin subclass found in file: {file_path}",
                 details={"file": str(file_path)}
             )
-        
+
         self.load_plugin(plugin_class)
-    
+
     def unload_plugin(self, name: str) -> None:
         """Unload a plugin.
         
@@ -446,15 +444,15 @@ class PluginManager:
         """
         if name not in self.plugins:
             return
-        
+
         plugin = self.plugins[name]
         plugin.deactivate()
         plugin.is_active = False
         del self.plugins[name]
-        
+
         logger.info("Plugin unloaded", extra={"plugin": name})
-    
-    def get_plugin(self, name: str) -> Optional[Plugin]:
+
+    def get_plugin(self, name: str) -> Plugin | None:
         """Get a loaded plugin.
         
         Args:
@@ -464,8 +462,8 @@ class PluginManager:
             Plugin instance or None if not found.
         """
         return self.plugins.get(name)
-    
-    def list_plugins(self) -> List[PluginMetadata]:
+
+    def list_plugins(self) -> list[PluginMetadata]:
         """List all loaded plugins.
         
         Returns:
@@ -475,8 +473,8 @@ class PluginManager:
 
 
 # Global instances
-_plugin_registry: Optional[PluginRegistry] = None
-_plugin_manager: Optional[PluginManager] = None
+_plugin_registry: PluginRegistry | None = None
+_plugin_manager: PluginManager | None = None
 
 
 def get_plugin_registry() -> PluginRegistry:

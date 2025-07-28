@@ -28,7 +28,7 @@ class VersionInfo:
     patch: int
     release: str = "final"
     serial: int = 0
-    
+
     def __str__(self) -> str:
         """Return version string.
         
@@ -41,27 +41,27 @@ class VersionInfo:
                 return version
             case _:
                 return f"{version}{self.release}{self.serial}"
-    
+
     def __lt__(self, other: VersionInfo) -> bool:
         """Compare versions for ordering."""
         if not isinstance(other, VersionInfo):
             return NotImplemented
-        
+
         # Compare major.minor.patch first
         if (self.major, self.minor, self.patch) != (other.major, other.minor, other.patch):
             return (self.major, self.minor, self.patch) < (other.major, other.minor, other.patch)
-        
+
         # Then compare release types
         release_order = {"alpha": 1, "beta": 2, "rc": 3, "final": 4}
         self_order = release_order.get(self.release, 0)
         other_order = release_order.get(other.release, 0)
-        
+
         if self_order != other_order:
             return self_order < other_order
-        
+
         # Finally compare serial numbers
         return self.serial < other.serial
-    
+
     def is_compatible_with(self, required: VersionInfo) -> bool:
         """Check if this version is compatible with a required version.
         
@@ -72,12 +72,12 @@ class VersionInfo:
             True if this version is >= required version.
         """
         return self >= required
-    
+
     @property
     def is_prerelease(self) -> bool:
         """Check if this is a prerelease version."""
         return self.release != "final"
-    
+
     @property
     def version_tuple(self) -> tuple[int, int, int]:
         """Get version as a tuple for easy comparison."""

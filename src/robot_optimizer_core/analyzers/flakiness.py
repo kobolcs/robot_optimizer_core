@@ -54,7 +54,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
         min_runs: Minimum runs to determine flakiness (default: 4).
         severity_thresholds: Dict mapping failure rate to severity.
     """
-    
+
     def __init__(
         self,
         test_result_repository: TestResultRepository | None = None,
@@ -67,7 +67,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
             config: Analyzer configuration.
         """
         super().__init__(config)
-        
+
         # Get repository from DI if not provided
         if test_result_repository is None:
             container = get_container()
@@ -78,12 +78,12 @@ class FlakinessAnalyzer(BaseAnalyzer):
                     "TestResultRepository not provided and not found in DI container",
                     config_key="test_result_repository"
                 )
-        
+
         self._repository = test_result_repository
-        
+
         # Get settings
         settings = get_settings()
-        
+
         # Configuration
         self._days_back = self.get_config_value("days_back", 30)
         self._failure_threshold = self.get_config_value(
@@ -94,7 +94,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
             "min_runs",
             settings.flakiness_min_runs
         )
-        
+
         # Severity thresholds
         self._severity_thresholds = self.get_config_value(
             "severity_thresholds",
@@ -104,7 +104,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
                 "error": 0.30     # 30% failure rate
             }
         )
-    
+
     @property
     def name(self) -> str:
         """Get analyzer name.
@@ -113,7 +113,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
             Analyzer name.
         """
         return "flakiness"
-    
+
     @property
     def description(self) -> str:
         """Get analyzer description.
@@ -122,7 +122,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
             Analyzer description.
         """
         return "Detects tests that fail intermittently"
-    
+
     @property
     def tags(self) -> list[str]:
         """Get analyzer tags.
@@ -131,7 +131,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
             List of tags.
         """
         return ["stability", "reliability", "test-quality"]
-    
+
     def analyze(self, test_file: TestFile) -> list[Finding]:
         """Analyze test file for flaky tests.
         
@@ -142,7 +142,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
             List of findings.
         """
         findings = []
-        
+
         # Get flakiness statistics from repository
         try:
             stats_list = self._repository.get_flakiness_stats(
@@ -157,15 +157,15 @@ class FlakinessAnalyzer(BaseAnalyzer):
             )
             # Return empty list on error - don't fail analysis
             return findings
-        
+
         # Analyze each test's flakiness
         for stats in stats_list:
             if self._is_flaky(stats):
                 finding = self._create_finding(stats, test_file)
                 findings.append(finding)
-        
+
         return findings
-    
+
     def _is_flaky(self, stats: FlakinessStats) -> bool:
         """Determine if test statistics indicate flakiness.
         
@@ -178,15 +178,15 @@ class FlakinessAnalyzer(BaseAnalyzer):
         # Need minimum runs
         if stats.total_runs < self._min_runs:
             return False
-        
+
         # Check failure rate
         if stats.failure_rate <= 0 or stats.failure_rate >= 1:
             # Always fails or always passes - not flaky
             return False
-        
+
         # Check against threshold
         return stats.failure_rate >= self._failure_threshold
-    
+
     def _create_finding(
         self,
         stats: FlakinessStats,
@@ -202,7 +202,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
             Finding object.
         """
         severity = self._determine_severity(stats.failure_rate)
-        
+
         # Create pattern
         pattern = Pattern(
             type=PatternType.INEFFICIENT_WAIT,  # Often the cause
@@ -211,26 +211,26 @@ class FlakinessAnalyzer(BaseAnalyzer):
             recommendation=self._get_recommendation(stats),
             auto_fixable=False  # Can't auto-fix flakiness
         )
-        
+
         # Build detailed message
         message_parts = [
             f"Flaky test: {stats.failure_rate:.1%} failure rate",
             f"({stats.failures}/{stats.total_runs} runs)"
         ]
-        
+
         if stats.last_failure:
             message_parts.append(f"Last failed: {stats.last_failure.date()}")
-        
+
         # Estimate time wasted
         avg_investigation_hours = 0.25  # 15 minutes per failure
         time_wasted = stats.failures * avg_investigation_hours
         message_parts.append(f"Est. {time_wasted:.1f} hours wasted on failures")
-        
+
         message = " - ".join(message_parts)
-        
+
         # Try to find test location in file
         line_number = self._find_test_line(test_file, stats.test_name) or 1
-        
+
         return Finding.create(
             pattern=pattern,
             severity=severity,
@@ -247,7 +247,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
             time_wasted_hours=time_wasted,
             flakiness_category=self._categorize_flakiness(stats, test_file)
         )
-    
+
     def _determine_severity(self, failure_rate: float) -> Severity:
         """Determine severity based on failure rate using pattern matching.
         
@@ -264,7 +264,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
                 return Severity.WARNING
             case _:
                 return Severity.INFO
-    
+
     def _get_recommendation(self, stats: FlakinessStats) -> str:
         """Get recommendation based on flakiness pattern.
         
@@ -275,7 +275,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
             Recommendation text.
         """
         rate = stats.failure_rate
-        
+
         match rate:
             case r if r > 0.5:
                 return (
@@ -297,7 +297,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
                     "Low but persistent flakiness - review wait conditions "
                     "and external dependencies"
                 )
-    
+
     def _find_test_line(self, test_file: TestFile, test_name: str) -> int | None:
         """Find the line number where a test is defined.
         
@@ -310,25 +310,25 @@ class FlakinessAnalyzer(BaseAnalyzer):
         """
         lines = test_file.content.splitlines()
         in_test_cases = False
-        
+
         for line_num, line in enumerate(lines, 1):
             # Check for test cases section
             if line.strip().startswith('***') and 'test case' in line.lower():
                 in_test_cases = True
                 continue
-            
+
             # Check for other sections
             if line.strip().startswith('***') and 'test case' not in line.lower():
                 in_test_cases = False
                 continue
-            
+
             # Look for test name
             if in_test_cases and not line.startswith((' ', '\t')):
                 if line.strip() == test_name:
                     return line_num
-        
+
         return None
-    
+
     def _categorize_flakiness(
         self,
         stats: FlakinessStats,
@@ -348,11 +348,11 @@ class FlakinessAnalyzer(BaseAnalyzer):
         """
         rate = stats.failure_rate
         test_lower = stats.test_name.lower()
-        
+
         # High failure rate - likely logic issue
         if rate > 0.5:
             return "logic_issue"
-        
+
         # Check test name for hints
         match test_lower:
             case name if any(word in name for word in ['ui', 'click', 'element', 'page']):
@@ -365,7 +365,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
                 return "file_operation"
             case _:
                 return "timing_issue"
-    
+
     def validate_config(self) -> None:
         """Validate analyzer configuration.
         
@@ -379,7 +379,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
                 config_key="days_back",
                 provided_value=self._days_back
             )
-        
+
         # Validate failure_threshold
         if not 0 < self._failure_threshold < 1:
             raise ConfigurationError(
@@ -387,7 +387,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
                 config_key="failure_threshold",
                 provided_value=self._failure_threshold
             )
-        
+
         # Validate min_runs
         if self._min_runs < 2:
             raise ConfigurationError(
@@ -395,17 +395,17 @@ class FlakinessAnalyzer(BaseAnalyzer):
                 config_key="min_runs",
                 provided_value=self._min_runs
             )
-        
+
         # Validate severity thresholds
         thresholds = self._severity_thresholds
-        
+
         for key in ["info", "warning", "error"]:
             if key not in thresholds:
                 raise ConfigurationError(
                     f"Missing severity threshold: {key}",
                     config_key="severity_thresholds"
                 )
-            
+
             value = thresholds[key]
             if not 0 < value <= 1:
                 raise ConfigurationError(

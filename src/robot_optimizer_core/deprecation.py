@@ -23,7 +23,8 @@ from __future__ import annotations
 import functools
 import inspect
 import warnings
-from typing import Any, Callable, ParamSpec, TypeVar
+from collections.abc import Callable
+from typing import Any, ParamSpec, TypeVar
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -31,7 +32,6 @@ R = TypeVar("R")
 
 class RobotOptimizerDeprecationWarning(UserWarning):
     """Warning category for Robot Framework Optimizer deprecations."""
-    pass
 
 
 def deprecated(
@@ -68,40 +68,39 @@ def deprecated(
         # Build deprecation message
         name = obj.__name__
         msg_parts = [f"'{name}' is deprecated since version {since}"]
-        
+
         if removed_in:
             msg_parts.append(f"and will be removed in version {removed_in}")
-        
+
         if replacement:
             msg_parts.append(f"Use '{replacement}' instead")
-        
+
         if details:
             msg_parts.append(details)
-        
+
         message = ". ".join(msg_parts) + "."
-        
+
         if inspect.isclass(obj):
             # Handle class deprecation
             return _deprecate_class(obj, message)
-        else:
-            # Handle function/method deprecation
-            @functools.wraps(obj)
-            def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-                warnings.warn(
-                    message,
-                    category=RobotOptimizerDeprecationWarning,
-                    stacklevel=2
-                )
-                return obj(*args, **kwargs)
-            
-            # Add deprecation metadata
-            wrapper.__deprecated__ = True
-            wrapper.__deprecated_since__ = since
-            wrapper.__deprecated_removed_in__ = removed_in
-            wrapper.__deprecated_replacement__ = replacement
-            
-            return wrapper
-    
+        # Handle function/method deprecation
+        @functools.wraps(obj)
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+            warnings.warn(
+                message,
+                category=RobotOptimizerDeprecationWarning,
+                stacklevel=2
+            )
+            return obj(*args, **kwargs)
+
+        # Add deprecation metadata
+        wrapper.__deprecated__ = True
+        wrapper.__deprecated_since__ = since
+        wrapper.__deprecated_removed_in__ = removed_in
+        wrapper.__deprecated_replacement__ = replacement
+
+        return wrapper
+
     return decorator
 
 
@@ -116,7 +115,7 @@ def _deprecate_class[T](cls: type[T], message: str) -> type[T]:
         Modified class.
     """
     original_init = cls.__init__
-    
+
     @functools.wraps(original_init)
     def new_init(self: T, *args: Any, **kwargs: Any) -> None:
         warnings.warn(
@@ -125,10 +124,10 @@ def _deprecate_class[T](cls: type[T], message: str) -> type[T]:
             stacklevel=2
         )
         original_init(self, *args, **kwargs)
-    
+
     cls.__init__ = new_init
     cls.__deprecated__ = True
-    
+
     return cls
 
 
@@ -183,13 +182,13 @@ def deprecated_parameter(
         ...         new_param = old_param
     """
     msg_parts = [f"Parameter '{param_name}' is deprecated since version {since}"]
-    
+
     if removed_in:
         msg_parts.append(f"and will be removed in version {removed_in}")
-    
+
     if replacement:
         msg_parts.append(f"Use '{replacement}' instead")
-    
+
     message = ". ".join(msg_parts) + "."
     deprecation_warning(message, stacklevel=3)
 
@@ -226,7 +225,7 @@ def get_deprecation_info(obj: Any) -> dict[str, Any] | None:
     """
     if not check_deprecated(obj):
         return None
-    
+
     return {
         "since": getattr(obj, "__deprecated_since__", None),
         "removed_in": getattr(obj, "__deprecated_removed_in__", None),
@@ -245,28 +244,28 @@ class DeprecatedMixin:
         ...     _deprecated_since = "1.2.0"
         ...     _deprecated_replacement = "NewAnalyzer"
     """
-    
+
     _deprecated_since: str = "1.0.0"
     _deprecated_removed_in: str | None = None
     _deprecated_replacement: str | None = None
     _deprecated_details: str | None = None
-    
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize and issue deprecation warning."""
         super().__init__(*args, **kwargs)
-        
+
         cls_name = self.__class__.__name__
         msg_parts = [f"'{cls_name}' is deprecated since version {self._deprecated_since}"]
-        
+
         if self._deprecated_removed_in:
             msg_parts.append(f"and will be removed in version {self._deprecated_removed_in}")
-        
+
         if self._deprecated_replacement:
             msg_parts.append(f"Use '{self._deprecated_replacement}' instead")
-        
+
         if self._deprecated_details:
             msg_parts.append(self._deprecated_details)
-        
+
         message = ". ".join(msg_parts) + "."
         deprecation_warning(message, stacklevel=3)
 
@@ -299,16 +298,16 @@ def renamed_parameter(**mappings: str) -> Callable[[Callable[P, R]], Callable[P,
                         since="1.0.0",  # Should be configured
                         replacement=new_name
                     )
-                    
+
                     # Move value to new name if not already set
                     if new_name not in kwargs:
                         kwargs[new_name] = kwargs.pop(old_name)
                     else:
                         # Both old and new provided, remove old
                         kwargs.pop(old_name)
-            
+
             return func(*args, **kwargs)
-        
+
         return wrapper
-    
+
     return decorator

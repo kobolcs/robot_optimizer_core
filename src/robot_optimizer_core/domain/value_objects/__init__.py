@@ -3,21 +3,21 @@
 
 These immutable objects represent core concepts in the domain.
 """
-from .severity import Severity
+from .finding import Finding
+from .flakiness_stats import FlakinessStats
 from .location import Location
 from .pattern import Pattern, PatternType
-from .finding import Finding
+from .severity import Severity
 from .sleep_pattern import SleepPattern
 from .test_result import TestResult
-from .flakiness_stats import FlakinessStats
 
 __all__ = [
-    "Severity",
+    "Finding",
+    "FlakinessStats",
     "Location",
     "Pattern",
-    "PatternType", 
-    "Finding",
+    "PatternType",
+    "Severity",
     "SleepPattern",
     "TestResult",
-    "FlakinessStats",
 ]

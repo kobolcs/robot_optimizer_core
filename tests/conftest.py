@@ -9,15 +9,14 @@ This module provides common fixtures and configuration for all test levels:
 from __future__ import annotations
 
 import tempfile
+from collections.abc import Generator
 from datetime import datetime, timedelta
-from decimal import Decimal
 from pathlib import Path
-from typing import Any, Dict, Generator, List
+from typing import Any
 from unittest.mock import Mock
 from uuid import uuid4
 
 import pytest
-from pydantic import BaseModel
 
 from robot_optimizer_core import (
     Settings,
@@ -29,7 +28,6 @@ from robot_optimizer_core import (
 from robot_optimizer_core.di import Container
 from robot_optimizer_core.domain.repositories import TestResultRepository
 from robot_optimizer_core.domain.value_objects import FlakinessStats, TestResult
-
 
 # Configure logging for tests
 configure_logging(level="WARNING", format_json=False)
@@ -133,7 +131,7 @@ Test Case {i}
     Sleep    {i % 10} seconds
     Should Be Equal    ${i}    ${i}
 """
-    
+
     file_path = temp_dir / "large_suite.robot"
     file_path.write_text(content)
     return file_path
@@ -149,17 +147,17 @@ def di_container() -> Container:
 def mock_test_result_repository() -> Mock:
     """Provide a mock test result repository."""
     mock_repo = Mock(spec=TestResultRepository)
-    
+
     # Default behavior
     mock_repo.get_flakiness_stats.return_value = []
     mock_repo.get_results_for_file.return_value = []
     mock_repo.get_total_results_count.return_value = 0
-    
+
     return mock_repo
 
 
 @pytest.fixture
-def flaky_test_stats() -> List[FlakinessStats]:
+def flaky_test_stats() -> list[FlakinessStats]:
     """Provide sample flakiness statistics."""
     return [
         FlakinessStats(
@@ -187,7 +185,7 @@ def flaky_test_stats() -> List[FlakinessStats]:
 
 
 @pytest.fixture
-def test_results() -> List[TestResult]:
+def test_results() -> list[TestResult]:
     """Provide sample test results."""
     base_time = datetime.now()
     return [
@@ -239,35 +237,35 @@ def pytest_configure(config: Any) -> None:
 # Test helpers
 class TestData:
     """Container for common test data."""
-    
+
     @staticmethod
     def create_robot_content(
-        test_cases: List[str],
-        keywords: List[str],
-        variables: Optional[Dict[str, str]] = None
+        test_cases: list[str],
+        keywords: list[str],
+        variables: Optional[dict[str, str]] = None
     ) -> str:
         """Create robot file content from components."""
         content = "*** Settings ***\nDocumentation    Test suite\n\n"
-        
+
         if variables:
             content += "*** Variables ***\n"
             for var, value in variables.items():
                 content += f"{var}    {value}\n"
             content += "\n"
-        
+
         if test_cases:
             content += "*** Test Cases ***\n"
             for test in test_cases:
                 content += f"{test}\n"
             content += "\n"
-        
+
         if keywords:
             content += "*** Keywords ***\n"
             for keyword in keywords:
                 content += f"{keyword}\n"
-        
+
         return content
-    
+
     @staticmethod
     def create_test_file(
         path: Path,
@@ -282,25 +280,25 @@ class TestData:
 # Performance tracking
 class PerformanceTimer:
     """Context manager for timing operations in tests."""
-    
+
     def __init__(self, name: str, threshold_seconds: float = 1.0):
         """Initialize timer."""
         self.name = name
         self.threshold = threshold_seconds
         self.start_time = None
         self.duration = None
-    
-    def __enter__(self) -> "PerformanceTimer":
+
+    def __enter__(self) -> PerformanceTimer:
         """Start timing."""
         import time
         self.start_time = time.time()
         return self
-    
+
     def __exit__(self, *args: Any) -> None:
         """Stop timing and check threshold."""
         import time
         self.duration = time.time() - self.start_time
-        
+
         if self.duration > self.threshold:
             pytest.fail(
                 f"{self.name} took {self.duration:.2f}s "
@@ -311,12 +309,12 @@ class PerformanceTimer:
 # Mock factories
 class MockFactory:
     """Factory for creating mock objects."""
-    
+
     @staticmethod
     def create_finding(**kwargs: Any) -> Mock:
         """Create a mock finding."""
         from robot_optimizer_core import Finding, Location, Pattern, Severity
-        
+
         defaults = {
             "id": uuid4(),
             "pattern": Pattern.sleep_in_test("5s"),
@@ -326,9 +324,9 @@ class MockFactory:
             "context": {}
         }
         defaults.update(kwargs)
-        
+
         finding = Mock(spec=Finding)
         for key, value in defaults.items():
             setattr(finding, key, value)
-        
+
         return finding

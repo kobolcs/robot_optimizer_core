@@ -49,9 +49,9 @@ class BaseAnalyzer(ABC):
         config: Analyzer-specific configuration.
         metrics_enabled: Whether to collect metrics for this analyzer.
     """
-    
-    __slots__ = ('config', 'metrics_enabled', '_metrics', '_logger')
-    
+
+    __slots__ = ('_logger', '_metrics', 'config', 'metrics_enabled')
+
     def __init__(
         self,
         config: dict[str, Any] | None = None,
@@ -70,7 +70,7 @@ class BaseAnalyzer(ABC):
             f"{__name__}.{self.__class__.__name__}",
             {"analyzer": self.name}
         )
-    
+
     @property
     @abstractmethod
     def name(self) -> str:
@@ -81,8 +81,7 @@ class BaseAnalyzer(ABC):
         Returns:
             Analyzer name.
         """
-        pass
-    
+
     @property
     @abstractmethod
     def description(self) -> str:
@@ -94,8 +93,7 @@ class BaseAnalyzer(ABC):
         Returns:
             Analyzer description.
         """
-        pass
-    
+
     @property
     def version(self) -> str:
         """Get the analyzer version.
@@ -106,7 +104,7 @@ class BaseAnalyzer(ABC):
             Analyzer version (default: "1.0.0").
         """
         return "1.0.0"
-    
+
     @property
     def tags(self) -> list[str]:
         """Get analyzer tags for categorization.
@@ -117,7 +115,7 @@ class BaseAnalyzer(ABC):
             List of tags (default: empty).
         """
         return []
-    
+
     @property
     def supports_auto_fix(self) -> bool:
         """Check if analyzer supports auto-fixing.
@@ -128,7 +126,7 @@ class BaseAnalyzer(ABC):
             True if auto-fix is supported (default: False).
         """
         return False
-    
+
     @abstractmethod
     def analyze(self, test_file: TestFile) -> list[Finding]:
         """Analyze a test file and return findings.
@@ -146,8 +144,7 @@ class BaseAnalyzer(ABC):
         Raises:
             AnalysisError: If analysis fails.
         """
-        pass
-    
+
     def pre_analyze(self, test_file: TestFile) -> None:
         """Hook called before analysis.
         
@@ -158,8 +155,7 @@ class BaseAnalyzer(ABC):
         Args:
             test_file: The test file to be analyzed.
         """
-        pass
-    
+
     def post_analyze(
         self,
         test_file: TestFile,
@@ -179,7 +175,7 @@ class BaseAnalyzer(ABC):
             Modified findings (default: unchanged).
         """
         return findings
-    
+
     def validate_config(self) -> None:
         """Validate analyzer configuration.
         
@@ -189,8 +185,7 @@ class BaseAnalyzer(ABC):
         Raises:
             ConfigurationError: If configuration is invalid.
         """
-        pass
-    
+
     def safe_analyze(self, test_file: TestFile) -> list[Finding]:
         """Safely analyze a file with full error handling.
         
@@ -211,20 +206,20 @@ class BaseAnalyzer(ABC):
             "Starting analysis",
             extra={"file": str(test_file.path)}
         )
-        
+
         try:
             # Pre-analysis hook
             self.pre_analyze(test_file)
-            
+
             # Main analysis
             findings = self.analyze(test_file)
-            
+
             # Validate findings
             validated_findings = self._validate_findings(findings, test_file)
-            
+
             # Post-analysis hook
             final_findings = self.post_analyze(test_file, validated_findings)
-            
+
             # Collect metrics
             if self._metrics:
                 self._metrics.increment(f"analyzer.{self.name}.success")
@@ -232,7 +227,7 @@ class BaseAnalyzer(ABC):
                     f"analyzer.{self.name}.findings_count",
                     len(final_findings)
                 )
-            
+
             self._logger.debug(
                 "Analysis complete",
                 extra={
@@ -240,20 +235,20 @@ class BaseAnalyzer(ABC):
                     "findings_count": len(final_findings)
                 }
             )
-            
+
             return final_findings
-            
+
         except AnalysisError:
             # Re-raise analysis errors
             if self._metrics:
                 self._metrics.increment(f"analyzer.{self.name}.failure")
             raise
-            
+
         except Exception as e:
             # Wrap other errors
             if self._metrics:
                 self._metrics.increment(f"analyzer.{self.name}.failure")
-            
+
             self._logger.error(
                 f"Analysis failed: {e}",
                 extra={
@@ -262,13 +257,13 @@ class BaseAnalyzer(ABC):
                 },
                 exc_info=True
             )
-            
+
             raise AnalysisError(
                 f"Analysis failed in {self.name}: {e}",
                 file_path=test_file.path,
                 analyzer=self.name
             ) from e
-    
+
     def _validate_findings(
         self,
         findings: list[Finding],
@@ -287,7 +282,7 @@ class BaseAnalyzer(ABC):
             Validated findings.
         """
         validated = []
-        
+
         for finding in findings:
             # Ensure file path matches
             if finding.location.file_path != test_file.path:
@@ -299,7 +294,7 @@ class BaseAnalyzer(ABC):
                     }
                 )
                 continue
-            
+
             # Ensure line number is valid
             if finding.location.line > test_file.line_count:
                 self._logger.warning(
@@ -310,11 +305,11 @@ class BaseAnalyzer(ABC):
                     }
                 )
                 continue
-            
+
             validated.append(finding)
-        
+
         return validated
-    
+
     def get_config_value[T](
         self,
         key: str,
@@ -343,9 +338,9 @@ class BaseAnalyzer(ABC):
                 f"Required configuration key missing: {key}",
                 config_key=f"{self.name}.{key}"
             )
-        
+
         return self.config.get(key, default)
-    
+
     def __repr__(self) -> str:
         """Return string representation of analyzer.
         

@@ -1,17 +1,19 @@
 # tests/unit/domain/test_entities.py
-import pytest
-from datetime import datetime, timedelta
+import tempfile
+from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
-import tempfile
-from pydantic import ValidationError
 
-from robot_optimizer.domain.entities import DomainTestFile as DomainTestFile, Analysis
+import pytest
+from pydantic import ValidationError
+from robot_optimizer.domain.entities import Analysis
+from robot_optimizer.domain.entities import DomainTestFile as DomainTestFile
+from robot_optimizer.domain.events import FileAnalyzedEvent, HighSeverityFindingEvent
 from robot_optimizer.domain.value_objects import (
-    Finding, Pattern, PatternType, Severity, Location
-)
-from robot_optimizer.domain.events import (
-    FileAnalyzedEvent, HighSeverityFindingEvent
+    Finding,
+    Location,
+    Pattern,
+    Severity,
 )
 
 

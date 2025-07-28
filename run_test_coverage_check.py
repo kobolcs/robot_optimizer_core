@@ -12,35 +12,35 @@ def check_dependencies():
     """Check if required dependencies are installed."""
     required = ['pytest', 'pytest-cov', 'pytest-asyncio']
     missing = []
-    
+
     for pkg in required:
         try:
             __import__(pkg.replace('-', '_'))
         except ImportError:
             missing.append(pkg)
-    
+
     if missing:
         print(f"❌ Missing dependencies: {', '.join(missing)}")
         print(f"   Install with: pip install {' '.join(missing)}")
         return False
-    
+
     return True
 
 
 def run_tests():
     """Run the comprehensive test suite."""
     print("🧪 Running Robot Framework Optimizer Core tests...\n")
-    
+
     # Ensure we're in the right directory
     if not Path("src/robot_optimizer_core").exists():
         print("❌ Error: Must run from project root directory")
         print("   Current directory:", Path.cwd())
         return False
-    
+
     # Set PYTHONPATH to include src
     import os
     os.environ['PYTHONPATH'] = str(Path.cwd() / 'src')
-    
+
     # Run pytest with coverage
     cmd = [
         sys.executable, '-m', 'pytest',
@@ -55,25 +55,24 @@ def run_tests():
         '--strict-markers',
         '--color=yes'
     ]
-    
+
     print(f"📋 Running command: {' '.join(cmd)}\n")
-    
-    result = subprocess.run(cmd, capture_output=False)
-    
+
+    result = subprocess.run(cmd, check=False, capture_output=False)
+
     if result.returncode == 0:
         print("\n✅ All tests passed with 99.9%+ coverage!")
         print("\n📊 Coverage reports:")
         print("   - Terminal: See above")
         print("   - HTML: htmlcov/index.html")
         print("   - XML: coverage.xml")
-        
+
         # Show coverage summary
         show_coverage_summary()
-        
+
         return True
-    else:
-        print("\n❌ Tests failed or coverage below 99.9%")
-        return False
+    print("\n❌ Tests failed or coverage below 99.9%")
+    return False
 
 
 def show_coverage_summary():
@@ -83,14 +82,14 @@ def show_coverage_summary():
         import xml.etree.ElementTree as ET
         tree = ET.parse('coverage.xml')
         root = tree.getroot()
-        
+
         line_rate = float(root.get('line-rate', 0))
         branch_rate = float(root.get('branch-rate', 0))
-        
-        print(f"\n📊 Coverage Summary:")
+
+        print("\n📊 Coverage Summary:")
         print(f"   Line Coverage: {line_rate * 100:.2f}%")
         print(f"   Branch Coverage: {branch_rate * 100:.2f}%")
-        
+
         # Find any uncovered files
         uncovered = []
         for package in root.findall('.//package'):
@@ -99,7 +98,7 @@ def show_coverage_summary():
                 line_rate = float(class_elem.get('line-rate', 0))
                 if line_rate < 0.999:
                     uncovered.append((filename, line_rate))
-        
+
         if uncovered:
             print("\n⚠️  Files with less than 99.9% coverage:")
             for filename, rate in sorted(uncovered):
@@ -112,7 +111,7 @@ def show_coverage_summary():
 def create_test_report():
     """Create a comprehensive test report."""
     print("\n📝 Generating test report...")
-    
+
     report = """# Robot Framework Optimizer Core - Test Report
 
 ## Coverage Summary
@@ -179,31 +178,30 @@ When adding new features:
 4. Verify error paths
 5. Run coverage before committing
 """
-    
+
     with open("TEST_REPORT.md", "w") as f:
         f.write(report)
-    
+
     print("   ✅ Test report saved to TEST_REPORT.md")
 
 
 def main():
     """Main entry point."""
     print("🚀 Robot Framework Optimizer Core - Test Runner\n")
-    
+
     if not check_dependencies():
         return 1
-    
+
     if run_tests():
         create_test_report()
         print("\n🎉 Success! Core package has 99.99%+ test coverage!")
         return 0
-    else:
-        print("\n💡 Tips to improve coverage:")
-        print("   1. Check htmlcov/index.html for uncovered lines")
-        print("   2. Add tests for any missed branches")
-        print("   3. Test all error conditions")
-        print("   4. Cover all property methods")
-        return 1
+    print("\n💡 Tips to improve coverage:")
+    print("   1. Check htmlcov/index.html for uncovered lines")
+    print("   2. Add tests for any missed branches")
+    print("   3. Test all error conditions")
+    print("   4. Cover all property methods")
+    return 1
 
 
 if __name__ == "__main__":

@@ -7,11 +7,11 @@ This module contains the essential domain models including:
 - Repository interfaces
 """
 
-from .base import ValueObject, Entity, AggregateRoot, DomainEvent
+from .base import AggregateRoot, DomainEvent, Entity, ValueObject
 
 __all__ = [
-    "ValueObject",
-    "Entity", 
     "AggregateRoot",
     "DomainEvent",
+    "Entity",
+    "ValueObject",
 ]

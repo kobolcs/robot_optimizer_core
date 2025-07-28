@@ -35,64 +35,64 @@ from typing import TYPE_CHECKING
 # Version
 from .__version__ import __version__, __version_info__
 
+# Analyzers
+from .analyzers import (
+    AnalyzerRegistry,
+    BaseAnalyzer,
+    DeadCodeAnalyzer,
+    FlakinessAnalyzer,
+    SleepDetector,
+    get_analyzer,
+    list_analyzers,
+    register_analyzer,
+)
+
+# High-level API functions
+from .api import analyze_directory, analyze_file, analyze_suite
+
+# Configuration
+from .config import Settings, get_settings
+
+# Deprecation utilities
+from .deprecation import deprecated, deprecation_warning
+
+# Dependency injection
+from .di import Container, get_container
+
+# Core services
+from .discovery import FileDiscoveryService
+
 # Core domain models
-from .domain.base import ValueObject, Entity, AggregateRoot, DomainEvent
+from .domain.base import AggregateRoot, DomainEvent, Entity, ValueObject
 from .domain.entities import TestFile
 from .domain.value_objects import (
     Finding,
+    FlakinessStats,
     Location,
     Pattern,
     PatternType,
     Severity,
     SleepPattern,
     TestResult,
-    FlakinessStats,
 )
-
-# Analyzers
-from .analyzers import (
-    BaseAnalyzer,
-    AnalyzerRegistry,
-    DeadCodeAnalyzer,
-    SleepDetector,
-    FlakinessAnalyzer,
-    register_analyzer,
-    get_analyzer,
-    list_analyzers,
-)
-
-# Core services
-from .discovery import FileDiscoveryService
-from .parsers import RobotASTParser
-
-# Configuration
-from .config import Settings, get_settings
 
 # Exceptions
 from .exceptions import (
-    RobotOptimizerError,
     AnalysisError,
     ConfigurationError,
     PluginError,
+    RobotOptimizerError,
 )
 
 # Logging
-from .logging import get_logger, configure_logging
+from .logging import configure_logging, get_logger
 
 # Metrics
 from .metrics import MetricsCollector, get_metrics
-
-# Dependency injection
-from .di import Container, get_container
+from .parsers import RobotASTParser
 
 # Plugin system
 from .plugin import Plugin, PluginMetadata
-
-# Deprecation utilities
-from .deprecation import deprecated, deprecation_warning
-
-# High-level API functions
-from .api import analyze_file, analyze_directory, analyze_suite
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -101,14 +101,14 @@ __all__ = [
     # Version
     "__version__",
     "__version_info__",
-    
+
     # Domain models
     "ValueObject",
-    "Entity", 
+    "Entity",
     "AggregateRoot",
     "DomainEvent",
     "TestFile",
-    
+
     # Value objects
     "Finding",
     "Location",
@@ -118,7 +118,7 @@ __all__ = [
     "SleepPattern",
     "TestResult",
     "FlakinessStats",
-    
+
     # Analyzers
     "BaseAnalyzer",
     "AnalyzerRegistry",
@@ -128,44 +128,44 @@ __all__ = [
     "register_analyzer",
     "get_analyzer",
     "list_analyzers",
-    
+
     # Services
     "FileDiscoveryService",
     "RobotASTParser",
-    
+
     # Configuration
     "Settings",
     "get_settings",
-    
+
     # Exceptions
     "RobotOptimizerError",
     "AnalysisError",
     "ConfigurationError",
     "PluginError",
-    
+
     # Logging
     "get_logger",
     "configure_logging",
-    
+
     # Metrics
     "MetricsCollector",
     "get_metrics",
-    
+
     # DI
     "Container",
     "get_container",
-    
+
     # Plugins
     "Plugin",
     "PluginMetadata",
-    
+
     # Utilities
     "deprecated",
     "deprecation_warning",
-    
+
     # High-level API
     "analyze_file",
-    "analyze_directory", 
+    "analyze_directory",
     "analyze_suite",
 ]
 

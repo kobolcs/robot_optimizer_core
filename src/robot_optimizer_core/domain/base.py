@@ -22,8 +22,8 @@ Example:
 from __future__ import annotations
 
 from abc import ABC
-from datetime import datetime, timezone
-from typing import Any, ClassVar, Dict, Generic, List, Type, TypeVar
+from datetime import UTC, datetime
+from typing import Any, ClassVar, Generic, TypeVar
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
@@ -56,7 +56,7 @@ class ValueObject(BaseModel, ABC):
         >>> addr2 = Address(street="123 Main", city="NYC", country="USA")
         >>> assert addr1 == addr2  # Value equality
     """
-    
+
     model_config: ClassVar[ConfigDict] = ConfigDict(
         frozen=True,
         str_strip_whitespace=True,
@@ -68,7 +68,7 @@ class ValueObject(BaseModel, ABC):
             "description": "Immutable value object"
         }
     )
-    
+
     def __eq__(self, other: Any) -> bool:
         """Compare value objects by their attributes.
         
@@ -81,7 +81,7 @@ class ValueObject(BaseModel, ABC):
         if not isinstance(other, self.__class__):
             return False
         return self.model_dump() == other.model_dump()
-    
+
     def __hash__(self) -> int:
         """Generate hash based on all attributes.
         
@@ -91,7 +91,7 @@ class ValueObject(BaseModel, ABC):
         # Create a hashable representation of the model data
         data = self.model_dump()
         hashable_items = []
-        
+
         for key, value in sorted(data.items()):
             if isinstance(value, list):
                 hashable_items.append((key, tuple(value)))
@@ -99,9 +99,9 @@ class ValueObject(BaseModel, ABC):
                 hashable_items.append((key, tuple(sorted(value.items()))))
             else:
                 hashable_items.append((key, value))
-        
+
         return hash(tuple(hashable_items))
-    
+
     def __repr__(self) -> str:
         """Return a detailed string representation.
         
@@ -139,7 +139,7 @@ class Entity(BaseModel, ABC, Generic[T]):
         >>> p2 = Product(id=p1.id, name="Gaming Laptop", price=Decimal("1299.99"))
         >>> assert p1 == p2  # Same ID = same entity
     """
-    
+
     model_config: ClassVar[ConfigDict] = ConfigDict(
         arbitrary_types_allowed=True,
         validate_assignment=True,
@@ -151,9 +151,9 @@ class Entity(BaseModel, ABC, Generic[T]):
             "description": "Domain entity with identity"
         }
     )
-    
+
     id: T = Field(..., description="Unique identifier for the entity")
-    
+
     def __eq__(self, other: Any) -> bool:
         """Compare entities by their ID.
         
@@ -166,7 +166,7 @@ class Entity(BaseModel, ABC, Generic[T]):
         if not isinstance(other, self.__class__):
             return False
         return self.id == other.id
-    
+
     def __hash__(self) -> int:
         """Hash based on entity ID.
         
@@ -174,7 +174,7 @@ class Entity(BaseModel, ABC, Generic[T]):
             Hash of the entity ID.
         """
         return hash(self.id)
-    
+
     def __repr__(self) -> str:
         """Return string representation with ID.
         
@@ -182,7 +182,7 @@ class Entity(BaseModel, ABC, Generic[T]):
             String representation.
         """
         return f"{self.__class__.__name__}(id={self.id!r})"
-    
+
     def same_identity(self, other: Entity[T]) -> bool:
         """Check if two entities have the same identity.
         
@@ -216,7 +216,7 @@ class AggregateRoot(Entity[T], ABC):
         ...         self.items.append(item)
         ...         self.add_event(ItemAddedEvent(order_id=self.id, item=item))
     """
-    
+
     model_config: ClassVar[ConfigDict] = ConfigDict(
         arbitrary_types_allowed=True,
         validate_assignment=True,
@@ -228,7 +228,7 @@ class AggregateRoot(Entity[T], ABC):
             "description": "Aggregate root entity"
         }
     )
-    
+
     def __init__(self, **data: Any) -> None:
         """Initialize aggregate root with event list.
         
@@ -237,8 +237,8 @@ class AggregateRoot(Entity[T], ABC):
         """
         super().__init__(**data)
         # Initialize events list as instance attribute
-        self._events: List[DomainEvent] = []
-    
+        self._events: list[DomainEvent] = []
+
     def add_event(self, event: DomainEvent) -> None:
         """Add a domain event to be dispatched.
         
@@ -249,8 +249,8 @@ class AggregateRoot(Entity[T], ABC):
             event: Domain event to add.
         """
         self._events.append(event)
-    
-    def pull_events(self) -> List[DomainEvent]:
+
+    def pull_events(self) -> list[DomainEvent]:
         """Pull all pending events and clear the list.
         
         This method is typically called by the infrastructure layer
@@ -262,7 +262,7 @@ class AggregateRoot(Entity[T], ABC):
         events = self._events.copy()
         self._events.clear()
         return events
-    
+
     @computed_field  # type: ignore[misc]
     @property
     def has_events(self) -> bool:
@@ -272,7 +272,7 @@ class AggregateRoot(Entity[T], ABC):
             True if events are pending.
         """
         return len(self._events) > 0
-    
+
     @computed_field  # type: ignore[misc]
     @property
     def event_count(self) -> int:
@@ -282,7 +282,7 @@ class AggregateRoot(Entity[T], ABC):
             Number of pending events.
         """
         return len(self._events)
-    
+
     def mark_events_committed(self) -> None:
         """Mark all events as committed.
         
@@ -307,7 +307,7 @@ def create_timestamp() -> datetime:
     Returns:
         Current UTC timestamp.
     """
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class DomainEvent(BaseModel, ABC):
@@ -335,7 +335,7 @@ class DomainEvent(BaseModel, ABC):
         ...     registered_at=datetime.now(timezone.utc)
         ... )
     """
-    
+
     model_config: ClassVar[ConfigDict] = ConfigDict(
         frozen=True,
         populate_by_name=True,
@@ -349,7 +349,7 @@ class DomainEvent(BaseModel, ABC):
             }
         }
     )
-    
+
     event_id: UUID = Field(
         default_factory=create_event_id,
         description="Unique event identifier"
@@ -358,7 +358,7 @@ class DomainEvent(BaseModel, ABC):
         default_factory=create_timestamp,
         description="When the event occurred (UTC)"
     )
-    
+
     @computed_field  # type: ignore[misc]
     @property
     def event_name(self) -> str:
@@ -371,17 +371,17 @@ class DomainEvent(BaseModel, ABC):
             Event name in snake_case.
         """
         name = self.__class__.__name__
-        
+
         # Remove Event suffix if present
         if name.endswith("Event"):
             name = name[:-5]
-        
+
         # Convert PascalCase to snake_case
         import re
         name = re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
-        
+
         return name
-    
+
     @computed_field  # type: ignore[misc]
     @property
     def event_version(self) -> str:
@@ -393,8 +393,8 @@ class DomainEvent(BaseModel, ABC):
             Event version (default: "1.0").
         """
         return "1.0"
-    
-    def to_message(self) -> Dict[str, Any]:
+
+    def to_message(self) -> dict[str, Any]:
         """Convert event to a message format.
         
         Useful for event buses and message queues.
@@ -412,7 +412,7 @@ class DomainEvent(BaseModel, ABC):
                 mode="json"
             )
         }
-    
+
     def __repr__(self) -> str:
         """Return string representation of event.
         

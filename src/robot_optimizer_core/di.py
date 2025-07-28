@@ -22,10 +22,10 @@ Example:
 from __future__ import annotations
 
 import inspect
-from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum, auto
-from typing import Any, Callable, TypeVar, TypeAlias
+from typing import Any, TypeAlias, TypeVar
 
 from .exceptions import ConfigurationError
 from .logging import get_logger
@@ -70,9 +70,9 @@ class Container:
         services: Registered service descriptors.
         resolving: Stack to detect circular dependencies.
     """
-    
-    __slots__ = ('services', 'parent', 'resolving')
-    
+
+    __slots__ = ('parent', 'resolving', 'services')
+
     def __init__(self, parent: Container | None = None) -> None:
         """Initialize the container.
         
@@ -82,7 +82,7 @@ class Container:
         self.services: dict[str, ServiceDescriptor] = {}
         self.parent = parent
         self.resolving: list[str] = []
-    
+
     def register(
         self,
         service_type: str,
@@ -111,10 +111,10 @@ class Container:
                 config_key="di.service",
                 provided_value=service_type
             )
-        
+
         descriptor = ServiceDescriptor(service_type, implementation, lifetime)
         self.services[service_type] = descriptor
-        
+
         logger.debug(
             "Service registered",
             extra={
@@ -123,7 +123,7 @@ class Container:
                 "override": override
             }
         )
-    
+
     def register_singleton(
         self,
         service_type: str,
@@ -140,7 +140,7 @@ class Container:
             override: Whether to override existing registration.
         """
         self.register(service_type, implementation, ServiceLifetime.SINGLETON, override)
-    
+
     def register_instance(
         self,
         service_type: str,
@@ -158,7 +158,7 @@ class Container:
         # Pre-cache the instance
         if service_type in self.services:
             self.services[service_type].instance = instance
-    
+
     def resolve[T](self, service_type: str) -> T:
         """Resolve a service with type safety.
         
@@ -184,44 +184,44 @@ class Container:
                 config_key="di.circular",
                 provided_value=service_type
             )
-        
+
         # Try to find service in this container
         descriptor = self.services.get(service_type)
-        
+
         # If not found, try parent container
         if descriptor is None and self.parent:
             return self.parent.resolve(service_type)
-        
+
         if descriptor is None:
             available = list(self.services.keys())
             if self.parent:
                 available.extend(self.parent.list_services())
-            
+
             raise ConfigurationError(
                 f"Service not registered: {service_type}",
                 config_key="di.service",
                 provided_value=service_type,
                 details={"available": available}
             )
-        
+
         # Return cached singleton
         if descriptor.lifetime == ServiceLifetime.SINGLETON and descriptor.instance is not None:
             return descriptor.instance
-        
+
         # Create new instance
         self.resolving.append(service_type)
         try:
             instance = self._create_instance(descriptor)
-            
+
             # Cache singleton
             if descriptor.lifetime == ServiceLifetime.SINGLETON:
                 descriptor.instance = instance
-            
+
             return instance
-            
+
         finally:
             self.resolving.remove(service_type)
-    
+
     def resolve_optional[T](self, service_type: str, default: T | None = None) -> T | None:
         """Resolve a service or return default if not found.
         
@@ -236,7 +236,7 @@ class Container:
             return self.resolve(service_type)
         except ConfigurationError:
             return default
-    
+
     def has_service(self, service_type: str) -> bool:
         """Check if a service is registered.
         
@@ -249,7 +249,7 @@ class Container:
         if service_type in self.services:
             return True
         return self.parent.has_service(service_type) if self.parent else False
-    
+
     def list_services(self) -> list[str]:
         """List all registered services.
         
@@ -260,7 +260,7 @@ class Container:
         if self.parent:
             services.extend(self.parent.list_services())
         return sorted(set(services))
-    
+
     def create_scope(self) -> Container:
         """Create a child container scope.
         
@@ -275,7 +275,7 @@ class Container:
             >>> child.register("logger", CustomLogger)
         """
         return Container(parent=self)
-    
+
     def _create_instance(self, descriptor: ServiceDescriptor) -> Any:
         """Create an instance from a descriptor.
         
@@ -286,18 +286,18 @@ class Container:
             Service instance.
         """
         implementation = descriptor.implementation
-        
+
         # If it's a callable (factory), call it
         if callable(implementation) and not inspect.isclass(implementation):
             return implementation()
-        
+
         # If it's a class, try to auto-inject constructor parameters
         if inspect.isclass(implementation):
             return self._create_with_injection(implementation)
-        
+
         # Otherwise, just return it
         return implementation
-    
+
     def _create_with_injection[T](self, cls: type[T]) -> T:
         """Create an instance with constructor injection.
         
@@ -313,11 +313,11 @@ class Container:
         # Get constructor signature
         signature = inspect.signature(cls.__init__)
         kwargs = {}
-        
+
         for param_name, param in signature.parameters.items():
             if param_name == "self":
                 continue
-            
+
             # Try to resolve by parameter name
             if self.has_service(param_name):
                 kwargs[param_name] = self.resolve(param_name)
@@ -334,7 +334,7 @@ class Container:
                 logger.debug(
                     f"Cannot resolve parameter: {param_name} for {cls.__name__}"
                 )
-        
+
         return cls(**kwargs)
 
 
@@ -365,15 +365,15 @@ def _register_defaults(container: Container) -> None:
     Args:
         container: Container to configure.
     """
-    from .parsers import RobotASTParser
-    from .discovery import FileDiscoveryService
     from .config import get_settings
+    from .discovery import FileDiscoveryService
     from .metrics import get_metrics
-    
+    from .parsers import RobotASTParser
+
     # Register core services
     container.register_singleton("settings", get_settings)
     container.register_singleton("metrics", get_metrics)
     container.register("parser", RobotASTParser)
     container.register("file_discovery", FileDiscoveryService)
-    
+
     logger.debug("Default services registered")

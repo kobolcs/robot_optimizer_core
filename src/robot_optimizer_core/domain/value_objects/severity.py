@@ -49,11 +49,11 @@ class Severity(IntEnum):
         >>> print(f"{Severity.ERROR.emoji} {Severity.ERROR.name}")
         ❌ ERROR
     """
-    
+
     ERROR = 1    # Critical - breaks best practices or causes issues
     WARNING = 2  # Important - suboptimal but works
     INFO = 3     # Minor - improvement opportunity
-    
+
     def __str__(self) -> str:
         """Return the severity name.
         
@@ -61,7 +61,7 @@ class Severity(IntEnum):
             Severity name as string.
         """
         return self.name
-    
+
     @property
     def emoji(self) -> str:
         """Get emoji representation for the severity.
@@ -83,7 +83,7 @@ class Severity(IntEnum):
                 return "⚠️"
             case Severity.INFO:
                 return "ℹ️"
-    
+
     @property
     def color(self) -> str:
         """Get color name for console output.
@@ -100,7 +100,7 @@ class Severity(IntEnum):
                 return "yellow"
             case Severity.INFO:
                 return "blue"
-    
+
     @property
     def ansi_code(self) -> str:
         """Get ANSI color code for direct terminal coloring.
@@ -115,7 +115,7 @@ class Severity(IntEnum):
                 return "\033[93m"    # Bright yellow
             case Severity.INFO:
                 return "\033[94m"    # Bright blue
-    
+
     @property
     def priority(self) -> int:
         """Get numeric priority (inverse of value).
@@ -128,7 +128,7 @@ class Severity(IntEnum):
             Priority value (1-3, higher is more important).
         """
         return 4 - self.value
-    
+
     @property
     def description(self) -> str:
         """Get human-readable description of the severity.
@@ -152,7 +152,7 @@ class Severity(IntEnum):
                     "Minor improvements and suggestions that can enhance "
                     "test suite quality"
                 )
-    
+
     @property
     def exit_code(self) -> int:
         """Get suggested exit code for CLI tools.
@@ -170,7 +170,7 @@ class Severity(IntEnum):
                 return 1    # Warnings found
             case Severity.INFO:
                 return 0    # Only info, success
-    
+
     @classmethod
     def from_string(cls, value: str) -> Severity:
         """Create severity from string representation.
@@ -198,7 +198,7 @@ class Severity(IntEnum):
                 f"Invalid severity '{value}'. "
                 f"Valid values are: {', '.join(valid)}"
             )
-    
+
     def is_at_least(self, level: Severity) -> bool:
         """Check if this severity is at least as severe as another.
         
@@ -214,7 +214,7 @@ class Severity(IntEnum):
             >>> assert not error.is_at_least(Severity.INFO)
         """
         return self <= level
-    
+
     def should_fail_build(self) -> bool:
         """Check if this severity should fail a build/check.
         
@@ -225,7 +225,7 @@ class Severity(IntEnum):
             True if build should fail with this severity.
         """
         return self == Severity.ERROR
-    
+
     def format_count(self, count: int) -> str:
         """Format a count with appropriate plural and emoji.
         

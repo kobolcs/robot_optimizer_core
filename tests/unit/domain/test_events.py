@@ -1,20 +1,23 @@
 # tests/domain/test_events.py
-import pytest
 from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
-from pydantic import ValidationError
 
+import pytest
+from pydantic import ValidationError
 from robot_optimizer.domain.events import (
-    FileAnalyzedEvent,
-    OptimizationAppliedEvent,
-    HighSeverityFindingEvent,
     AnalysisStartedEvent,
     BatchAnalysisCompletedEvent,
-    OptimizationFailedEvent
+    FileAnalyzedEvent,
+    HighSeverityFindingEvent,
+    OptimizationAppliedEvent,
+    OptimizationFailedEvent,
 )
 from robot_optimizer.domain.value_objects import (
-    Finding, Pattern, PatternType, Severity, Location
+    Finding,
+    Location,
+    Pattern,
+    Severity,
 )
 
 

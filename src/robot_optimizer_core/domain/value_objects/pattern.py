@@ -1,6 +1,5 @@
 # src/robot_optimizer/domain/value_objects/pattern.py
 """Pattern value object for representing optimization patterns."""
-from typing import Optional
 from enum import Enum, auto
 
 from pydantic import Field, field_validator
@@ -56,7 +55,7 @@ class Pattern(ValueObject):
     recommendation: str = Field(
         ..., min_length=1, description="Recommendation for fixing"
     )
-    documentation_url: Optional[str] = Field(
+    documentation_url: str | None = Field(
         None, description="URL to documentation"
     )
     auto_fixable: bool = Field(

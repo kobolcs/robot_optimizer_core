@@ -9,13 +9,16 @@ from uuid import uuid4
 import pydantic
 import pytest
 from pydantic import ValidationError
-
-from robot_optimizer.domain.base import ValueObject, Entity, AggregateRoot, DomainEvent
-from robot_optimizer.domain.value_objects import (
-    Severity, Location, Pattern, PatternType, Finding
-)
-from robot_optimizer.domain.entities import DomainTestFile as DomainTestFile, Analysis
+from robot_optimizer.domain.base import ValueObject
+from robot_optimizer.domain.entities import Analysis
+from robot_optimizer.domain.entities import DomainTestFile as DomainTestFile
 from robot_optimizer.domain.events import FileAnalyzedEvent
+from robot_optimizer.domain.value_objects import (
+    Finding,
+    Location,
+    Pattern,
+    Severity,
+)
 
 
 class TestPydanticV2Compliance:
@@ -409,7 +412,6 @@ class TestPydanticV2Compliance:
 
     def test_json_encoders_config(self):
         """Test custom JSON encoders in ConfigDict."""
-        from decimal import Decimal
 
         # Analysis has custom encoders for datetime, Path, UUID
         analysis = Analysis(

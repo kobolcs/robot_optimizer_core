@@ -25,18 +25,16 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from .analyzers import get_analyzer, list_analyzers
 from .config import get_settings
 from .di import get_container
-from .discovery import FileDiscoveryService
 from .domain.entities import TestFile
 from .domain.value_objects import Finding
 from .exceptions import AnalysisError, FileNotFoundError
 from .logging import get_logger, log_analysis_complete, log_analysis_start
 from .metrics import get_metrics
-from .parsers import RobotASTParser
 
 if TYPE_CHECKING:
     from .analyzers import BaseAnalyzer
@@ -74,18 +72,18 @@ def analyze_file(
     """
     # Convert to Path
     path = Path(file_path)
-    
+
     # Validate file exists
     if not path.exists():
         raise FileNotFoundError(path)
-    
+
     # Get settings
     if settings is None:
         settings = get_settings()
-    
+
     # Get metrics collector
     metrics = get_metrics()
-    
+
     # Load file
     try:
         test_file = TestFile.from_path(path)
@@ -94,50 +92,50 @@ def analyze_file(
             f"Failed to load file: {e}",
             file_path=path
         ) from e
-    
+
     # Get analyzers
     analyzer_instances = _get_analyzer_instances(analyzers, settings)
-    
+
     # Run analysis
     all_findings: list[Finding] = []
-    
+
     for analyzer in analyzer_instances:
         analyzer_name = analyzer.name
-        
+
         # Log and track analysis start
         log_analysis_start(path, analyzer_name, logger)
         start_time = time.time()
-        
+
         try:
             # Run analyzer
             findings = analyzer.analyze(test_file)
             all_findings.extend(findings)
-            
+
             # Track success
             duration = time.time() - start_time
             log_analysis_complete(
                 path, analyzer_name, len(findings), duration, logger
             )
-            
+
             metrics.increment("analysis.completed")
             metrics.increment(f"analysis.{analyzer_name}.completed")
             metrics.timing(f"analysis.{analyzer_name}.duration", duration)
             metrics.gauge(f"analysis.{analyzer_name}.findings", len(findings))
-            
+
         except Exception as e:
             # Track failure
             metrics.increment("analysis.failed")
             metrics.increment(f"analysis.{analyzer_name}.failed")
-            
+
             raise AnalysisError(
                 f"Analysis failed: {e}",
                 file_path=path,
                 analyzer=analyzer_name
             ) from e
-    
+
     # Track total findings
     metrics.gauge("findings.total", len(all_findings))
-    
+
     return all_findings
 
 
@@ -178,39 +176,39 @@ def analyze_directory(
     """
     # Convert to Path
     path = Path(directory_path)
-    
+
     # Validate directory exists
     if not path.exists():
         raise FileNotFoundError(path)
-    
+
     if not path.is_dir():
         raise AnalysisError(
             "Path is not a directory",
             file_path=path
         )
-    
+
     # Get settings
     if settings is None:
         settings = get_settings()
-    
+
     # Get file discovery service
     container = get_container()
     discovery = container.resolve("file_discovery")
-    
+
     # Discover files
     if patterns is None:
         patterns = settings.file_patterns
-    
+
     if exclude_patterns is None:
         exclude_patterns = settings.exclude_patterns
-    
+
     files = discovery.find_files(
         root_path=path,
         patterns=patterns,
         exclude_patterns=exclude_patterns,
         recursive=recursive
     )
-    
+
     logger.info(
         "Starting directory analysis",
         extra={
@@ -219,27 +217,27 @@ def analyze_directory(
             "recursive": recursive
         }
     )
-    
+
     # Analyze each file
     results: dict[Path, list[Finding]] = {}
     errors: list[tuple[Path, Exception]] = []
-    
+
     for file_path in files:
         try:
             findings = analyze_file(file_path, analyzers, settings)
             results[file_path] = findings
-            
+
         except Exception as e:
             if fail_fast:
                 raise
-            
+
             errors.append((file_path, e))
             logger.error(
                 f"Failed to analyze file: {file_path}",
                 extra={"file": str(file_path), "error": str(e)},
                 exc_info=True
             )
-    
+
     # Log summary
     total_findings = sum(len(findings) for findings in results.values())
     logger.info(
@@ -251,21 +249,21 @@ def analyze_directory(
             "total_findings": total_findings
         }
     )
-    
+
     # Track metrics
     metrics = get_metrics()
     metrics.gauge("batch.files_analyzed", len(results))
     metrics.gauge("batch.files_failed", len(errors))
     metrics.gauge("batch.total_findings", total_findings)
-    
+
     # Use ExceptionGroup for multiple errors (Python 3.11+)
     if errors and hasattr(builtins, 'ExceptionGroup'):
         error_messages = [f"{path}: {e}" for path, e in errors]
         raise ExceptionGroup(
-            f"Analysis failed for {len(errors)} files", 
+            f"Analysis failed for {len(errors)} files",
             [e for _, e in errors]
         )
-    
+
     return results
 
 
@@ -296,15 +294,15 @@ def analyze_suite(
         >>> print(f"Keywords: {results['suite_info']['keyword_count']}")
     """
     path = Path(suite_path)
-    
+
     # Single file or directory?
     files = [path] if path.is_file() else None
-    
+
     if files is None:
         container = get_container()
         discovery = container.resolve("file_discovery")
         files = discovery.find_files(path)
-    
+
     # Parse suite structure
     container = get_container()
     parser = container.resolve("parser")
@@ -314,34 +312,34 @@ def analyze_suite(
         "test_cases": [],
         "imports": []
     }
-    
+
     # Analyze files and collect suite info
     all_findings: list[Finding] = []
     file_findings: dict[Path, list[Finding]] = {}
-    
+
     for file_path in files:
         # Load and parse
         test_file = TestFile.from_path(file_path)
-        
+
         try:
             robot_suite = parser.parse_suite(test_file)
-            
+
             # Collect suite info
             suite_info["keywords"].extend(robot_suite.keywords)
             suite_info["test_cases"].extend(robot_suite.test_cases)
             suite_info["imports"].extend(robot_suite.imports)
-            
+
         except Exception as e:
             logger.warning(
                 f"Failed to parse suite structure: {file_path}",
                 extra={"error": str(e)}
             )
-        
+
         # Run analyzers
         findings = analyze_file(file_path, analyzers, settings)
         all_findings.extend(findings)
         file_findings[file_path] = findings
-    
+
     # Calculate statistics
     statistics = {
         "total_findings": len(all_findings),
@@ -351,7 +349,7 @@ def analyze_suite(
         "test_count": len(suite_info["test_cases"]),
         "import_count": len(suite_info["imports"])
     }
-    
+
     # Group findings
     for finding in all_findings:
         # By severity
@@ -359,13 +357,13 @@ def analyze_suite(
         statistics["findings_by_severity"][severity] = (
             statistics["findings_by_severity"].get(severity, 0) + 1
         )
-        
+
         # By type
         pattern_type = finding.pattern.type.name
         statistics["findings_by_type"][pattern_type] = (
             statistics["findings_by_type"].get(pattern_type, 0) + 1
         )
-    
+
     return {
         "findings": all_findings,
         "file_findings": file_findings,
@@ -391,7 +389,7 @@ def _get_analyzer_instances(
         # Use all registered analyzers
         analyzer_names = list_analyzers()
         return [get_analyzer(name) for name in analyzer_names]
-    
+
     instances = []
     for analyzer in analyzers:
         match analyzer:
@@ -401,5 +399,5 @@ def _get_analyzer_instances(
             case _:
                 # Already an instance
                 instances.append(analyzer)
-    
+
     return instances

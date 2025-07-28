@@ -20,7 +20,7 @@ import json
 import logging
 import sys
 from contextvars import ContextVar
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from functools import cache
 from pathlib import Path
 from typing import Any
@@ -37,7 +37,7 @@ class StructuredFormatter(logging.Formatter):
     Formats log records as JSON for easy parsing and analysis.
     Includes timestamp, level, logger name, message, and any extra fields.
     """
-    
+
     def format(self, record: logging.LogRecord) -> str:
         """Format the log record as JSON.
         
@@ -49,7 +49,7 @@ class StructuredFormatter(logging.Formatter):
         """
         # Base log entry
         log_entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -57,15 +57,15 @@ class StructuredFormatter(logging.Formatter):
             "function": record.funcName,
             "line": record.lineno,
         }
-        
+
         # Add exception info if present
         if record.exc_info:
             log_entry["exception"] = self.formatException(record.exc_info)
-        
+
         # Add context from context variable
         if context := logging_context.get():
             log_entry["context"] = context
-        
+
         # Add extra fields
         extra_fields = {
             k: v for k, v in record.__dict__.items()
@@ -78,7 +78,7 @@ class StructuredFormatter(logging.Formatter):
         }
         if extra_fields:
             log_entry["extra"] = extra_fields
-        
+
         return json.dumps(log_entry, default=str)
 
 
@@ -88,7 +88,7 @@ class MetricsHandler(logging.Handler):
     This handler tracks logging metrics for monitoring purposes,
     respecting GDPR by not storing personal information.
     """
-    
+
     def emit(self, record: logging.LogRecord) -> None:
         """Emit a log record and update metrics.
         
@@ -96,11 +96,11 @@ class MetricsHandler(logging.Handler):
             record: The log record to emit.
         """
         metrics = get_metrics()
-        
+
         # Track log levels
         metrics.increment("logs.total")
         metrics.increment(f"logs.{record.levelname.lower()}")
-        
+
         # Track errors by module (no personal data)
         if record.levelno >= logging.ERROR:
             module_name = record.name.split(".")[-1]  # Last part only
@@ -113,9 +113,9 @@ class LoggerAdapter(logging.LoggerAdapter):
     This adapter allows adding persistent context that will be
     included in all log messages.
     """
-    
-    __slots__ = ('logger', 'extra', '_context')
-    
+
+    __slots__ = ('_context', 'extra', 'logger')
+
     def __init__(self, logger: logging.Logger, extra: dict[str, Any]) -> None:
         """Initialize the adapter.
         
@@ -125,7 +125,7 @@ class LoggerAdapter(logging.LoggerAdapter):
         """
         super().__init__(logger, extra)
         self._context = extra.copy()
-    
+
     def add_context(self, **kwargs: Any) -> None:
         """Add context that will be included in all future log messages.
         
@@ -134,7 +134,7 @@ class LoggerAdapter(logging.LoggerAdapter):
         """
         self._context |= kwargs  # Dictionary merge operator
         self.extra = self._context.copy()
-    
+
     def remove_context(self, *keys: str) -> None:
         """Remove context keys.
         
@@ -144,7 +144,7 @@ class LoggerAdapter(logging.LoggerAdapter):
         for key in keys:
             self._context.pop(key, None)
         self.extra = self._context.copy()
-    
+
     def with_context(self, **kwargs: Any) -> LoggerAdapter:
         """Create a new adapter with additional context.
         
@@ -190,14 +190,14 @@ def configure_logging(
         ... )
     """
     global _root_logger_configured
-    
+
     # Configure root logger for the package
     root_logger = logging.getLogger("robot_optimizer_core")
     root_logger.setLevel(level)
-    
+
     # Remove existing handlers
     root_logger.handlers.clear()
-    
+
     # Console handler
     console_handler = logging.StreamHandler(sys.stdout)
     if format_json:
@@ -209,7 +209,7 @@ def configure_logging(
             )
         )
     root_logger.addHandler(console_handler)
-    
+
     # File handler if specified
     if log_file:
         file_handler = logging.FileHandler(log_file)
@@ -222,18 +222,18 @@ def configure_logging(
                 )
             )
         root_logger.addHandler(file_handler)
-    
+
     # Metrics handler
     if enable_metrics:
         metrics_handler = MetricsHandler()
         metrics_handler.setLevel(logging.WARNING)  # Only track warnings and above
         root_logger.addHandler(metrics_handler)
-    
+
     # Extra handlers
     if extra_handlers:
         for handler in extra_handlers:
             root_logger.addHandler(handler)
-    
+
     _root_logger_configured = True
 
 
@@ -262,11 +262,11 @@ def get_logger(
     # Auto-configure if not done yet
     if not _root_logger_configured:
         configure_logging()
-    
+
     # Create new logger
     logger = logging.getLogger(name)
     adapter = LoggerAdapter(logger, context or {})
-    
+
     return adapter
 
 
@@ -286,7 +286,7 @@ def log_analysis_start(
     """
     if logger is None:
         logger = get_logger(__name__)
-    
+
     logger.info(
         "Starting analysis",
         extra={
@@ -318,7 +318,7 @@ def log_analysis_complete(
     """
     if logger is None:
         logger = get_logger(__name__)
-    
+
     logger.info(
         "Analysis complete",
         extra={
@@ -347,9 +347,9 @@ def log_error(
     """
     if logger is None:
         logger = get_logger(__name__)
-    
+
     logger.error(
-        f"{type(error).__name__}: {str(error)}",
+        f"{type(error).__name__}: {error!s}",
         extra={
             "event": "error",
             "error_type": type(error).__name__,

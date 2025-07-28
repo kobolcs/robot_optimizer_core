@@ -1,17 +1,23 @@
 # tests/unit/domain/test_complete_coverage.py
 """Additional tests to ensure 100% coverage of domain layer."""
-import pytest
-from pathlib import Path
 from datetime import datetime
 from decimal import Decimal
-from uuid import uuid4
+from pathlib import Path
 
+import pytest
+from robot_optimizer.domain.base import AggregateRoot, DomainEvent, Entity, ValueObject
+from robot_optimizer.domain.entities import Analysis
+from robot_optimizer.domain.entities import DomainTestFile as DomainTestFile
 from robot_optimizer.domain.value_objects import (
-    Severity, Location, Pattern, PatternType, Finding,
-    SleepPattern, OptimizationSuggestion, OptimizationType
+    Finding,
+    Location,
+    OptimizationSuggestion,
+    OptimizationType,
+    Pattern,
+    PatternType,
+    Severity,
+    SleepPattern,
 )
-from robot_optimizer.domain.entities import DomainTestFile as DomainTestFile, Analysis
-from robot_optimizer.domain.base import ValueObject, Entity, AggregateRoot, DomainEvent
 
 
 class TestCompleteCoverage:
