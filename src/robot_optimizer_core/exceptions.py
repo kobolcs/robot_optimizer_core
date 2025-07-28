@@ -19,7 +19,10 @@ Example:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, Optional, Type
+from typing import Any, TypeVar
+
+# Type variable for exception factory
+E = TypeVar("E", bound="RobotOptimizerError")
 
 
 class RobotOptimizerError(Exception):
@@ -33,10 +36,12 @@ class RobotOptimizerError(Exception):
         details: Additional error details as key-value pairs.
     """
     
+    __slots__ = ('message', 'details')
+    
     def __init__(
         self, 
         message: str, 
-        details: Optional[Dict[str, Any]] = None
+        details: dict[str, Any] | None = None
     ) -> None:
         """Initialize the exception.
         
@@ -71,12 +76,14 @@ class AnalysisError(RobotOptimizerError):
         analyzer: Name of the analyzer that failed (if applicable).
     """
     
+    __slots__ = ('file_path', 'analyzer')
+    
     def __init__(
         self,
         message: str,
-        file_path: Optional[Path] = None,
-        analyzer: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
+        file_path: Path | None = None,
+        analyzer: str | None = None,
+        details: dict[str, Any] | None = None
     ) -> None:
         """Initialize the analysis error.
         
@@ -108,13 +115,15 @@ class ParsingError(AnalysisError):
         column: Column number where parsing failed (if known).
     """
     
+    __slots__ = ('line_number', 'column')
+    
     def __init__(
         self,
         message: str,
         file_path: Path,
-        line_number: Optional[int] = None,
-        column: Optional[int] = None,
-        details: Optional[Dict[str, Any]] = None
+        line_number: int | None = None,
+        column: int | None = None,
+        details: dict[str, Any] | None = None
     ) -> None:
         """Initialize the parsing error.
         
@@ -146,12 +155,14 @@ class ConfigurationError(RobotOptimizerError):
         provided_value: The invalid value that was provided.
     """
     
+    __slots__ = ('config_key', 'provided_value')
+    
     def __init__(
         self,
         message: str,
-        config_key: Optional[str] = None,
+        config_key: str | None = None,
         provided_value: Any = None,
-        details: Optional[Dict[str, Any]] = None
+        details: dict[str, Any] | None = None
     ) -> None:
         """Initialize the configuration error.
         
@@ -182,12 +193,14 @@ class PluginError(RobotOptimizerError):
         plugin_type: Type of plugin (e.g., 'analyzer', 'parser').
     """
     
+    __slots__ = ('plugin_name', 'plugin_type')
+    
     def __init__(
         self,
         message: str,
-        plugin_name: Optional[str] = None,
-        plugin_type: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
+        plugin_name: str | None = None,
+        plugin_type: str | None = None,
+        details: dict[str, Any] | None = None
     ) -> None:
         """Initialize the plugin error.
         
@@ -219,13 +232,15 @@ class ValidationError(RobotOptimizerError):
         validation_rule: Description of the validation rule.
     """
     
+    __slots__ = ('field_name', 'invalid_value', 'validation_rule')
+    
     def __init__(
         self,
         message: str,
-        field_name: Optional[str] = None,
+        field_name: str | None = None,
         invalid_value: Any = None,
-        validation_rule: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
+        validation_rule: str | None = None,
+        details: dict[str, Any] | None = None
     ) -> None:
         """Initialize the validation error.
         
@@ -258,7 +273,7 @@ class FileNotFoundError(AnalysisError):
     def __init__(
         self,
         file_path: Path,
-        details: Optional[Dict[str, Any]] = None
+        details: dict[str, Any] | None = None
     ) -> None:
         """Initialize the file not found error.
         
@@ -280,12 +295,14 @@ class RepositoryError(RobotOptimizerError):
         operation: The operation that failed (e.g., 'save', 'load').
     """
     
+    __slots__ = ('repository_name', 'operation')
+    
     def __init__(
         self,
         message: str,
-        repository_name: Optional[str] = None,
-        operation: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
+        repository_name: str | None = None,
+        operation: str | None = None,
+        details: dict[str, Any] | None = None
     ) -> None:
         """Initialize the repository error.
         
@@ -305,12 +322,14 @@ class RepositoryError(RobotOptimizerError):
             self.details["operation"] = operation
 
 
-def create_error(
-    error_class: Type[RobotOptimizerError],
+def create_error[E: RobotOptimizerError](
+    error_class: type[E],
     message: str,
     **kwargs: Any
-) -> RobotOptimizerError:
+) -> E:
     """Factory function to create errors with consistent formatting.
+    
+    Uses PEP 695 type parameters for better type inference.
     
     Args:
         error_class: The error class to instantiate.

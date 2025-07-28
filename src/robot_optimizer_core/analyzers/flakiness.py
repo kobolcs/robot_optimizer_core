@@ -23,7 +23,7 @@ Example:
 """
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Any
 
 from ..config import get_settings
 from ..di import get_container
@@ -57,8 +57,8 @@ class FlakinessAnalyzer(BaseAnalyzer):
     
     def __init__(
         self,
-        test_result_repository: Optional[TestResultRepository] = None,
-        config: Dict[str, any] = None
+        test_result_repository: TestResultRepository | None = None,
+        config: dict[str, Any] | None = None
     ) -> None:
         """Initialize the analyzer.
         
@@ -124,7 +124,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
         return "Detects tests that fail intermittently"
     
     @property
-    def tags(self) -> List[str]:
+    def tags(self) -> list[str]:
         """Get analyzer tags.
         
         Returns:
@@ -132,7 +132,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
         """
         return ["stability", "reliability", "test-quality"]
     
-    def analyze(self, test_file: TestFile) -> List[Finding]:
+    def analyze(self, test_file: TestFile) -> list[Finding]:
         """Analyze test file for flaky tests.
         
         Args:
@@ -229,14 +229,14 @@ class FlakinessAnalyzer(BaseAnalyzer):
         message = " - ".join(message_parts)
         
         # Try to find test location in file
-        line_number = self._find_test_line(test_file, stats.test_name)
+        line_number = self._find_test_line(test_file, stats.test_name) or 1
         
         return Finding.create(
             pattern=pattern,
             severity=severity,
             location=Location(
                 file_path=test_file.path,
-                line=line_number or 1
+                line=line_number
             ),
             message=message,
             test_name=stats.test_name,
@@ -249,7 +249,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
         )
     
     def _determine_severity(self, failure_rate: float) -> Severity:
-        """Determine severity based on failure rate.
+        """Determine severity based on failure rate using pattern matching.
         
         Args:
             failure_rate: Test failure rate (0-1).
@@ -257,12 +257,13 @@ class FlakinessAnalyzer(BaseAnalyzer):
         Returns:
             Severity level.
         """
-        if failure_rate >= self._severity_thresholds["error"]:
-            return Severity.ERROR
-        elif failure_rate >= self._severity_thresholds["warning"]:
-            return Severity.WARNING
-        else:
-            return Severity.INFO
+        match failure_rate:
+            case rate if rate >= self._severity_thresholds["error"]:
+                return Severity.ERROR
+            case rate if rate >= self._severity_thresholds["warning"]:
+                return Severity.WARNING
+            case _:
+                return Severity.INFO
     
     def _get_recommendation(self, stats: FlakinessStats) -> str:
         """Get recommendation based on flakiness pattern.
@@ -275,28 +276,29 @@ class FlakinessAnalyzer(BaseAnalyzer):
         """
         rate = stats.failure_rate
         
-        if rate > 0.5:
-            return (
-                "Test fails more often than passes - investigate test logic "
-                "and prerequisites"
-            )
-        elif rate > 0.2:
-            return (
-                "High failure rate suggests timing issues - add explicit waits "
-                "and check test isolation"
-            )
-        elif rate > 0.1:
-            return (
-                "Moderate flakiness - check for race conditions and "
-                "environmental dependencies"
-            )
-        else:
-            return (
-                "Low but persistent flakiness - review wait conditions "
-                "and external dependencies"
-            )
+        match rate:
+            case r if r > 0.5:
+                return (
+                    "Test fails more often than passes - investigate test logic "
+                    "and prerequisites"
+                )
+            case r if r > 0.2:
+                return (
+                    "High failure rate suggests timing issues - add explicit waits "
+                    "and check test isolation"
+                )
+            case r if r > 0.1:
+                return (
+                    "Moderate flakiness - check for race conditions and "
+                    "environmental dependencies"
+                )
+            case _:
+                return (
+                    "Low but persistent flakiness - review wait conditions "
+                    "and external dependencies"
+                )
     
-    def _find_test_line(self, test_file: TestFile, test_name: str) -> Optional[int]:
+    def _find_test_line(self, test_file: TestFile, test_name: str) -> int | None:
         """Find the line number where a test is defined.
         
         Args:
@@ -332,7 +334,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
         stats: FlakinessStats,
         test_file: TestFile
     ) -> str:
-        """Categorize the type of flakiness.
+        """Categorize the type of flakiness using pattern matching.
         
         This is a simple categorization. The Pro version provides
         more sophisticated root cause analysis.
@@ -345,28 +347,24 @@ class FlakinessAnalyzer(BaseAnalyzer):
             Flakiness category.
         """
         rate = stats.failure_rate
+        test_lower = stats.test_name.lower()
         
         # High failure rate - likely logic issue
         if rate > 0.5:
             return "logic_issue"
         
         # Check test name for hints
-        test_lower = stats.test_name.lower()
-        
-        if any(word in test_lower for word in ['ui', 'click', 'element', 'page']):
-            return "ui_timing"
-        
-        if any(word in test_lower for word in ['api', 'request', 'response']):
-            return "api_timing"
-        
-        if any(word in test_lower for word in ['database', 'db', 'query']):
-            return "database_timing"
-        
-        if any(word in test_lower for word in ['file', 'upload', 'download']):
-            return "file_operation"
-        
-        # Default
-        return "timing_issue"
+        match test_lower:
+            case name if any(word in name for word in ['ui', 'click', 'element', 'page']):
+                return "ui_timing"
+            case name if any(word in name for word in ['api', 'request', 'response']):
+                return "api_timing"
+            case name if any(word in name for word in ['database', 'db', 'query']):
+                return "database_timing"
+            case name if any(word in name for word in ['file', 'upload', 'download']):
+                return "file_operation"
+            case _:
+                return "timing_issue"
     
     def validate_config(self) -> None:
         """Validate analyzer configuration.

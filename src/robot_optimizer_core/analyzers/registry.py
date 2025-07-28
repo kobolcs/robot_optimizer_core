@@ -20,13 +20,19 @@ Example:
 """
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Type, Union
+from functools import cache
+from typing import Any, TYPE_CHECKING
 
 from ..di import get_container
 from ..exceptions import PluginError
 from ..logging import get_logger
 from ..plugin import get_plugin_registry
 from .base import BaseAnalyzer
+
+if TYPE_CHECKING:
+    from typing import TypeAlias
+    
+    AnalyzerClass: TypeAlias = type[BaseAnalyzer]
 
 logger = get_logger(__name__)
 
@@ -43,11 +49,13 @@ class AnalyzerRegistry:
         default_analyzers: List of analyzer names to use by default.
     """
     
+    __slots__ = ('analyzers', 'instances', 'default_analyzers')
+    
     def __init__(self) -> None:
         """Initialize the analyzer registry."""
-        self.analyzers: Dict[str, Type[BaseAnalyzer]] = {}
-        self.instances: Dict[str, BaseAnalyzer] = {}
-        self.default_analyzers: List[str] = [
+        self.analyzers: dict[str, AnalyzerClass] = {}
+        self.instances: dict[str, BaseAnalyzer] = {}
+        self.default_analyzers: list[str] = [
             "dead_code",
             "sleep_detector",
             "flakiness"
@@ -56,7 +64,7 @@ class AnalyzerRegistry:
     def register(
         self,
         name: str,
-        analyzer_class: Type[BaseAnalyzer],
+        analyzer_class: AnalyzerClass,
         override: bool = False
     ) -> None:
         """Register an analyzer.
@@ -149,7 +157,7 @@ class AnalyzerRegistry:
         
         return instance
     
-    def list(self) -> List[str]:
+    def list(self) -> list[str]:
         """List all registered analyzer names.
         
         Returns:
@@ -164,7 +172,7 @@ class AnalyzerRegistry:
         
         return sorted(names)
     
-    def get_info(self, name: str) -> Dict[str, str]:
+    def get_info(self, name: str) -> dict[str, str]:
         """Get information about an analyzer.
         
         Args:
@@ -185,7 +193,7 @@ class AnalyzerRegistry:
             "tags": ", ".join(analyzer.tags) if analyzer.tags else ""
         }
     
-    def get_default_analyzers(self) -> List[BaseAnalyzer]:
+    def get_default_analyzers(self) -> list[BaseAnalyzer]:
         """Get default analyzer instances.
         
         Returns:
@@ -193,7 +201,7 @@ class AnalyzerRegistry:
         """
         return [self.get(name) for name in self.default_analyzers]
     
-    def set_default_analyzers(self, names: List[str]) -> None:
+    def set_default_analyzers(self, names: list[str]) -> None:
         """Set the default analyzers.
         
         Args:
@@ -201,9 +209,7 @@ class AnalyzerRegistry:
         """
         # Validate all names exist
         available = set(self.list())
-        invalid = set(names) - available
-        
-        if invalid:
+        if invalid := set(names) - available:
             raise PluginError(
                 f"Invalid analyzer names: {invalid}",
                 plugin_type="analyzer",
@@ -234,9 +240,10 @@ class AnalyzerRegistry:
 
 
 # Global registry instance
-_analyzer_registry: Optional[AnalyzerRegistry] = None
+_analyzer_registry: AnalyzerRegistry | None = None
 
 
+@cache
 def get_analyzer_registry() -> AnalyzerRegistry:
     """Get the global analyzer registry.
     
@@ -271,7 +278,7 @@ def _register_built_in_analyzers(registry: AnalyzerRegistry) -> None:
 # Public API functions
 def register_analyzer(
     name: str,
-    analyzer_class: Type[BaseAnalyzer],
+    analyzer_class: AnalyzerClass,
     override: bool = False
 ) -> None:
     """Register an analyzer in the global registry.
@@ -304,7 +311,7 @@ def get_analyzer(name: str) -> BaseAnalyzer:
     return registry.get(name)
 
 
-def list_analyzers() -> List[str]:
+def list_analyzers() -> list[str]:
     """List all available analyzer names.
     
     Returns:
@@ -319,7 +326,7 @@ def list_analyzers() -> List[str]:
     return registry.list()
 
 
-def get_analyzer_info(name: str) -> Dict[str, str]:
+def get_analyzer_info(name: str) -> dict[str, str]:
     """Get information about an analyzer.
     
     Args:
