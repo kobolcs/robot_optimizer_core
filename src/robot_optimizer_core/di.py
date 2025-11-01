@@ -297,15 +297,19 @@ _global_container_lock = threading.RLock()
 def get_thread_safe_container() -> ThreadSafeContainer:
     """Get the global thread-safe container."""
     global _global_container
-    
+
     if _global_container is None:
         with _global_container_lock:
             # Double-check pattern
             if _global_container is None:
                 _global_container = ThreadSafeContainer()
                 _register_defaults(_global_container)
-    
+
     return _global_container
+
+
+# Alias for backward compatibility
+get_container = get_thread_safe_container
 
 
 def _register_defaults(container: ThreadSafeContainer) -> None:

@@ -1,7 +1,7 @@
 # src/robot_optimizer/domain/value_objects/robot_ast.py
 """Value objects for Robot Framework AST representation."""
 from pathlib import Path
-from typing import Any
+from typing import Any, Set
 
 from pydantic import Field
 
