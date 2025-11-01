@@ -285,3 +285,7 @@ def example_timezone_usage():
     # Format for display
     formatted = format_datetime_local(dt, "America/New_York")
     print(f"NY Time: {formatted}")
+
+
+# Export alias for backward compatibility
+TestFile = TimezoneAwareTestFile

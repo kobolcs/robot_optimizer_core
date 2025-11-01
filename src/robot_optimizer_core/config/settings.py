@@ -21,8 +21,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseSettings, Field, validator
-from pydantic.env_settings import SettingsSourceCallable
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from ..exceptions import ConfigurationError
 
@@ -131,7 +131,7 @@ class Settings(BaseSettings):
     log_level: str = Field(
         default="INFO",
         description="Logging level",
-        regex="^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$"
+        pattern="^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$"
     )
 
     log_format_json: bool = Field(
@@ -156,17 +156,16 @@ class Settings(BaseSettings):
         description="Custom settings for extensions"
     )
 
-    class Config:
-        """Pydantic configuration."""
-        env_prefix = "ROBOT_OPTIMIZER_"
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
+    model_config = SettingsConfigDict(
+        env_prefix="ROBOT_OPTIMIZER_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="allow",  # Allow extra fields for Pro extensions
+    )
 
-        # Allow extra fields for Pro extensions
-        extra = "allow"
-
-    @validator("file_patterns", "exclude_patterns")
+    @field_validator("file_patterns", "exclude_patterns")
+    @classmethod
     def validate_patterns(cls, v: list[str]) -> list[str]:
         """Validate file patterns.
         
@@ -185,7 +184,8 @@ class Settings(BaseSettings):
         # Ensure patterns are strings
         return [str(p) for p in v]
 
-    @validator("plugin_dirs")
+    @field_validator("plugin_dirs")
+    @classmethod
     def validate_plugin_dirs(cls, v: list[str | Path]) -> list[Path]:
         """Validate and convert plugin directories to Path objects.
         
@@ -206,7 +206,8 @@ class Settings(BaseSettings):
             paths.append(path)
         return paths
 
-    @validator("log_level")
+    @field_validator("log_level")
+    @classmethod
     def validate_log_level(cls, v: str) -> str:
         """Validate log level.
         

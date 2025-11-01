@@ -25,8 +25,6 @@ from functools import cache
 from pathlib import Path
 from typing import Any
 
-from .metrics import get_metrics
-
 # Context variable for logging context
 logging_context: ContextVar[dict[str, Any]] = ContextVar('logging_context', default={})
 
@@ -91,10 +89,13 @@ class MetricsHandler(logging.Handler):
 
     def emit(self, record: logging.LogRecord) -> None:
         """Emit a log record and update metrics.
-        
+
         Args:
             record: The log record to emit.
         """
+        # Lazy import to avoid circular dependency
+        from .metrics import get_metrics
+
         metrics = get_metrics()
 
         # Track log levels
