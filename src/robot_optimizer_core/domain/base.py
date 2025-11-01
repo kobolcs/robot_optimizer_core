@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from abc import ABC
 from datetime import UTC, datetime
-from typing import Any, ClassVar
+from typing import Any, ClassVar, override
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
@@ -65,12 +65,13 @@ class ValueObject(BaseModel, ABC):
         }
     )
 
+    @override
     def __eq__(self, other: Any) -> bool:
         """Compare value objects by their attributes.
-        
+
         Args:
             other: Object to compare with.
-            
+
         Returns:
             True if all attributes are equal.
         """
@@ -78,9 +79,10 @@ class ValueObject(BaseModel, ABC):
             return False
         return self.model_dump() == other.model_dump()
 
+    @override
     def __hash__(self) -> int:
         """Generate hash based on all attributes.
-        
+
         Returns:
             Hash value for the object.
         """
@@ -98,9 +100,10 @@ class ValueObject(BaseModel, ABC):
 
         return hash(tuple(hashable_items))
 
+    @override
     def __repr__(self) -> str:
         """Return a detailed string representation.
-        
+
         Returns:
             String representation with all fields.
         """
@@ -150,12 +153,13 @@ class Entity[T](BaseModel, ABC):
 
     id: T = Field(..., description="Unique identifier for the entity")
 
+    @override
     def __eq__(self, other: Any) -> bool:
         """Compare entities by their ID.
-        
+
         Args:
             other: Object to compare with.
-            
+
         Returns:
             True if both have the same ID.
         """
@@ -163,17 +167,19 @@ class Entity[T](BaseModel, ABC):
             return False
         return self.id == other.id
 
+    @override
     def __hash__(self) -> int:
         """Hash based on entity ID.
-        
+
         Returns:
             Hash of the entity ID.
         """
         return hash(self.id)
 
+    @override
     def __repr__(self) -> str:
         """Return string representation with ID.
-        
+
         Returns:
             String representation.
         """
@@ -225,9 +231,10 @@ class AggregateRoot[T](Entity[T], ABC):
         }
     )
 
+    @override
     def __init__(self, **data: Any) -> None:
         """Initialize aggregate root with event list.
-        
+
         Args:
             **data: Field values for the aggregate.
         """
@@ -409,9 +416,10 @@ class DomainEvent(BaseModel, ABC):
             )
         }
 
+    @override
     def __repr__(self) -> str:
         """Return string representation of event.
-        
+
         Returns:
             String representation.
         """

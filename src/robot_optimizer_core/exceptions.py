@@ -19,7 +19,7 @@ Example:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 
 class RobotOptimizerError(Exception):
@@ -50,9 +50,10 @@ class RobotOptimizerError(Exception):
         self.message = message
         self.details = details or {}
 
+    @override
     def __str__(self) -> str:
         """Return string representation of the error.
-        
+
         Returns:
             Error message with details if available.
         """
