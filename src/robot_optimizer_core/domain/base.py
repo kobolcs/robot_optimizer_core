@@ -23,14 +23,10 @@ from __future__ import annotations
 
 from abc import ABC
 from datetime import UTC, datetime
-from typing import Any, ClassVar, Generic, TypeVar
+from typing import Any, ClassVar
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
-
-T = TypeVar("T")
-TEntity = TypeVar("TEntity", bound="Entity")
-TValueObject = TypeVar("TValueObject", bound="ValueObject")
 
 
 class ValueObject(BaseModel, ABC):
@@ -114,27 +110,27 @@ class ValueObject(BaseModel, ABC):
         return f"{self.__class__.__name__}({fields})"
 
 
-class Entity(BaseModel, ABC, Generic[T]):
+class Entity[T](BaseModel, ABC):
     """Base class for entities using Pydantic v2.
-    
+
     Entities have identity and are compared by their ID, not by their
     attributes. They can change over time while maintaining identity.
-    
+
     Type Parameters:
         T: Type of the entity ID (e.g., UUID, str, int).
-    
+
     Features:
         - Identity-based equality
         - Mutable attributes
         - Arbitrary types allowed
         - Can be created from ORM objects
-    
+
     Example:
         >>> class Product(Entity[UUID]):
         ...     id: UUID = Field(default_factory=uuid4)
         ...     name: str
         ...     price: Decimal
-        >>> 
+        >>>
         >>> p1 = Product(name="Laptop", price=Decimal("999.99"))
         >>> p2 = Product(id=p1.id, name="Gaming Laptop", price=Decimal("1299.99"))
         >>> assert p1 == p2  # Same ID = same entity
@@ -185,17 +181,17 @@ class Entity(BaseModel, ABC, Generic[T]):
 
     def same_identity(self, other: Entity[T]) -> bool:
         """Check if two entities have the same identity.
-        
+
         Args:
             other: Another entity.
-            
+
         Returns:
             True if same identity.
         """
         return self.id == other.id
 
 
-class AggregateRoot(Entity[T], ABC):
+class AggregateRoot[T](Entity[T], ABC):
     """Base class for aggregate roots using Pydantic v2.
     
     Aggregate roots are entities that serve as the entry point to an

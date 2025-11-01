@@ -5,7 +5,7 @@ from __future__ import annotations
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Any, Protocol, TypeVar, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from .analyzers.registry import AnalyzerRegistry
 from .config.settings import Settings
@@ -15,8 +15,6 @@ from .logging import LoggerAdapter, configure_logging
 from .metrics import MetricsCollector
 from .parsers.robot_ast_parser import RobotASTParser
 from .plugin import SecurePluginManager
-
-T = TypeVar("T")
 
 
 @runtime_checkable

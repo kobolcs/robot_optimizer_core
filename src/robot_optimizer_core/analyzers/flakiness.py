@@ -23,7 +23,7 @@ Example:
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, override
 
 from ..config import get_settings
 from ..di import get_container
@@ -106,32 +106,36 @@ class FlakinessAnalyzer(BaseAnalyzer):
         )
 
     @property
+    @override
     def name(self) -> str:
         """Get analyzer name.
-        
+
         Returns:
             Analyzer name.
         """
         return "flakiness"
 
     @property
+    @override
     def description(self) -> str:
         """Get analyzer description.
-        
+
         Returns:
             Analyzer description.
         """
         return "Detects tests that fail intermittently"
 
     @property
+    @override
     def tags(self) -> list[str]:
         """Get analyzer tags.
-        
+
         Returns:
             List of tags.
         """
         return ["stability", "reliability", "test-quality"]
 
+    @override
     def analyze(self, test_file: TestFile) -> list[Finding]:
         """Analyze test file for flaky tests.
         
@@ -366,9 +370,10 @@ class FlakinessAnalyzer(BaseAnalyzer):
             case _:
                 return "timing_issue"
 
+    @override
     def validate_config(self) -> None:
         """Validate analyzer configuration.
-        
+
         Raises:
             ConfigurationError: If configuration is invalid.
         """

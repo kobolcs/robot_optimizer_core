@@ -19,10 +19,7 @@ Example:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, TypeVar
-
-# Type variable for exception factory
-E = TypeVar("E", bound="RobotOptimizerError")
+from typing import Any
 
 
 class RobotOptimizerError(Exception):

@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import re
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import Any, override
 
 from ..config import get_settings
 from ..domain.entities import TestFile
@@ -76,41 +76,46 @@ class SleepDetector(BaseAnalyzer):
         self._sleep_patterns = self._compile_sleep_patterns()
 
     @property
+    @override
     def name(self) -> str:
         """Get analyzer name.
-        
+
         Returns:
             Analyzer name.
         """
         return "sleep_detector"
 
     @property
+    @override
     def description(self) -> str:
         """Get analyzer description.
-        
+
         Returns:
             Analyzer description.
         """
         return "Finds Sleep keyword usage that makes tests slow and fragile"
 
     @property
+    @override
     def tags(self) -> list[str]:
         """Get analyzer tags.
-        
+
         Returns:
             List of tags.
         """
         return ["performance", "stability", "wait-conditions"]
 
     @property
+    @override
     def supports_auto_fix(self) -> bool:
         """Check if analyzer supports auto-fixing.
-        
+
         Returns:
             True (sleep can be replaced with waits).
         """
         return True
 
+    @override
     def analyze(self, test_file: TestFile) -> list[Finding]:
         """Find all sleep patterns in the test file.
         
@@ -361,9 +366,10 @@ class SleepDetector(BaseAnalyzer):
             case _:
                 return "Long sleeps indicate missing synchronization - use proper wait conditions"
 
+    @override
     def validate_config(self) -> None:
         """Validate analyzer configuration.
-        
+
         Raises:
             ConfigurationError: If configuration is invalid.
         """
