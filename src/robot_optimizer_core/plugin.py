@@ -1,18 +1,67 @@
-# src/robot_optimizer_core/plugin_secure.py
+# src/robot_optimizer_core/plugin.py
 """Secure plugin system that prevents arbitrary code execution."""
 from __future__ import annotations
 
 import ast
 import hashlib
 import importlib.util
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TypeVar
 
 from .exceptions import PluginError
 from .logging import get_logger
-from .plugin import Plugin, PluginMetadata, PluginRegistry
 
 logger = get_logger(__name__)
+
+
+@dataclass
+class PluginMetadata:
+    """Metadata for a plugin."""
+    name: str
+    version: str
+    description: str
+    author: str
+
+
+class Plugin(ABC):
+    """Base class for plugins."""
+
+    @property
+    @abstractmethod
+    def metadata(self) -> PluginMetadata:
+        """Get plugin metadata."""
+        ...
+
+    @abstractmethod
+    def activate(self) -> None:
+        """Activate the plugin."""
+        ...
+
+    @abstractmethod
+    def deactivate(self) -> None:
+        """Deactivate the plugin."""
+        ...
+
+
+class PluginRegistry:
+    """Registry for managing plugins."""
+
+    def __init__(self) -> None:
+        self.plugins: dict[str, type[Plugin]] = {}
+
+    def register(self, name: str, plugin_class: type[Plugin]) -> None:
+        """Register a plugin."""
+        self.plugins[name] = plugin_class
+
+    def get(self, name: str) -> type[Plugin] | None:
+        """Get a plugin by name."""
+        return self.plugins.get(name)
+
+    def list(self) -> list[str]:
+        """List all registered plugins."""
+        return list(self.plugins.keys())
 
 # Whitelist of allowed imports for plugins
 ALLOWED_IMPORTS = {
@@ -191,8 +240,10 @@ class SecurePluginManager:
         # Load plugin in restricted environment
         try:
             # Create a restricted globals environment
+            # Handle both dict and module forms of __builtins__
+            builtin_dict = __builtins__ if isinstance(__builtins__, dict) else vars(__builtins__)
             restricted_globals = {
-                '__builtins__': {k: __builtins__[k] for k in ALLOWED_BUILTINS},
+                '__builtins__': {k: builtin_dict[k] for k in ALLOWED_BUILTINS if k in builtin_dict},
                 '__name__': f'plugin_{file_path.stem}',
                 '__file__': str(file_path),
             }
