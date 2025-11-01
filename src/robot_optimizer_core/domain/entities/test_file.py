@@ -1,8 +1,8 @@
-# src/robot_optimizer_core/domain/entities/test_file_safe.py
+# src/robot_optimizer_core/domain/entities/test_file.py
 """Timezone-aware test file entity with proper datetime handling."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
@@ -10,7 +10,10 @@ from zoneinfo import ZoneInfo  # Python 3.9+ for timezone support
 
 from pydantic import Field, computed_field, field_validator, model_validator
 
+from ...logging import get_logger
 from ..base import Entity
+
+logger = get_logger(__name__)
 
 
 def utc_now() -> datetime:

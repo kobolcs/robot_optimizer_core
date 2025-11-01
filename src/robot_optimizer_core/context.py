@@ -10,9 +10,9 @@ from typing import Any, Protocol, TypeVar, runtime_checkable
 from .analyzers.registry import AnalyzerRegistry
 from .config.settings import Settings
 from .di import ThreadSafeContainer
-from .discovery.file_finder import SecureFileDiscoveryService
+from .discovery.file_finder import FileDiscoveryService
 from .logging import LoggerAdapter, configure_logging
-from .metrics import MemorySafeMetricsCollector
+from .metrics import MetricsCollector
 from .parsers.robot_ast_parser import RobotASTParser
 from .plugin import SecurePluginManager
 
@@ -74,7 +74,7 @@ class ApplicationContext:
         
         # Core services (not global!)
         self._container: ThreadSafeContainer | None = None
-        self._metrics: MemorySafeMetricsCollector | None = None
+        self._metrics: MetricsCollector | None = None
         self._plugin_manager: SecurePluginManager | None = None
         self._analyzer_registry: AnalyzerRegistry | None = None
         self._loggers: dict[str, LoggerAdapter] = {}
@@ -112,9 +112,8 @@ class ApplicationContext:
             
             # Initialize metrics
             if self.config.enable_metrics:
-                self._metrics = MemorySafeMetricsCollector(
-                    enabled=True,
-                    max_metrics=10000
+                self._metrics = MetricsCollector(
+                    enabled=True
                 )
                 self._container.register_instance("metrics", self._metrics)
             
@@ -166,14 +165,14 @@ class ApplicationContext:
         return self._container
     
     @property
-    def metrics(self) -> MemorySafeMetricsCollector:
+    def metrics(self) -> MetricsCollector:
         """Get the metrics collector."""
         if not self._initialized:
             self.initialize()
-        
+
         if not self._metrics:
             raise RuntimeError("Metrics not enabled")
-        
+
         return self._metrics
     
     @property
@@ -223,7 +222,7 @@ class ApplicationContext:
         # Register core services
         self._container.register_singleton(
             "file_discovery",
-            lambda: SecureFileDiscoveryService(self.config.settings)
+            lambda: FileDiscoveryService(self.config.settings)
         )
         
         self._container.register(
