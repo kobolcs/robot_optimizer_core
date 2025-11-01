@@ -1,4 +1,7 @@
 """File discovery services."""
-from .file_finder import FileDiscoveryService
+from .file_finder import OptimizedFileDiscoveryService
 
-__all__ = ["FileDiscoveryService"]
+# Alias for backward compatibility
+FileDiscoveryService = OptimizedFileDiscoveryService
+
+__all__ = ["FileDiscoveryService", "OptimizedFileDiscoveryService"]

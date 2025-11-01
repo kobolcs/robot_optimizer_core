@@ -354,3 +354,19 @@ class ExamplePlugin(Plugin):
         """Clean up resources."""
         pass
 '''
+
+
+# Global plugin registry instance
+_plugin_registry: PluginRegistry | None = None
+
+
+def get_plugin_registry() -> PluginRegistry:
+    """Get the global plugin registry instance.
+
+    Returns:
+        The global plugin registry instance.
+    """
+    global _plugin_registry
+    if _plugin_registry is None:
+        _plugin_registry = PluginRegistry()
+    return _plugin_registry

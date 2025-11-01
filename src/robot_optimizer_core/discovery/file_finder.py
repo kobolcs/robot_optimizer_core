@@ -13,7 +13,7 @@ from typing import Iterator, Set
 from ..config import Settings
 from ..exceptions import FileNotFoundError as RFFileNotFoundError, ValidationError
 from ..logging import get_logger
-from ..metrics import MemorySafeMetricsCollector
+from ..metrics import MetricsCollector
 
 
 @dataclass
