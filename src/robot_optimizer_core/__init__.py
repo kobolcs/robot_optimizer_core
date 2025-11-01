@@ -51,13 +51,15 @@ from .analyzers import (
 from .api import analyze_directory, analyze_file, analyze_suite
 
 # Configuration
-from .config import Settings, get_settings
+from .config import Settings, get_settings, reset_settings
 
 # Deprecation utilities
 from .deprecation import deprecated, deprecation_warning
 
 # Dependency injection
-from .di import Container, get_container
+from .di import ThreadSafeContainer, get_container
+# Alias for backward compatibility
+Container = ThreadSafeContainer
 
 # Core services
 from .discovery import FileDiscoveryService
@@ -88,7 +90,7 @@ from .exceptions import (
 from .logging import configure_logging, get_logger
 
 # Metrics
-from .metrics import MetricsCollector, get_metrics
+from .metrics import MetricsCollector, configure_metrics, get_metrics
 from .parsers import RobotASTParser
 
 # Plugin system
@@ -136,6 +138,7 @@ __all__ = [
     # Configuration
     "Settings",
     "get_settings",
+    "reset_settings",
 
     # Exceptions
     "RobotOptimizerError",
@@ -150,6 +153,7 @@ __all__ = [
     # Metrics
     "MetricsCollector",
     "get_metrics",
+    "configure_metrics",
 
     # DI
     "Container",

@@ -30,9 +30,7 @@ from ..plugin import get_plugin_registry
 from .base import BaseAnalyzer
 
 if TYPE_CHECKING:
-    from typing import TypeAlias
-
-    AnalyzerClass: TypeAlias = type[BaseAnalyzer]
+    type AnalyzerClass = type[BaseAnalyzer]
 
 logger = get_logger(__name__)
 

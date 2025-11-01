@@ -1,4 +1,4 @@
-# src/robot_optimizer_core/di_safe.py
+# src/robot_optimizer_core/di.py
 """Thread-safe dependency injection container."""
 from __future__ import annotations
 
@@ -8,13 +8,12 @@ from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import StrEnum, auto
-from typing import Any, TypeAlias, TypeVar
+from typing import Any
 
 from .exceptions import ConfigurationError
 from .logging import get_logger
 
-T = TypeVar("T")
-ServiceFactory: TypeAlias = type[Any] | Callable[..., Any]
+type ServiceFactory = type[Any] | Callable[..., Any]
 
 logger = get_logger(__name__)
 
@@ -298,15 +297,19 @@ _global_container_lock = threading.RLock()
 def get_thread_safe_container() -> ThreadSafeContainer:
     """Get the global thread-safe container."""
     global _global_container
-    
+
     if _global_container is None:
         with _global_container_lock:
             # Double-check pattern
             if _global_container is None:
                 _global_container = ThreadSafeContainer()
                 _register_defaults(_global_container)
-    
+
     return _global_container
+
+
+# Alias for backward compatibility
+get_container = get_thread_safe_container
 
 
 def _register_defaults(container: ThreadSafeContainer) -> None:

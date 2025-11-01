@@ -7,7 +7,7 @@ that can be safely removed to improve maintainability.
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Any
+from typing import Any, override
 
 from ..domain.entities import TestFile
 from ..domain.value_objects import Finding, Location, Pattern, PatternType, Severity
@@ -31,17 +31,21 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         self._check_unreachable = self.get_config_value("check_unreachable", True)
 
     @property
+    @override
     def name(self) -> str:
         return "dead_code"
 
     @property
+    @override
     def description(self) -> str:
         return "Detects unused keywords and duplicate definitions"
 
     @property
+    @override
     def tags(self) -> list[str]:
         return ["cleanup", "maintainability", "code-quality"]
 
+    @override
     def analyze(self, test_file: TestFile) -> list[Finding]:
         """Analyze test file for dead code."""
         findings = []

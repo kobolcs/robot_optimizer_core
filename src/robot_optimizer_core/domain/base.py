@@ -23,14 +23,10 @@ from __future__ import annotations
 
 from abc import ABC
 from datetime import UTC, datetime
-from typing import Any, ClassVar, Generic, TypeVar
+from typing import Any, ClassVar, override
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
-
-T = TypeVar("T")
-TEntity = TypeVar("TEntity", bound="Entity")
-TValueObject = TypeVar("TValueObject", bound="ValueObject")
 
 
 class ValueObject(BaseModel, ABC):
@@ -69,12 +65,13 @@ class ValueObject(BaseModel, ABC):
         }
     )
 
+    @override
     def __eq__(self, other: Any) -> bool:
         """Compare value objects by their attributes.
-        
+
         Args:
             other: Object to compare with.
-            
+
         Returns:
             True if all attributes are equal.
         """
@@ -82,9 +79,10 @@ class ValueObject(BaseModel, ABC):
             return False
         return self.model_dump() == other.model_dump()
 
+    @override
     def __hash__(self) -> int:
         """Generate hash based on all attributes.
-        
+
         Returns:
             Hash value for the object.
         """
@@ -102,9 +100,10 @@ class ValueObject(BaseModel, ABC):
 
         return hash(tuple(hashable_items))
 
+    @override
     def __repr__(self) -> str:
         """Return a detailed string representation.
-        
+
         Returns:
             String representation with all fields.
         """
@@ -114,27 +113,27 @@ class ValueObject(BaseModel, ABC):
         return f"{self.__class__.__name__}({fields})"
 
 
-class Entity(BaseModel, ABC, Generic[T]):
+class Entity[T](BaseModel, ABC):
     """Base class for entities using Pydantic v2.
-    
+
     Entities have identity and are compared by their ID, not by their
     attributes. They can change over time while maintaining identity.
-    
+
     Type Parameters:
         T: Type of the entity ID (e.g., UUID, str, int).
-    
+
     Features:
         - Identity-based equality
         - Mutable attributes
         - Arbitrary types allowed
         - Can be created from ORM objects
-    
+
     Example:
         >>> class Product(Entity[UUID]):
         ...     id: UUID = Field(default_factory=uuid4)
         ...     name: str
         ...     price: Decimal
-        >>> 
+        >>>
         >>> p1 = Product(name="Laptop", price=Decimal("999.99"))
         >>> p2 = Product(id=p1.id, name="Gaming Laptop", price=Decimal("1299.99"))
         >>> assert p1 == p2  # Same ID = same entity
@@ -154,12 +153,13 @@ class Entity(BaseModel, ABC, Generic[T]):
 
     id: T = Field(..., description="Unique identifier for the entity")
 
+    @override
     def __eq__(self, other: Any) -> bool:
         """Compare entities by their ID.
-        
+
         Args:
             other: Object to compare with.
-            
+
         Returns:
             True if both have the same ID.
         """
@@ -167,17 +167,19 @@ class Entity(BaseModel, ABC, Generic[T]):
             return False
         return self.id == other.id
 
+    @override
     def __hash__(self) -> int:
         """Hash based on entity ID.
-        
+
         Returns:
             Hash of the entity ID.
         """
         return hash(self.id)
 
+    @override
     def __repr__(self) -> str:
         """Return string representation with ID.
-        
+
         Returns:
             String representation.
         """
@@ -185,17 +187,17 @@ class Entity(BaseModel, ABC, Generic[T]):
 
     def same_identity(self, other: Entity[T]) -> bool:
         """Check if two entities have the same identity.
-        
+
         Args:
             other: Another entity.
-            
+
         Returns:
             True if same identity.
         """
         return self.id == other.id
 
 
-class AggregateRoot(Entity[T], ABC):
+class AggregateRoot[T](Entity[T], ABC):
     """Base class for aggregate roots using Pydantic v2.
     
     Aggregate roots are entities that serve as the entry point to an
@@ -229,9 +231,10 @@ class AggregateRoot(Entity[T], ABC):
         }
     )
 
+    @override
     def __init__(self, **data: Any) -> None:
         """Initialize aggregate root with event list.
-        
+
         Args:
             **data: Field values for the aggregate.
         """
@@ -413,9 +416,10 @@ class DomainEvent(BaseModel, ABC):
             )
         }
 
+    @override
     def __repr__(self) -> str:
         """Return string representation of event.
-        
+
         Returns:
             String representation.
         """

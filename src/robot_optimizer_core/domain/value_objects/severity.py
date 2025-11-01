@@ -24,6 +24,7 @@ Example:
 from __future__ import annotations
 
 from enum import IntEnum
+from typing import override
 
 
 class Severity(IntEnum):
@@ -54,9 +55,10 @@ class Severity(IntEnum):
     WARNING = 2  # Important - suboptimal but works
     INFO = 3     # Minor - improvement opportunity
 
+    @override
     def __str__(self) -> str:
         """Return the severity name.
-        
+
         Returns:
             Severity name as string.
         """
