@@ -7,11 +7,11 @@ that can be safely removed to improve maintainability.
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Any, override
+from typing import override
 
 from ..domain.entities import TestFile
 from ..domain.value_objects import Finding, Location, Pattern, PatternType, Severity
-from .base import BaseAnalyzer
+from .base import BaseAnalyzer, ConfigValue
 
 
 class DeadCodeAnalyzer(BaseAnalyzer):
@@ -23,7 +23,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
     - Unreachable code after RETURN statements
     """
 
-    def __init__(self, config: dict[str, Any] | None = None) -> None:
+    def __init__(self, config: dict[str, ConfigValue] | None = None) -> None:
         """Initialize the analyzer."""
         super().__init__(config)
         self._check_unused = self.get_config_value("check_unused", True)
@@ -49,74 +49,66 @@ class DeadCodeAnalyzer(BaseAnalyzer):
     def analyze(self, test_file: TestFile) -> list[Finding]:
         """Analyze test file for dead code."""
         findings = []
-        
-        # Parse the file structure
-        keywords = self._extract_keywords(test_file)
-        keyword_calls = self._extract_keyword_calls(test_file)
-        
+
+        # Parse the file structure in a single pass (optimization)
+        keywords, keyword_calls = self._extract_keywords_and_calls(test_file)
+
         if self._check_unused:
             findings.extend(self._find_unused_keywords(keywords, keyword_calls, test_file))
-        
+
         if self._check_duplicates:
             findings.extend(self._find_duplicate_keywords(keywords, test_file))
-            
+
         if self._check_unreachable:
             findings.extend(self._find_unreachable_code(test_file))
-        
+
         return findings
 
-    def _extract_keywords(self, test_file: TestFile) -> dict[str, list[int]]:
-        """Extract keyword definitions and their line numbers."""
-        keywords = defaultdict(list)
-        lines = test_file.content.splitlines()
-        in_keywords_section = False
-        
-        for line_num, line in enumerate(lines, 1):
-            stripped = line.strip()
-            
-            # Check for Keywords section
-            if stripped.startswith('***') and 'keyword' in stripped.lower():
-                in_keywords_section = True
-                continue
-            elif stripped.startswith('***'):
-                in_keywords_section = False
-                continue
-            
-            # Extract keyword definitions
-            if in_keywords_section and stripped and not line.startswith((' ', '\t')):
-                # This is a keyword definition
-                keyword_name = stripped
-                keywords[keyword_name.lower()].append(line_num)
-        
-        return dict(keywords)
+    def _extract_keywords_and_calls(
+        self,
+        test_file: TestFile
+    ) -> tuple[dict[str, list[int]], set[str]]:
+        """Extract keyword definitions and calls in a single pass (optimized).
 
-    def _extract_keyword_calls(self, test_file: TestFile) -> set[str]:
-        """Extract all keyword calls from tests and keywords."""
+        This method combines the functionality of _extract_keywords and
+        _extract_keyword_calls to avoid iterating through the file twice (N+1 fix).
+
+        Returns:
+            Tuple of (keywords dict, keyword calls set)
+        """
+        keywords = defaultdict(list)
         calls = set()
         lines = test_file.content.splitlines()
+
+        in_keywords_section = False
         in_test_or_keyword = False
-        
-        for line in lines:
+
+        for line_num, line in enumerate(lines, 1):
             stripped = line.strip()
-            
+
             # Skip empty lines and comments
             if not stripped or stripped.startswith('#'):
                 continue
-                
-            # Track if we're in a test or keyword body
+
+            # Check for section markers
             if stripped.startswith('***'):
+                in_keywords_section = 'keyword' in stripped.lower()
                 in_test_or_keyword = 'test case' in stripped.lower() or 'keyword' in stripped.lower()
                 continue
-            
+
+            # Extract keyword definitions (non-indented lines in keywords section)
+            if in_keywords_section and not line.startswith((' ', '\t')):
+                keyword_name = stripped
+                keywords[keyword_name.lower()].append(line_num)
+
             # Extract keyword calls (indented lines in test/keyword sections)
             if in_test_or_keyword and line.startswith((' ', '\t')):
-                # Simple extraction - in reality would need proper parsing
                 parts = stripped.split()
                 if parts:
                     # First part is usually the keyword name
                     calls.add(parts[0].lower())
-        
-        return calls
+
+        return dict(keywords), calls
 
     def _find_unused_keywords(
         self, 

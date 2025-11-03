@@ -23,7 +23,7 @@ Example:
 """
 from __future__ import annotations
 
-from typing import Any, override
+from typing import override
 
 from ..config import get_settings
 from ..di import get_container
@@ -37,8 +37,8 @@ from ..domain.value_objects import (
     PatternType,
     Severity,
 )
-from ..exceptions import ConfigurationError
-from .base import BaseAnalyzer
+from ..exceptions import ConfigurationError, RepositoryError
+from .base import BaseAnalyzer, ConfigValue
 
 
 class FlakinessAnalyzer(BaseAnalyzer):
@@ -58,7 +58,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
     def __init__(
         self,
         test_result_repository: TestResultRepository | None = None,
-        config: dict[str, Any] | None = None
+        config: dict[str, ConfigValue] | None = None
     ) -> None:
         """Initialize the analyzer.
         
@@ -153,9 +153,18 @@ class FlakinessAnalyzer(BaseAnalyzer):
                 test_file.path,
                 days_back=self._days_back
             )
-        except Exception as e:
+        except RepositoryError as e:
             self._logger.error(
-                f"Failed to get flakiness stats: {e}",
+                f"Repository error getting flakiness stats: {e}",
+                extra={"file": str(test_file.path)},
+                exc_info=True
+            )
+            # Return empty list on error - don't fail analysis
+            return findings
+        except Exception as e:
+            # Catch any other unexpected errors
+            self._logger.error(
+                f"Unexpected error getting flakiness stats: {e}",
                 extra={"file": str(test_file.path)},
                 exc_info=True
             )
@@ -253,21 +262,18 @@ class FlakinessAnalyzer(BaseAnalyzer):
         )
 
     def _determine_severity(self, failure_rate: float) -> Severity:
-        """Determine severity based on failure rate using pattern matching.
-        
+        """Determine severity based on failure rate.
+
         Args:
             failure_rate: Test failure rate (0-1).
-            
+
         Returns:
             Severity level.
         """
-        match failure_rate:
-            case rate if rate >= self._severity_thresholds["error"]:
-                return Severity.ERROR
-            case rate if rate >= self._severity_thresholds["warning"]:
-                return Severity.WARNING
-            case _:
-                return Severity.INFO
+        return self.determine_severity_by_threshold(
+            failure_rate,
+            self._severity_thresholds
+        )
 
     def _get_recommendation(self, stats: FlakinessStats) -> str:
         """Get recommendation based on flakiness pattern.

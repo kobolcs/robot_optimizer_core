@@ -19,7 +19,9 @@ Example:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, override
+from typing import TypeVar, override
+
+E = TypeVar('E', bound='RobotOptimizerError')
 
 
 class RobotOptimizerError(Exception):
@@ -38,7 +40,7 @@ class RobotOptimizerError(Exception):
     def __init__(
         self,
         message: str,
-        details: dict[str, Any] | None = None
+        details: dict[str, object] | None = None
     ) -> None:
         """Initialize the exception.
         
@@ -81,7 +83,7 @@ class AnalysisError(RobotOptimizerError):
         message: str,
         file_path: Path | None = None,
         analyzer: str | None = None,
-        details: dict[str, Any] | None = None
+        details: dict[str, object] | None = None
     ) -> None:
         """Initialize the analysis error.
         
@@ -121,7 +123,7 @@ class ParsingError(AnalysisError):
         file_path: Path,
         line_number: int | None = None,
         column: int | None = None,
-        details: dict[str, Any] | None = None
+        details: dict[str, object] | None = None
     ) -> None:
         """Initialize the parsing error.
         
@@ -159,8 +161,8 @@ class ConfigurationError(RobotOptimizerError):
         self,
         message: str,
         config_key: str | None = None,
-        provided_value: Any = None,
-        details: dict[str, Any] | None = None
+        provided_value: object = None,
+        details: dict[str, object] | None = None
     ) -> None:
         """Initialize the configuration error.
         
@@ -198,7 +200,7 @@ class PluginError(RobotOptimizerError):
         message: str,
         plugin_name: str | None = None,
         plugin_type: str | None = None,
-        details: dict[str, Any] | None = None
+        details: dict[str, object] | None = None
     ) -> None:
         """Initialize the plugin error.
         
@@ -236,9 +238,9 @@ class ValidationError(RobotOptimizerError):
         self,
         message: str,
         field_name: str | None = None,
-        invalid_value: Any = None,
+        invalid_value: object = None,
         validation_rule: str | None = None,
-        details: dict[str, Any] | None = None
+        details: dict[str, object] | None = None
     ) -> None:
         """Initialize the validation error.
         
@@ -271,7 +273,7 @@ class FileNotFoundError(AnalysisError):
     def __init__(
         self,
         file_path: Path,
-        details: dict[str, Any] | None = None
+        details: dict[str, object] | None = None
     ) -> None:
         """Initialize the file not found error.
         
@@ -300,7 +302,7 @@ class RepositoryError(RobotOptimizerError):
         message: str,
         repository_name: str | None = None,
         operation: str | None = None,
-        details: dict[str, Any] | None = None
+        details: dict[str, object] | None = None
     ) -> None:
         """Initialize the repository error.
         
@@ -320,14 +322,12 @@ class RepositoryError(RobotOptimizerError):
             self.details["operation"] = operation
 
 
-def create_error[E: RobotOptimizerError](
+def create_error(
     error_class: type[E],
     message: str,
-    **kwargs: Any
+    **kwargs: object
 ) -> E:
     """Factory function to create errors with consistent formatting.
-    
-    Uses PEP 695 type parameters for better type inference.
     
     Args:
         error_class: The error class to instantiate.
