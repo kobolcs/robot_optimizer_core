@@ -8,7 +8,7 @@ import importlib.util
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import TypeVar
 
 from .exceptions import PluginError
 from .logging import get_logger

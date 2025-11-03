@@ -27,13 +27,19 @@ Example:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import TypeAlias, TypeVar
 
 from ..domain.entities import TestFile
 from ..domain.value_objects import Finding
 from ..exceptions import AnalysisError
 from ..logging import get_logger
 from ..metrics import get_metrics
+
+# Type alias for analyzer configuration values
+ConfigValue: TypeAlias = str | int | float | bool | dict[str, object] | list[object] | None
+
+# Type variable for generic config value retrieval
+T = TypeVar('T')
 
 logger = get_logger(__name__)
 
@@ -54,7 +60,7 @@ class BaseAnalyzer(ABC):
 
     def __init__(
         self,
-        config: dict[str, Any] | None = None,
+        config: dict[str, ConfigValue] | None = None,
         metrics_enabled: bool = True
     ) -> None:
         """Initialize the analyzer.
@@ -310,25 +316,25 @@ class BaseAnalyzer(ABC):
 
         return validated
 
-    def get_config_value[T](
+    def get_config_value(
         self,
         key: str,
         default: T | None = None,
         required: bool = False
-    ) -> T | Any:
+    ) -> T | ConfigValue:
         """Get a configuration value with type safety.
-        
+
         Convenience method for accessing configuration with
-        defaults and validation. Uses PEP 695 type parameters.
-        
+        defaults and validation.
+
         Args:
             key: Configuration key.
             default: Default value if not found.
             required: Whether the key is required.
-            
+
         Returns:
             Configuration value.
-            
+
         Raises:
             ConfigurationError: If required key is missing.
         """
@@ -340,6 +346,39 @@ class BaseAnalyzer(ABC):
             )
 
         return self.config.get(key, default)
+
+    def determine_severity_by_threshold(
+        self,
+        value: float,
+        thresholds: dict[str, float]
+    ) -> Severity:
+        """Determine severity based on value and threshold mapping.
+
+        This is a helper method to reduce duplication across analyzers
+        that use threshold-based severity determination.
+
+        Args:
+            value: The numeric value to evaluate.
+            thresholds: Dict mapping severity level names to threshold values.
+                       Should contain 'info', 'warning', and 'error' keys.
+
+        Returns:
+            Severity level based on thresholds.
+
+        Example:
+            >>> thresholds = {'info': 1.0, 'warning': 5.0, 'error': 10.0}
+            >>> self.determine_severity_by_threshold(3.0, thresholds)
+            Severity.WARNING
+        """
+        from ..domain.value_objects import Severity
+
+        # Check thresholds in order from highest to lowest severity
+        if value >= thresholds.get("error", float('inf')):
+            return Severity.ERROR
+        elif value >= thresholds.get("warning", float('inf')):
+            return Severity.WARNING
+        else:
+            return Severity.INFO
 
     def __repr__(self) -> str:
         """Return string representation of analyzer.

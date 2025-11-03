@@ -8,12 +8,13 @@ from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import StrEnum, auto
-from typing import Any
+from typing import Any, TypeAlias, TypeVar
 
 from .exceptions import ConfigurationError
 from .logging import get_logger
 
-type ServiceFactory = type[Any] | Callable[..., Any]
+ServiceFactory: TypeAlias = type[Any] | Callable[..., Any]
+T = TypeVar('T')
 
 logger = get_logger(__name__)
 
@@ -111,7 +112,7 @@ class ThreadSafeContainer:
             }
         )
     
-    def resolve[T](self, service_type: str) -> T:
+    def resolve(self, service_type: str) -> T:
         """Thread-safe service resolution."""
         # Check for circular dependencies (thread-local)
         if service_type in self._resolution_stack:
@@ -202,7 +203,7 @@ class ThreadSafeContainer:
         # Otherwise, just return it
         return implementation
     
-    def _create_with_injection[T](self, cls: type[T]) -> T:
+    def _create_with_injection(self, cls: type[T]) -> T:
         """Create instance with constructor injection."""
         signature = inspect.signature(cls.__init__)
         kwargs = {}
@@ -315,17 +316,19 @@ get_container = get_thread_safe_container
 def _register_defaults(container: ThreadSafeContainer) -> None:
     """Register default services in the container."""
     from .config import get_settings
-    from .discovery import FileDiscoveryService
+    from .discovery import OptimizedFileDiscoveryService
     from .metrics import get_metrics
     from .parsers import RobotASTParser
-    
+
     # Register core services as singletons
     container.register_singleton("settings", get_settings)
     container.register_singleton("metrics", get_metrics)
     container.register("parser", RobotASTParser)
-    container.register("file_discovery", FileDiscoveryService)
-    
-    logger.debug("Default services registered")
+
+    # Use optimized file discovery for better performance
+    container.register("file_discovery", OptimizedFileDiscoveryService)
+
+    logger.debug("Default services registered with optimized discovery")
 
 
 # Example usage with scoped resolution

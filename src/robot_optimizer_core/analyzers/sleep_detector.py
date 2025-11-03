@@ -23,12 +23,12 @@ from __future__ import annotations
 
 import re
 from decimal import Decimal, InvalidOperation
-from typing import Any, override
+from typing import override
 
 from ..config import get_settings
 from ..domain.entities import TestFile
 from ..domain.value_objects import Finding, Location, Pattern, Severity, SleepPattern
-from .base import BaseAnalyzer
+from .base import BaseAnalyzer, ConfigValue
 
 
 class SleepDetector(BaseAnalyzer):
@@ -45,7 +45,7 @@ class SleepDetector(BaseAnalyzer):
         check_custom_sleep: Check custom sleep implementations.
     """
 
-    def __init__(self, config: dict[str, Any] | None = None) -> None:
+    def __init__(self, config: dict[str, ConfigValue] | None = None) -> None:
         """Initialize the analyzer.
         
         Args:
@@ -188,7 +188,7 @@ class SleepDetector(BaseAnalyzer):
 
         return patterns
 
-    def _detect_sleep(self, line: str) -> dict[str, Any] | None:
+    def _detect_sleep(self, line: str) -> dict[str, str | Decimal | None] | None:
         """Detect sleep pattern in a line.
         
         Args:
@@ -232,7 +232,7 @@ class SleepDetector(BaseAnalyzer):
 
     def _create_finding(
         self,
-        sleep_info: dict[str, Any],
+        sleep_info: dict[str, str | Decimal | None],
         test_file: TestFile,
         line_num: int,
         original_text: str
@@ -310,20 +310,17 @@ class SleepDetector(BaseAnalyzer):
 
     def _determine_severity(self, duration_seconds: float) -> Severity:
         """Determine severity based on sleep duration.
-        
+
         Args:
             duration_seconds: Duration in seconds.
-            
+
         Returns:
             Severity level.
         """
-        match duration_seconds:
-            case d if d <= self._severity_thresholds["info"]:
-                return Severity.INFO
-            case d if d <= self._severity_thresholds["warning"]:
-                return Severity.WARNING
-            case _:
-                return Severity.ERROR
+        return self.determine_severity_by_threshold(
+            duration_seconds,
+            self._severity_thresholds
+        )
 
     def _suggest_alternative(
         self,
