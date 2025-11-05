@@ -24,7 +24,10 @@ Example:
 from __future__ import annotations
 
 from enum import IntEnum
-from typing import override
+try:
+    from typing import override
+except ImportError:
+    from typing_extensions import override
 
 
 class Severity(IntEnum):

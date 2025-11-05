@@ -23,7 +23,10 @@ from __future__ import annotations
 
 import re
 from decimal import Decimal, InvalidOperation
-from typing import override
+try:
+    from typing import override
+except ImportError:
+    from typing_extensions import override
 
 from ..config import get_settings
 from ..domain.entities import TestFile

@@ -19,7 +19,12 @@ Example:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TypeVar, override
+from typing import TypeVar
+
+try:
+    from typing import override
+except ImportError:
+    from typing_extensions import override
 
 E = TypeVar('E', bound='RobotOptimizerError')
 

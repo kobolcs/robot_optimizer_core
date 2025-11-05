@@ -21,7 +21,7 @@ Example:
 from __future__ import annotations
 
 from functools import cache
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeAlias
 
 from ..di import get_container
 from ..exceptions import PluginError
@@ -30,7 +30,7 @@ from ..plugin import get_plugin_registry
 from .base import BaseAnalyzer
 
 if TYPE_CHECKING:
-    type AnalyzerClass = type[BaseAnalyzer]
+    AnalyzerClass: TypeAlias = type[BaseAnalyzer]
 
 logger = get_logger(__name__)
 
