@@ -34,21 +34,21 @@ class ServiceDescriptor:
     lifetime: ServiceLifetime = ServiceLifetime.TRANSIENT
     instance: Any | None = field(default=None, init=False)
     _lock: threading.RLock = field(default_factory=threading.RLock, init=False)
-    
+
     def get_or_create_instance(self, factory: Callable[[], Any]) -> Any:
         """Thread-safe instance creation for singletons."""
         if self.lifetime != ServiceLifetime.SINGLETON:
             return factory()
-        
+
         # Double-checked locking pattern
         if self.instance is not None:
             return self.instance
-        
+
         with self._lock:
             # Check again inside lock
             if self.instance is not None:
                 return self.instance
-                
+
             # Create instance
             self.instance = factory()
             return self.instance
@@ -60,7 +60,7 @@ class ThreadSafeContainer:
     This container uses fine-grained locking to ensure thread safety
     while maintaining good performance.
     """
-    
+
     def __init__(self, parent: ThreadSafeContainer | None = None) -> None:
         """Initialize the thread-safe container."""
         self.parent = parent
@@ -68,21 +68,21 @@ class ThreadSafeContainer:
         self._services_lock = threading.RLock()
         self._resolving: threading.local = threading.local()
         self._scoped_instances: threading.local = threading.local()
-    
+
     @property
     def _resolution_stack(self) -> list[str]:
         """Get thread-local resolution stack."""
         if not hasattr(self._resolving, 'stack'):
             self._resolving.stack = []
         return self._resolving.stack
-    
+
     @property
     def _scope_instances(self) -> dict[str, Any]:
         """Get thread-local scoped instances."""
         if not hasattr(self._scoped_instances, 'instances'):
             self._scoped_instances.instances = {}
         return self._scoped_instances.instances
-    
+
     def register(
         self,
         service_type: str,
@@ -98,10 +98,10 @@ class ThreadSafeContainer:
                     config_key="di.service",
                     provided_value=service_type
                 )
-            
+
             descriptor = ServiceDescriptor(service_type, implementation, lifetime)
             self._services[service_type] = descriptor
-        
+
         logger.debug(
             "Service registered",
             extra={
@@ -111,7 +111,7 @@ class ThreadSafeContainer:
                 "thread_id": threading.get_ident()
             }
         )
-    
+
     def resolve(self, service_type: str) -> T:
         """Thread-safe service resolution."""
         # Check for circular dependencies (thread-local)
@@ -122,10 +122,10 @@ class ThreadSafeContainer:
                 config_key="di.circular",
                 provided_value=service_type
             )
-        
+
         # Try to find service descriptor
         descriptor = self._get_descriptor(service_type)
-        
+
         if descriptor is None:
             available = self._list_all_services()
             raise ConfigurationError(
@@ -134,7 +134,7 @@ class ThreadSafeContainer:
                 provided_value=service_type,
                 details={"available": available}
             )
-        
+
         # Add to resolution stack
         self._resolution_stack.append(service_type)
         try:
@@ -142,34 +142,34 @@ class ThreadSafeContainer:
         finally:
             # Always remove from stack
             self._resolution_stack.remove(service_type)
-    
+
     def _get_descriptor(self, service_type: str) -> ServiceDescriptor | None:
         """Get service descriptor with locking."""
         # Check this container
         with self._services_lock:
             if service_type in self._services:
                 return self._services[service_type]
-        
+
         # Check parent container
         if self.parent:
             return self.parent._get_descriptor(service_type)
-        
+
         return None
-    
+
     def _list_all_services(self) -> list[str]:
         """List all available services across hierarchy."""
         services = set()
-        
+
         # This container's services
         with self._services_lock:
             services.update(self._services.keys())
-        
+
         # Parent's services
         if self.parent:
             services.update(self.parent._list_all_services())
-        
+
         return sorted(services)
-    
+
     def _create_instance_based_on_lifetime(self, descriptor: ServiceDescriptor) -> Any:
         """Create instance based on service lifetime."""
         if descriptor.lifetime == ServiceLifetime.SINGLETON:
@@ -180,38 +180,38 @@ class ThreadSafeContainer:
             # Check scoped instances
             if descriptor.service_type in self._scope_instances:
                 return self._scope_instances[descriptor.service_type]
-            
+
             # Create and cache in scope
             instance = self._create_instance(descriptor)
             self._scope_instances[descriptor.service_type] = instance
             return instance
         else:  # TRANSIENT
             return self._create_instance(descriptor)
-    
+
     def _create_instance(self, descriptor: ServiceDescriptor) -> Any:
         """Create an instance from a descriptor."""
         implementation = descriptor.implementation
-        
+
         # If it's a callable (factory), call it
         if callable(implementation) and not inspect.isclass(implementation):
             return implementation()
-        
+
         # If it's a class, try to auto-inject constructor parameters
         if inspect.isclass(implementation):
             return self._create_with_injection(implementation)
-        
+
         # Otherwise, just return it
         return implementation
-    
+
     def _create_with_injection(self, cls: type[T]) -> T:
         """Create instance with constructor injection."""
         signature = inspect.signature(cls.__init__)
         kwargs = {}
-        
+
         for param_name, param in signature.parameters.items():
             if param_name == "self":
                 continue
-            
+
             # Try to resolve by parameter name
             if self.has_service(param_name):
                 kwargs[param_name] = self.resolve(param_name)
@@ -228,37 +228,37 @@ class ThreadSafeContainer:
                 logger.debug(
                     f"Cannot resolve parameter: {param_name} for {cls.__name__}"
                 )
-        
+
         return cls(**kwargs)
-    
+
     def has_service(self, service_type: str) -> bool:
         """Check if service is registered (thread-safe)."""
         with self._services_lock:
             if service_type in self._services:
                 return True
-        
+
         return self.parent.has_service(service_type) if self.parent else False
-    
+
     @contextmanager
     def create_scope(self):
         """Create a new resolution scope."""
         # Save current scoped instances
         old_instances = self._scope_instances.copy()
-        
+
         # Clear scoped instances for new scope
         self._scope_instances.clear()
-        
+
         try:
             yield self
         finally:
             # Restore previous scope
             self._scope_instances.clear()
             self._scope_instances.update(old_instances)
-    
+
     def register_singleton(self, service_type: str, implementation: ServiceFactory, override: bool = False) -> None:
         """Register a singleton service."""
         self.register(service_type, implementation, ServiceLifetime.SINGLETON, override)
-    
+
     def register_instance(self, service_type: str, instance: Any, override: bool = False) -> None:
         """Register an existing instance as a singleton."""
         with self._services_lock:
@@ -268,7 +268,7 @@ class ThreadSafeContainer:
                     config_key="di.service",
                     provided_value=service_type
                 )
-            
+
             # Create descriptor with pre-cached instance
             descriptor = ServiceDescriptor(
                 service_type,
@@ -277,12 +277,12 @@ class ThreadSafeContainer:
             )
             descriptor.instance = instance  # Pre-cache
             self._services[service_type] = descriptor
-    
+
     def clear(self) -> None:
         """Clear all registrations and instances."""
         with self._services_lock:
             self._services.clear()
-        
+
         # Clear thread-local data
         if hasattr(self._resolving, 'stack'):
             self._resolving.stack.clear()
@@ -335,16 +335,16 @@ def _register_defaults(container: ThreadSafeContainer) -> None:
 def example_scoped_usage():
     """Example of using scoped services."""
     container = get_thread_safe_container()
-    
+
     # Register a scoped service
     container.register("request_context", dict, ServiceLifetime.SCOPED)
-    
+
     # Use in a scope
     with container.create_scope():
         ctx1 = container.resolve("request_context")
         ctx2 = container.resolve("request_context")
         assert ctx1 is ctx2  # Same instance within scope
-    
+
     # Different scope gets different instance
     with container.create_scope():
         ctx3 = container.resolve("request_context")

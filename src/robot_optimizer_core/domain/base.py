@@ -23,10 +23,18 @@ from __future__ import annotations
 
 from abc import ABC
 from datetime import UTC, datetime
-from typing import Any, ClassVar, override
+from typing import Any, ClassVar, Generic, TypeVar
+
+try:
+    from typing import override
+except ImportError:
+    from typing_extensions import override
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
+
+# Type variable for Entity and AggregateRoot generic types
+T = TypeVar('T')
 
 
 class ValueObject(BaseModel, ABC):
@@ -113,7 +121,7 @@ class ValueObject(BaseModel, ABC):
         return f"{self.__class__.__name__}({fields})"
 
 
-class Entity[T](BaseModel, ABC):
+class Entity(BaseModel, Generic[T], ABC):
     """Base class for entities using Pydantic v2.
 
     Entities have identity and are compared by their ID, not by their
@@ -197,7 +205,7 @@ class Entity[T](BaseModel, ABC):
         return self.id == other.id
 
 
-class AggregateRoot[T](Entity[T], ABC):
+class AggregateRoot(Entity[T], ABC):
     """Base class for aggregate roots using Pydantic v2.
     
     Aggregate roots are entities that serve as the entry point to an

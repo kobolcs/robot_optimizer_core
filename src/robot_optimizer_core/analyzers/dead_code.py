@@ -7,7 +7,10 @@ that can be safely removed to improve maintainability.
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import override
+try:
+    from typing import override
+except ImportError:
+    from typing_extensions import override
 
 from ..domain.entities import TestFile
 from ..domain.value_objects import Finding, Location, Pattern, PatternType, Severity
@@ -111,20 +114,20 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         return dict(keywords), calls
 
     def _find_unused_keywords(
-        self, 
-        keywords: dict[str, list[int]], 
+        self,
+        keywords: dict[str, list[int]],
         calls: set[str],
         test_file: TestFile
     ) -> list[Finding]:
         """Find keywords that are never called."""
         findings = []
-        
+
         for keyword_name, line_numbers in keywords.items():
             if keyword_name not in calls:
                 # Skip special keywords
                 if keyword_name in {'suite setup', 'suite teardown', 'test setup', 'test teardown'}:
                     continue
-                    
+
                 pattern = Pattern(
                     type=PatternType.UNUSED_KEYWORD,
                     name="Unused Keyword",
@@ -132,7 +135,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                     recommendation="Remove this keyword or use it in your tests",
                     auto_fixable=True
                 )
-                
+
                 finding = Finding.create(
                     pattern=pattern,
                     severity=Severity.WARNING,
@@ -140,7 +143,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                     message=f"Keyword '{keyword_name}' is defined but never used"
                 )
                 findings.append(finding)
-        
+
         return findings
 
     def _find_duplicate_keywords(
@@ -150,11 +153,11 @@ class DeadCodeAnalyzer(BaseAnalyzer):
     ) -> list[Finding]:
         """Find keywords defined multiple times."""
         findings = []
-        
+
         for keyword_name, line_numbers in keywords.items():
             if len(line_numbers) > 1:
                 pattern = Pattern.duplicate_keyword(keyword_name)
-                
+
                 # Create findings for all duplicates after the first
                 for line_num in line_numbers[1:]:
                     finding = Finding.create(
@@ -166,21 +169,21 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                         duplicate_count=len(line_numbers)
                     )
                     findings.append(finding)
-        
+
         return findings
 
     def _find_unreachable_code(self, test_file: TestFile) -> list[Finding]:
         """Find code after RETURN statements."""
         findings = []
         lines = test_file.content.splitlines()
-        
+
         in_keyword = False
         found_return = False
         current_keyword = None
-        
+
         for line_num, line in enumerate(lines, 1):
             stripped = line.strip()
-            
+
             # Track keyword boundaries
             if not line.startswith((' ', '\t')) and stripped:
                 in_keyword = False
@@ -188,12 +191,12 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                 if '***' not in line:
                     current_keyword = stripped
                     in_keyword = True
-            
+
             # Check for RETURN
             if in_keyword and stripped.upper().startswith('RETURN'):
                 found_return = True
                 continue
-            
+
             # Check for code after RETURN
             if found_return and in_keyword and stripped and not stripped.startswith('#'):
                 pattern = Pattern(
@@ -203,7 +206,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                     recommendation="Remove the unreachable code or move it before RETURN",
                     auto_fixable=True
                 )
-                
+
                 finding = Finding.create(
                     pattern=pattern,
                     severity=Severity.WARNING,
@@ -212,8 +215,8 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                     keyword_name=current_keyword
                 )
                 findings.append(finding)
-                
+
                 # Only report first line of unreachable code per keyword
                 found_return = False
-        
+
         return findings

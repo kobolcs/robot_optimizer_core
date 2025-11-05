@@ -15,9 +15,12 @@ Core analysis engine for Robot Framework test suite optimization. This package p
 - **Flakiness Detection**: Detect tests that fail intermittently
 - **Extensible Architecture**: Plugin system for custom analyzers
 - **Type-Safe**: Full type hints and Pydantic v2 models
-- **High Quality**: 99%+ test coverage with mutation testing
+- **Python 3.11+**: Compatible with Python 3.11, 3.12, and 3.13
+- **High Quality**: Comprehensive test coverage with property-based testing
 
 ## 📦 Installation
+
+**Requirements:** Python 3.11+
 
 ```bash
 pip install robot-framework-optimizer-core
@@ -104,19 +107,22 @@ The Core package follows Domain-Driven Design principles:
 Create custom analyzers by extending the base analyzer:
 
 ```python
-from robot_optimizer_core import BaseAnalyzer, Finding, Pattern, register_analyzer
-from typing import List
+from robot_optimizer_core import BaseAnalyzer, Finding, Pattern, TestFile, register_analyzer
 
 class MyCustomAnalyzer(BaseAnalyzer):
     @property
     def name(self) -> str:
         return "custom_analyzer"
-    
+
     @property
     def description(self) -> str:
         return "My custom analysis rules"
-    
-    def analyze(self, test_file: TestFile) -> List[Finding]:
+
+    @property
+    def tags(self) -> list[str]:
+        return ["custom", "quality"]
+
+    def analyze(self, test_file: TestFile) -> list[Finding]:
         findings = []
         # Your analysis logic here
         return findings
@@ -163,9 +169,9 @@ export ROBOT_OPTIMIZER_ENABLE_METRICS=true
 
 ```python
 # In code
-from robot_optimizer_core import configure_settings
+from robot_optimizer_core import Settings
 
-settings = configure_settings(
+settings = Settings(
     max_file_size_mb=10,
     log_level="DEBUG",
     enable_metrics=True

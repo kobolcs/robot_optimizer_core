@@ -43,6 +43,7 @@ from .analyzers import (
     FlakinessAnalyzer,
     SleepDetector,
     get_analyzer,
+    get_analyzer_registry,
     list_analyzers,
     register_analyzer,
 )
@@ -129,6 +130,7 @@ __all__ = [
     "FlakinessAnalyzer",
     "register_analyzer",
     "get_analyzer",
+    "get_analyzer_registry",
     "list_analyzers",
 
     # Services

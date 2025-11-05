@@ -7,7 +7,7 @@ name = "robot-framework-optimizer-core"
 version = "1.0.0"
 description = "Core analysis engine for Robot Framework test suite optimization"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
     {name = "Robot Framework Optimizer Team", email = "team@rf-optimizer.com"}
@@ -29,6 +29,8 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: Implementation :: CPython",
@@ -41,7 +43,9 @@ classifiers = [
 # Minimal core dependencies only
 dependencies = [
     "pydantic>=2.9.0",  # Latest v2 in 2025
+    "pydantic-settings>=2.0.0",  # Settings management with Pydantic
     "robotframework>=7.1.0",  # Latest RF in 2025
+    "typing-extensions>=4.0.0; python_version < '3.12'",  # For override decorator on Python < 3.12
 ]
 
 [project.optional-dependencies]
@@ -163,7 +167,7 @@ exclude_lines = [
 
 # Ruff configuration - Latest 2025 settings
 [tool.ruff]
-target-version = "py313"
+target-version = "py311"
 line-length = 88
 fix = true
 src = ["src", "tests"]
@@ -217,7 +221,7 @@ indent-style = "space"
 
 # Mypy configuration
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.11"
 strict = true
 warn_return_any = true
 warn_unused_configs = true

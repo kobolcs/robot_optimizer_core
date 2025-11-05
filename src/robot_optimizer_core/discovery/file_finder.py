@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import fnmatch
-import os
 import re
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -11,27 +10,26 @@ from pathlib import Path
 from typing import Iterator, Set
 
 from ..config import Settings
-from ..exceptions import FileNotFoundError as RFFileNotFoundError, ValidationError
+from ..exceptions import FileNotFoundError as RFFileNotFoundError
 from ..logging import get_logger
-from ..metrics import MetricsCollector
 
 
 @dataclass
 class PatternMatcher:
     """Optimized pattern matcher using pre-compiled patterns and tries."""
-    
+
     # Pre-compiled patterns for better performance
     patterns: list[re.Pattern] = field(default_factory=list)
     # Trie structure for exact matches
     exact_matches: Set[str] = field(default_factory=set)
     # Suffix tree for extension matching
     extensions: Set[str] = field(default_factory=set)
-    
+
     @classmethod
     def from_patterns(cls, patterns: list[str]) -> PatternMatcher:
         """Create optimized matcher from patterns."""
         matcher = cls()
-        
+
         for pattern in patterns:
             # Check if it's a simple extension pattern
             if pattern.startswith("*.") and "*" not in pattern[2:] and "?" not in pattern[2:]:
@@ -44,48 +42,48 @@ class PatternMatcher:
                 # Complex pattern - compile regex (still needed for some cases)
                 regex_pattern = fnmatch.translate(pattern)
                 matcher.patterns.append(re.compile(regex_pattern, re.IGNORECASE))
-        
+
         return matcher
-    
+
     def matches(self, filename: str) -> bool:
         """Check if filename matches any pattern - O(1) for most cases."""
         filename_lower = filename.lower()
-        
+
         # Check exact matches first - O(1)
         if filename_lower in self.exact_matches:
             return True
-        
+
         # Check extensions - O(1)
         for ext in self.extensions:
             if filename_lower.endswith(ext):
                 return True
-        
+
         # Fall back to regex for complex patterns - O(m) where m is number of complex patterns
         for pattern in self.patterns:
             if pattern.match(filename):
                 return True
-        
+
         return False
 
 
 @dataclass
 class PathExclusionTrie:
     """Trie structure for efficient path exclusion checking."""
-    
+
     class TrieNode:
         def __init__(self):
             self.children: dict[str, PathExclusionTrie.TrieNode] = {}
             self.is_excluded = False
             self.is_pattern = False
             self.pattern: re.Pattern | None = None
-    
+
     root: TrieNode = field(default_factory=TrieNode)
-    
+
     def add_exclusion(self, pattern: str) -> None:
         """Add exclusion pattern to trie."""
         parts = pattern.split("/")
         node = self.root
-        
+
         for part in parts:
             if "*" in part or "?" in part:
                 # Pattern node
@@ -97,24 +95,24 @@ class PathExclusionTrie:
                 if part not in node.children:
                     node.children[part] = PathExclusionTrie.TrieNode()
                 node = node.children[part]
-        
+
         node.is_excluded = True
-    
+
     def is_excluded(self, path: Path) -> bool:
         """Check if path is excluded - O(d) where d is directory depth."""
         parts = path.parts
         node = self.root
-        
+
         for i, part in enumerate(parts):
             # Check if current node excludes
             if node.is_excluded:
                 return True
-            
+
             # Check pattern matching
             if node.is_pattern and node.pattern:
                 if node.pattern.match(part):
                     return True
-            
+
             # Check exact match
             if part in node.children:
                 node = node.children[part]
@@ -129,25 +127,25 @@ class PathExclusionTrie:
                 else:
                     # No match found
                     return False
-        
+
         return node.is_excluded
 
 
 class OptimizedFileDiscoveryService:
     """File discovery with O(n) complexity instead of O(n*m)."""
-    
+
     def __init__(self, settings: Settings | None = None):
         """Initialize optimized discovery service."""
         self.settings = settings or Settings()
         self.logger = get_logger(__name__)
-        
+
         # Pre-compile patterns for O(1) matching
         self._include_matcher: PatternMatcher | None = None
         self._exclude_trie: PathExclusionTrie | None = None
-        
+
         # Cache for directory listings
         self._dir_cache: dict[Path, list[Path]] = {}
-        
+
         # Statistics
         self._stats = {
             "files_checked": 0,
@@ -155,7 +153,7 @@ class OptimizedFileDiscoveryService:
             "cache_hits": 0,
             "pattern_checks": 0
         }
-    
+
     def find_files(
         self,
         root_path: Path,
@@ -173,21 +171,21 @@ class OptimizedFileDiscoveryService:
             "pattern_checks": 0
         }
         self._dir_cache.clear()
-        
+
         # Validate and resolve root
         root_path = Path(root_path).resolve()
         if not root_path.exists():
             raise RFFileNotFoundError(root_path)
-        
+
         # Build optimized matchers - O(p) where p is number of patterns
         patterns = patterns or self.settings.file_patterns
         self._include_matcher = PatternMatcher.from_patterns(patterns)
-        
+
         exclude_patterns = exclude_patterns or self.settings.exclude_patterns
         self._exclude_trie = PathExclusionTrie()
         for pattern in exclude_patterns:
             self._exclude_trie.add_exclusion(pattern)
-        
+
         # Collect files - O(n) where n is total files
         files = list(self._discover_optimized(
             root_path,
@@ -196,7 +194,7 @@ class OptimizedFileDiscoveryService:
             max_depth,
             0
         ))
-        
+
         self.logger.info(
             "Optimized discovery complete",
             extra={
@@ -204,9 +202,9 @@ class OptimizedFileDiscoveryService:
                 "stats": self._stats
             }
         )
-        
+
         return sorted(files)  # O(n log n) for consistent ordering
-    
+
     def _discover_optimized(
         self,
         current_path: Path,
@@ -219,30 +217,30 @@ class OptimizedFileDiscoveryService:
         # Check depth limit
         if current_depth > max_depth:
             return
-        
+
         # Early termination for excluded directories - O(d) where d is depth
         if self._exclude_trie.is_excluded(current_path.relative_to(root_path)):
             return
-        
+
         self._stats["dirs_checked"] += 1
-        
+
         # Get directory listing with caching
         entries = self._get_cached_listing(current_path)
-        
+
         # Process entries - O(e) where e is entries in directory
         for entry in entries:
             # Skip if excluded - O(d) check
             if self._exclude_trie.is_excluded(entry.relative_to(root_path)):
                 continue
-            
+
             if entry.is_file():
                 self._stats["files_checked"] += 1
                 self._stats["pattern_checks"] += 1
-                
+
                 # Check pattern match - O(1) for most patterns
                 if self._include_matcher.matches(entry.name):
                     yield entry
-            
+
             elif entry.is_dir() and recursive:
                 # Recurse into subdirectory
                 yield from self._discover_optimized(
@@ -252,13 +250,13 @@ class OptimizedFileDiscoveryService:
                     max_depth,
                     current_depth + 1
                 )
-    
+
     def _get_cached_listing(self, path: Path) -> list[Path]:
         """Get directory listing with caching."""
         if path in self._dir_cache:
             self._stats["cache_hits"] += 1
             return self._dir_cache[path]
-        
+
         try:
             entries = list(path.iterdir())
             self._dir_cache[path] = entries
@@ -270,7 +268,7 @@ class OptimizedFileDiscoveryService:
 # Optimized analyzer base
 class OptimizedAnalyzer:
     """Base analyzer with performance optimizations."""
-    
+
     def __init__(self):
         """Initialize with optimizations."""
         # Pre-compile all regex patterns
@@ -279,28 +277,28 @@ class OptimizedAnalyzer:
         self._parse_cache: dict[str, Any] = {}
         # Metrics for performance tracking
         self._perf_metrics = defaultdict(float)
-    
+
     def compile_pattern(self, name: str, pattern: str, flags: int = 0) -> re.Pattern:
         """Compile and cache regex pattern."""
         if name not in self._compiled_patterns:
             self._compiled_patterns[name] = re.compile(pattern, flags)
         return self._compiled_patterns[name]
-    
+
     def batch_analyze(self, test_files: list[TestFile]) -> dict[Path, list[Finding]]:
         """Analyze multiple files in batch for better performance."""
         import concurrent.futures
         import multiprocessing
-        
+
         # Use process pool for CPU-bound analysis
         max_workers = min(multiprocessing.cpu_count(), len(test_files))
-        
+
         with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
             # Submit all files
             future_to_file = {
                 executor.submit(self._analyze_single, test_file): test_file
                 for test_file in test_files
             }
-            
+
             # Collect results
             results = {}
             for future in concurrent.futures.as_completed(future_to_file):
@@ -311,9 +309,9 @@ class OptimizedAnalyzer:
                 except Exception as e:
                     self.logger.error(f"Analysis failed for {test_file.path}: {e}")
                     results[test_file.path] = []
-            
+
             return results
-    
+
     def _analyze_single(self, test_file: TestFile) -> list[Finding]:
         """Analyze single file (runs in separate process)."""
         # Override in subclasses
@@ -323,43 +321,43 @@ class OptimizedAnalyzer:
 # Example: Optimized sleep detector
 class OptimizedSleepDetector(OptimizedAnalyzer):
     """Sleep detector with pre-compiled patterns and caching."""
-    
+
     def __init__(self):
         """Initialize with optimized patterns."""
         super().__init__()
-        
+
         # Pre-compile all patterns once
         self.sleep_pattern = self.compile_pattern(
             "sleep",
             r'^\s*(?:BuiltIn\.)?Sleep\s+(\d+(?:\.\d+)?)\s*(s|seconds?|m|minutes?|ms|milliseconds?)?',
             re.IGNORECASE
         )
-        
+
         self.wait_pattern = self.compile_pattern(
             "wait",
             r'^\s*(?:Wait|Pause|Delay)\s+(\d+(?:\.\d+)?)\s*(s|seconds?|m|minutes?)?',
             re.IGNORECASE
         )
-        
+
         self.variable_sleep = self.compile_pattern(
             "variable",
             r'^\s*Sleep\s+\$\{([^}]+)\}',
             re.IGNORECASE
         )
-    
+
     def analyze(self, test_file: TestFile) -> list[Finding]:
         """Analyze with optimized pattern matching."""
         findings = []
-        
+
         # Split lines once
         lines = test_file.content.splitlines()
-        
+
         # Single pass through file - O(n) where n is lines
         for line_num, line in enumerate(lines, 1):
             # Skip empty lines early
             if not line.strip():
                 continue
-            
+
             # Check patterns - each pattern is O(1) average case
             if match := self.sleep_pattern.match(line):
                 findings.append(self._create_finding(match, line, line_num, test_file))
@@ -367,21 +365,21 @@ class OptimizedSleepDetector(OptimizedAnalyzer):
                 findings.append(self._create_finding(match, line, line_num, test_file))
             elif match := self.variable_sleep.match(line):
                 findings.append(self._create_variable_finding(match, line, line_num, test_file))
-        
+
         return findings
 
 
 # String matching optimization using Aho-Corasick
 class MultiPatternMatcher:
     """Efficient multi-pattern string matching using Aho-Corasick algorithm."""
-    
+
     def __init__(self, patterns: list[str]):
         """Build Aho-Corasick automaton for O(n + m) matching."""
         self.patterns = patterns
         self.root = {}
         self.outputs = defaultdict(list)
         self._build_automaton()
-    
+
     def _build_automaton(self):
         """Build the automaton - O(m) where m is total pattern length."""
         # Build trie
@@ -392,29 +390,29 @@ class MultiPatternMatcher:
                     node[char] = {}
                 node = node[char]
             self.outputs[id(node)].append(idx)
-        
+
         # Build failure links (simplified version)
         # Full implementation would include proper failure function
-    
+
     def find_all(self, text: str) -> list[tuple[int, int]]:
         """Find all pattern occurrences - O(n) where n is text length."""
         matches = []
         node = self.root
-        
+
         for i, char in enumerate(text):
             while node and char not in node:
                 # Follow failure link (simplified)
                 node = self.root
-            
+
             if char in node:
                 node = node[char]
-                
+
                 # Check for matches
                 if id(node) in self.outputs:
                     for pattern_idx in self.outputs[id(node)]:
                         pattern_len = len(self.patterns[pattern_idx])
                         matches.append((i - pattern_len + 1, pattern_idx))
-        
+
         return matches
 
 
@@ -422,17 +420,17 @@ class MultiPatternMatcher:
 def example_optimized_discovery():
     """Example of using optimized discovery."""
     from ..context import create_application
-    
+
     with create_application() as app:
         # Use optimized discovery
         discovery = OptimizedFileDiscoveryService(app.settings)
-        
+
         # Find files - O(n) instead of O(n*m)
         files = discovery.find_files(
             Path("/path/to/project"),
             patterns=["*.robot", "*.resource"],
             exclude_patterns=["**/build/**", "**/.*", "**/__pycache__/**"]
         )
-        
+
         print(f"Found {len(files)} files")
         print(f"Stats: {discovery._stats}")

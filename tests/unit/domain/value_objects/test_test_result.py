@@ -216,8 +216,6 @@ class TestTestResult:
 Comprehensive tests for the FlakinessStats value object including validation,
 computed properties, and edge cases.
 """
-from __future__ import annotations
-
 import pytest
 
 from robot_optimizer_core.domain.value_objects import FlakinessStats

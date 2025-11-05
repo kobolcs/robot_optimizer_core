@@ -8,7 +8,6 @@ import importlib.util
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TypeVar
 
 from .exceptions import PluginError
 from .logging import get_logger
@@ -85,10 +84,10 @@ ALLOWED_BUILTINS = {
 
 class PluginSecurityValidator:
     """Validates plugin code for security issues before loading."""
-    
+
     def __init__(self) -> None:
         self.violations: list[str] = []
-    
+
     def validate_file(self, file_path: Path) -> tuple[bool, list[str]]:
         """Validate a plugin file for security issues.
         
@@ -96,27 +95,27 @@ class PluginSecurityValidator:
             Tuple of (is_safe, violations)
         """
         self.violations = []
-        
+
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
-            
+
             # Parse AST
             tree = ast.parse(content, filename=str(file_path))
-            
+
             # Run security checks
             validator = SecurityVisitor()
             validator.visit(tree)
-            
+
             self.violations.extend(validator.violations)
-            
+
             # Check file permissions (should not be writable by others)
             stat = file_path.stat()
             if stat.st_mode & 0o022:  # Check if writable by group/others
                 self.violations.append("Plugin file is writable by group/others")
-            
+
             return len(self.violations) == 0, self.violations
-            
+
         except Exception as e:
             self.violations.append(f"Failed to parse plugin: {e}")
             return False, self.violations
@@ -124,11 +123,11 @@ class PluginSecurityValidator:
 
 class SecurityVisitor(ast.NodeVisitor):
     """AST visitor that checks for security violations."""
-    
+
     def __init__(self) -> None:
         self.violations: list[str] = []
         self.in_plugin_class = False
-    
+
     def visit_Import(self, node: ast.Import) -> None:
         """Check import statements."""
         for alias in node.names:
@@ -138,7 +137,7 @@ class SecurityVisitor(ast.NodeVisitor):
                     f"Forbidden import: {alias.name} (only allowed: {ALLOWED_IMPORTS})"
                 )
         self.generic_visit(node)
-    
+
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         """Check from-import statements."""
         if node.module:
@@ -148,7 +147,7 @@ class SecurityVisitor(ast.NodeVisitor):
                     f"Forbidden import: from {node.module} (only allowed: {ALLOWED_IMPORTS})"
                 )
         self.generic_visit(node)
-    
+
     def visit_Call(self, node: ast.Call) -> None:
         """Check function calls for dangerous operations."""
         # Check for dangerous functions
@@ -160,7 +159,7 @@ class SecurityVisitor(ast.NodeVisitor):
             }
             if func_name in dangerous_funcs:
                 self.violations.append(f"Forbidden function call: {func_name}")
-        
+
         # Check for subprocess, os, sys modules
         elif isinstance(node.func, ast.Attribute):
             if isinstance(node.func.value, ast.Name):
@@ -169,9 +168,9 @@ class SecurityVisitor(ast.NodeVisitor):
                     self.violations.append(
                         f"Forbidden module usage: {module}.{node.func.attr}"
                     )
-        
+
         self.generic_visit(node)
-    
+
     def visit_Attribute(self, node: ast.Attribute) -> None:
         """Check attribute access for dangerous patterns."""
         # Check for __dict__, __globals__, etc.
@@ -182,23 +181,23 @@ class SecurityVisitor(ast.NodeVisitor):
             }
             if node.attr in dangerous_attrs:
                 self.violations.append(f"Forbidden attribute access: {node.attr}")
-        
+
         self.generic_visit(node)
 
 
 class SecurePluginManager:
     """Secure plugin manager that validates plugins before loading."""
-    
+
     def __init__(self, registry: PluginRegistry | None = None) -> None:
         self.registry = registry or PluginRegistry()
         self.plugins: dict[str, Plugin] = {}
         self.trusted_hashes: set[str] = set()
         self.validator = PluginSecurityValidator()
-    
+
     def add_trusted_plugin_hash(self, file_hash: str) -> None:
         """Add a trusted plugin hash (for pre-approved plugins)."""
         self.trusted_hashes.add(file_hash)
-    
+
     def _compute_file_hash(self, file_path: Path) -> str:
         """Compute SHA-256 hash of a file."""
         sha256 = hashlib.sha256()
@@ -206,7 +205,7 @@ class SecurePluginManager:
             for chunk in iter(lambda: f.read(4096), b''):
                 sha256.update(chunk)
         return sha256.hexdigest()
-    
+
     def load_plugin_from_file(self, file_path: Path, force: bool = False) -> None:
         """Securely load a plugin from a file.
         
@@ -219,7 +218,7 @@ class SecurePluginManager:
         """
         if not file_path.exists():
             raise PluginError(f"Plugin file not found: {file_path}")
-        
+
         # Check if plugin is trusted
         file_hash = self._compute_file_hash(file_path)
         if file_hash in self.trusted_hashes:
@@ -227,7 +226,7 @@ class SecurePluginManager:
         elif not force:
             # Validate plugin security
             is_safe, violations = self.validator.validate_file(file_path)
-            
+
             if not is_safe:
                 raise PluginError(
                     f"Plugin failed security validation: {file_path}",
@@ -236,7 +235,7 @@ class SecurePluginManager:
                         "file_hash": file_hash
                     }
                 )
-        
+
         # Load plugin in restricted environment
         try:
             # Create a restricted globals environment
@@ -247,51 +246,51 @@ class SecurePluginManager:
                 '__name__': f'plugin_{file_path.stem}',
                 '__file__': str(file_path),
             }
-            
+
             # Read and compile the plugin code
             with open(file_path, 'r', encoding='utf-8') as f:
                 plugin_code = f.read()
-            
+
             # Compile with restricted mode
             compiled = compile(plugin_code, str(file_path), 'exec', flags=0)
-            
+
             # Create module
             module_name = f"plugin_{file_path.stem}"
             spec = importlib.util.spec_from_file_location(module_name, file_path)
             module = importlib.util.module_from_spec(spec)
-            
+
             # Execute in restricted environment
             exec(compiled, restricted_globals)
-            
+
             # Find Plugin subclass
             plugin_class = None
             for name, obj in restricted_globals.items():
-                if (isinstance(obj, type) and 
-                    issubclass(obj, Plugin) and 
+                if (isinstance(obj, type) and
+                    issubclass(obj, Plugin) and
                     obj is not Plugin):
                     plugin_class = obj
                     break
-            
+
             if not plugin_class:
                 raise PluginError(f"No Plugin subclass found in: {file_path}")
-            
+
             # Create and activate plugin
             plugin = plugin_class(self.registry)
             metadata = plugin.metadata
-            
+
             # Additional validation of metadata
             if not metadata.name or '..' in metadata.name or '/' in metadata.name:
                 raise PluginError("Invalid plugin name")
-            
+
             plugin.activate()
             plugin.is_active = True
             self.plugins[metadata.name] = plugin
-            
+
             logger.info(
                 f"Plugin loaded securely: {metadata.name} v{metadata.version}",
                 extra={"file_hash": file_hash}
             )
-            
+
         except PluginError:
             raise
         except Exception as e:
@@ -299,7 +298,7 @@ class SecurePluginManager:
                 f"Failed to load plugin: {file_path}",
                 details={"error": str(e)}
             ) from e
-    
+
     def unload_plugin(self, name: str) -> None:
         """Unload a plugin."""
         if name in self.plugins:

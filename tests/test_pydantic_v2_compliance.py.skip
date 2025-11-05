@@ -9,11 +9,11 @@ from uuid import uuid4
 import pydantic
 import pytest
 from pydantic import ValidationError
-from robot_optimizer.domain.base import ValueObject
-from robot_optimizer.domain.entities import Analysis
-from robot_optimizer.domain.entities import DomainTestFile as DomainTestFile
-from robot_optimizer.domain.events import FileAnalyzedEvent
-from robot_optimizer.domain.value_objects import (
+from robot_optimizer_core.domain.base import ValueObject
+from robot_optimizer_core.domain.entities import Analysis
+from robot_optimizer_core.domain.entities import DomainTestFile as DomainTestFile
+from robot_optimizer_core.domain.events import FileAnalyzedEvent
+from robot_optimizer_core.domain.value_objects import (
     Finding,
     Location,
     Pattern,
@@ -331,7 +331,7 @@ class TestPydanticV2Compliance:
     def test_model_validator_modes(self):
         """Test model validators with different modes."""
         # Test after mode validator
-        from robot_optimizer.domain.value_objects import SleepPattern
+        from robot_optimizer_core.domain.value_objects import SleepPattern
 
         pattern = SleepPattern(
             duration=Decimal("5"),

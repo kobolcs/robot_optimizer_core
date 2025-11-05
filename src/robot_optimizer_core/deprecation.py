@@ -28,6 +28,7 @@ from typing import Any, ParamSpec, TypeVar
 
 P = ParamSpec("P")
 R = TypeVar("R")
+T = TypeVar("T")
 
 
 class RobotOptimizerDeprecationWarning(UserWarning):
@@ -104,7 +105,7 @@ def deprecated(
     return decorator
 
 
-def _deprecate_class[T](cls: type[T], message: str) -> type[T]:
+def _deprecate_class(cls: type[T], message: str) -> type[T]:
     """Deprecate a class by wrapping its __init__ method.
     
     Args:
