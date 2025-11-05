@@ -5,10 +5,10 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
-from robot_optimizer.domain.base import AggregateRoot, DomainEvent, Entity, ValueObject
-from robot_optimizer.domain.entities import Analysis
-from robot_optimizer.domain.entities import DomainTestFile as DomainTestFile
-from robot_optimizer.domain.value_objects import (
+from robot_optimizer_core.domain.base import AggregateRoot, DomainEvent, Entity, ValueObject
+from robot_optimizer_core.domain.entities import Analysis
+from robot_optimizer_core.domain.entities import DomainTestFile as DomainTestFile
+from robot_optimizer_core.domain.value_objects import (
     Finding,
     Location,
     OptimizationSuggestion,

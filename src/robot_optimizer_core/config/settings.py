@@ -315,28 +315,32 @@ class Settings(BaseSettings):
         settings_cls: type[BaseSettings],
         init_settings: SettingsSourceCallable,
         env_settings: SettingsSourceCallable,
+        dotenv_settings: SettingsSourceCallable,
         file_secret_settings: SettingsSourceCallable,
     ) -> tuple[SettingsSourceCallable, ...]:
         """Customize settings sources for priority.
-        
+
         Priority order:
         1. Init arguments
         2. Environment variables
-        3. Config file (Pro feature)
-        4. Defaults
-        
+        3. .env file (dotenv)
+        4. File secrets
+        5. Defaults
+
         Args:
             settings_cls: Settings class.
             init_settings: Init settings source.
             env_settings: Environment settings source.
+            dotenv_settings: Dotenv file settings source.
             file_secret_settings: File settings source.
-            
+
         Returns:
             Tuple of settings sources.
         """
         return (
             init_settings,
             env_settings,
+            dotenv_settings,
             file_secret_settings,
         )
 

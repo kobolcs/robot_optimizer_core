@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
-from robot_optimizer.domain.events import (
+from robot_optimizer_core.domain.events import (
     AnalysisStartedEvent,
     BatchAnalysisCompletedEvent,
     FileAnalyzedEvent,
@@ -13,7 +13,7 @@ from robot_optimizer.domain.events import (
     OptimizationAppliedEvent,
     OptimizationFailedEvent,
 )
-from robot_optimizer.domain.value_objects import (
+from robot_optimizer_core.domain.value_objects import (
     Finding,
     Location,
     Pattern,

@@ -14,7 +14,7 @@ import pytest
 
 from robot_optimizer_core.analyzers import FlakinessAnalyzer
 from robot_optimizer_core.config import Settings
-from robot_optimizer_core.di import Container
+from robot_optimizer_core import Container
 from robot_optimizer_core.domain.entities import TestFile
 from robot_optimizer_core.domain.repositories import TestResultRepository
 from robot_optimizer_core.domain.value_objects import (

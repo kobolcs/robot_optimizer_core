@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
-from robot_optimizer.domain.value_objects import (
+from robot_optimizer_core.domain.value_objects import (
     Finding,
     Location,
     OptimizationSuggestion,
@@ -222,7 +222,7 @@ class TestFlakinessCoverage:
 
     def test_flakiness_stats_edge_cases(self):
         """Test FlakinessStats edge cases."""
-        from robot_optimizer.domain.value_objects.flakiness_stats import FlakinessStats
+        from robot_optimizer_core.domain.value_objects.flakiness_stats import FlakinessStats
 
         # Test with no failures but many runs
         stable = FlakinessStats(
@@ -277,7 +277,7 @@ class TestTestResultCoverage:
 
     def test_test_result_skip_status(self):
         """Test SKIP status handling."""
-        from robot_optimizer.domain.value_objects.test_result import TestResult
+        from robot_optimizer_core.domain.value_objects.test_result import TestResult
 
         result = TestResult(
             test_name="Skipped Test",

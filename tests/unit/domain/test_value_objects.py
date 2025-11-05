@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
-from robot_optimizer.domain.value_objects import (
+from robot_optimizer_core.domain.value_objects import (
     Finding,
     Location,
     Pattern,
