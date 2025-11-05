@@ -6,8 +6,8 @@ This guide will help you get started with Robot Framework Optimizer Core quickly
 
 ### Requirements
 
-- **Python 3.13+** (Required)
-- **Robot Framework 7.1+** (Optional, for parsing)
+- **Python 3.11+** (Required - supports Python 3.11, 3.12, and 3.13)
+- **Robot Framework 7.1+** (Required for core functionality)
 
 ### Install from PyPI
 
@@ -158,13 +158,13 @@ findings = sleep_detector.analyze(test_file)
 ### List Available Analyzers
 
 ```python
-from robot_optimizer_core import list_analyzers
+from robot_optimizer_core import list_analyzers, get_analyzer
 
-# Get all registered analyzers
-analyzers = list_analyzers()
+# Get all registered analyzer names
+analyzer_names = list_analyzers()
 
-for name, analyzer_class in analyzers.items():
-    analyzer = analyzer_class()
+for name in analyzer_names:
+    analyzer = get_analyzer(name)
     print(f"{name}: {analyzer.description}")
     print(f"  Tags: {', '.join(analyzer.tags)}")
     print()

@@ -10,7 +10,12 @@ Create a custom analyzer by inheriting from `BaseAnalyzer`:
 
 ```python
 from robot_optimizer_core import BaseAnalyzer, TestFile, Finding, Location, Pattern, Severity
-from typing import override
+
+# Import override decorator (compatible with Python 3.11+)
+try:
+    from typing import override
+except ImportError:
+    from typing_extensions import override
 
 class CustomAnalyzer(BaseAnalyzer):
     """Example custom analyzer."""
@@ -42,11 +47,17 @@ class CustomAnalyzer(BaseAnalyzer):
         lines = test_file.content.splitlines()
         for line_num, line in enumerate(lines, 1):
             if "FIXME" in line:
-                finding = Finding.create(
-                    pattern=Pattern(type="fixme_comment", details={"text": line.strip()}),
+                from robot_optimizer_core.domain.value_objects import PatternType
+                finding = Finding(
+                    pattern=Pattern(
+                        type=PatternType.CUSTOM,
+                        name="fixme_comment",
+                        description="FIXME comment detected"
+                    ),
                     severity=Severity.INFO,
-                    location=Location(test_file.path, line_num),
-                    message=f"FIXME comment found: {line.strip()}"
+                    location=Location(file_path=test_file.path, line_number=line_num),
+                    message=f"FIXME comment found: {line.strip()}",
+                    context={"text": line.strip()}
                 )
                 findings.append(finding)
 
