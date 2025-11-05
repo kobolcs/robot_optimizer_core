@@ -34,6 +34,33 @@ configure_logging(level="WARNING", format_json=False)
 configure_metrics(enabled=False)  # Disable metrics in tests
 
 
+def pytest_collection_modifyitems(config, items):
+    """Modify test collection to skip certain patterns."""
+    pass  # Keep for future use
+
+
+def pytest_ignore_collect(collection_path, config):
+    """Ignore certain files/patterns during collection."""
+    # Ignore .skip files
+    if collection_path.suffix == ".skip":
+        return True
+    return False
+
+
+def pytest_pycollect_makeitem(collector, name, obj):
+    """Control which classes are collected as test classes.
+
+    Prevent pytest from collecting domain model classes (TestFile, TestResult, etc.)
+    that happen to start with 'Test' but aren't actually test classes.
+    """
+    # List of class names to ignore (domain models, not test classes)
+    ignored_classes = {"TestFile", "TestResult", "TZAwareTestFile"}
+
+    if name in ignored_classes:
+        # Return None to tell pytest not to collect this
+        return None
+
+
 # Test data constants
 SAMPLE_ROBOT_CONTENT = """*** Settings ***
 Documentation    Sample test suite for testing

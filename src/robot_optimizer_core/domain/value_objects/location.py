@@ -36,23 +36,27 @@ from ..base import ValueObject
 
 class Location(ValueObject):
     """Represents a location in a Robot Framework test file.
-    
+
     A location can be a single point (line, optional column) or a range
     (start and end positions). This is used to precisely identify where
     findings occur in test files.
-    
+
     Attributes:
         file_path: Path to the file.
         line: Line number (1-based).
         column: Column number (1-based, optional).
         end_line: End line for ranges (optional).
         end_column: End column for ranges (optional).
-    
+
     Example:
         >>> loc = Location(Path("test.robot"), line=42)
         >>> print(loc.range_str)
         test.robot:42
-        
+
+        >>> # Positional arguments also work for convenience
+        >>> loc = Location(Path("test.robot"), 42)
+        >>> loc = Location(Path("test.robot"), 42, 5)  # with column
+
         >>> range_loc = Location(
         ...     Path("test.robot"),
         ...     line=10, column=5,
@@ -86,6 +90,42 @@ class Location(ValueObject):
         ge=1,
         description="End column for ranges"
     )
+
+    def __init__(
+        self,
+        file_path: Path | str | None = None,
+        line: int | None = None,
+        column: int | None = None,
+        end_line: int | None = None,
+        end_column: int | None = None,
+        **data: Any
+    ):
+        """Initialize Location with flexible argument handling.
+
+        Supports both positional and keyword arguments for convenience.
+
+        Args:
+            file_path: Path to the file (positional or keyword)
+            line: Line number (positional or keyword)
+            column: Column number (positional or keyword, optional)
+            end_line: End line for ranges (keyword only, optional)
+            end_column: End column for ranges (keyword only, optional)
+            **data: Additional keyword arguments passed to Pydantic
+        """
+        # Build kwargs dict for Pydantic
+        init_data = data.copy()
+        if file_path is not None:
+            init_data['file_path'] = file_path
+        if line is not None:
+            init_data['line'] = line
+        if column is not None:
+            init_data['column'] = column
+        if end_line is not None:
+            init_data['end_line'] = end_line
+        if end_column is not None:
+            init_data['end_column'] = end_column
+
+        super().__init__(**init_data)
 
     @field_validator("file_path", mode="before")
     @classmethod
