@@ -1,4 +1,4 @@
-# src/robot_optimizer/domain/repositories/test_result_repository.py
+# src/robot_optimizer_core/domain/repositories/test_result_repository.py
 """Repository interface for test result storage."""
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -25,4 +25,3 @@ class TestResultRepository(ABC):
     @abstractmethod
     def get_total_results_count(self) -> int:
         """Get total number of stored test results."""
-

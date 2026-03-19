@@ -1,5 +1,14 @@
-# src/robot_optimizer_core/performance/optimized_discovery.py
-"""Optimized file discovery with linear time complexity."""
+# src/robot_optimizer_core/discovery/file_finder.py
+"""Optimized file discovery with linear time complexity.
+
+This module is part of the test-suite analysis engine infrastructure.
+Its primary production responsibility is file discovery.
+
+Note:
+    Additional optimization helper classes in this module are retained for
+    backward compatibility and experimentation. Public imports should prefer
+    :class:`OptimizedFileDiscoveryService` (aliased as ``FileDiscoveryService``).
+"""
 from __future__ import annotations
 
 import fnmatch
@@ -12,6 +21,12 @@ from typing import Iterator, Set
 from ..config import Settings
 from ..exceptions import FileNotFoundError as RFFileNotFoundError
 from ..logging import get_logger
+
+__all__ = [
+    "PatternMatcher",
+    "PathExclusionTrie",
+    "OptimizedFileDiscoveryService",
+]
 
 
 @dataclass
