@@ -1,4 +1,4 @@
-# src/robot_optimizer/domain/value_objects/pattern.py
+# src/robot_optimizer_core/domain/value_objects/pattern.py
 """Pattern value object for representing optimization patterns."""
 from enum import Enum, auto
 
