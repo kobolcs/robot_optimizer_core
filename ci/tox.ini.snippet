@@ -1,7 +1,7 @@
 # Merge these envs into your existing tox.ini if they do not already exist.
 
 [tox]
-envlist = py,lint,type,packaging
+envlist = py,lint,type,build
 
 [testenv]
 description = Run the test suite
@@ -22,12 +22,12 @@ commands =
 [testenv:type]
 description = Static type checking
 deps =
-    pyright
+    mypy
 commands =
-    pyright src
+    mypy src
 
-[testenv:packaging]
-description = Verify package metadata and buildability
+[testenv:build]
+description = Verify package buildability
 deps =
     build
     twine
