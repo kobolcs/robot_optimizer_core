@@ -1,0 +1,36 @@
+# Merge these envs into your existing tox.ini if they do not already exist.
+
+[tox]
+envlist = py,lint,type,build
+
+[testenv]
+description = Run the test suite
+deps =
+    pytest
+    pytest-cov
+commands =
+    pytest -q
+
+[testenv:lint]
+description = Lint and formatting checks
+deps =
+    ruff
+commands =
+    ruff check src tests
+    ruff format --check src tests
+
+[testenv:type]
+description = Static type checking
+deps =
+    mypy
+commands =
+    mypy src
+
+[testenv:build]
+description = Verify package buildability
+deps =
+    build
+    twine
+commands =
+    python -m build
+    twine check dist/*
