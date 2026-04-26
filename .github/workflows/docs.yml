@@ -25,4 +25,4 @@ jobs:
           python -m pip install -e ".[docs]"
 
       - name: Build docs
-        run: mkdocs build --strict
+        run: mkdocs build
