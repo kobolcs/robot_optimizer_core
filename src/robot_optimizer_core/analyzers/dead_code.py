@@ -7,6 +7,7 @@ that can be safely removed to improve maintainability.
 from __future__ import annotations
 
 from collections import defaultdict
+import re
 try:
     from typing import override
 except ImportError:
@@ -32,6 +33,8 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         self._check_unused = self.get_config_value("check_unused", True)
         self._check_duplicates = self.get_config_value("check_duplicates", True)
         self._check_unreachable = self.get_config_value("check_unreachable", True)
+        ignore_patterns = self.get_config_value("ignore_patterns", [])
+        self._ignore_patterns = [re.compile(str(pattern), re.IGNORECASE) for pattern in ignore_patterns]
 
     @property
     @override
@@ -41,12 +44,17 @@ class DeadCodeAnalyzer(BaseAnalyzer):
     @property
     @override
     def description(self) -> str:
-        return "Detects unused keywords and duplicate definitions"
+        return "Finds unused keywords and duplicate definitions"
 
     @property
     @override
     def tags(self) -> list[str]:
-        return ["cleanup", "maintainability", "code-quality"]
+        return ["keywords", "maintenance", "cleanup"]
+
+    @property
+    @override
+    def supports_auto_fix(self) -> bool:
+        return True
 
     @override
     def analyze(self, test_file: TestFile) -> list[Finding]:
@@ -71,45 +79,75 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         self,
         test_file: TestFile
     ) -> tuple[dict[str, list[int]], set[str]]:
-        """Extract keyword definitions and calls in a single pass (optimized).
+        """Extract keyword definitions and resolved keyword calls."""
+        keywords: dict[str, list[int]] = defaultdict(list)
+        self._keyword_display_names: dict[str, str] = {}
+        candidate_calls: list[str] = []
+        calls: set[str] = set()
 
-        This method combines the functionality of _extract_keywords and
-        _extract_keyword_calls to avoid iterating through the file twice (N+1 fix).
-
-        Returns:
-            Tuple of (keywords dict, keyword calls set)
-        """
-        keywords = defaultdict(list)
-        calls = set()
         lines = test_file.content.splitlines()
-
         in_keywords_section = False
         in_test_or_keyword = False
 
         for line_num, line in enumerate(lines, 1):
             stripped = line.strip()
 
-            # Skip empty lines and comments
-            if not stripped or stripped.startswith('#'):
+            if not stripped or stripped.startswith("#"):
                 continue
 
-            # Check for section markers
-            if stripped.startswith('***'):
-                in_keywords_section = 'keyword' in stripped.lower()
-                in_test_or_keyword = 'test case' in stripped.lower() or 'keyword' in stripped.lower()
+            if stripped.startswith("***"):
+                section = stripped.lower()
+                in_keywords_section = "keyword" in section
+                in_test_or_keyword = "test case" in section or "keyword" in section
                 continue
 
-            # Extract keyword definitions (non-indented lines in keywords section)
-            if in_keywords_section and not line.startswith((' ', '\t')):
-                keyword_name = stripped
-                keywords[keyword_name.lower()].append(line_num)
+            if in_keywords_section and not line.startswith((" ", "\t")):
+                # Ignore malformed definitions such as names beginning with a digit.
+                if stripped[0].isdigit():
+                    continue
+                normalized = stripped.lower()
+                keywords[normalized].append(line_num)
+                self._keyword_display_names.setdefault(normalized, stripped)
+                continue
 
-            # Extract keyword calls (indented lines in test/keyword sections)
-            if in_test_or_keyword and line.startswith((' ', '\t')):
-                parts = stripped.split()
-                if parts:
-                    # First part is usually the keyword name
-                    calls.add(parts[0].lower())
+            if in_test_or_keyword and line.startswith((" ", "\t")):
+                candidate_calls.append(stripped)
+
+        keyword_names = set(keywords)
+
+        for call in candidate_calls:
+            lowered = call.lower()
+            parts = call.split()
+            lowered_parts = [part.lower() for part in parts]
+
+            # Direct full-line/prefix matches against known local keyword definitions.
+            for keyword in keyword_names:
+                if lowered == keyword or lowered.startswith(keyword + " "):
+                    calls.add(keyword)
+
+            # BDD prefixes: Given/When/Then/And/But <keyword>
+            if lowered_parts and lowered_parts[0] in {"given", "when", "then", "and", "but"}:
+                bdd_call = " ".join(lowered_parts[1:])
+                for keyword in keyword_names:
+                    if bdd_call == keyword or bdd_call.startswith(keyword + " "):
+                        calls.add(keyword)
+
+            # Dynamic Robot calls: Run Keyword <keyword>, Run Keywords <kw> AND <kw>
+            if lowered.startswith("run keyword "):
+                dynamic_call = lowered.removeprefix("run keyword ").strip()
+                for keyword in keyword_names:
+                    if dynamic_call == keyword or dynamic_call.startswith(keyword + " "):
+                        calls.add(keyword)
+
+            if lowered.startswith("run keywords "):
+                dynamic_parts = [
+                    part.strip().lower()
+                    for part in re.split(r"\s+AND\s+", call[len("Run Keywords "):], flags=re.IGNORECASE)
+                ]
+                for dynamic_call in dynamic_parts:
+                    for keyword in keyword_names:
+                        if dynamic_call == keyword or dynamic_call.startswith(keyword + " "):
+                            calls.add(keyword)
 
         return dict(keywords), calls
 
@@ -124,14 +162,18 @@ class DeadCodeAnalyzer(BaseAnalyzer):
 
         for keyword_name, line_numbers in keywords.items():
             if keyword_name not in calls:
-                # Skip special keywords
+                display_name = getattr(self, "_keyword_display_names", {}).get(keyword_name, keyword_name)
+
+                # Skip special keywords and configured ignore patterns
                 if keyword_name in {'suite setup', 'suite teardown', 'test setup', 'test teardown'}:
+                    continue
+                if any(pattern.match(display_name) for pattern in self._ignore_patterns):
                     continue
 
                 pattern = Pattern(
                     type=PatternType.UNUSED_KEYWORD,
                     name="Unused Keyword",
-                    description=f"Keyword '{keyword_name}' is never called",
+                    description=f"Keyword '{display_name}' is never called",
                     recommendation="Remove this keyword or use it in your tests",
                     auto_fixable=True
                 )
@@ -140,7 +182,8 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                     pattern=pattern,
                     severity=Severity.WARNING,
                     location=Location(file_path=test_file.path, line=line_numbers[0]),
-                    message=f"Keyword '{keyword_name}' is defined but never used"
+                    message=f"Keyword '{display_name}' is defined but never used",
+                    keyword_name=display_name
                 )
                 findings.append(finding)
 

@@ -196,7 +196,13 @@ class OptimizedFileDiscoveryService:
         patterns = patterns or self.settings.file_patterns
         self._include_matcher = PatternMatcher.from_patterns(patterns)
 
-        exclude_patterns = exclude_patterns or self.settings.exclude_patterns
+        # If callers provide explicit include patterns, don't unexpectedly apply
+        # global default excludes unless they also provide explicit excludes.
+        exclude_patterns = (
+            exclude_patterns
+            if exclude_patterns is not None
+            else ([] if patterns is not None else self.settings.exclude_patterns)
+        )
         self._exclude_trie = PathExclusionTrie()
         for pattern in exclude_patterns:
             self._exclude_trie.add_exclusion(pattern)
@@ -253,7 +259,7 @@ class OptimizedFileDiscoveryService:
                 self._stats["pattern_checks"] += 1
 
                 # Check pattern match - O(1) for most patterns
-                if self._include_matcher.matches(entry.name):
+                if self._include_matcher.matches(entry.name) and self._is_text_file(entry):
                     yield entry
 
             elif entry.is_dir() and recursive:
@@ -265,6 +271,28 @@ class OptimizedFileDiscoveryService:
                     max_depth,
                     current_depth + 1
                 )
+
+    def _is_text_file(self, path: Path) -> bool:
+        """Return False for binary/control-byte files that cannot be analyzed."""
+        try:
+            sample = path.read_bytes()[:4096]
+        except OSError:
+            return False
+
+        if b"\x00" in sample:
+            return False
+
+        try:
+            text = sample.decode("utf-8")
+        except UnicodeDecodeError:
+            return False
+
+        # Reject files that are mostly non-printable control bytes.
+        control_chars = sum(
+            1 for ch in text
+            if ord(ch) < 32 and ch not in "\n\r\t"
+        )
+        return control_chars <= max(1, len(text) // 20)
 
     def _get_cached_listing(self, path: Path) -> list[Path]:
         """Get directory listing with caching."""

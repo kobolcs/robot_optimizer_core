@@ -238,7 +238,6 @@ def configure_logging(
     _root_logger_configured = True
 
 
-@cache
 def get_logger(
     name: str,
     context: dict[str, Any] | None = None

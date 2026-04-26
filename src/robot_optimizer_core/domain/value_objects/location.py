@@ -244,46 +244,24 @@ class Location(ValueObject):
         return self.end_line is None
 
     def contains(self, other: Location) -> bool:
-        """Check if this location contains another location.
-        
-        A location contains another if:
-        - They are in the same file
-        - The other location's position is within this location's range
-        
-        Args:
-            other: Location to check.
-            
-        Returns:
-            True if this location contains the other.
-            
-        Example:
-            >>> range_loc = Location(Path("test.robot"), line=10, end_line=20)
-            >>> point_loc = Location(Path("test.robot"), line=15)
-            >>> assert range_loc.contains(point_loc)
-        """
-        # Must be same file
+        """Check if this location contains another location."""
         if self.file_path != other.file_path:
             return False
 
-        # Check line boundaries
-        if other.line < self.line:
+        self_end_line = self.end_line or self.line
+        other_end_line = other.end_line or other.line
+
+        if other.line < self.line or other_end_line > self_end_line:
             return False
 
-        if self.end_line is not None and other.line > self.end_line:
-            return False
+        if self.column is not None and other.line == self.line:
+            if other.column is None or other.column < self.column:
+                return False
 
-        # Check column boundaries if specified
-        match (self.column, other.column, other.line == self.line, self.end_line, self.end_column):
-            case (start_col, other_col, True, _, _) if start_col is not None and other_col is not None:
-                if other_col < start_col:
-                    return False
-            case (_, other_col, _, end_line, end_col) if (
-                end_line == other.line and
-                end_col is not None and
-                other_col is not None
-            ):
-                if other_col > end_col:
-                    return False
+        if self.end_column is not None and other_end_line == self_end_line:
+            other_end_column = other.end_column or other.column
+            if other_end_column is None or other_end_column > self.end_column:
+                return False
 
         return True
 
@@ -381,7 +359,7 @@ class Location(ValueObject):
             file_path=self.file_path,
             line=start_line,
             column=start_column,
-            end_line=end_line if end_line != start_line else None,
+            end_line=end_line,
             end_column=end_column
         )
 
