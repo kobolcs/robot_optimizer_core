@@ -26,6 +26,10 @@ class PluginMetadata:
 class Plugin(ABC):
     """Base class for plugins."""
 
+    def __init__(self, registry: PluginRegistry | None = None) -> None:
+        self.registry = registry
+        self.is_active: bool = False
+
     @property
     @abstractmethod
     def metadata(self) -> PluginMetadata:
@@ -89,7 +93,7 @@ class PluginSecurityValidator:
 
     def validate_file(self, file_path: Path) -> tuple[bool, list[str]]:
         """Validate a plugin file for security issues.
-        
+
         Returns:
             Tuple of (is_safe, violations)
         """
@@ -202,11 +206,11 @@ class SecurePluginManager:
 
     def load_plugin_from_file(self, file_path: Path, force: bool = False) -> None:
         """Securely load a plugin from a file.
-        
+
         Args:
             file_path: Path to the plugin file
             force: Skip security validation (NOT RECOMMENDED)
-            
+
         Raises:
             PluginError: If plugin fails security validation
         """
@@ -252,7 +256,7 @@ class SecurePluginManager:
 
             # Find Plugin subclass
             plugin_class = None
-            for name, obj in restricted_globals.items():
+            for _, obj in restricted_globals.items():
                 if (isinstance(obj, type) and
                     issubclass(obj, Plugin) and
                     obj is not Plugin):
@@ -298,22 +302,22 @@ class SecurePluginManager:
 # Example of a safe plugin implementation
 SAFE_PLUGIN_TEMPLATE = '''
 """Example of a safe plugin implementation."""
-from robot_optimizer_core import Plugin, PluginMetadata, BaseAnalyzer
+from robot_optimizer_core import Plugin, PluginMetadata, BaseAnalyzer, register_analyzer
 from robot_optimizer_core.domain.entities import TestFile
 from robot_optimizer_core.domain.value_objects import Finding
 
 
 class ExampleAnalyzer(BaseAnalyzer):
     """Example analyzer that follows security guidelines."""
-    
+
     @property
     def name(self) -> str:
         return "example"
-    
+
     @property
     def description(self) -> str:
         return "Example analyzer"
-    
+
     def analyze(self, test_file: TestFile) -> list[Finding]:
         # Only access allowed attributes and methods
         findings = []
@@ -323,7 +327,10 @@ class ExampleAnalyzer(BaseAnalyzer):
 
 class ExamplePlugin(Plugin):
     """Example plugin following security best practices."""
-    
+
+    def __init__(self, registry=None):
+        super().__init__(registry)
+
     @property
     def metadata(self) -> PluginMetadata:
         return PluginMetadata(
@@ -332,11 +339,11 @@ class ExamplePlugin(Plugin):
             description="Safe example plugin",
             author="Your Name"
         )
-    
+
     def activate(self) -> None:
-        """Register components safely."""
-        self.register_analyzer("example", ExampleAnalyzer)
-    
+        """Register components using the module-level registry."""
+        register_analyzer("example", ExampleAnalyzer)
+
     def deactivate(self) -> None:
         """Clean up resources."""
         pass

@@ -45,10 +45,10 @@ Flaky Login Test
     Open Browser    ${URL}    chrome
     Wait Until Element Is Visible    id=login    timeout=2s
     Click Button    id=login
-    
+
 Stable Test
     Log    Always passes
-    
+
 Very Flaky Test
     [Documentation]    Fails often
     ${random}=    Evaluate    random.random()

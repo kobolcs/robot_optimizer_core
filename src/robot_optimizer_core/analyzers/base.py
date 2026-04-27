@@ -6,19 +6,19 @@ inherit from, including support for the plugin system and metrics.
 
 Example:
     Creating a custom analyzer::
-    
+
         from robot_optimizer_core.analyzers import BaseAnalyzer
         from robot_optimizer_core import Finding, Pattern, Severity
-        
+
         class MyAnalyzer(BaseAnalyzer):
             @property
             def name(self) -> str:
                 return "my_analyzer"
-            
+
             @property
             def description(self) -> str:
                 return "My custom analyzer"
-            
+
             def analyze(self, test_file: TestFile) -> list[Finding]:
                 findings = []
                 # Analysis logic here
@@ -46,11 +46,11 @@ logger = get_logger(__name__)
 
 class BaseAnalyzer(ABC):
     """Enhanced base class for all analyzers with plugin support.
-    
+
     This abstract base class defines the interface that all analyzers
     must implement. It includes hooks for metrics, logging, and error
     handling that can be extended by subclasses.
-    
+
     Attributes:
         config: Analyzer-specific configuration.
         metrics_enabled: Whether to collect metrics for this analyzer.
@@ -64,7 +64,7 @@ class BaseAnalyzer(ABC):
         metrics_enabled: bool = True
     ) -> None:
         """Initialize the analyzer.
-        
+
         Args:
             config: Analyzer-specific configuration.
             metrics_enabled: Whether to collect metrics.
@@ -81,9 +81,9 @@ class BaseAnalyzer(ABC):
     @abstractmethod
     def name(self) -> str:
         """Get the analyzer name.
-        
+
         This should be a unique identifier for the analyzer.
-        
+
         Returns:
             Analyzer name.
         """
@@ -92,10 +92,10 @@ class BaseAnalyzer(ABC):
     @abstractmethod
     def description(self) -> str:
         """Get the analyzer description.
-        
+
         This should be a human-readable description of what
         the analyzer does.
-        
+
         Returns:
             Analyzer description.
         """
@@ -103,9 +103,9 @@ class BaseAnalyzer(ABC):
     @property
     def version(self) -> str:
         """Get the analyzer version.
-        
+
         Subclasses can override this to provide version information.
-        
+
         Returns:
             Analyzer version (default: "1.0.0").
         """
@@ -114,9 +114,9 @@ class BaseAnalyzer(ABC):
     @property
     def tags(self) -> list[str]:
         """Get analyzer tags for categorization.
-        
+
         Subclasses can override this to provide tags.
-        
+
         Returns:
             List of tags (default: empty).
         """
@@ -125,9 +125,9 @@ class BaseAnalyzer(ABC):
     @property
     def supports_auto_fix(self) -> bool:
         """Check if analyzer supports auto-fixing.
-        
+
         Subclasses that support auto-fixing should override this.
-        
+
         Returns:
             True if auto-fix is supported (default: False).
         """
@@ -136,28 +136,28 @@ class BaseAnalyzer(ABC):
     @abstractmethod
     def analyze(self, test_file: TestFile) -> list[Finding]:
         """Analyze a test file and return findings.
-        
+
         This is the main method that subclasses must implement.
         It should analyze the given test file and return a list
         of findings.
-        
+
         Args:
             test_file: The test file to analyze.
-            
+
         Returns:
             List of findings discovered.
-            
+
         Raises:
             AnalysisError: If analysis fails.
         """
 
-    def pre_analyze(self, test_file: TestFile) -> None:
+    def pre_analyze(self, test_file: TestFile) -> None:  # noqa: B027
         """Hook called before analysis.
-        
+
         Subclasses can override this to perform setup tasks.
         This is called before analyze() and is wrapped in
         error handling.
-        
+
         Args:
             test_file: The test file to be analyzed.
         """
@@ -168,43 +168,43 @@ class BaseAnalyzer(ABC):
         findings: list[Finding]
     ) -> list[Finding]:
         """Hook called after analysis.
-        
+
         Subclasses can override this to perform cleanup or
         modify findings. This is called after analyze() and
         is wrapped in error handling.
-        
+
         Args:
             test_file: The test file that was analyzed.
             findings: The findings from analysis.
-            
+
         Returns:
             Modified findings (default: unchanged).
         """
         return findings
 
-    def validate_config(self) -> None:
+    def validate_config(self) -> None:  # noqa: B027
         """Validate analyzer configuration.
-        
+
         Subclasses can override this to validate their specific
         configuration. This is called during initialization.
-        
+
         Raises:
             ConfigurationError: If configuration is invalid.
         """
 
     def safe_analyze(self, test_file: TestFile) -> list[Finding]:
         """Safely analyze a file with full error handling.
-        
+
         This method wraps the analyze() method with error handling,
         metrics collection, and logging. It should not be overridden
         by subclasses.
-        
+
         Args:
             test_file: The test file to analyze.
-            
+
         Returns:
             List of findings discovered.
-            
+
         Raises:
             AnalysisError: If analysis fails.
         """
@@ -276,14 +276,14 @@ class BaseAnalyzer(ABC):
         test_file: TestFile
     ) -> list[Finding]:
         """Validate findings from analysis.
-        
+
         This ensures all findings have correct file paths and
         valid line numbers.
-        
+
         Args:
             findings: Findings to validate.
             test_file: The analyzed file.
-            
+
         Returns:
             Validated findings.
         """
@@ -379,7 +379,7 @@ class BaseAnalyzer(ABC):
 
     def __repr__(self) -> str:
         """Return string representation of analyzer.
-        
+
         Returns:
             String representation.
         """

@@ -7,11 +7,12 @@ that can be safely removed to improve maintainability.
 from __future__ import annotations
 
 import re
+import sys
 from collections import defaultdict
 
-try:
+if sys.version_info >= (3, 12):
     from typing import override
-except ImportError:
+else:
     from typing_extensions import override
 
 from ..domain.entities import TestFile
@@ -25,7 +26,7 @@ _LIFECYCLE_KEYWORDS = frozenset({
 
 class DeadCodeAnalyzer(BaseAnalyzer):
     """Analyzer for detecting dead code in Robot Framework files.
-    
+
     Detects:
     - Unused keywords
     - Duplicate keyword definitions

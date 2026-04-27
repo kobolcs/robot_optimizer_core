@@ -29,7 +29,7 @@ import tempfile
 from collections.abc import Generator
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 from unittest.mock import Mock
 from uuid import uuid4
 
@@ -114,7 +114,7 @@ Login With Credentials
 Unused Keyword
     [Documentation]    This keyword is never used
     Log    This is unused
-    
+
 Login With Credentials
     [Documentation]    Duplicate keyword definition
     Log    Duplicate implementation
@@ -286,7 +286,7 @@ class TestData:
     def create_robot_content(
         test_cases: list[str],
         keywords: list[str],
-        variables: Optional[dict[str, str]] = None
+        variables: dict[str, str] | None = None
     ) -> str:
         """Create robot file content from components."""
         content = "*** Settings ***\nDocumentation    Test suite\n\n"

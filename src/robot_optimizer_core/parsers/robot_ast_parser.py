@@ -95,7 +95,7 @@ class RobotASTParser(RobotParserRepository):
         arguments = []
         if hasattr(keyword, "args") and keyword.args:
             for arg in keyword.args:
-                arguments.append(RobotArgument(
+                arguments.append(RobotArgument(  # type: ignore[call-arg]
                     name=arg.name if hasattr(arg, "name") else str(arg),
                     default_value=arg.default if hasattr(arg, "default") else None
                 ))

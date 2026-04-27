@@ -6,26 +6,28 @@ indicates timing issues, race conditions, or environmental dependencies.
 
 Example:
     Using the flakiness analyzer::
-    
+
         from robot_optimizer_core.analyzers import FlakinessAnalyzer
         from robot_optimizer_core import TestFile
         from robot_optimizer_core.repositories import TestResultRepository
-        
+
         repo = TestResultRepository()  # Your implementation
         analyzer = FlakinessAnalyzer(test_result_repository=repo)
-        
+
         test_file = TestFile.from_path("tests/login.robot")
         findings = analyzer.analyze(test_file)
-        
+
         for finding in findings:
             failure_rate = finding.context['failure_rate']
             print(f"Flaky test: {failure_rate:.1%} failure rate")
 """
 from __future__ import annotations
 
-try:
+import sys
+
+if sys.version_info >= (3, 12):
     from typing import override
-except ImportError:
+else:
     from typing_extensions import override
 
 from ..config import get_settings
@@ -46,11 +48,11 @@ from .base import BaseAnalyzer, ConfigValue
 
 class FlakinessAnalyzer(BaseAnalyzer):
     """Analyzer for detecting flaky tests.
-    
+
     This analyzer uses historical test results to identify tests
     that fail intermittently. The Pro version extends this with
     root cause analysis and trend detection.
-    
+
     Configuration:
         days_back: Number of days of history to analyze (default: 30).
         failure_threshold: Failure rate to consider flaky (default: 0.05).
@@ -64,7 +66,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
         config: dict[str, ConfigValue] | None = None
     ) -> None:
         """Initialize the analyzer.
-        
+
         Args:
             test_result_repository: Repository for test results.
             config: Analyzer configuration.
@@ -141,10 +143,10 @@ class FlakinessAnalyzer(BaseAnalyzer):
     @override
     def analyze(self, test_file: TestFile) -> list[Finding]:
         """Analyze test file for flaky tests.
-        
+
         Args:
             test_file: The test file to analyze.
-            
+
         Returns:
             List of findings.
         """
@@ -184,10 +186,10 @@ class FlakinessAnalyzer(BaseAnalyzer):
 
     def _is_flaky(self, stats: FlakinessStats) -> bool:
         """Determine if test statistics indicate flakiness.
-        
+
         Args:
             stats: Test statistics.
-            
+
         Returns:
             True if test is flaky.
         """
@@ -209,11 +211,11 @@ class FlakinessAnalyzer(BaseAnalyzer):
         test_file: TestFile
     ) -> Finding:
         """Create a finding from flakiness statistics.
-        
+
         Args:
             stats: Flakiness statistics.
             test_file: The test file.
-            
+
         Returns:
             Finding object.
         """
@@ -282,10 +284,10 @@ class FlakinessAnalyzer(BaseAnalyzer):
 
     def _get_recommendation(self, stats: FlakinessStats) -> str:
         """Get recommendation based on flakiness pattern.
-        
+
         Args:
             stats: Flakiness statistics.
-            
+
         Returns:
             Recommendation text.
         """
@@ -341,14 +343,14 @@ class FlakinessAnalyzer(BaseAnalyzer):
         test_file: TestFile
     ) -> str:
         """Categorize the type of flakiness using pattern matching.
-        
+
         This is a simple categorization. The Pro version provides
         more sophisticated root cause analysis.
-        
+
         Args:
             stats: Flakiness statistics.
             test_file: The test file.
-            
+
         Returns:
             Flakiness category.
         """

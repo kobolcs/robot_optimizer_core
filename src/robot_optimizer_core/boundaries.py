@@ -87,7 +87,7 @@ class ErrorBoundary:
 
     def __init__(self, operation_name: str, fallback: Any = None):
         """Initialize error boundary.
-        
+
         Args:
             operation_name: Name of the operation for logging
             fallback: Fallback value on error
@@ -172,7 +172,7 @@ def transactional(
     log_level: str = "ERROR"
 ) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """Decorator for transactional operations with automatic rollback.
-    
+
     Args:
         operation_name: Name for logging (defaults to function name)
         rollback_on: Exception types that trigger rollback

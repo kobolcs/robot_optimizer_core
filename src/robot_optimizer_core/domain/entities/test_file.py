@@ -11,7 +11,9 @@ from zoneinfo import ZoneInfo  # Python 3.9+ for timezone support
 from pydantic import Field, computed_field, field_validator
 
 from ...logging import get_logger
+from ..base import DomainEvent as BaseDomainEvent
 from ..base import Entity
+from ..value_objects.test_result import TestResult as BaseTestResult
 
 logger = get_logger(__name__)
 
@@ -30,7 +32,7 @@ def ensure_utc(dt: datetime) -> datetime:
 
 class TZAwareTestFile(Entity[UUID]):
     """Test file entity with proper timezone handling (timezone-aware).
-    
+
     All datetime fields are stored in UTC with timezone information.
     """
 
@@ -184,21 +186,21 @@ class TZAwareTestFile(Entity[UUID]):
         )
         return schema
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def last_modified_local(self) -> datetime:
         """Get last modified time in display timezone."""
         tz = ZoneInfo(self.display_timezone)
         return self.last_modified_utc.astimezone(tz)
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def age_hours(self) -> float:
         """Get file age in hours."""
         age = utc_now() - self.last_modified_utc
         return age.total_seconds() / 3600
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def is_recently_modified(self) -> bool:
         """Check if file was modified in last 24 hours."""
@@ -221,9 +223,6 @@ class TZAwareTestFile(Entity[UUID]):
         return data
 
 
-# Fix for domain events with timezone
-from ..base import DomainEvent as BaseDomainEvent
-
 
 class TimezoneAwareDomainEvent(BaseDomainEvent):
     """Domain event with proper UTC timezone handling."""
@@ -239,9 +238,9 @@ class TimezoneAwareDomainEvent(BaseDomainEvent):
         """Ensure occurred_at is in UTC."""
         if isinstance(v, datetime):
             return ensure_utc(v)
-        return v
+        return v  # type: ignore[no-any-return]
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def occurred_at_iso(self) -> str:
         """Get ISO format timestamp with timezone."""
@@ -262,9 +261,6 @@ class TimezoneAwareDomainEvent(BaseDomainEvent):
         }
 
 
-# Fix for test results with timezone
-from ..value_objects.test_result import TestResult as BaseTestResult
-
 
 class TimezoneAwareTestResult(BaseTestResult):
     """Test result with UTC timestamp."""
@@ -284,18 +280,30 @@ class TimezoneAwareTestResult(BaseTestResult):
             return ensure_utc(dt)
         raise ValueError(f"Cannot convert {type(v)} to datetime")
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def age_days(self) -> float:
         """Get result age in days."""
         age = datetime.now(UTC) - self.timestamp
         return age.total_seconds() / 86400
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def timestamp_iso(self) -> str:
         """Get ISO format timestamp."""
         return self.timestamp.isoformat()
+
+
+# Common non-ISO datetime formats tried by parse_datetime_safe (stdlib only, no extra deps).
+_NON_ISO_FORMATS: tuple[str, ...] = (
+    "%Y-%m-%d %H:%M:%S.%f",
+    "%Y-%m-%d %H:%M:%S",
+    "%Y-%m-%d",
+    "%d/%m/%Y %H:%M:%S",
+    "%d/%m/%Y",
+    "%m/%d/%Y %H:%M:%S",
+    "%m/%d/%Y",
+)
 
 
 # Utility functions for timezone handling
@@ -307,9 +315,15 @@ def parse_datetime_safe(dt_str: str, default_tz: timezone = UTC) -> datetime:
             # ISO format
             dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
         else:
-            # Other formats
-            from dateutil import parser
-            dt = parser.parse(dt_str)
+            # Other formats – try common non-ISO patterns using stdlib only
+            for fmt in _NON_ISO_FORMATS:
+                try:
+                    dt = datetime.strptime(dt_str, fmt)
+                    break
+                except ValueError:
+                    continue
+            else:
+                raise ValueError(f"Unrecognized datetime format: {dt_str!r}")
 
         # Ensure timezone
         if dt.tzinfo is None:

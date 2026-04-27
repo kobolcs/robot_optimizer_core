@@ -6,14 +6,14 @@ including Value Objects, Entities, Aggregate Roots, and Domain Events.
 
 Example:
     Creating domain objects::
-    
+
         from robot_optimizer_core.domain.base import ValueObject, Entity
         from pydantic import Field
-        
+
         class Money(ValueObject):
             amount: Decimal = Field(ge=0)
             currency: str = Field(regex="^[A-Z]{3}$")
-        
+
         class User(Entity[UUID]):
             id: UUID
             name: str
@@ -21,13 +21,14 @@ Example:
 """
 from __future__ import annotations
 
+import sys
 from abc import ABC
 from datetime import UTC, datetime
 from typing import Any, ClassVar, Generic, TypeVar
 
-try:
+if sys.version_info >= (3, 12):
     from typing import override
-except ImportError:
+else:
     from typing_extensions import override
 from uuid import UUID, uuid4
 
@@ -39,23 +40,23 @@ T = TypeVar("T")
 
 class ValueObject(BaseModel, ABC):
     """Base class for value objects using Pydantic v2.
-    
+
     Value objects are immutable domain objects that are defined by their
     attributes rather than identity. They are compared by value equality.
-    
+
     Features:
         - Immutable (frozen=True)
         - Value equality comparison
         - Automatic whitespace stripping
         - No extra fields allowed
         - Enum values used directly
-    
+
     Example:
         >>> class Address(ValueObject):
         ...     street: str
         ...     city: str
         ...     country: str
-        >>> 
+        >>>
         >>> addr1 = Address(street="123 Main", city="NYC", country="USA")
         >>> addr2 = Address(street="123 Main", city="NYC", country="USA")
         >>> assert addr1 == addr2  # Value equality
@@ -207,21 +208,21 @@ class Entity(BaseModel, Generic[T], ABC):
 
 class AggregateRoot(Entity[T], ABC):
     """Base class for aggregate roots using Pydantic v2.
-    
+
     Aggregate roots are entities that serve as the entry point to an
     aggregate. They maintain consistency boundaries and emit domain events.
-    
+
     Features:
         - Event sourcing support
         - Consistency boundary enforcement
         - Domain event emission
         - Transaction boundary marker
-    
+
     Example:
         >>> class Order(AggregateRoot[UUID]):
         ...     id: UUID = Field(default_factory=uuid4)
         ...     items: List[OrderItem] = Field(default_factory=list)
-        ...     
+        ...
         ...     def add_item(self, item: OrderItem) -> None:
         ...         self.items.append(item)
         ...         self.add_event(ItemAddedEvent(order_id=self.id, item=item))
@@ -252,10 +253,10 @@ class AggregateRoot(Entity[T], ABC):
 
     def add_event(self, event: DomainEvent) -> None:
         """Add a domain event to be dispatched.
-        
+
         Events are collected and can be retrieved using pull_events().
         They represent important state changes in the domain.
-        
+
         Args:
             event: Domain event to add.
         """
@@ -263,10 +264,10 @@ class AggregateRoot(Entity[T], ABC):
 
     def pull_events(self) -> list[DomainEvent]:
         """Pull all pending events and clear the list.
-        
+
         This method is typically called by the infrastructure layer
         after persisting the aggregate to dispatch events.
-        
+
         Returns:
             List of pending domain events.
         """
@@ -274,21 +275,21 @@ class AggregateRoot(Entity[T], ABC):
         self._events.clear()
         return events
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def has_events(self) -> bool:
         """Check if there are pending events.
-        
+
         Returns:
             True if events are pending.
         """
         return len(self._events) > 0
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def event_count(self) -> int:
         """Get the count of pending events.
-        
+
         Returns:
             Number of pending events.
         """
@@ -296,7 +297,7 @@ class AggregateRoot(Entity[T], ABC):
 
     def mark_events_committed(self) -> None:
         """Mark all events as committed.
-        
+
         This clears the events list without returning them,
         useful when events have been persisted separately.
         """
@@ -305,7 +306,7 @@ class AggregateRoot(Entity[T], ABC):
 
 def create_event_id() -> UUID:
     """Create a new event ID.
-    
+
     Returns:
         New UUID for event identification.
     """
@@ -314,7 +315,7 @@ def create_event_id() -> UUID:
 
 def create_timestamp() -> datetime:
     """Create a timestamp in UTC.
-    
+
     Returns:
         Current UTC timestamp.
     """
@@ -323,23 +324,23 @@ def create_timestamp() -> datetime:
 
 class DomainEvent(BaseModel, ABC):
     """Base class for domain events using Pydantic v2.
-    
+
     Domain events represent something that has happened in the domain
     that domain experts care about. They are immutable records of
     past occurrences.
-    
+
     Features:
         - Immutable (frozen=True)
         - Automatic ID and timestamp
         - JSON serializable
         - Event name derivation
-    
+
     Example:
         >>> class UserRegisteredEvent(DomainEvent):
         ...     user_id: UUID
         ...     email: str
         ...     registered_at: datetime
-        >>> 
+        >>>
         >>> event = UserRegisteredEvent(
         ...     user_id=uuid4(),
         ...     email="user@example.com",
@@ -370,14 +371,14 @@ class DomainEvent(BaseModel, ABC):
         description="When the event occurred (UTC)"
     )
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def event_name(self) -> str:
         """Get the event name derived from class name.
-        
+
         Converts class name from PascalCase to snake_case,
         removing 'Event' suffix if present.
-        
+
         Returns:
             Event name in snake_case.
         """
@@ -393,13 +394,13 @@ class DomainEvent(BaseModel, ABC):
 
         return name
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def event_version(self) -> str:
         """Get the event version.
-        
+
         Subclasses can override this to provide versioning.
-        
+
         Returns:
             Event version (default: "1.0").
         """
@@ -407,9 +408,9 @@ class DomainEvent(BaseModel, ABC):
 
     def to_message(self) -> dict[str, Any]:
         """Convert event to a message format.
-        
+
         Useful for event buses and message queues.
-        
+
         Returns:
             Dictionary with event data and metadata.
         """

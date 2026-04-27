@@ -56,14 +56,14 @@ class ApplicationConfig:
 
 class ApplicationContext:
     """Application context that manages all services without global state.
-    
+
     This replaces all global singletons with a proper context that can be
     created, configured, and destroyed for each use (especially tests).
     """
 
     def __init__(self, config: ApplicationConfig | None = None):
         """Initialize application context.
-        
+
         Args:
             config: Application configuration
         """
@@ -191,11 +191,11 @@ class ApplicationContext:
 
     def get_logger(self, name: str, context: dict[str, Any] | None = None) -> LoggerAdapter:
         """Get a logger instance.
-        
+
         Args:
             name: Logger name
             context: Logger context
-            
+
         Returns:
             Logger adapter
         """
@@ -244,10 +244,10 @@ class ApplicationContext:
     @contextmanager
     def request_scope(self, **context: Any):
         """Create a request-scoped context.
-        
+
         Args:
             **context: Request context values
-            
+
         Yields:
             Request scope
         """
@@ -282,10 +282,10 @@ class ApplicationContext:
 # Factory functions (no globals!)
 def create_application(config: ApplicationConfig | None = None) -> ApplicationContext:
     """Create a new application context.
-    
+
     Args:
         config: Application configuration
-        
+
     Returns:
         New application context
     """
@@ -294,7 +294,7 @@ def create_application(config: ApplicationConfig | None = None) -> ApplicationCo
 
 def create_test_application() -> ApplicationContext:
     """Create an application context for testing.
-    
+
     Returns:
         Test application context with minimal configuration
     """

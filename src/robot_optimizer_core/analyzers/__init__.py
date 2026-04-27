@@ -11,21 +11,21 @@ Built-in analyzers:
 
 Example:
     Using analyzers directly::
-    
+
         from robot_optimizer_core.analyzers import DeadCodeAnalyzer
         from robot_optimizer_core import TestFile
-        
+
         analyzer = DeadCodeAnalyzer()
         test_file = TestFile.from_path("tests/login.robot")
         findings = analyzer.analyze(test_file)
-        
+
     Using the registry::
-    
+
         from robot_optimizer_core.analyzers import get_analyzer, list_analyzers
-        
+
         # List available analyzers
         print(list_analyzers())
-        
+
         # Get analyzer by name
         analyzer = get_analyzer("dead_code")
 """

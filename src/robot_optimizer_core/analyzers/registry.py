@@ -6,15 +6,15 @@ analyzers, including built-in and plugin-provided analyzers.
 
 Example:
     Registering and using analyzers::
-    
+
         from robot_optimizer_core.analyzers import register_analyzer, get_analyzer
-        
+
         # Register a custom analyzer
         register_analyzer("custom", CustomAnalyzer)
-        
+
         # Get analyzer instance
         analyzer = get_analyzer("custom")
-        
+
         # List all available analyzers
         analyzers = list_analyzers()
 """
@@ -37,10 +37,10 @@ logger = get_logger(__name__)
 
 class AnalyzerRegistry:
     """Registry for managing analyzers.
-    
+
     This registry tracks all available analyzers and provides
     methods for registration, discovery, and instantiation.
-    
+
     Attributes:
         analyzers: Dictionary of registered analyzer classes.
         instances: Cache of analyzer instances.
@@ -65,12 +65,12 @@ class AnalyzerRegistry:
         override: bool = False
     ) -> None:
         """Register an analyzer.
-        
+
         Args:
             name: Unique name for the analyzer.
             analyzer_class: The analyzer class.
             override: Whether to override existing analyzer.
-            
+
         Raises:
             PluginError: If analyzer already exists and override is False.
         """
@@ -106,16 +106,16 @@ class AnalyzerRegistry:
 
     def get(self, name: str) -> BaseAnalyzer:
         """Get an analyzer instance.
-        
+
         This method returns a cached instance if available,
         otherwise creates a new instance.
-        
+
         Args:
             name: Analyzer name.
-            
+
         Returns:
             Analyzer instance.
-            
+
         Raises:
             PluginError: If analyzer not found.
         """
@@ -130,13 +130,13 @@ class AnalyzerRegistry:
             try:
                 analyzer_class = plugin_registry.get("analyzers", name)
                 self.analyzers[name] = analyzer_class
-            except PluginError:
+            except PluginError as err:
                 raise PluginError(
                     f"Analyzer not found: {name}",
                     plugin_name=name,
                     plugin_type="analyzer",
                     details={"available": self.list()}
-                )
+                ) from err
 
         # Create instance
         analyzer_class = self.analyzers[name]
@@ -176,10 +176,10 @@ class AnalyzerRegistry:
 
     def get_info(self, name: str) -> dict[str, str]:
         """Get information about an analyzer.
-        
+
         Args:
             name: Analyzer name.
-            
+
         Returns:
             Dictionary with analyzer information.
         """
@@ -197,7 +197,7 @@ class AnalyzerRegistry:
 
     def get_default_analyzers(self) -> list[BaseAnalyzer]:
         """Get default analyzer instances.
-        
+
         Returns:
             List of default analyzer instances.
         """
@@ -205,7 +205,7 @@ class AnalyzerRegistry:
 
     def set_default_analyzers(self, names: list[str]) -> None:
         """Set the default analyzers.
-        
+
         Args:
             names: List of analyzer names to use by default.
         """
@@ -222,14 +222,14 @@ class AnalyzerRegistry:
 
     def clear_cache(self) -> None:
         """Clear the instance cache.
-        
+
         This forces new instances to be created on next access.
         """
         self.instances.clear()
 
     def unregister(self, name: str) -> None:
         """Unregister an analyzer.
-        
+
         Args:
             name: Analyzer name to remove.
         """
@@ -248,7 +248,7 @@ _analyzer_registry: AnalyzerRegistry | None = None
 @cache
 def get_analyzer_registry() -> AnalyzerRegistry:
     """Get the global analyzer registry.
-    
+
     Returns:
         The global analyzer registry instance.
     """
@@ -261,7 +261,7 @@ def get_analyzer_registry() -> AnalyzerRegistry:
 
 def _register_built_in_analyzers(registry: AnalyzerRegistry) -> None:
     """Register built-in analyzers.
-    
+
     Args:
         registry: The analyzer registry.
     """
@@ -284,12 +284,12 @@ def register_analyzer(
     override: bool = False
 ) -> None:
     """Register an analyzer in the global registry.
-    
+
     Args:
         name: Unique name for the analyzer.
         analyzer_class: The analyzer class.
         override: Whether to override existing analyzer.
-        
+
     Example:
         >>> register_analyzer("custom", CustomAnalyzer)
     """
@@ -299,13 +299,13 @@ def register_analyzer(
 
 def get_analyzer(name: str) -> BaseAnalyzer:
     """Get an analyzer instance from the global registry.
-    
+
     Args:
         name: Analyzer name.
-        
+
     Returns:
         Analyzer instance.
-        
+
     Example:
         >>> analyzer = get_analyzer("dead_code")
     """
@@ -315,10 +315,10 @@ def get_analyzer(name: str) -> BaseAnalyzer:
 
 def list_analyzers() -> list[str]:
     """List all available analyzer names.
-    
+
     Returns:
         List of analyzer names.
-        
+
     Example:
         >>> analyzers = list_analyzers()
         >>> print(analyzers)
@@ -330,13 +330,13 @@ def list_analyzers() -> list[str]:
 
 def get_analyzer_info(name: str) -> dict[str, str]:
     """Get information about an analyzer.
-    
+
     Args:
         name: Analyzer name.
-        
+
     Returns:
         Dictionary with analyzer information.
-        
+
     Example:
         >>> info = get_analyzer_info("dead_code")
         >>> print(info["description"])

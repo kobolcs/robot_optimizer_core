@@ -38,14 +38,14 @@ class TestDeadCodeAnalyzer:
         content = """*** Test Cases ***
 Test Case 1
     Used Keyword
-    
+
 *** Keywords ***
 Used Keyword
     Log    This is used
-    
+
 Unused Keyword
     Log    This is never called
-    
+
 Another Unused
     [Documentation]    Also not used
     Log    Never executed
@@ -82,14 +82,14 @@ Login User
     [Arguments]    ${username}    ${password}
     Input Text    id=user    ${username}
     Input Text    id=pass    ${password}
-    
+
 Do Something
     Log    First implementation
-    
+
 Login User
     [Documentation]    Duplicate definition
     Log    Different implementation
-    
+
 Do Something
     Log    Second implementation
 """
@@ -119,7 +119,7 @@ Recursive Keyword
     Log    Before recursion
     Recursive Keyword
     Log    After recursion
-    
+
 Normal Keyword
     Log    Just logging
 """
@@ -147,7 +147,7 @@ Test With Builtins
     Should Be Equal    1    1
     Run Keyword If    True    Log    Conditional
     Sleep    1s
-    
+
 *** Keywords ***
 My Keyword
     Log To Console    Testing
@@ -174,7 +174,7 @@ Test With Library Keywords
     SeleniumLibrary.Open Browser    http://example.com    chrome
     BuiltIn.Log    Using library prefix
     Collections.Append To List    ${list}    item
-    
+
 *** Keywords ***
 Local Keyword
     Log    Not used anywhere
@@ -202,20 +202,20 @@ BDD Test
     Then result should be visible
     And another condition is met
     But exception should not occur
-    
+
 *** Keywords ***
 system is ready
     Log    Setup done
-    
+
 user performs action
     Log    Action performed
-    
+
 result should be visible
     Log    Checking result
-    
+
 another condition is met
     Log    Additional check
-    
+
 exception should not occur
     Log    No exceptions
 """
@@ -241,10 +241,10 @@ exception should not occur
         content = """*** Keywords ***
 Unused Keyword
     Log    Not used
-    
+
 Duplicate
     Log    First
-    
+
 Duplicate
     Log    Second
 """
@@ -277,10 +277,10 @@ Duplicate
         content = """*** Keywords ***
 Test Setup Keyword
     Log    Would be unused but ignored
-    
+
 Database Helper
     Log    Also ignored
-    
+
 Normal Unused Keyword
     Log    This should be detected
 """
@@ -326,10 +326,10 @@ Normal Unused Keyword
             content="""*** Keywords ***
 123 Invalid Start With Number
     Log    Won't be detected
-    
-    
+
+
     Log    Indented line without keyword
-    
+
 Valid Keyword Name
     Log    This is fine but unused
 """,
@@ -348,7 +348,7 @@ Valid Keyword Name
         content = """*** Test Cases ***
 Test
     my keyword    # lowercase usage
-    
+
 *** Keywords ***
 My Keyword
     Log    Mixed case definition
@@ -373,17 +373,17 @@ My Keyword
 Complex Test
     Run Keyword    Dynamic Keyword Name
     Run Keywords    Keyword One    AND    Keyword Two
-    
+
 *** Keywords ***
 Dynamic Keyword Name
     Log    Called dynamically
-    
+
 Keyword One
     Log    First
-    
-Keyword Two  
+
+Keyword Two
     Log    Second
-    
+
 Static Unused
     Log    Not called
 """

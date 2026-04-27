@@ -15,7 +15,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True, slots=True)
 class VersionInfo:
     """Structured version information.
-    
+
     Attributes:
         major: Major version number.
         minor: Minor version number.
@@ -31,7 +31,7 @@ class VersionInfo:
 
     def __str__(self) -> str:
         """Return version string.
-        
+
         Returns:
             Version string in PEP 440 format.
         """
@@ -64,14 +64,14 @@ class VersionInfo:
 
     def is_compatible_with(self, required: VersionInfo) -> bool:
         """Check if this version is compatible with a required version.
-        
+
         Args:
             required: Required minimum version.
-            
+
         Returns:
             True if this version is >= required version.
         """
-        return self >= required
+        return not (self < required)
 
     @property
     def is_prerelease(self) -> bool:

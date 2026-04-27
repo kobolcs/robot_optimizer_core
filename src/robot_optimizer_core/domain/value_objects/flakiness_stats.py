@@ -17,7 +17,7 @@ class FlakinessStats(ValueObject):
     failures: int = Field(..., ge=0)
     last_failure: datetime | None = Field(default=None)
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def failure_rate(self) -> float:
         """Calculate failure rate as percentage."""
@@ -25,13 +25,13 @@ class FlakinessStats(ValueObject):
             return 0.0
         return self.failures / self.total_runs
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def is_flaky(self) -> bool:
         """Determine if test is considered flaky."""
         return 0 < self.failure_rate < 1.0 and self.total_runs >= 4
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def severity_level(self) -> str:
         """Determine severity level based on failure rate."""

@@ -6,9 +6,9 @@ based on their impact and urgency.
 
 Example:
     Using severity levels::
-    
+
         from robot_optimizer_core import Severity, Finding
-        
+
         # Create finding with severity
         finding = Finding.create(
             pattern=pattern,
@@ -16,40 +16,41 @@ Example:
             location=location,
             message="Critical issue found"
         )
-        
+
         # Compare severities
         if finding.severity > Severity.WARNING:
             print("High priority issue!")
 """
 from __future__ import annotations
 
+import sys
 from enum import IntEnum
 
-try:
+if sys.version_info >= (3, 12):
     from typing import override
-except ImportError:
+else:
     from typing_extensions import override
 
 
 class Severity(IntEnum):
     """Severity levels for optimization findings.
-    
+
     Severity levels indicate the importance and urgency of addressing
     a finding. They are ordered from most severe (ERROR) to least
     severe (INFO).
-    
+
     The enum uses integer values for easy comparison:
     - Lower values = higher severity
     - Higher values = lower severity
-    
+
     Attributes:
         ERROR: Critical issues that should be fixed immediately.
         WARNING: Important issues that should be addressed.
         INFO: Minor improvements or informational findings.
-    
+
     Example:
         >>> assert Severity.ERROR < Severity.WARNING < Severity.INFO
-        >>> 
+        >>>
         >>> # Get display properties
         >>> print(f"{Severity.ERROR.emoji} {Severity.ERROR.name}")
         ❌ ERROR
@@ -71,12 +72,12 @@ class Severity(IntEnum):
     @property
     def emoji(self) -> str:
         """Get emoji representation for the severity.
-        
+
         Used for console output and visual indicators.
-        
+
         Returns:
             Emoji character for this severity.
-        
+
         Example:
             >>> print(f"{Severity.ERROR.emoji} Critical issue")
             ❌ Critical issue
@@ -93,9 +94,9 @@ class Severity(IntEnum):
     @property
     def color(self) -> str:
         """Get color name for console output.
-        
+
         Used with Rich library for colored terminal output.
-        
+
         Returns:
             Color name for this severity.
         """
@@ -110,7 +111,7 @@ class Severity(IntEnum):
     @property
     def ansi_code(self) -> str:
         """Get ANSI color code for direct terminal coloring.
-        
+
         Returns:
             ANSI escape code for this severity's color.
         """
@@ -125,11 +126,11 @@ class Severity(IntEnum):
     @property
     def priority(self) -> int:
         """Get numeric priority (inverse of value).
-        
+
         Higher priority = more severe = lower enum value.
         This provides an intuitive priority number where
         higher numbers mean higher priority.
-        
+
         Returns:
             Priority value (1-3, higher is more important).
         """
@@ -138,7 +139,7 @@ class Severity(IntEnum):
     @property
     def description(self) -> str:
         """Get human-readable description of the severity.
-        
+
         Returns:
             Description of what this severity level means.
         """
@@ -162,10 +163,10 @@ class Severity(IntEnum):
     @property
     def exit_code(self) -> int:
         """Get suggested exit code for CLI tools.
-        
+
         Useful when implementing CLI tools that need to
         return different exit codes based on findings.
-        
+
         Returns:
             Suggested exit code.
         """
@@ -180,40 +181,40 @@ class Severity(IntEnum):
     @classmethod
     def from_string(cls, value: str) -> Severity:
         """Create severity from string representation.
-        
+
         Case-insensitive conversion from string to severity.
-        
+
         Args:
             value: String representation ("error", "warning", "info").
-            
+
         Returns:
             Corresponding Severity enum value.
-            
+
         Raises:
             ValueError: If string doesn't match any severity.
-            
+
         Example:
             >>> severity = Severity.from_string("warning")
             >>> assert severity == Severity.WARNING
         """
         try:
             return cls[value.upper()]
-        except KeyError:
+        except KeyError as err:
             valid = [s.name.lower() for s in cls]
             raise ValueError(
                 f"Invalid severity '{value}'. "
                 f"Valid values are: {', '.join(valid)}"
-            )
+            ) from err
 
     def is_at_least(self, level: Severity) -> bool:
         """Check if this severity is at least as severe as another.
-        
+
         Args:
             level: Severity level to compare against.
-            
+
         Returns:
             True if this severity is equal or more severe.
-            
+
         Example:
             >>> error = Severity.ERROR
             >>> assert error.is_at_least(Severity.WARNING)
@@ -223,10 +224,10 @@ class Severity(IntEnum):
 
     def should_fail_build(self) -> bool:
         """Check if this severity should fail a build/check.
-        
+
         Typically only ERROR severity should fail builds,
         but this can be configured.
-        
+
         Returns:
             True if build should fail with this severity.
         """
@@ -234,13 +235,13 @@ class Severity(IntEnum):
 
     def format_count(self, count: int) -> str:
         """Format a count with appropriate plural and emoji.
-        
+
         Args:
             count: Number of findings with this severity.
-            
+
         Returns:
             Formatted string with count and emoji.
-            
+
         Example:
             >>> print(Severity.ERROR.format_count(3))
             ❌ 3 errors
