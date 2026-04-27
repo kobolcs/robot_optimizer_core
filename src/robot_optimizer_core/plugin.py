@@ -26,6 +26,10 @@ class PluginMetadata:
 class Plugin(ABC):
     """Base class for plugins."""
 
+    def __init__(self, registry: PluginRegistry | None = None) -> None:
+        self.registry = registry
+        self.is_active: bool = False
+
     @property
     @abstractmethod
     def metadata(self) -> PluginMetadata:
@@ -263,7 +267,7 @@ class SecurePluginManager:
                 raise PluginError(f"No Plugin subclass found in: {file_path}")
 
             # Create and activate plugin
-            plugin = plugin_class(self.registry)  # type: ignore[call-arg]
+            plugin = plugin_class(self.registry)
             metadata = plugin.metadata
 
             # Additional validation of metadata
@@ -271,7 +275,7 @@ class SecurePluginManager:
                 raise PluginError("Invalid plugin name")
 
             plugin.activate()
-            plugin.is_active = True  # type: ignore[attr-defined]
+            plugin.is_active = True
             self.plugins[metadata.name] = plugin
 
             logger.info(
