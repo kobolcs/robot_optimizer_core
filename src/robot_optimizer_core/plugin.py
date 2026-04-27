@@ -302,7 +302,7 @@ class SecurePluginManager:
 # Example of a safe plugin implementation
 SAFE_PLUGIN_TEMPLATE = '''
 """Example of a safe plugin implementation."""
-from robot_optimizer_core import Plugin, PluginMetadata, BaseAnalyzer
+from robot_optimizer_core import Plugin, PluginMetadata, BaseAnalyzer, register_analyzer
 from robot_optimizer_core.domain.entities import TestFile
 from robot_optimizer_core.domain.value_objects import Finding
 
@@ -328,6 +328,9 @@ class ExampleAnalyzer(BaseAnalyzer):
 class ExamplePlugin(Plugin):
     """Example plugin following security best practices."""
 
+    def __init__(self, registry=None):
+        super().__init__(registry)
+
     @property
     def metadata(self) -> PluginMetadata:
         return PluginMetadata(
@@ -338,8 +341,8 @@ class ExamplePlugin(Plugin):
         )
 
     def activate(self) -> None:
-        """Register components safely."""
-        self.register_analyzer("example", ExampleAnalyzer)
+        """Register components using the module-level registry."""
+        register_analyzer("example", ExampleAnalyzer)
 
     def deactivate(self) -> None:
         """Clean up resources."""
