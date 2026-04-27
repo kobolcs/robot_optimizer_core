@@ -233,6 +233,11 @@ class SecurePluginManager:
                         "file_hash": file_hash
                     }
                 )
+        else:
+            logger.warning(
+                f"Plugin security validation bypassed via force=True: {file_path} "
+                f"(hash: {file_hash})"
+            )
 
         # Load plugin in restricted environment
         try:

@@ -16,7 +16,8 @@ This subtree is the **core analysis engine**. Treat it as stable library code, n
 - Python: 3.11+
 - Package path: `src/robot_optimizer_core`
 - Entry-point group: `robot_optimizer.analyzers`
-- Pytest coverage gate is very high (`--cov-fail-under=99`)
+- Current enforced coverage gate: `--cov-fail-under=55` (see `pyproject.toml`)
+  - TODO: raise to 99% as the test suite grows (long-term roadmap target, not current CI policy)
 - Ruff and Mypy are configured strictly
 
 ## Validation preference order

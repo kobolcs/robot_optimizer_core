@@ -1,0 +1,66 @@
+# tests/unit/test_api.py
+"""Unit tests for the high-level API — focused on file-size enforcement."""
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from robot_optimizer_core.api import analyze_file
+from robot_optimizer_core.config import Settings
+from robot_optimizer_core.exceptions import AnalysisError
+
+
+@pytest.mark.unit
+class TestAnalyzeFileMaxSizeEnforcement:
+    def test_file_over_limit_raises_before_loading(self, tmp_path: Path) -> None:
+        # 0.1 MB = 104857 bytes; write 150 000 bytes to exceed the limit
+        robot_file = tmp_path / "large.robot"
+        robot_file.write_bytes(b"x" * 150_000)
+
+        settings = Settings(max_file_size_mb=0.1)
+
+        with pytest.raises(AnalysisError, match="[Ee]xceeds maximum size"):
+            analyze_file(robot_file, settings=settings)
+
+    def test_file_error_includes_file_path(self, tmp_path: Path) -> None:
+        robot_file = tmp_path / "large.robot"
+        robot_file.write_bytes(b"x" * 150_000)
+
+        settings = Settings(max_file_size_mb=0.1)
+
+        with pytest.raises(AnalysisError) as exc_info:
+            analyze_file(robot_file, settings=settings)
+
+        assert exc_info.value.file_path == robot_file
+
+    def test_normal_file_within_limit_analyzes_successfully(
+        self, tmp_path: Path
+    ) -> None:
+        robot_file = tmp_path / "normal.robot"
+        robot_file.write_text(
+            "*** Test Cases ***\nSample Test\n    Log    hello\n"
+        )
+
+        settings = Settings(max_file_size_mb=10.0)
+        findings = analyze_file(robot_file, settings=settings)
+
+        assert isinstance(findings, list)
+
+    def test_file_exactly_at_limit_is_not_rejected_by_size_check(
+        self, tmp_path: Path
+    ) -> None:
+        # A file whose byte count equals the limit exactly must not be rejected
+        # by the size guard (the check is strictly greater-than).
+        settings = Settings(max_file_size_mb=0.1)
+        limit = settings.max_file_size_bytes  # 104857
+
+        robot_file = tmp_path / "edge.robot"
+        robot_file.write_bytes(b"x" * limit)
+
+        try:
+            analyze_file(robot_file, settings=settings)
+        except AnalysisError as exc:
+            assert "exceeds maximum size" not in str(exc), (
+                f"File at exactly the limit must not trigger the size guard, got: {exc}"
+            )
