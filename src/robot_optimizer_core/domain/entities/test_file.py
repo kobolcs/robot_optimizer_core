@@ -294,6 +294,18 @@ class TimezoneAwareTestResult(BaseTestResult):
         return self.timestamp.isoformat()
 
 
+# Common non-ISO datetime formats tried by parse_datetime_safe (stdlib only, no extra deps).
+_NON_ISO_FORMATS: tuple[str, ...] = (
+    "%Y-%m-%d %H:%M:%S.%f",
+    "%Y-%m-%d %H:%M:%S",
+    "%Y-%m-%d",
+    "%d/%m/%Y %H:%M:%S",
+    "%d/%m/%Y",
+    "%m/%d/%Y %H:%M:%S",
+    "%m/%d/%Y",
+)
+
+
 # Utility functions for timezone handling
 def parse_datetime_safe(dt_str: str, default_tz: timezone = UTC) -> datetime:
     """Safely parse datetime string with timezone handling."""
@@ -304,15 +316,6 @@ def parse_datetime_safe(dt_str: str, default_tz: timezone = UTC) -> datetime:
             dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
         else:
             # Other formats – try common non-ISO patterns using stdlib only
-            _NON_ISO_FORMATS = [
-                "%Y-%m-%d %H:%M:%S.%f",
-                "%Y-%m-%d %H:%M:%S",
-                "%Y-%m-%d",
-                "%d/%m/%Y %H:%M:%S",
-                "%d/%m/%Y",
-                "%m/%d/%Y %H:%M:%S",
-                "%m/%d/%Y",
-            ]
             for fmt in _NON_ISO_FORMATS:
                 try:
                     dt = datetime.strptime(dt_str, fmt)
@@ -320,7 +323,7 @@ def parse_datetime_safe(dt_str: str, default_tz: timezone = UTC) -> datetime:
                 except ValueError:
                     continue
             else:
-                raise ValueError(f"Unrecognised datetime format: {dt_str!r}")
+                raise ValueError(f"Unrecognized datetime format: {dt_str!r}")
 
         # Ensure timezone
         if dt.tzinfo is None:
