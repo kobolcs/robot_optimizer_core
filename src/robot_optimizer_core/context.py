@@ -252,7 +252,7 @@ class ApplicationContext:
             Request scope
         """
         # Store in thread-local
-        if not hasattr(self._local, 'context'):
+        if not hasattr(self._local, "context"):
             self._local.context = {}
 
         old_context = self._local.context.copy()

@@ -68,7 +68,7 @@ class Pattern(ValueObject):
         False, description="Whether this can be auto-fixed"
     )
 
-    @field_validator('name', 'description', 'recommendation', mode='before')
+    @field_validator("name", "description", "recommendation", mode="before")
     @classmethod
     def validate_non_empty(cls, v: str) -> str:
         """Ensure string fields are not empty."""
@@ -79,7 +79,7 @@ class Pattern(ValueObject):
         return v.strip()
 
     @classmethod
-    def duplicate_keyword(cls, keyword_name: str) -> 'Pattern':
+    def duplicate_keyword(cls, keyword_name: str) -> "Pattern":
         """Create a pattern for duplicate keyword detection."""
         return cls(
             type=PatternType.DUPLICATE_KEYWORD,
@@ -96,7 +96,7 @@ class Pattern(ValueObject):
         )
 
     @classmethod
-    def sleep_in_test(cls, sleep_duration: str) -> 'Pattern':
+    def sleep_in_test(cls, sleep_duration: str) -> "Pattern":
         """Create a pattern for sleep usage in tests."""
         return cls(
             type=PatternType.SLEEP_IN_TEST,
@@ -117,7 +117,7 @@ class Pattern(ValueObject):
         )
 
     @classmethod
-    def fragile_xpath(cls, xpath: str) -> 'Pattern':
+    def fragile_xpath(cls, xpath: str) -> "Pattern":
         """Create a pattern for fragile XPath detection."""
         return cls(
             type=PatternType.FRAGILE_XPATH,
@@ -137,7 +137,7 @@ class Pattern(ValueObject):
     @classmethod
     def long_test_case(
         cls, line_count: int, threshold: int = 50
-    ) -> 'Pattern':
+    ) -> "Pattern":
         """Create a pattern for overly long test cases."""
         return cls(
             type=PatternType.LONG_TEST_CASE,

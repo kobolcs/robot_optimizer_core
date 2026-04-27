@@ -307,7 +307,7 @@ class Settings(BaseSettings):
         Returns:
             Dictionary of settings.
         """
-        return self.dict(exclude_unset=False)
+        return self.model_dump()
 
     @classmethod
     def settings_customise_sources(

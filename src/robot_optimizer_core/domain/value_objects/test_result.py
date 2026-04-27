@@ -13,7 +13,7 @@ class TestResult(ValueObject):
 
     test_name: str = Field(..., min_length=1)
     file_path: Path = Field(...)
-    status: str = Field(..., pattern=r'^(PASS|FAIL|SKIP)$')  # Fixed: regex → pattern
+    status: str = Field(..., pattern=r"^(PASS|FAIL|SKIP)$")  # Fixed: regex → pattern
     execution_time: float = Field(..., ge=0)
     error_message: str | None = Field(default=None)
     timestamp: datetime = Field(...)
@@ -21,9 +21,9 @@ class TestResult(ValueObject):
     @property
     def is_failure(self) -> bool:
         """Check if this result represents a test failure."""
-        return self.status == 'FAIL'
+        return self.status == "FAIL"
 
     @property
     def is_success(self) -> bool:
         """Check if this result represents a test success."""
-        return self.status == 'PASS'
+        return self.status == "PASS"

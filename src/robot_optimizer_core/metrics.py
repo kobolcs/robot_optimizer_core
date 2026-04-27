@@ -2,18 +2,17 @@
 """Modern memory-safe metrics collection with GDPR compliance."""
 from __future__ import annotations
 
-import time
+import logging as _stdlib_logging
 import threading
+import time
 from collections import defaultdict, deque
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from .logging import get_logger
-
-logger = get_logger(__name__)
+logger = _stdlib_logging.getLogger(__name__)
 
 
 @dataclass
@@ -21,7 +20,7 @@ class TimingStats:
     """Statistics for timing metrics with bounded memory."""
     count: int = 0
     total: float = 0.0
-    min: float = float('inf')
+    min: float = float("inf")
     max: float = 0.0
     samples: deque[tuple[float, datetime]] = field(default_factory=lambda: deque(maxlen=100))
 
@@ -41,11 +40,11 @@ class TimingStats:
         self.total += value
         self.min = min(self.min, value)
         self.max = max(self.max, value)
-        self.samples.append((value, datetime.now(timezone.utc)))
+        self.samples.append((value, datetime.now(UTC)))
 
     def cleanup_old_samples(self, max_age: timedelta) -> None:
         """Remove samples older than max_age."""
-        cutoff = datetime.now(timezone.utc) - max_age
+        cutoff = datetime.now(UTC) - max_age
         while self.samples and self.samples[0][1] < cutoff:
             self.samples.popleft()
 
@@ -111,7 +110,7 @@ class MetricsCollector:
         with self._lock:
             # Check bounds
             if key not in self._counters and len(self._counters) >= self.max_counters:
-                self._evict_least_used_counter()
+                self._evict_least_used(self._counters)
 
             self._counters[key] = self._counters.get(key, 0) + value
             self._access_counts[key] += 1
@@ -127,7 +126,7 @@ class MetricsCollector:
         with self._lock:
             # Check bounds
             if key not in self._gauges and len(self._gauges) >= self.max_gauges:
-                self._evict_least_used_gauge()
+                self._evict_least_used(self._gauges)
 
             self._gauges[key] = value
             self._access_counts[key] += 1
@@ -143,7 +142,7 @@ class MetricsCollector:
         with self._lock:
             # Check bounds
             if key not in self._timings and len(self._timings) >= self.max_timings:
-                self._evict_least_used_timing()
+                self._evict_least_used(self._timings)
 
             if key not in self._timings:
                 self._timings[key] = TimingStats()
@@ -176,7 +175,7 @@ class MetricsCollector:
                         "count": stats.count,
                         "total": stats.total,
                         "mean": stats.mean,
-                        "min": stats.min if stats.min != float('inf') else 0,
+                        "min": stats.min if stats.min != float("inf") else 0,
                         "max": stats.max,
                         "last": stats.last,
                         "samples": len(stats.samples)
@@ -244,43 +243,12 @@ class MetricsCollector:
                 }
             )
 
-    def _evict_least_used_counter(self) -> None:
-        """Evict least recently used counter."""
-        if not self._counters:
+    def _evict_least_used(self, store: dict) -> None:
+        """Evict the least accessed entry from a metric store."""
+        if not store:
             return
-
-        least_used = min(
-            self._counters.keys(),
-            key=lambda k: self._access_counts.get(k, 0)
-        )
-
-        del self._counters[least_used]
-        self._access_counts.pop(least_used, None)
-
-    def _evict_least_used_gauge(self) -> None:
-        """Evict least recently used gauge."""
-        if not self._gauges:
-            return
-
-        least_used = min(
-            self._gauges.keys(),
-            key=lambda k: self._access_counts.get(k, 0)
-        )
-
-        del self._gauges[least_used]
-        self._access_counts.pop(least_used, None)
-
-    def _evict_least_used_timing(self) -> None:
-        """Evict least recently used timing."""
-        if not self._timings:
-            return
-
-        least_used = min(
-            self._timings.keys(),
-            key=lambda k: self._access_counts.get(k, 0)
-        )
-
-        del self._timings[least_used]
+        least_used = min(store, key=lambda k: self._access_counts.get(k, 0))
+        del store[least_used]
         self._access_counts.pop(least_used, None)
 
     def _make_key(self, metric: str, tags: dict[str, str] | None = None) -> str:

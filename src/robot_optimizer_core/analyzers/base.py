@@ -39,7 +39,7 @@ from ..metrics import get_metrics
 ConfigValue: TypeAlias = str | int | float | bool | dict[str, object] | list[object] | None
 
 # Type variable for generic config value retrieval
-T = TypeVar('T')
+T = TypeVar("T")
 
 logger = get_logger(__name__)
 
@@ -56,7 +56,7 @@ class BaseAnalyzer(ABC):
         metrics_enabled: Whether to collect metrics for this analyzer.
     """
 
-    __slots__ = ('_logger', '_metrics', 'config', 'metrics_enabled')
+    __slots__ = ("_logger", "_metrics", "config", "metrics_enabled")
 
     def __init__(
         self,
@@ -291,10 +291,7 @@ class BaseAnalyzer(ABC):
 
         for finding in findings:
             # Ensure file path matches
-            if (
-                finding.location.file_path != test_file.path
-                and finding.location.file_path.name != test_file.path.name
-            ):
+            if finding.location.file_path != test_file.path:
                 self._logger.warning(
                     "Finding has incorrect file path",
                     extra={
@@ -376,12 +373,11 @@ class BaseAnalyzer(ABC):
         from ..domain.value_objects import Severity
 
         # Check thresholds in order from highest to lowest severity
-        if value >= thresholds.get("error", float('inf')):
+        if value >= thresholds.get("error", float("inf")):
             return Severity.ERROR
-        elif value >= thresholds.get("warning", float('inf')):
+        if value >= thresholds.get("warning", float("inf")):
             return Severity.WARNING
-        else:
-            return Severity.INFO
+        return Severity.INFO
 
     def __repr__(self) -> str:
         """Return string representation of analyzer.

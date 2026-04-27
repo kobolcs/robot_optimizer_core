@@ -30,7 +30,7 @@ class SleepPattern(ValueObject):
         ..., description="Original sleep command text"
     )
 
-    @field_validator('duration')
+    @field_validator("duration")
     @classmethod
     def validate_duration(cls, v: Decimal) -> Decimal:
         """Validate duration is positive and reasonable.
@@ -52,7 +52,7 @@ class SleepPattern(ValueObject):
             )
         return v
 
-    @field_validator('unit')
+    @field_validator("unit")
     @classmethod
     def validate_unit(cls, v: str) -> str:
         """Validate time unit is supported.
@@ -67,16 +67,16 @@ class SleepPattern(ValueObject):
             ValueError: If unit is not supported
         """
         valid_units = {
-            's', 'seconds', 'second', 'm', 'minutes', 'minute',
-            'ms', 'milliseconds', 'millisecond'
+            "s", "seconds", "second", "m", "minutes", "minute",
+            "ms", "milliseconds", "millisecond"
         }
         normalized = v.lower().strip()
         if normalized not in valid_units:
             raise ValueError(f"Invalid time unit: {v}")
         return normalized
 
-    @model_validator(mode='after')
-    def validate_original_text_consistency(self) -> 'SleepPattern':
+    @model_validator(mode="after")
+    def validate_original_text_consistency(self) -> "SleepPattern":
         """Ensure original text contains the duration and unit.
 
         Pydantic v2 model validator.
@@ -92,9 +92,9 @@ class SleepPattern(ValueObject):
     @property
     def duration_in_seconds(self) -> float:
         """Convert duration to seconds regardless of unit."""
-        if self.unit in {'m', 'minutes', 'minute'}:
+        if self.unit in {"m", "minutes", "minute"}:
             return float(self.duration * 60)
-        if self.unit in {'ms', 'milliseconds', 'millisecond'}:
+        if self.unit in {"ms", "milliseconds", "millisecond"}:
             return float(self.duration / 1000)
         return float(self.duration)
 
@@ -109,15 +109,15 @@ class SleepPattern(ValueObject):
     def normalized_unit(self) -> str:
         """Get standardized unit representation."""
         unit_map = {
-            's': 'seconds',
-            'seconds': 'seconds',
-            'second': 'seconds',
-            'm': 'minutes',
-            'minutes': 'minutes',
-            'minute': 'minutes',
-            'ms': 'milliseconds',
-            'milliseconds': 'milliseconds',
-            'millisecond': 'milliseconds',
+            "s": "seconds",
+            "seconds": "seconds",
+            "second": "seconds",
+            "m": "minutes",
+            "minutes": "minutes",
+            "minute": "minutes",
+            "ms": "milliseconds",
+            "milliseconds": "milliseconds",
+            "millisecond": "milliseconds",
         }
         return unit_map.get(self.unit, self.unit)
 
@@ -155,14 +155,14 @@ class SleepPattern(ValueObject):
         Pydantic v2 method.
         """
         data = super().model_dump(**kwargs)
-        if kwargs.get('mode') == 'json':
+        if kwargs.get("mode") == "json":
             # Convert Decimal to float for JSON
-            data['duration'] = float(data['duration'])
+            data["duration"] = float(data["duration"])
             # Add computed fields
             data.update({
-                'duration_in_seconds': self.duration_in_seconds,
-                'is_excessive': self.is_excessive,
-                'normalized_unit': self.normalized_unit,
-                'severity_hint': self.severity_hint,
+                "duration_in_seconds": self.duration_in_seconds,
+                "is_excessive": self.is_excessive,
+                "normalized_unit": self.normalized_unit,
+                "severity_hint": self.severity_hint,
             })
         return data

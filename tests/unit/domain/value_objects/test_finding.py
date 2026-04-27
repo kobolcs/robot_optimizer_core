@@ -270,7 +270,7 @@ class TestFinding:
         assert dumped["severity"] == Severity.WARNING
 
         # Test model_dump with mode='json'
-        json_data = finding.model_dump(mode='json')
+        json_data = finding.model_dump(mode="json")
         assert isinstance(json_data["id"], str)  # UUID serialized to string
         assert isinstance(json_data["pattern"], dict)
         assert json_data["severity"] == 2  # Enum value

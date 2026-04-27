@@ -26,7 +26,7 @@ try:
 except ImportError:
     from typing_extensions import override
 
-E = TypeVar('E', bound='RobotOptimizerError')
+E = TypeVar("E", bound="RobotOptimizerError")
 
 
 class RobotOptimizerError(Exception):
@@ -40,7 +40,7 @@ class RobotOptimizerError(Exception):
         details: Additional error details as key-value pairs.
     """
 
-    __slots__ = ('details', 'message')
+    __slots__ = ("details", "message")
 
     def __init__(
         self,
@@ -81,7 +81,7 @@ class AnalysisError(RobotOptimizerError):
         analyzer: Name of the analyzer that failed (if applicable).
     """
 
-    __slots__ = ('analyzer', 'file_path')
+    __slots__ = ("analyzer", "file_path")
 
     def __init__(
         self,
@@ -102,12 +102,6 @@ class AnalysisError(RobotOptimizerError):
         self.file_path = file_path
         self.analyzer = analyzer
 
-        # Add to details for consistency
-        if file_path:
-            self.details["file_path"] = str(file_path)
-        if analyzer:
-            self.details["analyzer"] = analyzer
-
 
 class ParsingError(AnalysisError):
     """Raised when parsing a Robot Framework file fails.
@@ -120,7 +114,7 @@ class ParsingError(AnalysisError):
         column: Column number where parsing failed (if known).
     """
 
-    __slots__ = ('column', 'line_number')
+    __slots__ = ("column", "line_number")
 
     def __init__(
         self,
@@ -143,11 +137,6 @@ class ParsingError(AnalysisError):
         self.line_number = line_number
         self.column = column
 
-        if line_number:
-            self.details["line_number"] = line_number
-        if column:
-            self.details["column"] = column
-
 
 class ConfigurationError(RobotOptimizerError):
     """Raised when configuration is invalid or missing.
@@ -160,7 +149,7 @@ class ConfigurationError(RobotOptimizerError):
         provided_value: The invalid value that was provided.
     """
 
-    __slots__ = ('config_key', 'provided_value')
+    __slots__ = ("config_key", "provided_value")
 
     def __init__(
         self,
@@ -181,11 +170,6 @@ class ConfigurationError(RobotOptimizerError):
         self.config_key = config_key
         self.provided_value = provided_value
 
-        if config_key:
-            self.details["config_key"] = config_key
-        if provided_value is not None:
-            self.details["provided_value"] = provided_value
-
 
 class PluginError(RobotOptimizerError):
     """Raised when plugin loading or execution fails.
@@ -198,7 +182,7 @@ class PluginError(RobotOptimizerError):
         plugin_type: Type of plugin (e.g., 'analyzer', 'parser').
     """
 
-    __slots__ = ('plugin_name', 'plugin_type')
+    __slots__ = ("plugin_name", "plugin_type")
 
     def __init__(
         self,
@@ -219,11 +203,6 @@ class PluginError(RobotOptimizerError):
         self.plugin_name = plugin_name
         self.plugin_type = plugin_type
 
-        if plugin_name:
-            self.details["plugin_name"] = plugin_name
-        if plugin_type:
-            self.details["plugin_type"] = plugin_type
-
 
 class ValidationError(RobotOptimizerError):
     """Raised when data validation fails.
@@ -237,7 +216,7 @@ class ValidationError(RobotOptimizerError):
         validation_rule: Description of the validation rule.
     """
 
-    __slots__ = ('field_name', 'invalid_value', 'validation_rule')
+    __slots__ = ("field_name", "invalid_value", "validation_rule")
 
     def __init__(
         self,
@@ -260,13 +239,6 @@ class ValidationError(RobotOptimizerError):
         self.field_name = field_name
         self.invalid_value = invalid_value
         self.validation_rule = validation_rule
-
-        if field_name:
-            self.details["field_name"] = field_name
-        if invalid_value is not None:
-            self.details["invalid_value"] = invalid_value
-        if validation_rule:
-            self.details["validation_rule"] = validation_rule
 
 
 class FileNotFoundError(AnalysisError):
@@ -300,7 +272,7 @@ class RepositoryError(RobotOptimizerError):
         operation: The operation that failed (e.g., 'save', 'load').
     """
 
-    __slots__ = ('operation', 'repository_name')
+    __slots__ = ("operation", "repository_name")
 
     def __init__(
         self,
@@ -320,11 +292,6 @@ class RepositoryError(RobotOptimizerError):
         super().__init__(message, details)
         self.repository_name = repository_name
         self.operation = operation
-
-        if repository_name:
-            self.details["repository_name"] = repository_name
-        if operation:
-            self.details["operation"] = operation
 
 
 def create_error(

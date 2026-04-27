@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import functools
 import traceback
+from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum, auto
-from typing import Any, Callable, TypeVar, ParamSpec
+from typing import Any, ParamSpec, TypeVar
 from uuid import UUID, uuid4
 
 from .exceptions import AnalysisError, RepositoryError
@@ -33,7 +34,7 @@ class TransactionContext:
     """Context for a transaction with audit trail."""
     id: UUID = field(default_factory=uuid4)
     state: TransactionState = TransactionState.PENDING
-    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     ended_at: datetime | None = None
     operations: list[dict[str, Any]] = field(default_factory=list)
     rollback_actions: list[Callable[[], None]] = field(default_factory=list)
@@ -44,7 +45,7 @@ class TransactionContext:
         """Record an operation in the transaction."""
         self.operations.append({
             "operation": operation,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "details": details
         })
 
@@ -55,7 +56,7 @@ class TransactionContext:
     def commit(self) -> None:
         """Commit the transaction."""
         self.state = TransactionState.COMMITTED
-        self.ended_at = datetime.now(timezone.utc)
+        self.ended_at = datetime.now(UTC)
 
     def rollback(self) -> None:
         """Rollback the transaction."""
@@ -70,7 +71,7 @@ class TransactionContext:
                 )
 
         self.state = TransactionState.ROLLED_BACK
-        self.ended_at = datetime.now(timezone.utc)
+        self.ended_at = datetime.now(UTC)
 
     @property
     def duration_ms(self) -> float | None:

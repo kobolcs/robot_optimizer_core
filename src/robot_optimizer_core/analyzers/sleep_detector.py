@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import re
 from decimal import Decimal, InvalidOperation
+
 try:
     from typing import override
 except ImportError:
@@ -66,7 +67,7 @@ class SleepDetector(BaseAnalyzer):
             {
                 "info": max_acceptable,  # <= 1s by default
                 "warning": max_acceptable * 5,  # <= 5s
-                "error": float('inf')  # > 5s
+                "error": float("inf")  # > 5s
             }
         )
 
@@ -155,7 +156,7 @@ class SleepDetector(BaseAnalyzer):
             # Standard Sleep keyword
             patterns.append((
                 re.compile(
-                    r'^\s*Sleep\s+(\d+(?:\.\d+)?)\s*(s|seconds?|m|minutes?|ms|milliseconds?)?',
+                    r"^\s*Sleep\s+(\d+(?:\.\d+)?)\s*(s|seconds?|m|minutes?|ms|milliseconds?)?",
                     re.IGNORECASE
                 ),
                 "builtin"
@@ -164,7 +165,7 @@ class SleepDetector(BaseAnalyzer):
             # BuiltIn.Sleep format
             patterns.append((
                 re.compile(
-                    r'^\s*BuiltIn\.Sleep\s+(\d+(?:\.\d+)?)\s*(s|seconds?|m|minutes?|ms|milliseconds?)?',
+                    r"^\s*BuiltIn\.Sleep\s+(\d+(?:\.\d+)?)\s*(s|seconds?|m|minutes?|ms|milliseconds?)?",
                     re.IGNORECASE
                 ),
                 "builtin_qualified"
@@ -174,7 +175,7 @@ class SleepDetector(BaseAnalyzer):
             # Custom sleep patterns (common variations)
             patterns.append((
                 re.compile(
-                    r'^\s*(?:Wait|Pause|Delay)\s+(\d+(?:\.\d+)?)\s*(s|seconds?|m|minutes?)?',
+                    r"^\s*(?:Wait|Pause|Delay)\s+(\d+(?:\.\d+)?)\s*(s|seconds?|m|minutes?)?",
                     re.IGNORECASE
                 ),
                 "custom"
@@ -183,7 +184,7 @@ class SleepDetector(BaseAnalyzer):
             # Sleep with variable
             patterns.append((
                 re.compile(
-                    r'^\s*Sleep\s+\$\{([^}]+)\}',
+                    r"^\s*Sleep\s+\$\{([^}]+)\}",
                     re.IGNORECASE
                 ),
                 "variable"
@@ -214,14 +215,14 @@ class SleepDetector(BaseAnalyzer):
                     case _:
                         # Numeric sleep
                         duration_str = match.group(1)
-                        unit = match.group(2) if match.lastindex >= 2 else 's'
+                        unit = match.group(2) if match.lastindex >= 2 else "s"
 
                         try:
                             duration = Decimal(duration_str)
                             return {
                                 "type": sleep_type,
                                 "duration": duration,
-                                "unit": unit.lower() if unit else 's',
+                                "unit": unit.lower() if unit else "s",
                                 "duration_str": duration_str
                             }
                         except (ValueError, InvalidOperation):
@@ -350,11 +351,11 @@ class SleepDetector(BaseAnalyzer):
 
             # Common patterns and their alternatives
             match next_line.lower():
-                case line if any(kw in line for kw in ['click', 'element', 'button']):
+                case line if any(kw in line for kw in ["click", "element", "button"]):
                     return "Consider 'Wait Until Element Is Visible' or 'Wait Until Element Is Enabled'"
-                case line if 'page' in line:
+                case line if "page" in line:
                     return "Consider 'Wait Until Page Contains' or 'Wait Until Page Does Not Contain'"
-                case line if any(kw in line for kw in ['should', 'verify', 'check']):
+                case line if any(kw in line for kw in ["should", "verify", "check"]):
                     return "Consider 'Wait Until Keyword Succeeds' with the verification"
 
         # Generic suggestion based on duration

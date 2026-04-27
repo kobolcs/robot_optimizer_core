@@ -79,7 +79,7 @@ class TestTestFile:
     def test_encoding_validation(self) -> None:
         """Test encoding validation."""
         # Valid encodings (case insensitive)
-        for encoding in ['utf-8', 'UTF-8', 'utf-16', 'UTF-16', 'ascii', 'ASCII', 'latin-1', 'LATIN-1']:
+        for encoding in ["utf-8", "UTF-8", "utf-16", "UTF-16", "ascii", "ASCII", "latin-1", "LATIN-1"]:
             test_file = TestFile(
                 path=Path("test.robot"),
                 content="content",
@@ -128,7 +128,7 @@ class TestTestFile:
         test_file = TestFile(
             path=Path("test.robot"),
             content=content,
-            size_bytes=len(content.encode('utf-8')),
+            size_bytes=len(content.encode("utf-8")),
             last_modified_utc=datetime.now()
         )
 
@@ -137,7 +137,7 @@ class TestTestFile:
 
     def test_from_path_factory(self) -> None:
         """Test creating TestFile from an actual file."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.robot', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".robot", delete=False) as f:
             content = "*** Test Cases ***\nSample Test\n    Log    Hello World"
             f.write(content)
             temp_path = Path(f.name)
@@ -150,13 +150,13 @@ class TestTestFile:
             assert test_file.content == content
             assert test_file.size_bytes > 0
             assert isinstance(test_file.last_modified, datetime)
-            assert test_file.encoding == 'utf-8'
+            assert test_file.encoding == "utf-8"
         finally:
             temp_path.unlink()
 
     def test_from_path_with_content_override(self) -> None:
         """Test from_path with content parameter."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.robot', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".robot", delete=False) as f:
             f.write("Original content")
             temp_path = Path(f.name)
 
@@ -342,23 +342,23 @@ class TestTestFile:
 
         # Normal mode - Path remains as Path
         normal_data = test_file.model_dump()
-        assert isinstance(normal_data['path'], Path)
+        assert isinstance(normal_data["path"], Path)
 
         # JSON mode - Path becomes string
-        json_data = test_file.model_dump(mode='json')
-        assert isinstance(json_data['path'], str)
-        assert json_data['path'] == "test.robot"
+        json_data = test_file.model_dump(mode="json")
+        assert isinstance(json_data["path"], str)
+        assert json_data["path"] == "test.robot"
 
     def test_get_schema(self) -> None:
         """Test that get_schema returns JSON schema."""
         schema = TestFile.get_schema()
 
         assert isinstance(schema, dict)
-        assert 'properties' in schema
-        assert 'path' in schema['properties']
-        assert 'content' in schema['properties']
-        assert 'size_bytes' in schema['properties']
-        assert 'last_modified' in schema['properties']
+        assert "properties" in schema
+        assert "path" in schema["properties"]
+        assert "content" in schema["properties"]
+        assert "size_bytes" in schema["properties"]
+        assert "last_modified" in schema["properties"]
 
     def test_large_content(self) -> None:
         """Test handling large content."""
@@ -389,7 +389,7 @@ Test With Unicode
         test_file = TestFile(
             path=Path("unicode.robot"),
             content=unicode_content,
-            size_bytes=len(unicode_content.encode('utf-8')),
+            size_bytes=len(unicode_content.encode("utf-8")),
             last_modified_utc=datetime.now()
         )
 

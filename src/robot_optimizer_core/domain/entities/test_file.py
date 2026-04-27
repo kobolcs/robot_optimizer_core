@@ -2,7 +2,7 @@
 """Timezone-aware test file entity with proper datetime handling."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
@@ -18,21 +18,14 @@ logger = get_logger(__name__)
 
 def utc_now() -> datetime:
     """Get current UTC time with timezone info."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def ensure_utc(dt: datetime) -> datetime:
     """Ensure datetime is in UTC timezone."""
     if dt.tzinfo is None:
-        # Assume naive datetime is in system timezone
-        import time
-        is_dst = time.daylight and time.localtime().tm_isdst > 0
-        utc_offset = time.altzone if is_dst else time.timezone
-        local_tz = timezone(timedelta(seconds=-utc_offset))
-        dt = dt.replace(tzinfo=local_tz)
-
-    # Convert to UTC
-    return dt.astimezone(timezone.utc)
+        dt = dt.astimezone()  # attaches local system timezone
+    return dt.astimezone(UTC)
 
 
 class TZAwareTestFile(Entity[UUID]):
@@ -54,29 +47,28 @@ class TZAwareTestFile(Entity[UUID]):
     # Optional timezone for display purposes
     display_timezone: str = Field(default="UTC", description="Timezone for display purposes")
 
-    @field_validator('path', mode='before')
+    @field_validator("path", mode="before")
     @classmethod
     def ensure_path_object(cls, v: Any) -> Path:
         """Ensure path is a Path object."""
         return Path(v) if not isinstance(v, Path) else v
 
-    @field_validator('last_modified_utc', mode='before')
+    @field_validator("last_modified_utc", mode="before")
     @classmethod
     def ensure_utc_timezone(cls, v: Any) -> datetime:
         """Ensure datetime has UTC timezone."""
         if isinstance(v, datetime):
             return ensure_utc(v)
-        elif isinstance(v, (int, float)):
+        if isinstance(v, (int, float)):
             # Assume timestamp
-            return datetime.fromtimestamp(v, tz=timezone.utc)
-        elif isinstance(v, str):
+            return datetime.fromtimestamp(v, tz=UTC)
+        if isinstance(v, str):
             # Parse ISO format
-            dt = datetime.fromisoformat(v.replace('Z', '+00:00'))
+            dt = datetime.fromisoformat(v.replace("Z", "+00:00"))
             return ensure_utc(dt)
-        else:
-            raise ValueError(f"Cannot convert {type(v)} to datetime")
+        raise ValueError(f"Cannot convert {type(v)} to datetime")
 
-    @field_validator('encoding')
+    @field_validator("encoding")
     @classmethod
     def validate_encoding(cls, v: str) -> str:
         """Normalize and validate supported encodings."""
@@ -86,7 +78,7 @@ class TZAwareTestFile(Entity[UUID]):
             raise ValueError(f"Unsupported encoding: {v}")
         return value
 
-    @field_validator('display_timezone')
+    @field_validator("display_timezone")
     @classmethod
     def validate_timezone(cls, v: str) -> str:
         """Validate timezone string."""
@@ -123,14 +115,14 @@ class TZAwareTestFile(Entity[UUID]):
         stats = path.stat()
 
         # Convert to UTC timestamps
-        last_modified = datetime.fromtimestamp(stats.st_mtime, tz=timezone.utc)
+        last_modified = datetime.fromtimestamp(stats.st_mtime, tz=UTC)
 
         return cls.model_validate({
-            'path': path,
-            'content': content,
-            'size_bytes': stats.st_size,
-            'last_modified_utc': last_modified,
-            'encoding': 'utf-8'
+            "path": path,
+            "content": content,
+            "size_bytes": stats.st_size,
+            "last_modified_utc": last_modified,
+            "encoding": "utf-8"
         })
 
 
@@ -217,14 +209,14 @@ class TZAwareTestFile(Entity[UUID]):
         data = super().model_dump(**kwargs)
 
         # Ensure ISO format with timezone for JSON
-        if kwargs.get('mode') == 'json':
-            data['path'] = str(data['path'])
-            data['last_modified_utc'] = self.last_modified_utc.isoformat()
-            data['created_at_utc'] = self.created_at_utc.isoformat()
+        if kwargs.get("mode") == "json":
+            data["path"] = str(data["path"])
+            data["last_modified_utc"] = self.last_modified_utc.isoformat()
+            data["created_at_utc"] = self.created_at_utc.isoformat()
 
             # Add computed fields
-            data['last_modified_local'] = self.last_modified_local.isoformat()
-            data['age_hours'] = self.age_hours
+            data["last_modified_local"] = self.last_modified_local.isoformat()
+            data["age_hours"] = self.age_hours
 
         return data
 
@@ -237,11 +229,11 @@ class TimezoneAwareDomainEvent(BaseDomainEvent):
     """Domain event with proper UTC timezone handling."""
 
     occurred_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="When the event occurred (always UTC)"
     )
 
-    @field_validator('occurred_at', mode='before')
+    @field_validator("occurred_at", mode="before")
     @classmethod
     def ensure_utc(cls, v: Any) -> datetime:
         """Ensure occurred_at is in UTC."""
@@ -279,25 +271,24 @@ class TimezoneAwareTestResult(BaseTestResult):
 
     timestamp: datetime = Field(..., description="Test execution timestamp (UTC)")
 
-    @field_validator('timestamp', mode='before')
+    @field_validator("timestamp", mode="before")
     @classmethod
     def ensure_utc(cls, v: Any) -> datetime:
         """Ensure timestamp is UTC."""
         if isinstance(v, datetime):
             return ensure_utc(v)
-        elif isinstance(v, (int, float)):
-            return datetime.fromtimestamp(v, tz=timezone.utc)
-        elif isinstance(v, str):
-            dt = datetime.fromisoformat(v.replace('Z', '+00:00'))
+        if isinstance(v, (int, float)):
+            return datetime.fromtimestamp(v, tz=UTC)
+        if isinstance(v, str):
+            dt = datetime.fromisoformat(v.replace("Z", "+00:00"))
             return ensure_utc(dt)
-        else:
-            raise ValueError(f"Cannot convert {type(v)} to datetime")
+        raise ValueError(f"Cannot convert {type(v)} to datetime")
 
     @computed_field  # type: ignore[misc]
     @property
     def age_days(self) -> float:
         """Get result age in days."""
-        age = datetime.now(timezone.utc) - self.timestamp
+        age = datetime.now(UTC) - self.timestamp
         return age.total_seconds() / 86400
 
     @computed_field  # type: ignore[misc]
@@ -308,13 +299,13 @@ class TimezoneAwareTestResult(BaseTestResult):
 
 
 # Utility functions for timezone handling
-def parse_datetime_safe(dt_str: str, default_tz: timezone = timezone.utc) -> datetime:
+def parse_datetime_safe(dt_str: str, default_tz: timezone = UTC) -> datetime:
     """Safely parse datetime string with timezone handling."""
     try:
         # Try parsing with timezone
-        if 'T' in dt_str:
+        if "T" in dt_str:
             # ISO format
-            dt = datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
+            dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
         else:
             # Other formats
             from dateutil import parser

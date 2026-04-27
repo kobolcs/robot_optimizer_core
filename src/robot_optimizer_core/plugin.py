@@ -64,21 +64,21 @@ class PluginRegistry:
 
 # Whitelist of allowed imports for plugins
 ALLOWED_IMPORTS = {
-    'robot_optimizer_core',
-    'pathlib',
-    'typing',
-    'dataclasses',
-    'enum',
-    'abc',
-    'collections',
+    "robot_optimizer_core",
+    "pathlib",
+    "typing",
+    "dataclasses",
+    "enum",
+    "abc",
+    "collections",
 }
 
 # Whitelist of allowed builtins
 ALLOWED_BUILTINS = {
-    'len', 'str', 'int', 'float', 'bool', 'list', 'dict', 'set', 'tuple',
-    'isinstance', 'issubclass', 'hasattr', 'getattr', 'setattr',
-    'property', 'classmethod', 'staticmethod', 'super',
-    'Exception', 'ValueError', 'TypeError', 'AttributeError',
+    "len", "str", "int", "float", "bool", "list", "dict", "set", "tuple",
+    "isinstance", "issubclass", "hasattr", "getattr", "setattr",
+    "property", "classmethod", "staticmethod", "super",
+    "Exception", "ValueError", "TypeError", "AttributeError",
 }
 
 
@@ -97,8 +97,7 @@ class PluginSecurityValidator:
         self.violations = []
 
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
+            content = file_path.read_text(encoding="utf-8")
 
             # Parse AST
             tree = ast.parse(content, filename=str(file_path))
@@ -131,7 +130,7 @@ class SecurityVisitor(ast.NodeVisitor):
     def visit_Import(self, node: ast.Import) -> None:
         """Check import statements."""
         for alias in node.names:
-            module = alias.name.split('.')[0]
+            module = alias.name.split(".")[0]
             if module not in ALLOWED_IMPORTS:
                 self.violations.append(
                     f"Forbidden import: {alias.name} (only allowed: {ALLOWED_IMPORTS})"
@@ -141,7 +140,7 @@ class SecurityVisitor(ast.NodeVisitor):
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         """Check from-import statements."""
         if node.module:
-            module = node.module.split('.')[0]
+            module = node.module.split(".")[0]
             if module not in ALLOWED_IMPORTS:
                 self.violations.append(
                     f"Forbidden import: from {node.module} (only allowed: {ALLOWED_IMPORTS})"
@@ -154,8 +153,8 @@ class SecurityVisitor(ast.NodeVisitor):
         if isinstance(node.func, ast.Name):
             func_name = node.func.id
             dangerous_funcs = {
-                'eval', 'exec', 'compile', '__import__', 'open',
-                'input', 'raw_input', 'execfile', 'file', 'reload'
+                "eval", "exec", "compile", "__import__", "open",
+                "input", "raw_input", "execfile", "file", "reload"
             }
             if func_name in dangerous_funcs:
                 self.violations.append(f"Forbidden function call: {func_name}")
@@ -164,7 +163,7 @@ class SecurityVisitor(ast.NodeVisitor):
         elif isinstance(node.func, ast.Attribute):
             if isinstance(node.func.value, ast.Name):
                 module = node.func.value.id
-                if module in {'os', 'sys', 'subprocess', 'socket', 'urllib', 'requests'}:
+                if module in {"os", "sys", "subprocess", "socket", "urllib", "requests"}:
                     self.violations.append(
                         f"Forbidden module usage: {module}.{node.func.attr}"
                     )
@@ -174,10 +173,10 @@ class SecurityVisitor(ast.NodeVisitor):
     def visit_Attribute(self, node: ast.Attribute) -> None:
         """Check attribute access for dangerous patterns."""
         # Check for __dict__, __globals__, etc.
-        if node.attr.startswith('__') and node.attr.endswith('__'):
+        if node.attr.startswith("__") and node.attr.endswith("__"):
             dangerous_attrs = {
-                '__dict__', '__globals__', '__builtins__', '__import__',
-                '__code__', '__class__.__bases__', '__subclasses__'
+                "__dict__", "__globals__", "__builtins__", "__import__",
+                "__code__", "__class__.__bases__", "__subclasses__"
             }
             if node.attr in dangerous_attrs:
                 self.violations.append(f"Forbidden attribute access: {node.attr}")
@@ -200,11 +199,7 @@ class SecurePluginManager:
 
     def _compute_file_hash(self, file_path: Path) -> str:
         """Compute SHA-256 hash of a file."""
-        sha256 = hashlib.sha256()
-        with open(file_path, 'rb') as f:
-            for chunk in iter(lambda: f.read(4096), b''):
-                sha256.update(chunk)
-        return sha256.hexdigest()
+        return hashlib.sha256(file_path.read_bytes()).hexdigest()
 
     def load_plugin_from_file(self, file_path: Path, force: bool = False) -> None:
         """Securely load a plugin from a file.
@@ -242,17 +237,16 @@ class SecurePluginManager:
             # Handle both dict and module forms of __builtins__
             builtin_dict = __builtins__ if isinstance(__builtins__, dict) else vars(__builtins__)
             restricted_globals = {
-                '__builtins__': {k: builtin_dict[k] for k in ALLOWED_BUILTINS if k in builtin_dict},
-                '__name__': f'plugin_{file_path.stem}',
-                '__file__': str(file_path),
+                "__builtins__": {k: builtin_dict[k] for k in ALLOWED_BUILTINS if k in builtin_dict},
+                "__name__": f"plugin_{file_path.stem}",
+                "__file__": str(file_path),
             }
 
             # Read and compile the plugin code
-            with open(file_path, 'r', encoding='utf-8') as f:
-                plugin_code = f.read()
+            plugin_code = file_path.read_text(encoding="utf-8")
 
             # Compile with restricted mode
-            compiled = compile(plugin_code, str(file_path), 'exec', flags=0)
+            compiled = compile(plugin_code, str(file_path), "exec", flags=0)
 
             # Create module
             module_name = f"plugin_{file_path.stem}"
@@ -279,7 +273,7 @@ class SecurePluginManager:
             metadata = plugin.metadata
 
             # Additional validation of metadata
-            if not metadata.name or '..' in metadata.name or '/' in metadata.name:
+            if not metadata.name or ".." in metadata.name or "/" in metadata.name:
                 raise PluginError("Invalid plugin name")
 
             plugin.activate()

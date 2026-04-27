@@ -1,7 +1,7 @@
 # src/robot_optimizer/domain/value_objects/robot_ast.py
 """Value objects for Robot Framework AST representation."""
 from pathlib import Path
-from typing import Any, Set
+from typing import Any
 
 from pydantic import Field
 
@@ -28,13 +28,13 @@ class KeywordCall(ValueObject):
     @property
     def is_builtin(self) -> bool:
         """Check if this is a built-in keyword."""
-        builtins = {'log', 'set variable', 'should be equal', 'run keyword'}
+        builtins = {"log", "set variable", "should be equal", "run keyword"}
         return self.keyword_name.lower() in builtins
 
     @property
     def is_library_keyword(self) -> bool:
         """Check if this appears to be a library keyword (has dot notation)."""
-        return '.' in self.keyword_name
+        return "." in self.keyword_name
 
 
 class RobotKeyword(ValueObject):
@@ -118,7 +118,7 @@ class RobotImport(ValueObject):
     @property
     def resolved_path(self) -> Path | None:
         """Get resolved path for resource imports."""
-        if self.is_resource and not self.name.startswith('${'):
+        if self.is_resource and not self.name.startswith("${"):
             return Path(self.name)
         return None
 
@@ -133,17 +133,17 @@ class RobotVariable(ValueObject):
     @property
     def is_scalar(self) -> bool:
         """Check if this is a scalar variable."""
-        return self.name.startswith('${') and self.name.endswith('}')
+        return self.name.startswith("${") and self.name.endswith("}")
 
     @property
     def is_list(self) -> bool:
         """Check if this is a list variable."""
-        return self.name.startswith('@{') and self.name.endswith('}')
+        return self.name.startswith("@{") and self.name.endswith("}")
 
     @property
     def is_dict(self) -> bool:
         """Check if this is a dictionary variable."""
-        return self.name.startswith('&{') and self.name.endswith('}')
+        return self.name.startswith("&{") and self.name.endswith("}")
 
 
 class RobotSuite(ValueObject):
@@ -171,12 +171,12 @@ class RobotSuite(ValueObject):
         ]
 
     @property
-    def keyword_names(self) -> Set[str]:
+    def keyword_names(self) -> set[str]:
         """Get set of all keyword names defined in this suite."""
         return {kw.name for kw in self.keywords}
 
     @property
-    def test_names(self) -> Set[str]:
+    def test_names(self) -> set[str]:
         """Get set of all test case names."""
         return {tc.name for tc in self.test_cases}
 

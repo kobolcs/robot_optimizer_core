@@ -21,12 +21,13 @@ import logging
 import sys
 from contextvars import ContextVar
 from datetime import UTC, datetime
-from functools import cache
 from pathlib import Path
 from typing import Any
 
+from .metrics import get_metrics
+
 # Context variable for logging context
-logging_context: ContextVar[dict[str, Any]] = ContextVar('logging_context', default={})
+logging_context: ContextVar[dict[str, Any]] = ContextVar("logging_context", default={})
 
 
 class StructuredFormatter(logging.Formatter):
@@ -93,9 +94,6 @@ class MetricsHandler(logging.Handler):
         Args:
             record: The log record to emit.
         """
-        # Lazy import to avoid circular dependency
-        from .metrics import get_metrics
-
         metrics = get_metrics()
 
         # Track log levels
@@ -115,7 +113,7 @@ class LoggerAdapter(logging.LoggerAdapter):
     included in all log messages.
     """
 
-    __slots__ = ('_context', 'extra', 'logger')
+    __slots__ = ("_context", "extra", "logger")
 
     def __init__(self, logger: logging.Logger, extra: dict[str, Any]) -> None:
         """Initialize the adapter.

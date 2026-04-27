@@ -14,18 +14,18 @@ from __future__ import annotations
 import fnmatch
 import re
 from collections import defaultdict
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterator, Set
 
 from ..config import Settings
 from ..exceptions import FileNotFoundError as RFFileNotFoundError
 from ..logging import get_logger
 
 __all__ = [
-    "PatternMatcher",
-    "PathExclusionTrie",
     "OptimizedFileDiscoveryService",
+    "PathExclusionTrie",
+    "PatternMatcher",
 ]
 
 
@@ -36,9 +36,9 @@ class PatternMatcher:
     # Pre-compiled patterns for better performance
     patterns: list[re.Pattern] = field(default_factory=list)
     # Trie structure for exact matches
-    exact_matches: Set[str] = field(default_factory=set)
+    exact_matches: set[str] = field(default_factory=set)
     # Suffix tree for extension matching
-    extensions: Set[str] = field(default_factory=set)
+    extensions: set[str] = field(default_factory=set)
 
     @classmethod
     def from_patterns(cls, patterns: list[str]) -> PatternMatcher:
@@ -105,11 +105,10 @@ class PathExclusionTrie:
                 node.is_pattern = True
                 node.pattern = re.compile(fnmatch.translate(part))
                 break
-            else:
-                # Literal node
-                if part not in node.children:
-                    node.children[part] = PathExclusionTrie.TrieNode()
-                node = node.children[part]
+            # Literal node
+            if part not in node.children:
+                node.children[part] = PathExclusionTrie.TrieNode()
+            node = node.children[part]
 
         node.is_excluded = True
 
@@ -372,19 +371,19 @@ class OptimizedSleepDetector(OptimizedAnalyzer):
         # Pre-compile all patterns once
         self.sleep_pattern = self.compile_pattern(
             "sleep",
-            r'^\s*(?:BuiltIn\.)?Sleep\s+(\d+(?:\.\d+)?)\s*(s|seconds?|m|minutes?|ms|milliseconds?)?',
+            r"^\s*(?:BuiltIn\.)?Sleep\s+(\d+(?:\.\d+)?)\s*(s|seconds?|m|minutes?|ms|milliseconds?)?",
             re.IGNORECASE
         )
 
         self.wait_pattern = self.compile_pattern(
             "wait",
-            r'^\s*(?:Wait|Pause|Delay)\s+(\d+(?:\.\d+)?)\s*(s|seconds?|m|minutes?)?',
+            r"^\s*(?:Wait|Pause|Delay)\s+(\d+(?:\.\d+)?)\s*(s|seconds?|m|minutes?)?",
             re.IGNORECASE
         )
 
         self.variable_sleep = self.compile_pattern(
             "variable",
-            r'^\s*Sleep\s+\$\{([^}]+)\}',
+            r"^\s*Sleep\s+\$\{([^}]+)\}",
             re.IGNORECASE
         )
 
@@ -402,9 +401,7 @@ class OptimizedSleepDetector(OptimizedAnalyzer):
                 continue
 
             # Check patterns - each pattern is O(1) average case
-            if match := self.sleep_pattern.match(line):
-                findings.append(self._create_finding(match, line, line_num, test_file))
-            elif match := self.wait_pattern.match(line):
+            if (match := self.sleep_pattern.match(line)) or (match := self.wait_pattern.match(line)):
                 findings.append(self._create_finding(match, line, line_num, test_file))
             elif match := self.variable_sleep.match(line):
                 findings.append(self._create_variable_finding(match, line, line_num, test_file))

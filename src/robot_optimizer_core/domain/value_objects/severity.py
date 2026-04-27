@@ -24,6 +24,7 @@ Example:
 from __future__ import annotations
 
 from enum import IntEnum
+
 try:
     from typing import override
 except ImportError:

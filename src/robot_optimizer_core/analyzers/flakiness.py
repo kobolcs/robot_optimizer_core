@@ -361,13 +361,13 @@ class FlakinessAnalyzer(BaseAnalyzer):
 
         # Check test name for hints
         match test_lower:
-            case name if any(word in name for word in ['ui', 'click', 'element', 'page']):
+            case name if any(word in name for word in ["ui", "click", "element", "page"]):
                 return "ui_timing"
-            case name if any(word in name for word in ['api', 'request', 'response']):
+            case name if any(word in name for word in ["api", "request", "response"]):
                 return "api_timing"
-            case name if any(word in name for word in ['database', 'db', 'query']):
+            case name if any(word in name for word in ["database", "db", "query"]):
                 return "database_timing"
-            case name if any(word in name for word in ['file', 'upload', 'download']):
+            case name if any(word in name for word in ["file", "upload", "download"]):
                 return "file_operation"
             case _:
                 return "timing_issue"

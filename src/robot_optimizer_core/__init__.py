@@ -59,6 +59,7 @@ from .deprecation import deprecated, deprecation_warning
 
 # Dependency injection
 from .di import ThreadSafeContainer, get_container
+
 # Alias for backward compatibility
 Container = ThreadSafeContainer
 
