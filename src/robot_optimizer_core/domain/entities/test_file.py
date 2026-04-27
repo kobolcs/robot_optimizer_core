@@ -303,9 +303,24 @@ def parse_datetime_safe(dt_str: str, default_tz: timezone = UTC) -> datetime:
             # ISO format
             dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
         else:
-            # Other formats
-            from dateutil import parser  # type: ignore[import-untyped]
-            dt = parser.parse(dt_str)
+            # Other formats – try common non-ISO patterns using stdlib only
+            _NON_ISO_FORMATS = [
+                "%Y-%m-%d %H:%M:%S.%f",
+                "%Y-%m-%d %H:%M:%S",
+                "%Y-%m-%d",
+                "%d/%m/%Y %H:%M:%S",
+                "%d/%m/%Y",
+                "%m/%d/%Y %H:%M:%S",
+                "%m/%d/%Y",
+            ]
+            for fmt in _NON_ISO_FORMATS:
+                try:
+                    dt = datetime.strptime(dt_str, fmt)
+                    break
+                except ValueError:
+                    continue
+            else:
+                raise ValueError(f"Unrecognised datetime format: {dt_str!r}")
 
         # Ensure timezone
         if dt.tzinfo is None:
