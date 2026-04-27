@@ -7,14 +7,14 @@ better alternatives.
 
 Example:
     Using the sleep detector::
-    
+
         from robot_optimizer_core.analyzers import SleepDetector
         from robot_optimizer_core import TestFile
-        
+
         analyzer = SleepDetector()
         test_file = TestFile.from_path("tests/login.robot")
         findings = analyzer.analyze(test_file)
-        
+
         for finding in findings:
             duration = finding.context.get('duration_seconds')
             print(f"Sleep {duration}s at line {finding.line_number}")
@@ -22,26 +22,34 @@ Example:
 from __future__ import annotations
 
 import re
+import sys
 from decimal import Decimal, InvalidOperation
 
-try:
+if sys.version_info >= (3, 12):
     from typing import override
-except ImportError:
+else:
     from typing_extensions import override
 
 from ..config import get_settings
 from ..domain.entities import TestFile
-from ..domain.value_objects import Finding, Location, Pattern, PatternType, Severity, SleepPattern
+from ..domain.value_objects import (
+    Finding,
+    Location,
+    Pattern,
+    PatternType,
+    Severity,
+    SleepPattern,
+)
 from .base import BaseAnalyzer, ConfigValue
 
 
 class SleepDetector(BaseAnalyzer):
     """Detects sleep usage in Robot Framework tests.
-    
+
     This analyzer finds Sleep keyword usage and categorizes findings
     by severity based on duration. It suggests appropriate wait
     conditions as replacements.
-    
+
     Configuration:
         severity_thresholds: Dict mapping duration to severity.
         suggest_alternatives: Whether to suggest replacements.
@@ -51,7 +59,7 @@ class SleepDetector(BaseAnalyzer):
 
     def __init__(self, config: dict[str, ConfigValue] | None = None) -> None:
         """Initialize the analyzer.
-        
+
         Args:
             config: Analyzer configuration.
         """
@@ -122,10 +130,10 @@ class SleepDetector(BaseAnalyzer):
     @override
     def analyze(self, test_file: TestFile) -> list[Finding]:
         """Find all sleep patterns in the test file.
-        
+
         Args:
             test_file: The test file to analyze.
-            
+
         Returns:
             List of findings.
         """
@@ -146,7 +154,7 @@ class SleepDetector(BaseAnalyzer):
 
     def _compile_sleep_patterns(self) -> list[tuple[re.Pattern, str]]:
         """Compile regex patterns for sleep detection.
-        
+
         Returns:
             List of (pattern, type) tuples.
         """
@@ -194,10 +202,10 @@ class SleepDetector(BaseAnalyzer):
 
     def _detect_sleep(self, line: str) -> dict[str, str | Decimal | None] | None:
         """Detect sleep pattern in a line.
-        
+
         Args:
             line: Line to check.
-            
+
         Returns:
             Sleep information dict or None.
         """
@@ -242,13 +250,13 @@ class SleepDetector(BaseAnalyzer):
         original_text: str
     ) -> Finding | None:
         """Create a finding from sleep information.
-        
+
         Args:
             sleep_info: Sleep detection information.
             test_file: The test file.
             line_num: Line number.
             original_text: Original line text.
-            
+
         Returns:
             Finding object or None.
         """
@@ -333,12 +341,12 @@ class SleepDetector(BaseAnalyzer):
         line_num: int
     ) -> str | None:
         """Suggest alternative to sleep.
-        
+
         Args:
             sleep_pattern: The sleep pattern.
             test_file: The test file.
             line_num: Line number of sleep.
-            
+
         Returns:
             Suggestion text or None.
         """

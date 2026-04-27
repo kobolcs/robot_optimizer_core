@@ -74,7 +74,7 @@ class TestAnalyzerIntegration:
             content = f"""*** Test Cases ***
 Test Case {i}
     Sleep    {i + 1} seconds
-    
+
 *** Keywords ***
 Unused Keyword {i}
     Log    Never called
@@ -227,7 +227,7 @@ Unused Keyword {i}
         assert invalid_file not in files
 
         # Direct analysis should fail gracefully
-        with pytest.raises(Exception):  # Could be various exceptions
+        with pytest.raises(Exception):  # noqa: B017  # various exception types possible
             TestFile.from_path(invalid_file)
 
         # Create file with invalid encoding
@@ -341,7 +341,7 @@ login with credentials
 
 Proper Keyword Name
     Log    Good
-        
+
 unused keyword
     Log    Never called
 """

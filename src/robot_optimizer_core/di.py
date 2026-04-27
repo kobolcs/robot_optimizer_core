@@ -57,7 +57,7 @@ class ServiceDescriptor:
 
 class ThreadSafeContainer:
     """Thread-safe dependency injection container.
-    
+
     This container uses fine-grained locking to ensure thread safety
     while maintaining good performance.
     """

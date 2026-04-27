@@ -107,25 +107,25 @@ class Finding(ValueObject):
         })
 
     # Pydantic v2: computed fields for derived properties
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def file_path(self) -> str:
         """Get the file path as a string."""
         return str(self.location.file_path)
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def line_number(self) -> int:
         """Get the line number."""
         return self.location.line
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def is_auto_fixable(self) -> bool:
         """Check if this finding can be automatically fixed."""
         return self.pattern.auto_fixable
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def has_context(self) -> bool:
         """Check if finding has additional context."""
@@ -184,7 +184,7 @@ class Finding(ValueObject):
             "severity": self.severity if isinstance(self.severity, Severity) else Severity(self.severity),
             "message": self.message,
             "pattern": self.pattern.model_dump() | {"type": self.pattern.type},
-            "pattern_type": self.pattern.type.name,
+            "pattern_type": self.pattern.type.name,  # type: ignore[attr-defined]
             "pattern_name": self.pattern.name,
             "recommendation": self.pattern.recommendation,
             "is_auto_fixable": self.is_auto_fixable,

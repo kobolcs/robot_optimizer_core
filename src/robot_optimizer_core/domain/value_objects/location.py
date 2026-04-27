@@ -7,16 +7,16 @@ information.
 
 Example:
     Creating locations::
-    
+
         from robot_optimizer_core import Location
         from pathlib import Path
-        
+
         # Simple location
         loc = Location(Path("test.robot"), line=10)
-        
+
         # Location with column
         loc = Location(Path("test.robot"), line=10, column=5)
-        
+
         # Location range
         loc = Location(
             Path("test.robot"),
@@ -131,10 +131,10 @@ class Location(ValueObject):
     @classmethod
     def ensure_path_object(cls, v: Any) -> Path:
         """Ensure file_path is a Path object.
-        
+
         Args:
             v: Value to convert (string or Path).
-            
+
         Returns:
             Path object.
         """
@@ -144,14 +144,14 @@ class Location(ValueObject):
     @classmethod
     def validate_end_line(cls, v: int | None, info: Any) -> int | None:
         """Validate end line is not before start line.
-        
+
         Args:
             v: End line value.
             info: Validation context.
-            
+
         Returns:
             Validated end line.
-            
+
         Raises:
             ValueError: If end line is before start line.
         """
@@ -165,17 +165,17 @@ class Location(ValueObject):
     @classmethod
     def validate_end_column(cls, v: int | None, info: Any) -> int | None:
         """Validate end column constraints.
-        
+
         End column requires a start column, and if on the same line,
         must be after the start column.
-        
+
         Args:
             v: End column value.
             info: Validation context.
-            
+
         Returns:
             Validated end column.
-            
+
         Raises:
             ValueError: If validation fails.
         """
@@ -201,12 +201,12 @@ class Location(ValueObject):
     @property
     def range_str(self) -> str:
         """Get a string representation of the location range.
-        
+
         Format:
         - Simple: "file.robot:10"
         - With column: "file.robot:10:5"
         - Range: "file.robot:10:5-15:20"
-        
+
         Returns:
             Human-readable location string.
         """
@@ -228,7 +228,7 @@ class Location(ValueObject):
     @property
     def is_range(self) -> bool:
         """Check if this location represents a range.
-        
+
         Returns:
             True if end_line is specified.
         """
@@ -237,7 +237,7 @@ class Location(ValueObject):
     @property
     def is_point(self) -> bool:
         """Check if this location represents a single point.
-        
+
         Returns:
             True if no end position is specified.
         """
@@ -267,12 +267,12 @@ class Location(ValueObject):
 
     def overlaps(self, other: Location) -> bool:
         """Check if this location overlaps with another location.
-        
+
         Two locations overlap if they share any common positions.
-        
+
         Args:
             other: Location to check.
-            
+
         Returns:
             True if locations overlap.
         """
@@ -307,15 +307,15 @@ class Location(ValueObject):
 
     def merge(self, other: Location) -> Location:
         """Merge this location with another to create a combined range.
-        
+
         The result spans from the earliest position to the latest position.
-        
+
         Args:
             other: Location to merge with.
-            
+
         Returns:
             New location covering both ranges.
-            
+
         Raises:
             ValueError: If locations are in different files.
         """
@@ -365,14 +365,14 @@ class Location(ValueObject):
 
     def offset(self, lines: int = 0, columns: int = 0) -> Location:
         """Create a new location offset by the given amount.
-        
+
         Args:
             lines: Number of lines to offset (can be negative).
             columns: Number of columns to offset (can be negative).
-            
+
         Returns:
             New location with adjusted position.
-            
+
         Raises:
             ValueError: If offset would create invalid position.
         """

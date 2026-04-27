@@ -53,7 +53,7 @@ class Pattern(ValueObject):
     # Backward-compatible nested enum access: Pattern.PatternType.X
     PatternType: ClassVar[type[PatternType]] = PatternType
 
-    type: PatternType = Field(..., description="Type of pattern")
+    type: PatternType = Field(..., description="Type of pattern")  # type: ignore[valid-type]
     name: str = Field(..., min_length=1, description="Pattern name")
     description: str = Field(
         ..., min_length=1, description="Pattern description"

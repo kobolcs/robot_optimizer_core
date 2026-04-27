@@ -88,7 +88,7 @@ class SleepPattern(ValueObject):
         return self
 
     # Pydantic v2: computed fields for derived properties
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def duration_in_seconds(self) -> float:
         """Convert duration to seconds regardless of unit."""
@@ -98,13 +98,13 @@ class SleepPattern(ValueObject):
             return float(self.duration / 1000)
         return float(self.duration)
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def is_excessive(self) -> bool:
         """Check if sleep duration is excessive (>5 seconds)."""
         return self.duration_in_seconds > 5
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def normalized_unit(self) -> str:
         """Get standardized unit representation."""
@@ -121,7 +121,7 @@ class SleepPattern(ValueObject):
         }
         return unit_map.get(self.unit, self.unit)
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def severity_hint(self) -> str:
         """Suggest severity based on duration."""

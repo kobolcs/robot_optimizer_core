@@ -122,7 +122,7 @@ class PathExclusionTrie:
         parts = path.parts
         node = self.root
 
-        for i, part in enumerate(parts):
+        for _, part in enumerate(parts):
             # Check if current node excludes
             if node.is_excluded:
                 return True

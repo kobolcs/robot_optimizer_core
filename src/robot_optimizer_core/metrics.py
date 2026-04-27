@@ -51,7 +51,7 @@ class TimingStats:
 
 class MetricsCollector:
     """Modern metrics collector with memory safety and GDPR compliance.
-    
+
     Features:
     - Bounded memory usage with automatic cleanup
     - GDPR-compliant filtering of personal data
@@ -243,7 +243,7 @@ class MetricsCollector:
                 }
             )
 
-    def _evict_least_used(self, store: dict) -> None:
+    def _evict_least_used(self, store: dict[str, Any]) -> None:
         """Evict the least accessed entry from a metric store."""
         if not store:
             return

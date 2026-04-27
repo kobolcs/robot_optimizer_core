@@ -6,15 +6,15 @@ These functions handle common use cases with sensible defaults.
 
 Example:
     Analyzing files and directories::
-    
+
         from robot_optimizer_core import analyze_file, analyze_directory
-        
+
         # Analyze a single file
         findings = analyze_file("tests/login.robot")
-        
+
         # Analyze a directory
         all_findings = analyze_directory("tests/", recursive=True)
-        
+
         # Custom analyzers
         findings = analyze_file(
             "tests/login.robot",
@@ -50,22 +50,22 @@ def analyze_file(
     settings: Settings | None = None
 ) -> list[Finding]:
     """Analyze a single Robot Framework file.
-    
+
     This is the main entry point for analyzing individual files.
     It handles file loading, parsing, and running the specified analyzers.
-    
+
     Args:
         file_path: Path to the Robot Framework file.
         analyzers: List of analyzer names or instances (default: all).
         settings: Configuration settings (default: global settings).
-        
+
     Returns:
         List of findings from all analyzers.
-        
+
     Raises:
         FileNotFoundError: If the file doesn't exist.
         AnalysisError: If analysis fails.
-        
+
     Example:
         >>> findings = analyze_file("tests/login.robot")
         >>> for finding in findings:
@@ -150,10 +150,10 @@ def analyze_directory(
     fail_fast: bool = False
 ) -> dict[Path, list[Finding]]:
     """Analyze all Robot Framework files in a directory.
-    
+
     This function discovers and analyzes all matching files in a directory,
     returning a mapping of file paths to their findings.
-    
+
     Args:
         directory_path: Path to the directory.
         patterns: File patterns to include (default: ["*.robot", "*.resource"]).
@@ -162,14 +162,14 @@ def analyze_directory(
         analyzers: List of analyzer names or instances.
         settings: Configuration settings.
         fail_fast: Stop on first error.
-        
+
     Returns:
         Dictionary mapping file paths to findings.
-        
+
     Raises:
         FileNotFoundError: If directory doesn't exist.
         AnalysisError: If analysis fails (when fail_fast=True).
-        
+
     Example:
         >>> findings_map = analyze_directory("tests/", recursive=True)
         >>> for file_path, findings in findings_map.items():
@@ -273,21 +273,21 @@ def analyze_suite(
     settings: Settings | None = None
 ) -> dict[str, Any]:
     """Analyze a Robot Framework test suite with AST parsing.
-    
+
     This function provides more detailed analysis using the AST parser,
     including cross-file references and suite-level insights.
-    
+
     Args:
         suite_path: Path to suite file or directory.
         analyzers: List of analyzer names or instances.
         settings: Configuration settings.
-        
+
     Returns:
         Dictionary with analysis results including:
         - findings: List of all findings
         - suite_info: Parsed suite information
         - statistics: Analysis statistics
-        
+
     Example:
         >>> results = analyze_suite("tests/")
         >>> print(f"Total findings: {len(results['findings'])}")
@@ -377,11 +377,11 @@ def _get_analyzer_instances(
     settings: Settings
 ) -> list[BaseAnalyzer]:
     """Get analyzer instances from names or objects.
-    
+
     Args:
         analyzers: List of analyzer names or instances.
         settings: Configuration settings.
-        
+
     Returns:
         List of analyzer instances.
     """

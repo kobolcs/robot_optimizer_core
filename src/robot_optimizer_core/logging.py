@@ -7,9 +7,9 @@ for machine-readable logs.
 
 Example:
     Basic logging usage::
-    
+
         from robot_optimizer_core import get_logger
-        
+
         logger = get_logger(__name__)
         logger.info("Analysis started", extra={"file": "test.robot"})
         logger.error("Analysis failed", extra={"error": str(e)})
@@ -27,22 +27,22 @@ from typing import Any
 from .metrics import get_metrics
 
 # Context variable for logging context
-logging_context: ContextVar[dict[str, Any]] = ContextVar("logging_context", default={})
+logging_context: ContextVar[dict[str, Any] | None] = ContextVar("logging_context", default=None)
 
 
 class StructuredFormatter(logging.Formatter):
     """JSON formatter for structured logging.
-    
+
     Formats log records as JSON for easy parsing and analysis.
     Includes timestamp, level, logger name, message, and any extra fields.
     """
 
     def format(self, record: logging.LogRecord) -> str:
         """Format the log record as JSON.
-        
+
         Args:
             record: The log record to format.
-            
+
         Returns:
             JSON-formatted log entry.
         """
@@ -83,7 +83,7 @@ class StructuredFormatter(logging.Formatter):
 
 class MetricsHandler(logging.Handler):
     """Log handler that collects metrics about logging.
-    
+
     This handler tracks logging metrics for monitoring purposes,
     respecting GDPR by not storing personal information.
     """
@@ -106,9 +106,9 @@ class MetricsHandler(logging.Handler):
             metrics.increment(f"logs.errors.{module_name}")
 
 
-class LoggerAdapter(logging.LoggerAdapter):
+class LoggerAdapter(logging.LoggerAdapter[Any]):
     """Adapter that adds context to all log messages.
-    
+
     This adapter allows adding persistent context that will be
     included in all log messages.
     """
@@ -117,7 +117,7 @@ class LoggerAdapter(logging.LoggerAdapter):
 
     def __init__(self, logger: logging.Logger, extra: dict[str, Any]) -> None:
         """Initialize the adapter.
-        
+
         Args:
             logger: The underlying logger.
             extra: Context to add to all messages.
@@ -127,7 +127,7 @@ class LoggerAdapter(logging.LoggerAdapter):
 
     def add_context(self, **kwargs: Any) -> None:
         """Add context that will be included in all future log messages.
-        
+
         Args:
             **kwargs: Context key-value pairs.
         """
@@ -136,7 +136,7 @@ class LoggerAdapter(logging.LoggerAdapter):
 
     def remove_context(self, *keys: str) -> None:
         """Remove context keys.
-        
+
         Args:
             *keys: Context keys to remove.
         """
@@ -146,10 +146,10 @@ class LoggerAdapter(logging.LoggerAdapter):
 
     def with_context(self, **kwargs: Any) -> LoggerAdapter:
         """Create a new adapter with additional context.
-        
+
         Args:
             **kwargs: Additional context.
-            
+
         Returns:
             New adapter with combined context.
         """
@@ -169,18 +169,18 @@ def configure_logging(
     extra_handlers: list[logging.Handler] | None = None
 ) -> None:
     """Configure the logging system.
-    
+
     This function sets up the logging system with structured formatting
     and optional metrics collection. It can be called multiple times
     to reconfigure logging.
-    
+
     Args:
         level: Logging level (name or constant).
         format_json: Whether to use JSON formatting.
         log_file: Optional file to write logs to.
         enable_metrics: Whether to enable metrics collection.
         extra_handlers: Additional handlers to add.
-        
+
     Example:
         >>> configure_logging(
         ...     level="DEBUG",
@@ -241,18 +241,18 @@ def get_logger(
     context: dict[str, Any] | None = None
 ) -> LoggerAdapter:
     """Get a logger with optional context.
-    
+
     This function returns a logger adapter that can include persistent
     context in all log messages. The logger is cached for efficiency
     using functools.cache (Python 3.9+).
-    
+
     Args:
         name: Logger name (usually __name__).
         context: Optional context to include in all messages.
-        
+
     Returns:
         Logger adapter with context support.
-        
+
     Example:
         >>> logger = get_logger(__name__, {"component": "analyzer"})
         >>> logger.info("Starting analysis", extra={"file": "test.robot"})
@@ -274,9 +274,9 @@ def log_analysis_start(
     logger: LoggerAdapter | None = None
 ) -> None:
     """Log the start of file analysis.
-    
+
     Convenience function for consistent analysis logging.
-    
+
     Args:
         file_path: Path to file being analyzed.
         analyzer: Name of the analyzer.
@@ -304,9 +304,9 @@ def log_analysis_complete(
     logger: LoggerAdapter | None = None
 ) -> None:
     """Log the completion of file analysis.
-    
+
     Convenience function for consistent analysis logging.
-    
+
     Args:
         file_path: Path to file that was analyzed.
         analyzer: Name of the analyzer.
@@ -335,9 +335,9 @@ def log_error(
     logger: LoggerAdapter | None = None
 ) -> None:
     """Log an error with context.
-    
+
     Convenience function for consistent error logging.
-    
+
     Args:
         error: The exception that occurred.
         context: Additional context about the error.

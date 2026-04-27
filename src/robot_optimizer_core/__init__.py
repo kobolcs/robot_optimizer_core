@@ -14,11 +14,11 @@ Example:
     Basic usage of the Core package::
 
         from robot_optimizer_core import analyze_file, DeadCodeAnalyzer
-                
+
         # Analyze a single file
         test_file = Path("tests/login.robot")
         findings = analyze_file(test_file, analyzers=[DeadCodeAnalyzer()])
-        
+
         for finding in findings:
             print(f"{finding.severity.name}: {finding.message}")
 
@@ -57,9 +57,6 @@ from .deprecation import deprecated, deprecation_warning
 # Dependency injection
 from .di import ThreadSafeContainer, get_container
 
-# Alias for backward compatibility
-Container = ThreadSafeContainer
-
 # Core services
 from .discovery import FileDiscoveryService
 
@@ -94,6 +91,9 @@ from .parsers import RobotASTParser
 
 # Plugin system
 from .plugin import Plugin, PluginMetadata
+
+# Alias for backward compatibility
+Container = ThreadSafeContainer
 
 __all__ = [
     # Version
@@ -173,7 +173,7 @@ __all__ = [
 
 def __dir__() -> list[str]:
     """Return list of public attributes.
-    
+
     Returns:
         List of attribute names exposed by this module.
     """

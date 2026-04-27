@@ -6,9 +6,9 @@ functionality and providing migration paths for users.
 
 Example:
     Deprecating a function::
-    
+
         from robot_optimizer_core import deprecated
-        
+
         @deprecated(
             since="1.2.0",
             removed_in="2.0.0",
@@ -42,19 +42,19 @@ def deprecated(
     details: str | None = None
 ) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """Decorator to mark functions, methods, or classes as deprecated.
-    
+
     This decorator will issue a deprecation warning when the decorated
     callable is used. It preserves the original function's metadata.
-    
+
     Args:
         since: Version when the deprecation was introduced.
         removed_in: Version when the feature will be removed (optional).
         replacement: Name of replacement function/class (optional).
         details: Additional details about the deprecation (optional).
-        
+
     Returns:
         Decorator function.
-        
+
     Example:
         >>> @deprecated(
         ...     since="1.2.0",
@@ -107,11 +107,11 @@ def deprecated(
 
 def _deprecate_class(cls: type[T], message: str) -> type[T]:
     """Deprecate a class by wrapping its __init__ method.
-    
+
     Args:
         cls: Class to deprecate.
         message: Deprecation message.
-        
+
     Returns:
         Modified class.
     """
@@ -138,15 +138,15 @@ def deprecation_warning(
     stacklevel: int = 2
 ) -> None:
     """Issue a deprecation warning.
-    
+
     This is a convenience function for issuing deprecation warnings
     with consistent formatting.
-    
+
     Args:
         message: Warning message.
         category: Warning category (default: RobotOptimizerDeprecationWarning).
         stacklevel: Stack level for warning (default: 2).
-        
+
     Example:
         >>> deprecation_warning(
         ...     "Using 'old_param' is deprecated, use 'new_param' instead"
@@ -162,16 +162,16 @@ def deprecated_parameter(
     replacement: str | None = None
 ) -> None:
     """Warn about a deprecated parameter.
-    
+
     This function should be called within a function/method to warn
     about deprecated parameters.
-    
+
     Args:
         param_name: Name of the deprecated parameter.
         since: Version when deprecated.
         removed_in: Version when it will be removed.
         replacement: Replacement parameter name.
-        
+
     Example:
         >>> def my_function(old_param=None, new_param=None):
         ...     if old_param is not None:
@@ -196,13 +196,13 @@ def deprecated_parameter(
 
 def check_deprecated(obj: Any) -> bool:
     """Check if an object is marked as deprecated.
-    
+
     Args:
         obj: Object to check.
-        
+
     Returns:
         True if object is deprecated.
-        
+
     Example:
         >>> if check_deprecated(some_function):
         ...     print("This function is deprecated")
@@ -212,13 +212,13 @@ def check_deprecated(obj: Any) -> bool:
 
 def get_deprecation_info(obj: Any) -> dict[str, Any] | None:
     """Get deprecation information for an object.
-    
+
     Args:
         obj: Object to check.
-        
+
     Returns:
         Dictionary with deprecation info or None if not deprecated.
-        
+
     Example:
         >>> info = get_deprecation_info(old_function)
         >>> if info:
@@ -236,10 +236,10 @@ def get_deprecation_info(obj: Any) -> dict[str, Any] | None:
 
 class DeprecatedMixin:
     """Mixin class for deprecated functionality.
-    
+
     Classes can inherit from this mixin to mark themselves as deprecated
     and provide consistent deprecation behavior.
-    
+
     Example:
         >>> class OldAnalyzer(DeprecatedMixin, BaseAnalyzer):
         ...     _deprecated_since = "1.2.0"
@@ -273,16 +273,16 @@ class DeprecatedMixin:
 
 def renamed_parameter(**mappings: str) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """Decorator to handle renamed parameters with deprecation warnings.
-    
+
     This decorator allows old parameter names to still work while
     issuing deprecation warnings.
-    
+
     Args:
         **mappings: Mapping of old names to new names.
-        
+
     Returns:
         Decorator function.
-        
+
     Example:
         >>> @renamed_parameter(old_name="new_name", another_old="another_new")
         ... def my_function(new_name=None, another_new=None):

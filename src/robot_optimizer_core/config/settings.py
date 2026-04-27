@@ -7,12 +7,12 @@ Pro version with additional configuration options.
 
 Example:
     Using settings::
-    
+
         from robot_optimizer_core import get_settings
-        
+
         settings = get_settings()
         print(settings.max_file_size_mb)
-        
+
         # Override with environment variables
         # ROBOT_OPTIMIZER_MAX_FILE_SIZE_MB=20
 """
@@ -22,22 +22,26 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
-
-SettingsSourceCallable = PydanticBaseSettingsSource
+from pydantic_settings import (
+    BaseSettings,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+)
 
 from ..exceptions import ConfigurationError
+
+SettingsSourceCallable = PydanticBaseSettingsSource
 
 
 class Settings(BaseSettings):
     """Configuration settings for Robot Framework Optimizer Core.
-    
+
     Settings can be configured through:
     - Default values
     - Environment variables (ROBOT_OPTIMIZER_ prefix)
     - Configuration files (Pro feature)
     - Direct instantiation
-    
+
     Attributes:
         max_file_size_mb: Maximum file size to analyze in MB.
         file_patterns: File patterns to include in analysis.
@@ -170,13 +174,13 @@ class Settings(BaseSettings):
     @classmethod
     def validate_patterns(cls, v: list[str]) -> list[str]:
         """Validate file patterns.
-        
+
         Args:
             v: List of patterns.
-            
+
         Returns:
             Validated patterns.
-            
+
         Raises:
             ValueError: If patterns are invalid.
         """
@@ -190,10 +194,10 @@ class Settings(BaseSettings):
     @classmethod
     def validate_plugin_dirs(cls, v: list[str | Path]) -> list[Path]:
         """Validate and convert plugin directories to Path objects.
-        
+
         Args:
             v: List of directory paths.
-            
+
         Returns:
             List of Path objects.
         """
@@ -212,10 +216,10 @@ class Settings(BaseSettings):
     @classmethod
     def validate_log_level(cls, v: str) -> str:
         """Validate log level.
-        
+
         Args:
             v: Log level string.
-            
+
         Returns:
             Uppercase log level.
         """
@@ -228,18 +232,18 @@ class Settings(BaseSettings):
         setting_type: type | None = None
     ) -> Any:
         """Get a custom setting with type validation.
-        
+
         This method is designed for Pro version extensions to
         safely access custom settings.
-        
+
         Args:
             key: Setting key.
             default: Default value if not found.
             setting_type: Expected type for validation.
-            
+
         Returns:
             Setting value.
-            
+
         Raises:
             ConfigurationError: If type validation fails.
         """
@@ -261,7 +265,7 @@ class Settings(BaseSettings):
 
     def set_custom_setting(self, key: str, value: Any) -> None:
         """Set a custom setting.
-        
+
         Args:
             key: Setting key.
             value: Setting value.
@@ -270,10 +274,10 @@ class Settings(BaseSettings):
 
     def validate_settings(self) -> None:
         """Perform additional validation.
-        
+
         This method can be overridden by Pro version to add
         custom validation logic.
-        
+
         Raises:
             ConfigurationError: If validation fails.
         """
@@ -297,7 +301,7 @@ class Settings(BaseSettings):
     @property
     def max_file_size_bytes(self) -> int:
         """Get maximum file size in bytes.
-        
+
         Returns:
             Maximum file size in bytes.
         """
@@ -305,7 +309,7 @@ class Settings(BaseSettings):
 
     def to_dict(self) -> dict[str, Any]:
         """Convert settings to dictionary.
-        
+
         Returns:
             Dictionary of settings.
         """
@@ -353,10 +357,10 @@ _settings: Settings | None = None
 
 def get_settings() -> Settings:
     """Get the global settings instance.
-    
+
     Returns:
         The global settings instance.
-        
+
     Example:
         >>> settings = get_settings()
         >>> print(settings.max_file_size_mb)
@@ -370,13 +374,13 @@ def get_settings() -> Settings:
 
 def configure_settings(**kwargs: Any) -> Settings:
     """Configure global settings with overrides.
-    
+
     Args:
         **kwargs: Setting overrides.
-        
+
     Returns:
         Updated settings instance.
-        
+
     Example:
         >>> settings = configure_settings(
         ...     max_file_size_mb=20,
@@ -391,7 +395,7 @@ def configure_settings(**kwargs: Any) -> Settings:
 
 def reset_settings() -> None:
     """Reset settings to defaults.
-    
+
     This is mainly useful for testing.
     """
     global _settings

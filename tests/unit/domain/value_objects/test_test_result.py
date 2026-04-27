@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from robot_optimizer_core.domain.value_objects import TestResult
+from robot_optimizer_core.domain.value_objects import FlakinessStats, TestResult
 
 
 @pytest.mark.unit
@@ -208,17 +208,6 @@ class TestTestResult:
 
         with pytest.raises(ValidationError):
             result.execution_time = 2.0
-
-
-# tests/unit/domain/value_objects/test_flakiness_stats.py
-"""Unit tests for FlakinessStats value object.
-
-Comprehensive tests for the FlakinessStats value object including validation,
-computed properties, and edge cases.
-"""
-import pytest
-
-from robot_optimizer_core.domain.value_objects import FlakinessStats
 
 
 @pytest.mark.unit
