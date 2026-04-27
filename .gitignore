@@ -157,3 +157,6 @@ CODE_REVIEW_REPORT.md
 DOCUMENTATION_IMPROVEMENTS.md
 *_SUMMARY.md
 *_REPORT.md
+# Local/generated Codex artifact packs
+robot_optimizer_core_codex_pack.zip
+*_codex_pack.zip
