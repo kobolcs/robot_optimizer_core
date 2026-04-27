@@ -6,8 +6,9 @@ that can be safely removed to improve maintainability.
 """
 from __future__ import annotations
 
-from collections import defaultdict
 import re
+from collections import defaultdict
+
 try:
     from typing import override
 except ImportError:
@@ -16,6 +17,10 @@ except ImportError:
 from ..domain.entities import TestFile
 from ..domain.value_objects import Finding, Location, Pattern, PatternType, Severity
 from .base import BaseAnalyzer, ConfigValue
+
+_LIFECYCLE_KEYWORDS = frozenset({
+    "suite setup", "suite teardown", "test setup", "test teardown",
+})
 
 
 class DeadCodeAnalyzer(BaseAnalyzer):
@@ -165,7 +170,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                 display_name = getattr(self, "_keyword_display_names", {}).get(keyword_name, keyword_name)
 
                 # Skip special keywords and configured ignore patterns
-                if keyword_name in {'suite setup', 'suite teardown', 'test setup', 'test teardown'}:
+                if keyword_name in _LIFECYCLE_KEYWORDS:
                     continue
                 if any(pattern.match(display_name) for pattern in self._ignore_patterns):
                     continue
@@ -228,20 +233,20 @@ class DeadCodeAnalyzer(BaseAnalyzer):
             stripped = line.strip()
 
             # Track keyword boundaries
-            if not line.startswith((' ', '\t')) and stripped:
+            if not line.startswith((" ", "\t")) and stripped:
                 in_keyword = False
                 found_return = False
-                if '***' not in line:
+                if "***" not in line:
                     current_keyword = stripped
                     in_keyword = True
 
             # Check for RETURN
-            if in_keyword and stripped.upper().startswith('RETURN'):
+            if in_keyword and stripped.upper().startswith("RETURN"):
                 found_return = True
                 continue
 
             # Check for code after RETURN
-            if found_return and in_keyword and stripped and not stripped.startswith('#'):
+            if found_return and in_keyword and stripped and not stripped.startswith("#"):
                 pattern = Pattern(
                     type=PatternType.UNREACHABLE_CODE,
                     name="Unreachable Code",

@@ -14,8 +14,7 @@ Example:
     Basic usage of the Core package::
 
         from robot_optimizer_core import analyze_file, DeadCodeAnalyzer
-        from pathlib import Path
-        
+                
         # Analyze a single file
         test_file = Path("tests/login.robot")
         findings = analyze_file(test_file, analyzers=[DeadCodeAnalyzer()])
@@ -29,8 +28,6 @@ Attributes:
 
 """
 from __future__ import annotations
-
-from typing import TYPE_CHECKING
 
 # Version
 from .__version__ import __version__, __version_info__
@@ -59,6 +56,7 @@ from .deprecation import deprecated, deprecation_warning
 
 # Dependency injection
 from .di import ThreadSafeContainer, get_container
+
 # Alias for backward compatibility
 Container = ThreadSafeContainer
 
@@ -96,9 +94,6 @@ from .parsers import RobotASTParser
 
 # Plugin system
 from .plugin import Plugin, PluginMetadata
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 __all__ = [
     # Version

@@ -17,7 +17,9 @@ except Exception:
     pass
 
 try:
-    from robot_optimizer_core.domain.value_objects import TestResult as _DomainTestResult
+    from robot_optimizer_core.domain.value_objects import (
+        TestResult as _DomainTestResult,
+    )
     _DomainTestResult.__test__ = False
 except Exception:
     pass
@@ -27,7 +29,7 @@ import tempfile
 from collections.abc import Generator
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 from unittest.mock import Mock
 from uuid import uuid4
 
@@ -73,7 +75,7 @@ def pytest_pycollect_makeitem(collector, name, obj):
 
     if name in ignored_classes:
         # Return None to tell pytest not to collect this
-        return None
+        return
 
 
 # Test data constants

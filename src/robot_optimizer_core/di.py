@@ -6,6 +6,7 @@ import inspect
 import threading
 from collections.abc import Callable
 from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from enum import StrEnum, auto
 from typing import Any, TypeAlias, TypeVar
@@ -14,7 +15,7 @@ from .exceptions import ConfigurationError
 from .logging import get_logger
 
 ServiceFactory: TypeAlias = type[Any] | Callable[..., Any]
-T = TypeVar('T')
+T = TypeVar("T")
 
 logger = get_logger(__name__)
 
@@ -66,22 +67,28 @@ class ThreadSafeContainer:
         self.parent = parent
         self._services: dict[str, ServiceDescriptor] = {}
         self._services_lock = threading.RLock()
-        self._resolving: threading.local = threading.local()
-        self._scoped_instances: threading.local = threading.local()
+        self._resolution_stack_var: ContextVar[list[str] | None] = ContextVar(
+            f"resolution_stack_{id(self)}", default=None
+        )
+        self._scope_instances_var: ContextVar[dict[str, Any] | None] = ContextVar(
+            f"scope_instances_{id(self)}", default=None
+        )
 
     @property
     def _resolution_stack(self) -> list[str]:
-        """Get thread-local resolution stack."""
-        if not hasattr(self._resolving, 'stack'):
-            self._resolving.stack = []
-        return self._resolving.stack
+        stack = self._resolution_stack_var.get()
+        if stack is None:
+            stack = []
+            self._resolution_stack_var.set(stack)
+        return stack
 
     @property
     def _scope_instances(self) -> dict[str, Any]:
-        """Get thread-local scoped instances."""
-        if not hasattr(self._scoped_instances, 'instances'):
-            self._scoped_instances.instances = {}
-        return self._scoped_instances.instances
+        instances = self._scope_instances_var.get()
+        if instances is None:
+            instances = {}
+            self._scope_instances_var.set(instances)
+        return instances
 
     def register(
         self,
@@ -176,7 +183,7 @@ class ThreadSafeContainer:
             return descriptor.get_or_create_instance(
                 lambda: self._create_instance(descriptor)
             )
-        elif descriptor.lifetime == ServiceLifetime.SCOPED:
+        if descriptor.lifetime == ServiceLifetime.SCOPED:
             # Check scoped instances
             if descriptor.service_type in self._scope_instances:
                 return self._scope_instances[descriptor.service_type]
@@ -185,8 +192,8 @@ class ThreadSafeContainer:
             instance = self._create_instance(descriptor)
             self._scope_instances[descriptor.service_type] = instance
             return instance
-        else:  # TRANSIENT
-            return self._create_instance(descriptor)
+        # TRANSIENT
+        return self._create_instance(descriptor)
 
     def _create_instance(self, descriptor: ServiceDescriptor) -> Any:
         """Create an instance from a descriptor."""
@@ -242,18 +249,11 @@ class ThreadSafeContainer:
     @contextmanager
     def create_scope(self):
         """Create a new resolution scope."""
-        # Save current scoped instances
-        old_instances = self._scope_instances.copy()
-
-        # Clear scoped instances for new scope
-        self._scope_instances.clear()
-
+        token = self._scope_instances_var.set({})
         try:
             yield self
         finally:
-            # Restore previous scope
-            self._scope_instances.clear()
-            self._scope_instances.update(old_instances)
+            self._scope_instances_var.reset(token)
 
     def register_singleton(self, service_type: str, implementation: ServiceFactory, override: bool = False) -> None:
         """Register a singleton service."""
@@ -283,11 +283,8 @@ class ThreadSafeContainer:
         with self._services_lock:
             self._services.clear()
 
-        # Clear thread-local data
-        if hasattr(self._resolving, 'stack'):
-            self._resolving.stack.clear()
-        if hasattr(self._scoped_instances, 'instances'):
-            self._scoped_instances.instances.clear()
+        self._resolution_stack_var.set(None)
+        self._scope_instances_var.set(None)
 
 
 # Global container with thread safety

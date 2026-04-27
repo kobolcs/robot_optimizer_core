@@ -34,7 +34,7 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 # Type variable for Entity and AggregateRoot generic types
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class ValueObject(BaseModel, ABC):

@@ -358,7 +358,7 @@ class TestSleepPattern:
         assert isinstance(normal_data["duration"], Decimal)
 
         # JSON mode
-        json_data = pattern.model_dump(mode='json')
+        json_data = pattern.model_dump(mode="json")
 
         # Decimal converted to float
         assert isinstance(json_data["duration"], float)

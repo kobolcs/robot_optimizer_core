@@ -22,7 +22,9 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
+
+SettingsSourceCallable = PydanticBaseSettingsSource
 
 from ..exceptions import ConfigurationError
 
@@ -307,7 +309,7 @@ class Settings(BaseSettings):
         Returns:
             Dictionary of settings.
         """
-        return self.dict(exclude_unset=False)
+        return self.model_dump()
 
     @classmethod
     def settings_customise_sources(

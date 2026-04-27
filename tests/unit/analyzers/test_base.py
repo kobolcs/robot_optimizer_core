@@ -6,7 +6,7 @@ configuration, and error handling.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -85,7 +85,7 @@ class TestBaseAnalyzer:
             path=Path("test.robot"),
             content="*** Test Cases ***\nTest\n    Sleep    1s",
             size_bytes=100,
-            last_modified_utc=datetime.now(timezone.utc)
+            last_modified_utc=datetime.now(UTC)
         )
 
     def test_create_analyzer(self) -> None:
@@ -121,7 +121,7 @@ class TestBaseAnalyzer:
         """Test safe_analyze wrapper with successful analysis."""
         analyzer = ConcreteAnalyzer()
 
-        with patch.object(analyzer, '_metrics') as mock_metrics:
+        with patch.object(analyzer, "_metrics") as mock_metrics:
             findings = analyzer.safe_analyze(test_file)
 
         assert len(findings) == 1

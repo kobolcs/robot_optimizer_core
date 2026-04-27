@@ -115,15 +115,15 @@ class Location(ValueObject):
         # Build kwargs dict for Pydantic
         init_data = data.copy()
         if file_path is not None:
-            init_data['file_path'] = file_path
+            init_data["file_path"] = file_path
         if line is not None:
-            init_data['line'] = line
+            init_data["line"] = line
         if column is not None:
-            init_data['column'] = column
+            init_data["column"] = column
         if end_line is not None:
-            init_data['end_line'] = end_line
+            init_data["end_line"] = end_line
         if end_column is not None:
-            init_data['end_column'] = end_column
+            init_data["end_column"] = end_column
 
         super().__init__(**init_data)
 

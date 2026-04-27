@@ -47,7 +47,7 @@ class AnalyzerRegistry:
         default_analyzers: List of analyzer names to use by default.
     """
 
-    __slots__ = ('analyzers', 'default_analyzers', 'instances')
+    __slots__ = ("analyzers", "default_analyzers", "instances")
 
     def __init__(self) -> None:
         """Initialize the analyzer registry."""

@@ -40,7 +40,7 @@ class Finding(ValueObject):
         default=None, description="Additional context"
     )
 
-    @field_validator('message', mode='before')
+    @field_validator("message", mode="before")
     @classmethod
     def validate_message(cls, v: str) -> str:
         """Ensure message is not empty.
@@ -60,7 +60,7 @@ class Finding(ValueObject):
             raise ValueError("Finding message cannot be empty")
         return v.strip()
 
-    @field_validator('context')
+    @field_validator("context")
     @classmethod
     def ensure_context_copy(
         cls, v: dict[str, Any] | None
@@ -99,11 +99,11 @@ class Finding(ValueObject):
             A new Finding instance
         """
         return cls.model_validate({
-            'pattern': pattern,
-            'severity': severity,
-            'location': location,
-            'message': message,
-            'context': context if context else None
+            "pattern": pattern,
+            "severity": severity,
+            "location": location,
+            "message": message,
+            "context": context if context else None
         })
 
     # Pydantic v2: computed fields for derived properties

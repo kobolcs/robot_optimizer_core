@@ -28,7 +28,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from .analyzers import get_analyzer, get_analyzer_registry, list_analyzers
+from .analyzers import get_analyzer, list_analyzers
 from .config import get_settings
 from .di import get_container
 from .domain.entities import TestFile
@@ -258,8 +258,7 @@ def analyze_directory(
     metrics.gauge("batch.total_findings", total_findings)
 
     # Use ExceptionGroup for multiple errors (Python 3.11+)
-    if errors and hasattr(builtins, 'ExceptionGroup'):
-        error_messages = [f"{path}: {e}" for path, e in errors]
+    if errors and hasattr(builtins, "ExceptionGroup"):
         raise ExceptionGroup(
             f"Analysis failed for {len(errors)} files",
             [e for _, e in errors]

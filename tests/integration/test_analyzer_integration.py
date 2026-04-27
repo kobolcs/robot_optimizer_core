@@ -6,12 +6,13 @@ the infrastructure components like parsers and file discovery.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
 from robot_optimizer_core import (
+    Container,
     DeadCodeAnalyzer,
     FileDiscoveryService,
     Finding,
@@ -24,9 +25,13 @@ from robot_optimizer_core import (
     register_analyzer,
 )
 from robot_optimizer_core.analyzers import BaseAnalyzer
-from robot_optimizer_core import Container
 from robot_optimizer_core.domain.repositories import TestResultRepository
-from robot_optimizer_core.domain.value_objects import FlakinessStats, Location, Pattern, Severity
+from robot_optimizer_core.domain.value_objects import (
+    FlakinessStats,
+    Location,
+    Pattern,
+    Severity,
+)
 
 
 @pytest.mark.integration
@@ -157,7 +162,7 @@ Unused Keyword {i}
                 path=Path("test.robot"),
                 content="*** Test Cases ***\nFlaky Test\n    Log    test",
                 size_bytes=100,
-                last_modified_utc=datetime.now(timezone.utc)
+                last_modified_utc=datetime.now(UTC)
             )
 
             findings = analyzer.analyze(test_file)
@@ -342,7 +347,7 @@ unused keyword
 """
 
         from tempfile import NamedTemporaryFile
-        with NamedTemporaryFile(mode='w', suffix='.robot', delete=False) as f:
+        with NamedTemporaryFile(mode="w", suffix=".robot", delete=False) as f:
             f.write(content)
             temp_path = Path(f.name)
 
