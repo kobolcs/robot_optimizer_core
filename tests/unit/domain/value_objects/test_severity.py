@@ -166,4 +166,4 @@ class TestSeverity:
 
         # These shouldn't be members
         assert Severity(1) is Severity.ERROR
-        assert "ERROR" not in Severity
+        assert "ERROR" not in Severity.__members__
