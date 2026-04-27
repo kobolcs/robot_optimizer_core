@@ -12,7 +12,7 @@ from enum import StrEnum, auto
 from typing import Any, ParamSpec, TypeVar
 from uuid import UUID, uuid4
 
-from .exceptions import AnalysisError, RepositoryError
+from .exceptions import RepositoryError
 from .logging import get_logger
 
 P = ParamSpec("P")
@@ -395,66 +395,3 @@ class UnitOfWork:
         # Simple mapping - can be customized
         entity_type = type(entity).__name__.lower()
         return f"{entity_type}_repository"
-
-
-# Example usage
-def example_error_boundary_usage():
-    """Example of using error boundaries."""
-    # Create error boundary
-    boundary = ErrorBoundary("file_analysis", fallback=[])
-
-    # Register error handlers
-    @boundary.handle(FileNotFoundError)
-    def handle_file_not_found(e: FileNotFoundError, tx: TransactionContext) -> list:
-        logger.warning(f"File not found: {e}")
-        return []  # Return empty list as fallback
-
-    @boundary.handle(PermissionError)
-    def handle_permission(e: PermissionError, tx: TransactionContext) -> None:
-        logger.error(f"Permission denied: {e}")
-        # Re-raise with better error
-        raise AnalysisError(f"Cannot access file: {e}") from e
-
-    # Use boundary
-    with boundary.guard(file="test.robot") as transaction:
-        transaction.add_operation("open_file")
-        # ... file operations ...
-        transaction.add_operation("parse_file")
-        # ... parsing ...
-
-        # If error occurs, appropriate handler is called
-
-
-@transactional(max_retries=3, rollback_on=(RepositoryError,))
-def save_analysis_results(results: list[Any]) -> None:
-    """Example of transactional operation with retries."""
-    # This will automatically retry up to 3 times on RepositoryError
-    # and rollback on failure
-    pass
-
-
-# Usage with unit of work
-def example_unit_of_work():
-    """Example of using unit of work pattern."""
-    uow = UnitOfWork()
-
-    # Register repositories
-    uow.register_repository("testfile_repository", test_file_repo)
-    uow.register_repository("finding_repository", finding_repo)
-
-    # Use in transaction
-    with uow.transaction():
-        # Create new entities
-        test_file = TestFile(...)
-        uow.register_new(test_file)
-
-        # Modify existing
-        existing = test_file_repo.get(id)
-        existing.content = "modified"
-        uow.register_dirty(existing)
-
-        # Remove
-        old_file = test_file_repo.get(old_id)
-        uow.register_removed(old_file)
-
-        # All changes committed atomically at end of context

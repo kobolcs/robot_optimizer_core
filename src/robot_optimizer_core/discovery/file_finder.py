@@ -17,10 +17,15 @@ from collections import defaultdict
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from ..config import Settings
 from ..exceptions import FileNotFoundError as RFFileNotFoundError
 from ..logging import get_logger
+
+if TYPE_CHECKING:
+    from ..domain.entities import TestFile
+    from ..domain.value_objects import Finding
 
 __all__ = [
     "OptimizedFileDiscoveryService",

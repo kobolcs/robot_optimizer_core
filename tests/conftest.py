@@ -29,7 +29,7 @@ import tempfile
 from collections.abc import Generator
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 from unittest.mock import Mock
 from uuid import uuid4
 

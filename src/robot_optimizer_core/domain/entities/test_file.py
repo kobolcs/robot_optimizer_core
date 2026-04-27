@@ -332,32 +332,5 @@ def format_datetime_local(dt: datetime, tz_name: str = "UTC") -> str:
         return dt.strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
-# Example usage
-def example_timezone_usage():
-    """Example of using timezone-aware entities."""
-    # Create test file with UTC timestamps
-    test_file = TimezoneAwareTestFile.from_path(Path("test.robot"))
-
-    print(f"Last modified (UTC): {test_file.last_modified_utc}")
-    print(f"Last modified (Local): {test_file.last_modified_local}")
-    print(f"Age: {test_file.age_hours:.1f} hours")
-
-    # Create event with UTC timestamp
-    event = TimezoneAwareDomainEvent(
-        event_name="test_completed",
-        # occurred_at is automatically UTC
-    )
-
-    print(f"Event occurred at: {event.occurred_at_iso}")
-
-    # Parse datetime safely
-    dt = parse_datetime_safe("2024-01-01 12:00:00")  # Assumes UTC
-    dt2 = parse_datetime_safe("2024-01-01T12:00:00+02:00")  # Has timezone
-
-    # Format for display
-    formatted = format_datetime_local(dt, "America/New_York")
-    print(f"NY Time: {formatted}")
-
-
 # Export alias for backward compatibility
 TestFile = TZAwareTestFile

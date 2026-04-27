@@ -31,7 +31,7 @@ except ImportError:
 
 from ..config import get_settings
 from ..domain.entities import TestFile
-from ..domain.value_objects import Finding, Location, Pattern, Severity, SleepPattern
+from ..domain.value_objects import Finding, Location, Pattern, PatternType, Severity, SleepPattern
 from .base import BaseAnalyzer, ConfigValue
 
 

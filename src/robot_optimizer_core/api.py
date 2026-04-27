@@ -259,7 +259,6 @@ def analyze_directory(
 
     # Use ExceptionGroup for multiple errors (Python 3.11+)
     if errors and hasattr(builtins, "ExceptionGroup"):
-        error_messages = [f"{path}: {e}" for path, e in errors]
         raise ExceptionGroup(
             f"Analysis failed for {len(errors)} files",
             [e for _, e in errors]

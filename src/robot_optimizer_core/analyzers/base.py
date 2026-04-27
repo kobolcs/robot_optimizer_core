@@ -30,7 +30,7 @@ from abc import ABC, abstractmethod
 from typing import TypeAlias, TypeVar
 
 from ..domain.entities import TestFile
-from ..domain.value_objects import Finding
+from ..domain.value_objects import Finding, Severity
 from ..exceptions import AnalysisError
 from ..logging import get_logger
 from ..metrics import get_metrics
@@ -370,8 +370,6 @@ class BaseAnalyzer(ABC):
             >>> self.determine_severity_by_threshold(3.0, thresholds)
             Severity.WARNING
         """
-        from ..domain.value_objects import Severity
-
         # Check thresholds in order from highest to lowest severity
         if value >= thresholds.get("error", float("inf")):
             return Severity.ERROR

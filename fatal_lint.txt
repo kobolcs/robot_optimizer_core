@@ -1,0 +1,42 @@
+src/robot_optimizer_core/__init__.py:102:25: F401 `pathlib.Path` imported but unused
+src/robot_optimizer_core/analyzers/base.py:354:10: F821 Undefined name `Severity`
+src/robot_optimizer_core/analyzers/sleep_detector.py:258:22: F821 Undefined name `PatternType`
+src/robot_optimizer_core/api.py:262:9: F841 Local variable `error_messages` is assigned to but never used
+src/robot_optimizer_core/boundaries.py:442:52: F821 Undefined name `test_file_repo`
+src/robot_optimizer_core/boundaries.py:443:51: F821 Undefined name `finding_repo`
+src/robot_optimizer_core/boundaries.py:448:21: F821 Undefined name `TestFile`
+src/robot_optimizer_core/boundaries.py:452:20: F821 Undefined name `test_file_repo`
+src/robot_optimizer_core/boundaries.py:457:20: F821 Undefined name `test_file_repo`
+src/robot_optimizer_core/boundaries.py:457:39: F821 Undefined name `old_id`
+src/robot_optimizer_core/config/settings.py:316:24: F821 Undefined name `SettingsSourceCallable`
+src/robot_optimizer_core/config/settings.py:317:23: F821 Undefined name `SettingsSourceCallable`
+src/robot_optimizer_core/config/settings.py:318:26: F821 Undefined name `SettingsSourceCallable`
+src/robot_optimizer_core/config/settings.py:319:31: F821 Undefined name `SettingsSourceCallable`
+src/robot_optimizer_core/config/settings.py:320:16: F821 Undefined name `SettingsSourceCallable`
+src/robot_optimizer_core/context.py:322:9: F841 Local variable `parser` is assigned to but never used
+src/robot_optimizer_core/context.py:334:42: F821 Undefined name `Path`
+src/robot_optimizer_core/context.py:339:64: F841 Local variable `scope` is assigned to but never used
+src/robot_optimizer_core/context.py:341:33: F821 Undefined name `TestFile`
+src/robot_optimizer_core/context.py:363:13: F821 Undefined name `MockTestResultRepository`
+src/robot_optimizer_core/context.py:370:21: F821 Undefined name `TestFile`
+src/robot_optimizer_core/context.py:371:18: F821 Undefined name `Path`
+src/robot_optimizer_core/context.py:374:31: F821 Undefined name `datetime`
+src/robot_optimizer_core/context.py:374:44: F821 Undefined name `timezone`
+src/robot_optimizer_core/context.py:392:38: F841 Local variable `app` is assigned to but never used
+src/robot_optimizer_core/context.py:413:39: F821 Undefined name `Path`
+src/robot_optimizer_core/context.py:413:53: F821 Undefined name `Finding`
+src/robot_optimizer_core/context.py:416:9: F841 Local variable `parser` is assigned to but never used
+src/robot_optimizer_core/context.py:420:25: F821 Undefined name `TestFile`
+src/robot_optimizer_core/discovery/file_finder.py:319:38: F821 Undefined name `Any`
+src/robot_optimizer_core/discovery/file_finder.py:329:46: F821 Undefined name `TestFile`
+src/robot_optimizer_core/discovery/file_finder.py:329:76: F821 Undefined name `Finding`
+src/robot_optimizer_core/discovery/file_finder.py:357:42: F821 Undefined name `TestFile`
+src/robot_optimizer_core/discovery/file_finder.py:357:60: F821 Undefined name `Finding`
+src/robot_optimizer_core/discovery/file_finder.py:390:34: F821 Undefined name `TestFile`
+src/robot_optimizer_core/discovery/file_finder.py:390:52: F821 Undefined name `Finding`
+src/robot_optimizer_core/domain/entities/test_file.py:339:17: F821 Undefined name `TimezoneAwareTestFile`
+src/robot_optimizer_core/domain/entities/test_file.py:355:5: F841 Local variable `dt2` is assigned to but never used
+src/robot_optimizer_core/plugin.py:254:13: F841 Local variable `module` is assigned to but never used
+tests/conftest.py:289:20: F821 Undefined name `Optional`
+Found 40 errors.
+No fixes available (7 hidden fixes can be enabled with the `--unsafe-fixes` option).

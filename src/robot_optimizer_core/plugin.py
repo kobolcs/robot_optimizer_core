@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import ast
 import hashlib
-import importlib.util
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
@@ -247,11 +246,6 @@ class SecurePluginManager:
 
             # Compile with restricted mode
             compiled = compile(plugin_code, str(file_path), "exec", flags=0)
-
-            # Create module
-            module_name = f"plugin_{file_path.stem}"
-            spec = importlib.util.spec_from_file_location(module_name, file_path)
-            module = importlib.util.module_from_spec(spec)
 
             # Execute in restricted environment
             exec(compiled, restricted_globals)
