@@ -55,7 +55,7 @@ Another Unused
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
 
         findings = analyzer.analyze(test_file)
@@ -98,7 +98,7 @@ Do Something
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
 
         findings = analyzer.analyze(test_file)
@@ -128,7 +128,7 @@ Normal Keyword
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
 
         findings = analyzer.analyze(test_file)
@@ -157,7 +157,7 @@ My Keyword
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
 
         findings = analyzer.analyze(test_file)
@@ -184,7 +184,7 @@ Local Keyword
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
 
         findings = analyzer.analyze(test_file)
@@ -224,7 +224,7 @@ exception should not occur
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
 
         findings = analyzer.analyze(test_file)
@@ -253,7 +253,7 @@ Duplicate
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
 
         findings = analyzer.analyze(test_file)
@@ -289,7 +289,7 @@ Normal Unused Keyword
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
 
         findings = analyzer.analyze(test_file)
@@ -305,7 +305,7 @@ Normal Unused Keyword
             path=Path("empty.robot"),
             content="",
             size_bytes=0,
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
         findings = analyzer.analyze(empty_file)
         assert len(findings) == 0
@@ -315,7 +315,7 @@ Normal Unused Keyword
             path=Path("no_keywords.robot"),
             content="*** Test Cases ***\nTest\n    Log    Hi",
             size_bytes=100,
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
         findings = analyzer.analyze(no_keywords)
         assert len(findings) == 0
@@ -334,7 +334,7 @@ Valid Keyword Name
     Log    This is fine but unused
 """,
             size_bytes=200,
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
         findings = analyzer.analyze(malformed)
 
@@ -358,7 +358,7 @@ My Keyword
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
 
         findings = analyzer.analyze(test_file)
@@ -392,7 +392,7 @@ Static Unused
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
 
         findings = analyzer.analyze(test_file)

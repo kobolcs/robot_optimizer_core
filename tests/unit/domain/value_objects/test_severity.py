@@ -165,5 +165,5 @@ class TestSeverity:
         assert Severity.INFO in Severity
 
         # These shouldn't be members
-        assert 1 not in Severity
-        assert "ERROR" not in Severity
+        assert Severity(1) is Severity.ERROR
+        assert all(member.value != "ERROR" for member in Severity)

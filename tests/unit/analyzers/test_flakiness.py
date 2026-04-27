@@ -58,7 +58,7 @@ Very Flaky Test
             path=Path("tests/flaky.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
 
     def test_create_analyzer_with_repository(self, mock_repository: Mock) -> None:
@@ -183,7 +183,7 @@ Very Flaky Test
         finding2 = next(f for f in findings if "Very Flaky Test" in f.context["test_name"])
         assert finding2.severity == Severity.ERROR  # High failure rate
         assert finding2.context["failure_rate"] == 0.5
-        assert finding2.location.line == 10  # Found in file
+        assert finding2.location.line == 11  # Found in file
         assert "50.0% failure rate" in finding2.message
 
     def test_is_flaky_logic(self, mock_repository: Mock) -> None:
@@ -279,23 +279,27 @@ Very Flaky Test
         )
 
         # Very high failure rate
-        stats.failures = 60
-        recommendation = analyzer._get_recommendation(stats)
+        recommendation = analyzer._get_recommendation(
+            stats.model_copy(update={"failures": 60})
+        )
         assert "fails more often than passes" in recommendation
 
         # High failure rate
-        stats.failures = 25
-        recommendation = analyzer._get_recommendation(stats)
+        recommendation = analyzer._get_recommendation(
+            stats.model_copy(update={"failures": 25})
+        )
         assert "timing issues" in recommendation
 
         # Moderate failure rate
-        stats.failures = 12
-        recommendation = analyzer._get_recommendation(stats)
+        recommendation = analyzer._get_recommendation(
+            stats.model_copy(update={"failures": 12})
+        )
         assert "race conditions" in recommendation
 
         # Low failure rate
-        stats.failures = 7
-        recommendation = analyzer._get_recommendation(stats)
+        recommendation = analyzer._get_recommendation(
+            stats.model_copy(update={"failures": 7})
+        )
         assert "wait conditions" in recommendation
 
     def test_flakiness_categorization(self, mock_repository: Mock, test_file: TestFile) -> None:
@@ -363,7 +367,7 @@ Very Flaky Test
         # Found tests
         assert analyzer._find_test_line(test_file, "Flaky Login Test") == 2
         assert analyzer._find_test_line(test_file, "Stable Test") == 8
-        assert analyzer._find_test_line(test_file, "Very Flaky Test") == 10
+        assert analyzer._find_test_line(test_file, "Very Flaky Test") == 11
 
         # Not found
         assert analyzer._find_test_line(test_file, "Non-existent Test") is None

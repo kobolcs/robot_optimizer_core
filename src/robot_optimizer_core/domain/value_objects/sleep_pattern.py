@@ -127,7 +127,7 @@ class SleepPattern(ValueObject):
         """Suggest severity based on duration."""
         if self.duration_in_seconds < 1:
             return "INFO"
-        if self.duration_in_seconds < 5:
+        if self.duration_in_seconds <= 5:
             return "WARNING"
         return "ERROR"
 

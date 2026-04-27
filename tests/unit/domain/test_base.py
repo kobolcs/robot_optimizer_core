@@ -136,7 +136,7 @@ class TestValueObject:
         with pytest.raises(ValidationError) as exc_info:
             Money(amount=Decimal("100"), currency="US")
         errors = exc_info.value.errors()
-        assert any("string does not match regex" in str(e) for e in errors)
+        assert any("String should match pattern" in str(e) for e in errors)
 
         with pytest.raises(ValidationError):
             Money(amount=Decimal("100"), currency="usd")  # Lowercase

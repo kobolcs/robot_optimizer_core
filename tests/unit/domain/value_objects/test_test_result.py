@@ -89,7 +89,7 @@ class TestTestResult:
                 execution_time=1.0,
                 timestamp=timestamp
             )
-        assert "string does not match regex" in str(exc_info.value)
+        assert "String should match pattern" in str(exc_info.value)
 
     def test_execution_time_validation(self) -> None:
         """Test execution time validation."""

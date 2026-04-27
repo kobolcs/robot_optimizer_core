@@ -55,8 +55,7 @@ class AnalyzerRegistry:
         self.instances: dict[str, BaseAnalyzer] = {}
         self.default_analyzers: list[str] = [
             "dead_code",
-            "sleep_detector",
-            "flakiness"
+            "sleep_detector"
         ]
 
     def register(

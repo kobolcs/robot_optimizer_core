@@ -1,3 +1,4 @@
+
 # tests/conftest.py
 """Pytest configuration and shared fixtures for Robot Framework Optimizer Core tests.
 
@@ -7,6 +8,20 @@ This module provides common fixtures and configuration for all test levels:
 - Component tests: End-to-end workflow tests
 """
 from __future__ import annotations
+
+# Prevent pytest from collecting imported domain model classes as test classes.
+try:
+    from robot_optimizer_core.domain.entities import TestFile as _DomainTestFile
+    _DomainTestFile.__test__ = False
+except Exception:
+    pass
+
+try:
+    from robot_optimizer_core.domain.value_objects import TestResult as _DomainTestResult
+    _DomainTestResult.__test__ = False
+except Exception:
+    pass
+
 
 import tempfile
 from collections.abc import Generator
@@ -155,7 +170,7 @@ def large_robot_file(temp_dir: Path) -> Path:
         content += f"""
 Test Case {i}
     Log    Test case {i}
-    Sleep    {i % 10} seconds
+    Sleep    {(i % 10) + 1} seconds
     Should Be Equal    ${i}    ${i}
 """
 

@@ -31,7 +31,7 @@ class TestTestFile:
             path=Path("tests/sample.robot"),
             content="*** Test Cases ***\nTest Case 1\n    Log    Hello",
             size_bytes=1024,
-            last_modified=now
+            last_modified_utc=now
         )
 
         assert test_file.id == file_id
@@ -49,7 +49,7 @@ class TestTestFile:
             path=Path("test.robot"),
             content="content",
             size_bytes=100,
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
 
         assert test_file.id is not None
@@ -61,7 +61,7 @@ class TestTestFile:
             path="tests/sample.robot",  # String
             content="content",
             size_bytes=100,
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
 
         assert isinstance(test_file.path, Path)
@@ -72,7 +72,7 @@ class TestTestFile:
             path="tests/suite/subsuite/test.robot",
             content="content",
             size_bytes=100,
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
         assert test_file2.path == Path("tests/suite/subsuite/test.robot")
 
@@ -84,7 +84,7 @@ class TestTestFile:
                 path=Path("test.robot"),
                 content="content",
                 size_bytes=100,
-                last_modified=datetime.now(),
+                last_modified_utc=datetime.now(),
                 encoding=encoding
             )
             assert test_file.encoding == encoding.lower()
@@ -95,7 +95,7 @@ class TestTestFile:
                 path=Path("test.robot"),
                 content="content",
                 size_bytes=100,
-                last_modified=datetime.now(),
+                last_modified_utc=datetime.now(),
                 encoding="invalid-encoding"
             )
         assert "Unsupported encoding" in str(exc_info.value)
@@ -107,7 +107,7 @@ class TestTestFile:
                 path=Path("test.robot"),
                 content="content",
                 size_bytes=-1,
-                last_modified=datetime.now()
+                last_modified_utc=datetime.now()
             )
         assert "greater than or equal to 0" in str(exc_info.value)
 
@@ -116,7 +116,7 @@ class TestTestFile:
             path=Path("test.robot"),
             content="",
             size_bytes=0,
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
         assert test_file.size_bytes == 0
 
@@ -129,7 +129,7 @@ class TestTestFile:
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content.encode('utf-8')),
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
 
         # Should validate successfully
@@ -181,7 +181,7 @@ class TestTestFile:
             path=Path("tests/login_suite.robot"),
             content="Line 1\nLine 2\nLine 3\n",
             size_bytes=2048,
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
 
         # name property
@@ -209,7 +209,7 @@ class TestTestFile:
             path=Path("keywords.resource"),
             content="*** Keywords ***",
             size_bytes=100,
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
         assert resource1.is_resource_file is True
 
@@ -218,7 +218,7 @@ class TestTestFile:
             path=Path("common_resources.robot"),
             content="*** Keywords ***",
             size_bytes=100,
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
         assert resource2.is_resource_file is True
 
@@ -227,7 +227,7 @@ class TestTestFile:
             path=Path("test_suite.robot"),
             content="*** Test Cases ***",
             size_bytes=100,
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
         assert test_file.is_resource_file is False
 
@@ -237,7 +237,7 @@ class TestTestFile:
             path=Path("empty.robot"),
             content="",
             size_bytes=0,
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
 
         assert test_file.line_count == 1  # Empty string is still 1 "line"
@@ -251,7 +251,7 @@ class TestTestFile:
             path=Path("test.robot"),
             content=content,
             size_bytes=100,
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
 
         # Single line (default)
@@ -280,7 +280,7 @@ class TestTestFile:
             path=Path("test1.robot"),
             content="content1",
             size_bytes=100,
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
 
         file2 = TestFile(
@@ -288,7 +288,7 @@ class TestTestFile:
             path=Path("test2.robot"),  # Different attributes
             content="content2",
             size_bytes=200,
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
 
         file3 = TestFile(
@@ -296,7 +296,7 @@ class TestTestFile:
             path=Path("test1.robot"),  # Same attributes as file1
             content="content1",
             size_bytes=100,
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
 
         # Same ID = same entity
@@ -319,7 +319,7 @@ class TestTestFile:
             path=Path("test.robot"),
             content="original",
             size_bytes=100,
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
 
         # Should be able to change attributes
@@ -337,7 +337,7 @@ class TestTestFile:
             path=Path("test.robot"),
             content="content",
             size_bytes=100,
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
 
         # Normal mode - Path remains as Path
@@ -369,7 +369,7 @@ class TestTestFile:
             path=Path("large.robot"),
             content=large_content,
             size_bytes=len(large_content),
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
 
         assert len(test_file.content) == 1024 * 1024
@@ -390,7 +390,7 @@ Test With Unicode
             path=Path("unicode.robot"),
             content=unicode_content,
             size_bytes=len(unicode_content.encode('utf-8')),
-            last_modified=datetime.now()
+            last_modified_utc=datetime.now()
         )
 
         assert "世界" in test_file.content

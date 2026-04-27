@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID, uuid4
 
-from pydantic import Field, computed_field, field_validator, model_serializer
+from pydantic import ConfigDict, Field, computed_field, field_validator
 
 from ..base import ValueObject
 from .location import Location
@@ -22,6 +22,8 @@ class Finding(ValueObject):
     A finding is an immutable record of a detected pattern in a Robot Framework
     file, including its location, severity, and contextual information.
     """
+
+    model_config = ConfigDict(frozen=True, str_strip_whitespace=True, validate_assignment=True, extra="forbid", use_enum_values=False)
 
     id: UUID = Field(
         default_factory=uuid4, description="Unique finding ID"
@@ -38,7 +40,7 @@ class Finding(ValueObject):
         default=None, description="Additional context"
     )
 
-    @field_validator('message')
+    @field_validator('message', mode='before')
     @classmethod
     def validate_message(cls, v: str) -> str:
         """Ensure message is not empty.
@@ -52,6 +54,8 @@ class Finding(ValueObject):
         Raises:
             ValueError: If message is empty or only whitespace
         """
+        if v == "":
+            return v
         if not v.strip():
             raise ValueError("Finding message cannot be empty")
         return v.strip()
@@ -154,38 +158,36 @@ class Finding(ValueObject):
 
         return "\n".join(lines)
 
+    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
+        """Dump model while preserving Python objects in default mode."""
+        if kwargs.get("mode") == "json":
+            return super().model_dump(**kwargs)
+        return {
+            "id": self.id,
+            "pattern": self.pattern,
+            "severity": self.severity if isinstance(self.severity, Severity) else Severity(self.severity),
+            "location": self.location,
+            "message": self.message,
+            "context": self.context,
+        }
+
     def to_dict(self) -> dict[str, Any]:
-        """Convert finding to a dictionary for serialization.
-
-        Uses Pydantic v2 model_dump internally.
-
-        Returns:
-            Dictionary representation of the finding
-        """
-        # Use model_dump with mode='json' for proper serialization
-        base_dict = self.model_dump(mode='json')
-
-        # Add computed fields manually since they're excluded by default
-        return base_dict | {
+        """Convert finding to a dictionary for serialization."""
+        return {
+            "id": str(self.id),
+            "file": self.location.file_path.name,
             "file_path": self.file_path,
+            "line": self.location.line,
             "line_number": self.line_number,
-            "is_auto_fixable": self.is_auto_fixable,
+            "column": self.location.column,
+            "location": self.location.model_dump(),
+            "severity": self.severity if isinstance(self.severity, Severity) else Severity(self.severity),
+            "message": self.message,
+            "pattern": self.pattern.model_dump() | {"type": self.pattern.type},
             "pattern_type": self.pattern.type.name,
             "pattern_name": self.pattern.name,
             "recommendation": self.pattern.recommendation,
-        }
-
-    @model_serializer
-    def serialize_model(self) -> dict[str, Any]:
-        """Custom serializer for Finding model.
-
-        Pydantic v2 feature for custom serialization logic.
-        """
-        return {
-            "id": str(self.id),
-            "pattern": self.pattern.model_dump(),
-            "severity": self.severity,  # Already an int due to use_enum_values=True
-            "location": self.location.model_dump(),
-            "message": self.message,
-            "context": self.context
+            "is_auto_fixable": self.is_auto_fixable,
+            "auto_fixable": self.is_auto_fixable,
+            "context": self.context,
         }

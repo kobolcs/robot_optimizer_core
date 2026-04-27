@@ -6,6 +6,7 @@ configuration, and error handling.
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -84,7 +85,7 @@ class TestBaseAnalyzer:
             path=Path("test.robot"),
             content="*** Test Cases ***\nTest\n    Sleep    1s",
             size_bytes=100,
-            last_modified=None
+            last_modified_utc=datetime.now(timezone.utc)
         )
 
     def test_create_analyzer(self) -> None:
@@ -164,7 +165,7 @@ class TestBaseAnalyzer:
         valid_finding = Finding.create(
             pattern=Pattern.sleep_in_test("1s"),
             severity=Severity.WARNING,
-            location=Location(test_file.path, 10),
+            location=Location(test_file.path, 2),
             message="Valid"
         )
 
@@ -324,7 +325,7 @@ class TestBaseAnalyzer:
             analyzer.safe_analyze(test_file)
 
         # Should be the original error, not wrapped
-        assert str(exc_info.value) == "Custom analysis error"
+        assert exc_info.value.message == "Custom analysis error"
 
     def test_logger_with_context(self) -> None:
         """Test that logger includes analyzer context."""

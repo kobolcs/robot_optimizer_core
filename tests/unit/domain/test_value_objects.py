@@ -391,7 +391,7 @@ class TestFinding:
 
         data = finding.to_dict()
         assert data["pattern_type"] == "SLEEP_IN_TEST"
-        assert data["severity"] == "WARNING"
+        assert data["severity"] == Severity.WARNING
         assert data["file"] == "test.robot"
         assert data["line"] == 25
         assert data["column"] == 10

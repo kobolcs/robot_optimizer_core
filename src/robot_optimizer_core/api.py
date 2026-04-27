@@ -28,7 +28,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from .analyzers import get_analyzer, list_analyzers
+from .analyzers import get_analyzer, get_analyzer_registry, list_analyzers
 from .config import get_settings
 from .di import get_container
 from .domain.entities import TestFile
@@ -387,8 +387,10 @@ def _get_analyzer_instances(
         List of analyzer instances.
     """
     if analyzers is None:
-        # Use all registered analyzers
-        analyzer_names = list_analyzers()
+        # Use all registered analyzers that are safe to construct without
+        # external dependencies. Flakiness requires a TestResultRepository and
+        # must be requested explicitly or injected.
+        analyzer_names = [name for name in list_analyzers() if name != "flakiness"]
         return [get_analyzer(name) for name in analyzer_names]
 
     instances = []

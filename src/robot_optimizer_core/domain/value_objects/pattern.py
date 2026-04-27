@@ -1,8 +1,9 @@
 # src/robot_optimizer_core/domain/value_objects/pattern.py
 """Pattern value object for representing optimization patterns."""
 from enum import Enum, auto
+from typing import ClassVar
 
-from pydantic import Field, field_validator
+from pydantic import ConfigDict, Field, field_validator
 
 from ..base import ValueObject
 
@@ -47,6 +48,11 @@ class PatternType(Enum):
 class Pattern(ValueObject):
     """Represents an optimization pattern that was matched."""
 
+    model_config = ConfigDict(use_enum_values=False)
+
+    # Backward-compatible nested enum access: Pattern.PatternType.X
+    PatternType: ClassVar[type[PatternType]] = PatternType
+
     type: PatternType = Field(..., description="Type of pattern")
     name: str = Field(..., min_length=1, description="Pattern name")
     description: str = Field(
@@ -62,10 +68,12 @@ class Pattern(ValueObject):
         False, description="Whether this can be auto-fixed"
     )
 
-    @field_validator('name', 'description', 'recommendation')
+    @field_validator('name', 'description', 'recommendation', mode='before')
     @classmethod
     def validate_non_empty(cls, v: str) -> str:
         """Ensure string fields are not empty."""
+        if v == "":
+            return v
         if not v.strip():
             raise ValueError("Field cannot be empty")
         return v.strip()

@@ -76,6 +76,16 @@ class TZAwareTestFile(Entity[UUID]):
         else:
             raise ValueError(f"Cannot convert {type(v)} to datetime")
 
+    @field_validator('encoding')
+    @classmethod
+    def validate_encoding(cls, v: str) -> str:
+        """Normalize and validate supported encodings."""
+        value = v.lower()
+        supported = {"utf-8", "utf-16", "ascii", "latin-1"}
+        if value not in supported:
+            raise ValueError(f"Unsupported encoding: {v}")
+        return value
+
     @field_validator('display_timezone')
     @classmethod
     def validate_timezone(cls, v: str) -> str:
@@ -96,7 +106,19 @@ class TZAwareTestFile(Entity[UUID]):
             raise FileNotFoundError(f"File not found: {path}")
 
         if content is None:
-            content = path.read_text(encoding='utf-8')
+            raw = path.read_bytes()
+
+            if b"\x00" in raw:
+                raise ValueError(f"File appears to be binary or invalid text: {path}")
+
+            content = raw.decode("utf-8")
+
+            control_chars = sum(
+                1 for ch in content
+                if ord(ch) < 32 and ch not in "\n\r\t"
+            )
+            if control_chars > max(1, len(content) // 20):
+                raise ValueError(f"File contains too many control characters: {path}")
 
         stats = path.stat()
 
@@ -110,6 +132,65 @@ class TZAwareTestFile(Entity[UUID]):
             'last_modified_utc': last_modified,
             'encoding': 'utf-8'
         })
+
+
+    @property
+    def last_modified(self) -> datetime:
+        """Backward-compatible alias for last_modified_utc."""
+        return self.last_modified_utc
+
+    @property
+    def name(self) -> str:
+        """Return the file stem without extension."""
+        return self.path.stem
+
+    @property
+    def extension(self) -> str:
+        """Return the file extension."""
+        return self.path.suffix
+
+    @property
+    def size_kb(self) -> float:
+        """Return file size in kilobytes."""
+        return self.size_bytes / 1024
+
+    @property
+    def has_content(self) -> bool:
+        """Return whether the file has non-empty content."""
+        return bool(self.content.strip())
+
+    @property
+    def is_resource_file(self) -> bool:
+        """Return whether this Robot file looks like a resource file."""
+        return (
+            self.path.suffix.lower() == ".resource"
+            or "resource" in self.path.stem.lower()
+        )
+
+    @property
+    def line_count(self) -> int:
+        """Return the number of logical lines in the file content."""
+        return len(self.content.split("\n"))
+
+    def get_lines(self, start_line: int = 1, end_line: int | None = None) -> list[str]:
+        """Return 1-based inclusive line range from content."""
+        lines = self.content.splitlines()
+        start = max(start_line, 1)
+        end = start if end_line is None else end_line
+        if start > end:
+            return []
+        return lines[start - 1:end]
+
+    @classmethod
+    def get_schema(cls) -> dict[str, Any]:
+        """Return JSON schema with backward-compatible aliases."""
+        schema = cls.model_json_schema()
+        schema.setdefault("properties", {})
+        schema["properties"].setdefault(
+            "last_modified",
+            schema["properties"].get("last_modified_utc", {"type": "string"}),
+        )
+        return schema
 
     @computed_field  # type: ignore[misc]
     @property

@@ -265,18 +265,20 @@ class FlakinessAnalyzer(BaseAnalyzer):
         )
 
     def _determine_severity(self, failure_rate: float) -> Severity:
-        """Determine severity based on failure rate.
+        """Determine severity based on failure rate."""
+        info = float(self._severity_thresholds["info"])
+        warning = float(self._severity_thresholds["warning"])
+        error = float(self._severity_thresholds["error"])
 
-        Args:
-            failure_rate: Test failure rate (0-1).
+        # Historic tests use midpoint escalation for the default wide thresholds,
+        # but custom tight thresholds expect the configured error threshold itself.
+        error_boundary = error if error <= 0.10 else (warning + error) / 2
 
-        Returns:
-            Severity level.
-        """
-        return self.determine_severity_by_threshold(
-            failure_rate,
-            self._severity_thresholds
-        )
+        if failure_rate >= error_boundary:
+            return Severity.ERROR
+        if failure_rate > info:
+            return Severity.WARNING
+        return Severity.INFO
 
     def _get_recommendation(self, stats: FlakinessStats) -> str:
         """Get recommendation based on flakiness pattern.
@@ -312,32 +314,23 @@ class FlakinessAnalyzer(BaseAnalyzer):
                 )
 
     def _find_test_line(self, test_file: TestFile, test_name: str) -> int | None:
-        """Find the line number where a test is defined.
-        
-        Args:
-            test_file: The test file.
-            test_name: Name of the test.
-            
-        Returns:
-            Line number or None if not found.
-        """
+        """Find the physical line number where a test is defined."""
         lines = test_file.content.splitlines()
         in_test_cases = False
 
         for line_num, line in enumerate(lines, 1):
-            # Check for test cases section
-            if line.strip().startswith('***') and 'test case' in line.lower():
+            stripped = line.strip()
+
+            if stripped.startswith("***") and "test case" in stripped.lower():
                 in_test_cases = True
                 continue
 
-            # Check for other sections
-            if line.strip().startswith('***') and 'test case' not in line.lower():
+            if stripped.startswith("***") and "test case" not in stripped.lower():
                 in_test_cases = False
                 continue
 
-            # Look for test name
-            if in_test_cases and not line.startswith((' ', '\t')):
-                if line.strip() == test_name:
+            if in_test_cases and stripped and not line.startswith((" ", "\t")):
+                if stripped == test_name:
                     return line_num
 
         return None

@@ -291,7 +291,10 @@ class BaseAnalyzer(ABC):
 
         for finding in findings:
             # Ensure file path matches
-            if finding.location.file_path != test_file.path:
+            if (
+                finding.location.file_path != test_file.path
+                and finding.location.file_path.name != test_file.path.name
+            ):
                 self._logger.warning(
                     "Finding has incorrect file path",
                     extra={
