@@ -40,6 +40,7 @@ from ..domain.value_objects import (
     Severity,
     SleepPattern,
 )
+from ..exceptions import ConfigurationError
 from .base import BaseAnalyzer, ConfigValue
 
 
@@ -86,6 +87,7 @@ class SleepDetector(BaseAnalyzer):
 
         # Compile patterns
         self._sleep_patterns = self._compile_sleep_patterns()
+        self.validate_config()
 
     @property
     @override
@@ -386,7 +388,6 @@ class SleepDetector(BaseAnalyzer):
         thresholds = self._severity_thresholds
 
         if not isinstance(thresholds, dict):
-            from ..exceptions import ConfigurationError
             raise ConfigurationError(
                 "Severity thresholds must be a dictionary",
                 config_key="severity_thresholds",
@@ -395,7 +396,6 @@ class SleepDetector(BaseAnalyzer):
 
         required_keys = {"info", "warning", "error"}
         if missing := required_keys - set(thresholds.keys()):
-            from ..exceptions import ConfigurationError
             raise ConfigurationError(
                 f"Missing severity thresholds: {missing}",
                 config_key="severity_thresholds",
@@ -405,7 +405,6 @@ class SleepDetector(BaseAnalyzer):
         # Validate threshold values are numbers
         for key, value in thresholds.items():
             if not isinstance(value, (int, float)):
-                from ..exceptions import ConfigurationError
                 raise ConfigurationError(
                     f"Threshold '{key}' must be numeric",
                     config_key=f"severity_thresholds.{key}",

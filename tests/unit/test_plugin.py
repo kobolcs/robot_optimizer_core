@@ -54,6 +54,17 @@ class TestPluginRegistry:
         registry.register("b", _MinimalPlugin)
         assert sorted(registry.list()) == ["a", "b"]
 
+    def test_unregister_removes_entry(self) -> None:
+        registry = PluginRegistry()
+        registry.register("minimal", _MinimalPlugin)
+        registry.unregister("minimal")
+        assert registry.get("minimal") is None
+        assert "minimal" not in registry.list()
+
+    def test_unregister_missing_is_noop(self) -> None:
+        registry = PluginRegistry()
+        registry.unregister("does_not_exist")  # must not raise
+
 
 @pytest.mark.unit
 class TestPluginInterface:

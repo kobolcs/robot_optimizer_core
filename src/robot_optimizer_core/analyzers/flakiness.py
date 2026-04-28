@@ -110,6 +110,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
                 "error": 0.30     # 30% failure rate
             }
         )
+        self.validate_config()
 
     @property
     @override

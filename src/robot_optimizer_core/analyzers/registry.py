@@ -123,20 +123,14 @@ class AnalyzerRegistry:
         if name in self.instances:
             return self.instances[name]
 
-        # Check built-in analyzers
+        # Check registered analyzers (built-in or plugin-provided via register_analyzer())
         if name not in self.analyzers:
-            # Try plugin registry
-            plugin_registry = get_plugin_registry()
-            try:
-                analyzer_class = plugin_registry.get("analyzers", name)
-                self.analyzers[name] = analyzer_class
-            except PluginError as err:
-                raise PluginError(
-                    f"Analyzer not found: {name}",
-                    plugin_name=name,
-                    plugin_type="analyzer",
-                    details={"available": self.list()}
-                ) from err
+            raise PluginError(
+                f"Analyzer not found: {name}",
+                plugin_name=name,
+                plugin_type="analyzer",
+                details={"available": self.list()}
+            )
 
         # Create instance
         analyzer_class = self.analyzers[name]
@@ -235,10 +229,6 @@ class AnalyzerRegistry:
         """
         self.analyzers.pop(name, None)
         self.instances.pop(name, None)
-
-        # Also remove from plugin registry
-        plugin_registry = get_plugin_registry()
-        plugin_registry.unregister("analyzers", name)
 
 
 # Global registry instance
