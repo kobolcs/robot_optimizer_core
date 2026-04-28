@@ -1,10 +1,5 @@
 {
   "permissions": {
-    "allow": [
-      "Bash(wsl *)",
-      "Bash(tox -e type)",
-      "Read(///wsl.localhost/Ubuntu/home/csaba/projects/**)",
-      "Bash(git checkout *)"
-    ]
+    "allow": []
   }
 }
