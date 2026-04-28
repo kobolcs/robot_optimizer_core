@@ -160,3 +160,24 @@ DOCUMENTATION_IMPROVEMENTS.md
 # Local/generated Codex artifact packs
 robot_optimizer_core_codex_pack.zip
 *_codex_pack.zip
+
+# Ruff cache
+.ruff_cache/
+
+# Claude Code local tool config (developer-machine-specific)
+.claude/
+
+# Generated lint/coverage artifacts that should never be committed
+fatal_lint.txt
+coverage.xml
+htmlcov/
+
+# CI scaffolding and dev scripts that are not part of the package
+README_CI_INTEGRATION.md
+run_test_coverage_check.py
+
+# MkDocs generated site
+site/
+
+# mutmut cache
+.mutmut-cache
