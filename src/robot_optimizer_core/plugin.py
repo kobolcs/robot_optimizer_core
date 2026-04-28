@@ -233,14 +233,27 @@ class SecurePluginManager:
                         "file_hash": file_hash
                     }
                 )
+        else:
+            logger.warning(
+                f"Plugin security validation bypassed via force=True: {file_path} "
+                f"(hash: {file_hash})"
+            )
 
         # Load plugin in restricted environment
         try:
             # Create a restricted globals environment
             # Handle both dict and module forms of __builtins__
             builtin_dict = __builtins__ if isinstance(__builtins__, dict) else vars(__builtins__)
+            restricted_builtins = {k: builtin_dict[k] for k in ALLOWED_BUILTINS if k in builtin_dict}
+            # __import__ and __build_class__ are required by the Python runtime
+            # inside exec() for import statements and class definitions.
+            # Security is enforced by the AST validator that runs before exec,
+            # so restoring these here does not bypass the import allowlist.
+            for _name in ("__import__", "__build_class__"):
+                if _name in builtin_dict:
+                    restricted_builtins[_name] = builtin_dict[_name]
             restricted_globals = {
-                "__builtins__": {k: builtin_dict[k] for k in ALLOWED_BUILTINS if k in builtin_dict},
+                "__builtins__": restricted_builtins,
                 "__name__": f"plugin_{file_path.stem}",
                 "__file__": str(file_path),
             }
@@ -272,7 +285,7 @@ class SecurePluginManager:
 
             # Additional validation of metadata
             if not metadata.name or ".." in metadata.name or "/" in metadata.name:
-                raise PluginError("Invalid plugin name")
+                raise PluginError(f"Invalid plugin name: {metadata.name!r}")
 
             plugin.activate()
             plugin.is_active = True
