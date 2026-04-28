@@ -7,6 +7,13 @@ import pytest
 from robot_optimizer_core.metrics import MetricsCollector, TimingStats, get_metrics
 
 
+@pytest.fixture
+def collector() -> MetricsCollector:  # type: ignore[misc]
+    m = MetricsCollector(enabled=True)
+    yield m
+    m.stop()
+
+
 @pytest.mark.unit
 class TestTimingStats:
     def test_initial_state(self) -> None:
@@ -36,43 +43,37 @@ class TestTimingStats:
 
 @pytest.mark.unit
 class TestMetricsCollector:
-    def test_increment(self) -> None:
-        m = MetricsCollector(enabled=True)
-        m.increment("test.counter")
-        m.increment("test.counter")
-        data = m.get_metrics()
+    def test_increment(self, collector: MetricsCollector) -> None:
+        collector.increment("test.counter")
+        collector.increment("test.counter")
+        data = collector.get_metrics()
         assert data["counters"]["test.counter"] == 2
 
-    def test_increment_with_value(self) -> None:
-        m = MetricsCollector(enabled=True)
-        m.increment("test.counter", 5)
-        data = m.get_metrics()
+    def test_increment_with_value(self, collector: MetricsCollector) -> None:
+        collector.increment("test.counter", 5)
+        data = collector.get_metrics()
         assert data["counters"]["test.counter"] == 5
 
-    def test_gauge(self) -> None:
-        m = MetricsCollector(enabled=True)
-        m.gauge("test.gauge", 42.0)
-        data = m.get_metrics()
+    def test_gauge(self, collector: MetricsCollector) -> None:
+        collector.gauge("test.gauge", 42.0)
+        data = collector.get_metrics()
         assert data["gauges"]["test.gauge"] == 42.0
 
-    def test_gauge_overwrite(self) -> None:
-        m = MetricsCollector(enabled=True)
-        m.gauge("g", 1.0)
-        m.gauge("g", 2.0)
-        assert m.get_metrics()["gauges"]["g"] == 2.0
+    def test_gauge_overwrite(self, collector: MetricsCollector) -> None:
+        collector.gauge("g", 1.0)
+        collector.gauge("g", 2.0)
+        assert collector.get_metrics()["gauges"]["g"] == 2.0
 
-    def test_timing(self) -> None:
-        m = MetricsCollector(enabled=True)
-        m.timing("test.timing", 0.5)
-        data = m.get_metrics()
+    def test_timing(self, collector: MetricsCollector) -> None:
+        collector.timing("test.timing", 0.5)
+        data = collector.get_metrics()
         assert "test.timing" in data["timings"]
         assert data["timings"]["test.timing"]["count"] == 1
 
-    def test_timer_context_manager(self) -> None:
-        m = MetricsCollector(enabled=True)
-        with m.timer("op.duration"):
+    def test_timer_context_manager(self, collector: MetricsCollector) -> None:
+        with collector.timer("op.duration"):
             pass
-        data = m.get_metrics()
+        data = collector.get_metrics()
         assert "op.duration" in data["timings"]
 
     def test_disabled_collector_ignores_all(self) -> None:
@@ -89,18 +90,16 @@ class TestMetricsCollector:
         m2 = get_metrics()
         assert m1 is m2
 
-    def test_tags_create_separate_keys(self) -> None:
-        m = MetricsCollector(enabled=True)
-        m.increment("hits", tags={"env": "prod"})
-        m.increment("hits", tags={"env": "dev"})
-        data = m.get_metrics()
+    def test_tags_create_separate_keys(self, collector: MetricsCollector) -> None:
+        collector.increment("hits", tags={"env": "prod"})
+        collector.increment("hits", tags={"env": "dev"})
+        data = collector.get_metrics()
         keys = list(data["counters"].keys())
         assert len([k for k in keys if "hits" in k]) == 2
 
-    def test_reset(self) -> None:
-        m = MetricsCollector(enabled=True)
-        m.increment("x")
-        m.reset()
-        data = m.get_metrics()
+    def test_reset(self, collector: MetricsCollector) -> None:
+        collector.increment("x")
+        collector.reset()
+        data = collector.get_metrics()
         assert data["counters"] == {}
         assert data["gauges"] == {}

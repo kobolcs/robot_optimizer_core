@@ -98,6 +98,7 @@ class MetricsCollector:
         self._gdpr_filter = self._create_gdpr_filter()
 
         # Start cleanup thread if enabled
+        self._stop_event = threading.Event()
         if enabled:
             self._cleanup_thread = threading.Thread(
                 target=self._cleanup_loop,
@@ -210,11 +211,16 @@ class MetricsCollector:
             self._start_time = time.time()
             self._last_cleanup = time.time()
 
+    def stop(self) -> None:
+        """Signal the background cleanup thread to stop and wait for it to exit."""
+        self._stop_event.set()
+        if hasattr(self, "_cleanup_thread"):
+            self._cleanup_thread.join(timeout=2)
+
     def _cleanup_loop(self) -> None:
         """Background cleanup thread."""
-        while self.enabled:
+        while not self._stop_event.wait(timeout=self.cleanup_interval):
             try:
-                time.sleep(self.cleanup_interval)
                 with self._lock:
                     self._cleanup()
             except Exception as e:
