@@ -12,6 +12,13 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+__all__ = [
+    "TimingStats",
+    "MetricsCollector",
+    "get_metrics",
+    "configure_metrics",
+]
+
 logger = _stdlib_logging.getLogger(__name__)
 
 
@@ -91,6 +98,7 @@ class MetricsCollector:
         self._gdpr_filter = self._create_gdpr_filter()
 
         # Start cleanup thread if enabled
+        self._stop_event = threading.Event()
         if enabled:
             self._cleanup_thread = threading.Thread(
                 target=self._cleanup_loop,
@@ -203,11 +211,30 @@ class MetricsCollector:
             self._start_time = time.time()
             self._last_cleanup = time.time()
 
+    def stop(self) -> None:
+        """Signal the background cleanup thread to stop and wait for it to exit."""
+        stop_event = getattr(self, "_stop_event", None)
+        if stop_event is None or stop_event.is_set():
+            return
+        stop_event.set()
+        cleanup_thread = getattr(self, "_cleanup_thread", None)
+        if cleanup_thread is not None and cleanup_thread.is_alive():
+            cleanup_thread.join(timeout=2)
+
+    def close(self) -> None:
+        """Release collector resources."""
+        self.stop()
+
+    def __del__(self) -> None:
+        try:
+            self.stop()
+        except Exception:
+            pass
+
     def _cleanup_loop(self) -> None:
         """Background cleanup thread."""
-        while self.enabled:
+        while not self._stop_event.wait(timeout=self.cleanup_interval):
             try:
-                time.sleep(self.cleanup_interval)
                 with self._lock:
                     self._cleanup()
             except Exception as e:
@@ -315,6 +342,8 @@ def configure_metrics(**kwargs: Any) -> MetricsCollector:
     global _global_metrics
 
     with _metrics_lock:
+        if _global_metrics is not None:
+            _global_metrics.stop()
         _global_metrics = MetricsCollector(**kwargs)
 
     return _global_metrics

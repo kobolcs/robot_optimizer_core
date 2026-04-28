@@ -36,6 +36,8 @@ from ..logging import get_logger
 from ..metrics import get_metrics
 
 # Type alias for analyzer configuration values
+__all__ = ["BaseAnalyzer", "ConfigValue"]
+
 ConfigValue: TypeAlias = str | int | float | bool | dict[str, object] | list[object] | None
 
 # Type variable for generic config value retrieval

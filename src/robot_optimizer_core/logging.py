@@ -26,6 +26,17 @@ from typing import Any
 
 from .metrics import get_metrics
 
+__all__ = [
+    "StructuredFormatter",
+    "MetricsHandler",
+    "LoggerAdapter",
+    "configure_logging",
+    "get_logger",
+    "log_analysis_start",
+    "log_analysis_complete",
+    "log_error",
+]
+
 # Context variable for logging context
 logging_context: ContextVar[dict[str, Any] | None] = ContextVar("logging_context", default=None)
 

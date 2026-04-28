@@ -30,6 +30,17 @@ P = ParamSpec("P")
 R = TypeVar("R")
 T = TypeVar("T")
 
+__all__ = [
+    "RobotOptimizerDeprecationWarning",
+    "deprecated",
+    "deprecation_warning",
+    "deprecated_parameter",
+    "check_deprecated",
+    "get_deprecation_info",
+    "DeprecatedMixin",
+    "renamed_parameter",
+]
+
 
 class RobotOptimizerDeprecationWarning(UserWarning):
     """Warning category for Robot Framework Optimizer deprecations."""

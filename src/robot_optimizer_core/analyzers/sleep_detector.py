@@ -43,6 +43,8 @@ from ..domain.value_objects import (
 from ..exceptions import ConfigurationError
 from .base import BaseAnalyzer, ConfigValue
 
+__all__ = ["SleepDetector"]
+
 
 class SleepDetector(BaseAnalyzer):
     """Detects sleep usage in Robot Framework tests.

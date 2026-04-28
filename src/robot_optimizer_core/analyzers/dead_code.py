@@ -19,6 +19,8 @@ from ..domain.entities import TestFile
 from ..domain.value_objects import Finding, Location, Pattern, PatternType, Severity
 from .base import BaseAnalyzer, ConfigValue
 
+__all__ = ["DeadCodeAnalyzer"]
+
 _LIFECYCLE_KEYWORDS = frozenset({
     "suite setup", "suite teardown", "test setup", "test teardown",
 })
