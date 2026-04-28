@@ -237,8 +237,8 @@ ignore_missing_imports = true
 
 # TODO: Restore strict mypy progressively for these modules.
 # Current debt: strict violations (misc, object, operator, union-attr, no-untyped-def).
-# Done: api, boundaries.
-# Remaining order: context → di → registry → sleep_detector →
+# Done: api, boundaries, context, di.
+# Remaining order: registry → sleep_detector →
 #   dead_code → deprecation → file_finder → flakiness.
 [[tool.mypy.overrides]]
 module = [
