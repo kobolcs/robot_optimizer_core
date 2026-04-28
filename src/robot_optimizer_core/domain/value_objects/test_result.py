@@ -1,5 +1,6 @@
 # src/robot_optimizer/domain/value_objects/test_result.py
 """Test result value object."""
+
 from datetime import datetime
 from pathlib import Path
 

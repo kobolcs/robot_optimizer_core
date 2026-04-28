@@ -1,5 +1,6 @@
 # src/robot_optimizer_core/context.py
 """Application context to eliminate global state and improve testability."""
+
 from __future__ import annotations
 
 import threading
@@ -34,6 +35,7 @@ class Service(Protocol):
 @dataclass
 class ApplicationConfig:
     """Configuration for the application context."""
+
     settings: Settings = field(default_factory=Settings)
     enable_plugins: bool = True
     enable_metrics: bool = True
@@ -102,7 +104,7 @@ class ApplicationContext:
                 configure_logging(
                     level=self.config.log_level,
                     format_json=self.config.log_format_json,
-                    enable_metrics=False  # We have our own metrics
+                    enable_metrics=False,  # We have our own metrics
                 )
 
             # Initialize container
@@ -111,9 +113,7 @@ class ApplicationContext:
 
             # Initialize metrics
             if self.config.enable_metrics:
-                self._metrics = MetricsCollector(
-                    enabled=True
-                )
+                self._metrics = MetricsCollector(enabled=True)
                 self._container.register_instance("metrics", self._metrics)
 
             # Initialize analyzer registry
@@ -123,7 +123,9 @@ class ApplicationContext:
             # Initialize plugin manager
             if self.config.enable_plugins:
                 self._plugin_manager = SecurePluginManager()
-                self._container.register_instance("plugin_manager", self._plugin_manager)
+                self._container.register_instance(
+                    "plugin_manager", self._plugin_manager
+                )
 
             self._initialized = True
 
@@ -188,7 +190,9 @@ class ApplicationContext:
 
         return self._analyzer_registry
 
-    def get_logger(self, name: str, context: dict[str, Any] | None = None) -> LoggerAdapter:
+    def get_logger(
+        self, name: str, context: dict[str, Any] | None = None
+    ) -> LoggerAdapter:
         """Get a logger instance.
 
         Args:
@@ -201,10 +205,12 @@ class ApplicationContext:
         if name not in self._loggers:
             # Create logger without global state
             import logging
+
             logger = logging.getLogger(name)
 
             # Create adapter with context
             from .logging import LoggerAdapter
+
             adapter = LoggerAdapter(logger, context or {})
 
             self._loggers[name] = adapter
@@ -219,14 +225,10 @@ class ApplicationContext:
 
         # Register core services
         self._container.register_singleton(
-            "file_discovery",
-            lambda: FileDiscoveryService(self.config.settings)
+            "file_discovery", lambda: FileDiscoveryService(self.config.settings)
         )
 
-        self._container.register(
-            "parser",
-            RobotASTParser
-        )
+        self._container.register("parser", RobotASTParser)
 
         # Register context itself for services that need it
         self._container.register_instance("context", self)
@@ -275,7 +277,12 @@ class ApplicationContext:
         self.initialize()
         return self
 
-    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: object) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: object,
+    ) -> None:
         """Context manager exit."""
         self.shutdown()
 
@@ -306,8 +313,8 @@ def create_test_application() -> ApplicationContext:
         settings=Settings(
             max_file_size_mb=1.0,  # Small files for tests
             file_patterns=["*.robot"],
-            exclude_patterns=["**/.*"]
-        )
+            exclude_patterns=["**/.*"],
+        ),
     )
 
     return ApplicationContext(config)

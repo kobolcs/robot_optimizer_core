@@ -21,6 +21,7 @@ Example:
         if finding.severity > Severity.WARNING:
             print("High priority issue!")
 """
+
 from __future__ import annotations
 
 import sys
@@ -56,9 +57,9 @@ class Severity(IntEnum):
         ❌ ERROR
     """
 
-    ERROR = 1    # Critical - breaks best practices or causes issues
+    ERROR = 1  # Critical - breaks best practices or causes issues
     WARNING = 2  # Important - suboptimal but works
-    INFO = 3     # Minor - improvement opportunity
+    INFO = 3  # Minor - improvement opportunity
 
     @override
     def __str__(self) -> str:
@@ -117,11 +118,11 @@ class Severity(IntEnum):
         """
         match self:
             case Severity.ERROR:
-                return "\033[91m"    # Bright red
+                return "\033[91m"  # Bright red
             case Severity.WARNING:
-                return "\033[93m"    # Bright yellow
+                return "\033[93m"  # Bright yellow
             case Severity.INFO:
-                return "\033[94m"    # Bright blue
+                return "\033[94m"  # Bright blue
 
     @property
     def priority(self) -> int:
@@ -172,11 +173,11 @@ class Severity(IntEnum):
         """
         match self:
             case Severity.ERROR:
-                return 2    # Errors found
+                return 2  # Errors found
             case Severity.WARNING:
-                return 1    # Warnings found
+                return 1  # Warnings found
             case Severity.INFO:
-                return 0    # Only info, success
+                return 0  # Only info, success
 
     @classmethod
     def from_string(cls, value: str) -> Severity:
@@ -202,8 +203,7 @@ class Severity(IntEnum):
         except KeyError as err:
             valid = [s.name.lower() for s in cls]
             raise ValueError(
-                f"Invalid severity '{value}'. "
-                f"Valid values are: {', '.join(valid)}"
+                f"Invalid severity '{value}'. Valid values are: {', '.join(valid)}"
             ) from err
 
     def is_at_least(self, level: Severity) -> bool:

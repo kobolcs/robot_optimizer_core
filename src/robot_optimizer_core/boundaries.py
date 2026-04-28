@@ -1,5 +1,6 @@
 # src/robot_optimizer_core/boundaries.py
 """Error boundaries and transaction support for domain consistency."""
+
 from __future__ import annotations
 
 import functools
@@ -23,6 +24,7 @@ logger = get_logger(__name__)
 
 class TransactionState(StrEnum):
     """Transaction states."""
+
     PENDING = auto()
     COMMITTED = auto()
     ROLLED_BACK = auto()
@@ -32,6 +34,7 @@ class TransactionState(StrEnum):
 @dataclass
 class TransactionContext:
     """Context for a transaction with audit trail."""
+
     id: UUID = field(default_factory=uuid4)
     state: TransactionState = TransactionState.PENDING
     started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
@@ -43,11 +46,13 @@ class TransactionContext:
 
     def add_operation(self, operation: str, **details: Any) -> None:
         """Record an operation in the transaction."""
-        self.operations.append({
-            "operation": operation,
-            "timestamp": datetime.now(UTC).isoformat(),
-            "details": details
-        })
+        self.operations.append(
+            {
+                "operation": operation,
+                "timestamp": datetime.now(UTC).isoformat(),
+                "details": details,
+            }
+        )
 
     def add_rollback(self, action: Callable[[], None]) -> None:
         """Add a rollback action."""
@@ -67,7 +72,7 @@ class TransactionContext:
             except Exception as e:
                 logger.error(
                     f"Rollback action failed: {e}",
-                    extra={"transaction_id": str(self.id)}
+                    extra={"transaction_id": str(self.id)},
                 )
 
         self.state = TransactionState.ROLLED_BACK
@@ -99,9 +104,11 @@ class ErrorBoundary:
 
     def handle(self, exception_type: type[Exception]) -> Callable[..., Any]:
         """Decorator to register error handler."""
+
         def decorator(handler: Callable[..., Any]) -> Callable[..., Any]:
             self._error_handlers[exception_type] = handler
             return handler
+
         return decorator
 
     def add_finally(self, handler: Callable[..., Any]) -> None:
@@ -131,8 +138,8 @@ class ErrorBoundary:
                     "operation": self.operation_name,
                     "error_type": type(e).__name__,
                     "context": context,
-                    "traceback": traceback.format_exc()
-                }
+                    "traceback": traceback.format_exc(),
+                },
             )
 
             # Try specific error handler
@@ -145,7 +152,7 @@ class ErrorBoundary:
                 except Exception as handler_error:
                     logger.error(
                         f"Error handler failed: {handler_error}",
-                        extra={"transaction_id": str(transaction.id)}
+                        extra={"transaction_id": str(transaction.id)},
                     )
 
             # Rollback
@@ -169,7 +176,7 @@ def transactional(
     operation_name: str | None = None,
     rollback_on: tuple[type[Exception], ...] = (Exception,),
     max_retries: int = 0,
-    log_level: str = "ERROR"
+    log_level: str = "ERROR",
 ) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """Decorator for transactional operations with automatic rollback.
 
@@ -179,6 +186,7 @@ def transactional(
         max_retries: Number of retries on failure
         log_level: Logging level for errors
     """
+
     def decorator(func: Callable[P, R]) -> Callable[P, R]:
         op_name = operation_name or func.__name__
 
@@ -192,7 +200,7 @@ def transactional(
                     metadata={
                         "operation": op_name,
                         "function": func.__name__,
-                        "retry": retries
+                        "retry": retries,
                     }
                 )
 
@@ -209,7 +217,7 @@ def transactional(
                     if retries > 0:
                         logger.info(
                             f"Operation succeeded after {retries} retries",
-                            extra={"operation": op_name}
+                            extra={"operation": op_name},
                         )
 
                     return result
@@ -226,8 +234,8 @@ def transactional(
                         extra={
                             "transaction_id": str(transaction.id),
                             "retry": retries,
-                            "error_type": type(e).__name__
-                        }
+                            "error_type": type(e).__name__,
+                        },
                     )
 
                     # Rollback
@@ -249,7 +257,7 @@ def transactional(
                     logger.error(
                         f"Unexpected error in {op_name}: {e}",
                         extra={"transaction_id": str(transaction.id)},
-                        exc_info=True
+                        exc_info=True,
                     )
                     raise
 
@@ -313,7 +321,7 @@ class UnitOfWork:
         return self._repositories[name]
 
     @contextmanager
-    def transaction(self) -> Iterator["UnitOfWork"]:
+    def transaction(self) -> Iterator[UnitOfWork]:
         """Start a transaction context."""
         assert self._transaction is None, "Transaction already in progress"
 
@@ -339,21 +347,27 @@ class UnitOfWork:
                 repo_name = self._get_repository_name(entity)
                 repo = self.get_repository(repo_name)
                 repo.add(entity)
-                self._transaction.add_operation("insert", entity_type=type(entity).__name__)
+                self._transaction.add_operation(
+                    "insert", entity_type=type(entity).__name__
+                )
 
             # Update dirty entities
             for entity in self._dirty:
                 repo_name = self._get_repository_name(entity)
                 repo = self.get_repository(repo_name)
                 repo.update(entity)
-                self._transaction.add_operation("update", entity_type=type(entity).__name__)
+                self._transaction.add_operation(
+                    "update", entity_type=type(entity).__name__
+                )
 
             # Remove entities
             for entity in self._removed:
                 repo_name = self._get_repository_name(entity)
                 repo = self.get_repository(repo_name)
                 repo.remove(entity)
-                self._transaction.add_operation("delete", entity_type=type(entity).__name__)
+                self._transaction.add_operation(
+                    "delete", entity_type=type(entity).__name__
+                )
 
             # Clear tracking
             self._new.clear()
@@ -365,8 +379,7 @@ class UnitOfWork:
         except Exception as e:
             self._transaction.error = e
             raise RepositoryError(
-                f"Unit of work commit failed: {e}",
-                operation="commit"
+                f"Unit of work commit failed: {e}", operation="commit"
             ) from e
 
     def rollback(self) -> None:

@@ -1,5 +1,6 @@
 # src/robot_optimizer/domain/value_objects/flakiness_stats.py
 """Flakiness statistics value object."""
+
 from datetime import datetime
 from pathlib import Path
 

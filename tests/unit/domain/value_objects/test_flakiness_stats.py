@@ -1,5 +1,6 @@
 # tests/unit/domain/value_objects/test_flakiness_stats.py
 """Unit tests for FlakinessStats value object."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -23,7 +24,7 @@ class TestFlakinessStats:
             file_path=Path("tests/login.robot"),
             total_runs=100,
             failures=15,
-            last_failure=last_failure
+            last_failure=last_failure,
         )
 
         assert stats.test_name == "Flaky Login Test"
@@ -39,7 +40,7 @@ class TestFlakinessStats:
             file_path=Path("tests/stable.robot"),
             total_runs=200,
             failures=0,
-            last_failure=None
+            last_failure=None,
         )
 
         assert stats.failures == 0
@@ -50,10 +51,7 @@ class TestFlakinessStats:
         """Test test name validation."""
         with pytest.raises(ValidationError) as exc_info:
             FlakinessStats(
-                test_name="",
-                file_path=Path("test.robot"),
-                total_runs=10,
-                failures=1
+                test_name="", file_path=Path("test.robot"), total_runs=10, failures=1
             )
         assert "at least 1 character" in str(exc_info.value)
 
@@ -65,7 +63,7 @@ class TestFlakinessStats:
                 test_name="Test",
                 file_path=Path("test.robot"),
                 total_runs=-1,
-                failures=0
+                failures=0,
             )
         assert "greater than or equal to 0" in str(exc_info.value)
 
@@ -75,7 +73,7 @@ class TestFlakinessStats:
                 test_name="Test",
                 file_path=Path("test.robot"),
                 total_runs=10,
-                failures=-1
+                failures=-1,
             )
         assert "greater than or equal to 0" in str(exc_info.value)
 
@@ -83,37 +81,25 @@ class TestFlakinessStats:
         """Test failure rate calculation."""
         # Normal case
         stats1 = FlakinessStats(
-            test_name="Test",
-            file_path=Path("test.robot"),
-            total_runs=100,
-            failures=25
+            test_name="Test", file_path=Path("test.robot"), total_runs=100, failures=25
         )
         assert stats1.failure_rate == 0.25
 
         # No failures
         stats2 = FlakinessStats(
-            test_name="Test",
-            file_path=Path("test.robot"),
-            total_runs=50,
-            failures=0
+            test_name="Test", file_path=Path("test.robot"), total_runs=50, failures=0
         )
         assert stats2.failure_rate == 0.0
 
         # All failures
         stats3 = FlakinessStats(
-            test_name="Test",
-            file_path=Path("test.robot"),
-            total_runs=10,
-            failures=10
+            test_name="Test", file_path=Path("test.robot"), total_runs=10, failures=10
         )
         assert stats3.failure_rate == 1.0
 
         # No runs (edge case)
         stats4 = FlakinessStats(
-            test_name="Test",
-            file_path=Path("test.robot"),
-            total_runs=0,
-            failures=0
+            test_name="Test", file_path=Path("test.robot"), total_runs=0, failures=0
         )
         assert stats4.failure_rate == 0.0
 
@@ -121,46 +107,31 @@ class TestFlakinessStats:
         """Test flakiness detection logic."""
         # Flaky test (between 0 and 100% failure, min 4 runs)
         stats1 = FlakinessStats(
-            test_name="Test",
-            file_path=Path("test.robot"),
-            total_runs=100,
-            failures=15
+            test_name="Test", file_path=Path("test.robot"), total_runs=100, failures=15
         )
         assert stats1.is_flaky is True
 
         # Not flaky - always passes
         stats2 = FlakinessStats(
-            test_name="Test",
-            file_path=Path("test.robot"),
-            total_runs=100,
-            failures=0
+            test_name="Test", file_path=Path("test.robot"), total_runs=100, failures=0
         )
         assert stats2.is_flaky is False
 
         # Not flaky - always fails
         stats3 = FlakinessStats(
-            test_name="Test",
-            file_path=Path("test.robot"),
-            total_runs=50,
-            failures=50
+            test_name="Test", file_path=Path("test.robot"), total_runs=50, failures=50
         )
         assert stats3.is_flaky is False
 
         # Not flaky - too few runs
         stats4 = FlakinessStats(
-            test_name="Test",
-            file_path=Path("test.robot"),
-            total_runs=3,
-            failures=1
+            test_name="Test", file_path=Path("test.robot"), total_runs=3, failures=1
         )
         assert stats4.is_flaky is False
 
         # Edge case - exactly 4 runs (minimum)
         stats5 = FlakinessStats(
-            test_name="Test",
-            file_path=Path("test.robot"),
-            total_runs=4,
-            failures=1
+            test_name="Test", file_path=Path("test.robot"), total_runs=4, failures=1
         )
         assert stats5.is_flaky is True
 
@@ -168,28 +139,19 @@ class TestFlakinessStats:
         """Test severity level determination."""
         # INFO level (< 5% failure)
         stats1 = FlakinessStats(
-            test_name="Test",
-            file_path=Path("test.robot"),
-            total_runs=100,
-            failures=3
+            test_name="Test", file_path=Path("test.robot"), total_runs=100, failures=3
         )
         assert stats1.severity_level == "INFO"
 
         # WARNING level (5-15% failure)
         stats2 = FlakinessStats(
-            test_name="Test",
-            file_path=Path("test.robot"),
-            total_runs=100,
-            failures=10
+            test_name="Test", file_path=Path("test.robot"), total_runs=100, failures=10
         )
         assert stats2.severity_level == "WARNING"
 
         # ERROR level (> 15% failure)
         stats3 = FlakinessStats(
-            test_name="Test",
-            file_path=Path("test.robot"),
-            total_runs=100,
-            failures=20
+            test_name="Test", file_path=Path("test.robot"), total_runs=100, failures=20
         )
         assert stats3.severity_level == "ERROR"
 
@@ -198,7 +160,7 @@ class TestFlakinessStats:
             test_name="Test",
             file_path=Path("test.robot"),
             total_runs=100,
-            failures=5  # Exactly 5%
+            failures=5,  # Exactly 5%
         )
         assert stats4.severity_level == "INFO"
 
@@ -206,7 +168,7 @@ class TestFlakinessStats:
             test_name="Test",
             file_path=Path("test.robot"),
             total_runs=100,
-            failures=15  # Exactly 15%
+            failures=15,  # Exactly 15%
         )
         assert stats5.severity_level == "WARNING"
 
@@ -216,7 +178,7 @@ class TestFlakinessStats:
             test_name="Test",
             file_path="tests/suite/test.robot",  # String
             total_runs=10,
-            failures=1
+            failures=1,
         )
 
         assert isinstance(stats.file_path, Path)
@@ -231,7 +193,7 @@ class TestFlakinessStats:
             file_path=Path("test.robot"),
             total_runs=100,
             failures=10,
-            last_failure=last_failure
+            last_failure=last_failure,
         )
 
         s2 = FlakinessStats(
@@ -239,7 +201,7 @@ class TestFlakinessStats:
             file_path=Path("test.robot"),
             total_runs=100,
             failures=10,
-            last_failure=last_failure
+            last_failure=last_failure,
         )
 
         s3 = FlakinessStats(
@@ -247,7 +209,7 @@ class TestFlakinessStats:
             file_path=Path("test.robot"),
             total_runs=100,
             failures=10,
-            last_failure=last_failure
+            last_failure=last_failure,
         )
 
         assert s1 == s2
@@ -257,10 +219,7 @@ class TestFlakinessStats:
     def test_flakiness_stats_immutability(self) -> None:
         """Test that flakiness stats are immutable."""
         stats = FlakinessStats(
-            test_name="Test",
-            file_path=Path("test.robot"),
-            total_runs=100,
-            failures=10
+            test_name="Test", file_path=Path("test.robot"), total_runs=100, failures=10
         )
 
         with pytest.raises(ValidationError):
@@ -276,7 +235,7 @@ class TestFlakinessStats:
             test_name="Test",
             file_path=Path("test.robot"),
             total_runs=10,
-            failures=20  # More failures than runs
+            failures=20,  # More failures than runs
         )
 
         # The failure rate would be > 1, which is illogical

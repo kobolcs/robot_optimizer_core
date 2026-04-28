@@ -1,5 +1,6 @@
 # src/robot_optimizer/domain/value_objects/robot_ast.py
 """Value objects for Robot Framework AST representation."""
+
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,7 @@ from .location import Location
 
 class RobotArgument(ValueObject):
     """Represents a keyword argument."""
+
     name: str | None = Field(None, description="Argument name")
     default_value: str | None = Field(None, description="Default value")
     is_varargs: bool = Field(False, description="Is *args style")
@@ -19,6 +21,7 @@ class RobotArgument(ValueObject):
 
 class KeywordCall(ValueObject):
     """Represents a keyword call/usage."""
+
     keyword_name: str = Field(..., description="Name of keyword being called")
     arguments: list[str] = Field(default_factory=list, description="Arguments passed")
     location: Location = Field(..., description="Where the call occurs")
@@ -39,14 +42,14 @@ class KeywordCall(ValueObject):
 
 class RobotKeyword(ValueObject):
     """Represents a keyword definition."""
+
     name: str = Field(..., description="Keyword name")
     arguments: list[RobotArgument] = Field(default_factory=list)
     documentation: str | None = Field(None)
     tags: list[str] = Field(default_factory=list)
     location: Location = Field(..., description="Definition location")
     body_calls: list[KeywordCall] = Field(
-        default_factory=list,
-        description="Keyword calls within this keyword"
+        default_factory=list, description="Keyword calls within this keyword"
     )
     return_value: str | None = Field(None)
 
@@ -68,6 +71,7 @@ class RobotKeyword(ValueObject):
 
 class RobotTestCase(ValueObject):
     """Represents a test case."""
+
     name: str = Field(..., description="Test case name")
     documentation: str | None = Field(None)
     tags: list[str] = Field(default_factory=list)
@@ -75,8 +79,7 @@ class RobotTestCase(ValueObject):
     teardown: KeywordCall | None = Field(None)
     location: Location = Field(..., description="Test case location")
     body_calls: list[KeywordCall] = Field(
-        default_factory=list,
-        description="Keyword calls in test body"
+        default_factory=list, description="Keyword calls in test body"
     )
 
     @property
@@ -99,6 +102,7 @@ class RobotTestCase(ValueObject):
 
 class RobotImport(ValueObject):
     """Represents an import statement."""
+
     import_type: str = Field(..., pattern="^(Library|Resource|Variables)$")
     name: str = Field(..., description="What is being imported")
     alias: str | None = Field(None, description="Import alias")
@@ -125,6 +129,7 @@ class RobotImport(ValueObject):
 
 class RobotVariable(ValueObject):
     """Represents a variable definition."""
+
     name: str = Field(..., description="Variable name")
     value: Any = Field(..., description="Variable value")
     location: Location = Field(...)
@@ -148,6 +153,7 @@ class RobotVariable(ValueObject):
 
 class RobotSuite(ValueObject):
     """Represents a complete Robot Framework suite/file."""
+
     name: str = Field(..., description="Suite name")
     source: Path = Field(..., description="Source file path")
     documentation: str | None = Field(None)
@@ -166,7 +172,8 @@ class RobotSuite(ValueObject):
     def imported_resources(self) -> list[Path]:
         """Get list of imported resource paths."""
         return [
-            imp.resolved_path for imp in self.imports
+            imp.resolved_path
+            for imp in self.imports
             if imp.is_resource and imp.resolved_path
         ]
 

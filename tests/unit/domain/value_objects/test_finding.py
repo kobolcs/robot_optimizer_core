@@ -4,6 +4,7 @@
 Comprehensive tests for the Finding value object including validation,
 factory methods, and all properties to ensure mutation testing resilience.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -35,7 +36,9 @@ class TestFinding:
         """Create a sample location for testing."""
         return Location(file_path=Path("test.robot"), line=25, column=10)
 
-    def test_create_finding(self, sample_pattern: Pattern, sample_location: Location) -> None:
+    def test_create_finding(
+        self, sample_pattern: Pattern, sample_location: Location
+    ) -> None:
         """Test creating a finding with all required fields."""
         finding_id = uuid4()
         finding = Finding(
@@ -43,7 +46,7 @@ class TestFinding:
             pattern=sample_pattern,
             severity=Severity.WARNING,
             location=sample_location,
-            message="Using Sleep makes tests slow and fragile"
+            message="Using Sleep makes tests slow and fragile",
         )
 
         assert finding.id == finding_id
@@ -53,19 +56,23 @@ class TestFinding:
         assert finding.message == "Using Sleep makes tests slow and fragile"
         assert finding.context is None
 
-    def test_auto_generate_id(self, sample_pattern: Pattern, sample_location: Location) -> None:
+    def test_auto_generate_id(
+        self, sample_pattern: Pattern, sample_location: Location
+    ) -> None:
         """Test that ID is auto-generated if not provided."""
         finding = Finding(
             pattern=sample_pattern,
             severity=Severity.WARNING,
             location=sample_location,
-            message="Test message"
+            message="Test message",
         )
 
         assert finding.id is not None
         assert isinstance(finding.id, UUID)
 
-    def test_create_with_context(self, sample_pattern: Pattern, sample_location: Location) -> None:
+    def test_create_with_context(
+        self, sample_pattern: Pattern, sample_location: Location
+    ) -> None:
         """Test creating finding with context."""
         context = {"duration": "2 seconds", "line_text": "Sleep    2 seconds"}
         finding = Finding(
@@ -73,7 +80,7 @@ class TestFinding:
             severity=Severity.WARNING,
             location=sample_location,
             message="Sleep detected",
-            context=context
+            context=context,
         )
 
         assert finding.context == context
@@ -83,7 +90,9 @@ class TestFinding:
         context["duration"] = "modified"
         assert finding.context["duration"] == "2 seconds"
 
-    def test_create_factory_method(self, sample_pattern: Pattern, sample_location: Location) -> None:
+    def test_create_factory_method(
+        self, sample_pattern: Pattern, sample_location: Location
+    ) -> None:
         """Test the create factory method with kwargs as context."""
         finding = Finding.create(
             pattern=sample_pattern,
@@ -92,7 +101,7 @@ class TestFinding:
             message="Sleep usage detected",
             duration="2 seconds",
             suggested_wait="Wait Until Element Is Visible",
-            line_number=25
+            line_number=25,
         )
 
         assert finding.id is not None
@@ -103,10 +112,12 @@ class TestFinding:
         assert finding.context == {
             "duration": "2 seconds",
             "suggested_wait": "Wait Until Element Is Visible",
-            "line_number": 25
+            "line_number": 25,
         }
 
-    def test_message_validation(self, sample_pattern: Pattern, sample_location: Location) -> None:
+    def test_message_validation(
+        self, sample_pattern: Pattern, sample_location: Location
+    ) -> None:
         """Test message field validation."""
         # Empty message
         with pytest.raises(ValidationError) as exc_info:
@@ -114,7 +125,7 @@ class TestFinding:
                 pattern=sample_pattern,
                 severity=Severity.WARNING,
                 location=sample_location,
-                message=""
+                message="",
             )
         assert "at least 1 character" in str(exc_info.value)
 
@@ -124,7 +135,7 @@ class TestFinding:
                 pattern=sample_pattern,
                 severity=Severity.WARNING,
                 location=sample_location,
-                message="   \t\n   "
+                message="   \t\n   ",
             )
         assert "Finding message cannot be empty" in str(exc_info.value)
 
@@ -135,14 +146,14 @@ class TestFinding:
             name="Sleep Pattern",
             description="Sleep found",
             recommendation="Use waits",
-            auto_fixable=True
+            auto_fixable=True,
         )
 
         finding = Finding(
             pattern=pattern,
             severity=Severity.ERROR,
             location=sample_location,
-            message="Test message"
+            message="Test message",
         )
 
         # file_path property
@@ -163,7 +174,7 @@ class TestFinding:
             severity=Severity.ERROR,
             location=sample_location,
             message="Test message",
-            context={"key": "value"}
+            context={"key": "value"},
         )
         assert finding_with_context.has_context is True
 
@@ -173,7 +184,7 @@ class TestFinding:
             type=PatternType.SLEEP_IN_TEST,
             name="Sleep in Test",
             description="Sleep usage detected",
-            recommendation="Use explicit waits instead"
+            recommendation="Use explicit waits instead",
         )
 
         finding = Finding.create(
@@ -182,7 +193,7 @@ class TestFinding:
             location=sample_location,
             message="Found Sleep 2 seconds",
             duration="2 seconds",
-            suggestion="Wait Until Element Is Visible"
+            suggestion="Wait Until Element Is Visible",
         )
 
         output = finding.format_for_console()
@@ -201,7 +212,7 @@ class TestFinding:
             type=PatternType.DUPLICATE_KEYWORD,
             name="Duplicate",
             description="Duplicate found",
-            recommendation="Duplicate found"  # Same as message
+            recommendation="Duplicate found",  # Same as message
         )
 
         location = Location(Path("test.robot"), 10)
@@ -209,7 +220,7 @@ class TestFinding:
             pattern=pattern,
             severity=Severity.ERROR,
             location=location,
-            message="Duplicate found"
+            message="Duplicate found",
         )
 
         output = finding.format_for_console()
@@ -230,7 +241,7 @@ class TestFinding:
             location=location,
             message="Critical sleep usage",
             duration="3s",
-            impact="High"
+            impact="High",
         )
 
         data = finding.to_dict()
@@ -260,7 +271,7 @@ class TestFinding:
             pattern=pattern,
             severity=Severity.WARNING,
             location=location,
-            message="Duplicate keyword"
+            message="Duplicate keyword",
         )
 
         # Test model_dump (inherited from ValueObject)
@@ -286,7 +297,7 @@ class TestFinding:
             pattern=pattern,
             severity=Severity.WARNING,
             location=location,
-            message="Test"
+            message="Test",
         )
 
         finding2 = Finding(
@@ -294,7 +305,7 @@ class TestFinding:
             pattern=pattern,
             severity=Severity.WARNING,
             location=location,
-            message="Test"
+            message="Test",
         )
 
         finding3 = Finding(
@@ -302,7 +313,7 @@ class TestFinding:
             pattern=pattern,
             severity=Severity.WARNING,
             location=location,
-            message="Test"
+            message="Test",
         )
 
         # Same ID and content
@@ -326,7 +337,7 @@ class TestFinding:
             pattern=pattern,
             severity=Severity.WARNING,
             location=location,
-            message="Test"
+            message="Test",
         )
 
         with pytest.raises(ValidationError):
@@ -348,7 +359,7 @@ class TestFinding:
                 pattern=pattern,
                 severity=severity,
                 location=location,
-                message=f"Test with {severity.name}"
+                message=f"Test with {severity.name}",
             )
 
             assert finding.severity == severity

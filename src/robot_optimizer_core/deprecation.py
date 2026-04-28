@@ -18,6 +18,7 @@ Example:
             # Old implementation
             return analyze_file(path)
 """
+
 from __future__ import annotations
 
 import functools
@@ -50,7 +51,7 @@ def deprecated(
     since: str,
     removed_in: str | None = None,
     replacement: str | None = None,
-    details: str | None = None
+    details: str | None = None,
 ) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """Decorator to mark functions, methods, or classes as deprecated.
 
@@ -75,6 +76,7 @@ def deprecated(
         ... def old_function():
         ...     pass
     """
+
     def decorator(obj: Callable[P, R]) -> Callable[P, R]:
         """Actual decorator that wraps the object."""
         # Build deprecation message
@@ -95,13 +97,12 @@ def deprecated(
         if inspect.isclass(obj):
             # Handle class deprecation
             return _deprecate_class(obj, message)
+
         # Handle function/method deprecation
         @functools.wraps(obj)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             warnings.warn(
-                message,
-                category=RobotOptimizerDeprecationWarning,
-                stacklevel=2
+                message, category=RobotOptimizerDeprecationWarning, stacklevel=2
             )
             return obj(*args, **kwargs)
 
@@ -131,11 +132,7 @@ def _deprecate_class(cls: type[T], message: str) -> type[T]:
 
     @functools.wraps(original_init)
     def new_init(self: T, *args: Any, **kwargs: Any) -> None:
-        warnings.warn(
-            message,
-            category=RobotOptimizerDeprecationWarning,
-            stacklevel=2
-        )
+        warnings.warn(message, category=RobotOptimizerDeprecationWarning, stacklevel=2)
         original_init(self, *args, **kwargs)
 
     # Cast to Any so mypy does not flag method-assign / attr-defined on type[T]
@@ -149,7 +146,7 @@ def _deprecate_class(cls: type[T], message: str) -> type[T]:
 def deprecation_warning(
     message: str,
     category: type[Warning] = RobotOptimizerDeprecationWarning,
-    stacklevel: int = 2
+    stacklevel: int = 2,
 ) -> None:
     """Issue a deprecation warning.
 
@@ -173,7 +170,7 @@ def deprecated_parameter(
     param_name: str,
     since: str,
     removed_in: str | None = None,
-    replacement: str | None = None
+    replacement: str | None = None,
 ) -> None:
     """Warn about a deprecated parameter.
 
@@ -270,10 +267,14 @@ class DeprecatedMixin:
         super().__init__(*args, **kwargs)
 
         cls_name = self.__class__.__name__
-        msg_parts = [f"'{cls_name}' is deprecated since version {self._deprecated_since}"]
+        msg_parts = [
+            f"'{cls_name}' is deprecated since version {self._deprecated_since}"
+        ]
 
         if self._deprecated_removed_in:
-            msg_parts.append(f"and will be removed in version {self._deprecated_removed_in}")
+            msg_parts.append(
+                f"and will be removed in version {self._deprecated_removed_in}"
+            )
 
         if self._deprecated_replacement:
             msg_parts.append(f"Use '{self._deprecated_replacement}' instead")
@@ -302,6 +303,7 @@ def renamed_parameter(**mappings: str) -> Callable[[Callable[P, R]], Callable[P,
         ... def my_function(new_name=None, another_new=None):
         ...     pass
     """
+
     def decorator(func: Callable[P, R]) -> Callable[P, R]:
         @functools.wraps(func)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
@@ -311,7 +313,7 @@ def renamed_parameter(**mappings: str) -> Callable[[Callable[P, R]], Callable[P,
                     deprecated_parameter(
                         old_name,
                         since="1.0.0",  # Should be configured
-                        replacement=new_name
+                        replacement=new_name,
                     )
 
                     # Move value to new name if not already set

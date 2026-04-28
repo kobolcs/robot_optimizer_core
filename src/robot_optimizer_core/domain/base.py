@@ -19,6 +19,7 @@ Example:
             name: str
             email: EmailStr
 """
+
 from __future__ import annotations
 
 import sys
@@ -70,8 +71,8 @@ class ValueObject(BaseModel, ABC):
         use_enum_values=True,
         json_schema_extra={
             "title": "ValueObject",
-            "description": "Immutable value object"
-        }
+            "description": "Immutable value object",
+        },
     )
 
     @override
@@ -116,9 +117,7 @@ class ValueObject(BaseModel, ABC):
         Returns:
             String representation with all fields.
         """
-        fields = ", ".join(
-            f"{k}={v!r}" for k, v in self.model_dump().items()
-        )
+        fields = ", ".join(f"{k}={v!r}" for k, v in self.model_dump().items())
         return f"{self.__class__.__name__}({fields})"
 
 
@@ -156,8 +155,8 @@ class Entity(BaseModel, Generic[T], ABC):
         from_attributes=True,  # Support ORM mode
         json_schema_extra={
             "title": "Entity",
-            "description": "Domain entity with identity"
-        }
+            "description": "Domain entity with identity",
+        },
     )
 
     id: T = Field(..., description="Unique identifier for the entity")
@@ -236,8 +235,8 @@ class AggregateRoot(Entity[T], ABC):
         from_attributes=True,
         json_schema_extra={
             "title": "AggregateRoot",
-            "description": "Aggregate root entity"
-        }
+            "description": "Aggregate root entity",
+        },
     )
 
     @override
@@ -357,18 +356,16 @@ class DomainEvent(BaseModel, ABC):
             "description": "Immutable domain event",
             "example": {
                 "event_id": "123e4567-e89b-12d3-a456-426614174000",
-                "occurred_at": "2024-01-01T00:00:00Z"
-            }
-        }
+                "occurred_at": "2024-01-01T00:00:00Z",
+            },
+        },
     )
 
     event_id: UUID = Field(
-        default_factory=create_event_id,
-        description="Unique event identifier"
+        default_factory=create_event_id, description="Unique event identifier"
     )
     occurred_at: datetime = Field(
-        default_factory=create_timestamp,
-        description="When the event occurred (UTC)"
+        default_factory=create_timestamp, description="When the event occurred (UTC)"
     )
 
     @computed_field  # type: ignore[prop-decorator]
@@ -390,6 +387,7 @@ class DomainEvent(BaseModel, ABC):
 
         # Convert PascalCase to snake_case
         import re
+
         name = re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
 
         return name
@@ -419,10 +417,7 @@ class DomainEvent(BaseModel, ABC):
             "event_name": self.event_name,
             "event_version": self.event_version,
             "occurred_at": self.occurred_at.isoformat(),
-            "data": self.model_dump(
-                exclude={"event_id", "occurred_at"},
-                mode="json"
-            )
+            "data": self.model_dump(exclude={"event_id", "occurred_at"}, mode="json"),
         }
 
     @override

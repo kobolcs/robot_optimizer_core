@@ -1,5 +1,6 @@
 # tests/unit/test_metrics.py
 """Unit tests for the metrics collector."""
+
 from __future__ import annotations
 
 from collections.abc import Iterator
@@ -37,6 +38,7 @@ class TestTimingStats:
 
     def test_cleanup_old_samples(self) -> None:
         from datetime import timedelta
+
         stats = TimingStats()
         stats.add(1.0)
         stats.cleanup_old_samples(timedelta(seconds=0))
@@ -108,3 +110,68 @@ class TestMetricsCollector:
         data = collector.get_metrics()
         assert data["counters"] == {}
         assert data["gauges"] == {}
+
+    def test_close_stops_collector(self, collector: MetricsCollector) -> None:
+        collector.close()
+
+    def test_gdpr_filter_blocks_personal_data_metric(
+        self, collector: MetricsCollector
+    ) -> None:
+        collector.increment("user.login_count")
+        data = collector.get_metrics()
+        assert "user.login_count" not in data["counters"]
+
+    def test_validate_tags_raises_for_blocked_key(
+        self, collector: MetricsCollector
+    ) -> None:
+        with pytest.raises(ValueError, match="personal data"):
+            collector.increment("hits", tags={"user": "alice"})
+
+    def test_validate_tags_raises_for_email_key(
+        self, collector: MetricsCollector
+    ) -> None:
+        with pytest.raises(ValueError, match="personal data"):
+            collector.gauge("score", 1.0, tags={"email": "x@y.com"})
+
+    def test_evict_on_counter_overflow(self) -> None:
+        m = MetricsCollector(enabled=True, max_counters=2)
+        try:
+            m.increment("a")
+            m.increment("b")
+            m.increment("c")  # triggers eviction
+            data = m.get_metrics()
+            assert len(data["counters"]) <= 2
+        finally:
+            m.stop()
+
+    def test_evict_on_gauge_overflow(self) -> None:
+        m = MetricsCollector(enabled=True, max_gauges=2)
+        try:
+            m.gauge("a", 1.0)
+            m.gauge("b", 2.0)
+            m.gauge("c", 3.0)  # triggers eviction
+            data = m.get_metrics()
+            assert len(data["gauges"]) <= 2
+        finally:
+            m.stop()
+
+    def test_evict_on_timing_overflow(self) -> None:
+        m = MetricsCollector(enabled=True, max_timings=2)
+        try:
+            m.timing("a", 0.1)
+            m.timing("b", 0.2)
+            m.timing("c", 0.3)  # triggers eviction
+            data = m.get_metrics()
+            assert len(data["timings"]) <= 2
+        finally:
+            m.stop()
+
+    def test_configure_metrics_replaces_global(self) -> None:
+        from robot_optimizer_core.metrics import configure_metrics, get_metrics
+
+        m1 = configure_metrics(enabled=True)
+        try:
+            m2 = get_metrics()
+            assert m1 is m2
+        finally:
+            m1.stop()

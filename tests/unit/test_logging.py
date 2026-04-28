@@ -1,5 +1,6 @@
 # tests/unit/test_logging.py
 """Unit tests for structured logging."""
+
 from __future__ import annotations
 
 import json
@@ -17,10 +18,17 @@ from robot_optimizer_core.logging import (
 
 @pytest.mark.unit
 class TestStructuredFormatter:
-    def _make_record(self, msg: str = "hello", level: int = logging.INFO) -> logging.LogRecord:
+    def _make_record(
+        self, msg: str = "hello", level: int = logging.INFO
+    ) -> logging.LogRecord:
         record = logging.LogRecord(
-            name="test", level=level, pathname="", lineno=0,
-            msg=msg, args=(), exc_info=None
+            name="test",
+            level=level,
+            pathname="",
+            lineno=0,
+            msg=msg,
+            args=(),
+            exc_info=None,
         )
         return record
 
@@ -35,7 +43,15 @@ class TestStructuredFormatter:
     def test_required_fields_present(self) -> None:
         fmt = StructuredFormatter()
         data = json.loads(fmt.format(self._make_record()))
-        for field in ("timestamp", "level", "logger", "message", "module", "function", "line"):
+        for field in (
+            "timestamp",
+            "level",
+            "logger",
+            "message",
+            "module",
+            "function",
+            "line",
+        ):
             assert field in data
 
     def test_extra_fields_included(self) -> None:
@@ -58,6 +74,7 @@ class TestStructuredFormatter:
             raise ValueError("boom")
         except ValueError:
             import sys
+
             record = self._make_record()
             record.exc_info = sys.exc_info()
             data = json.loads(fmt.format(record))

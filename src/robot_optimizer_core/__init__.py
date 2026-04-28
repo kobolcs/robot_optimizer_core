@@ -27,6 +27,7 @@ Attributes:
     __all__ (list[str]): Public API exports.
 
 """
+
 from __future__ import annotations
 
 # Version
@@ -106,14 +107,12 @@ __all__ = [
     # Version
     "__version__",
     "__version_info__",
-
     # Domain models
     "ValueObject",
     "Entity",
     "AggregateRoot",
     "DomainEvent",
     "TestFile",
-
     # Value objects
     "Finding",
     "Location",
@@ -123,7 +122,6 @@ __all__ = [
     "SleepPattern",
     "TestResult",
     "FlakinessStats",
-
     # Analyzers
     "BaseAnalyzer",
     "AnalyzerRegistry",
@@ -134,43 +132,34 @@ __all__ = [
     "get_analyzer",
     "get_analyzer_registry",
     "list_analyzers",
-
     # Services
     "FileDiscoveryService",
     "RobotASTParser",
-
     # Configuration
     "Settings",
     "get_settings",
     "reset_settings",
-
     # Exceptions
     "RobotOptimizerError",
     "AnalysisError",
     "ConfigurationError",
     "PluginError",
-
     # Logging
     "get_logger",
     "configure_logging",
-
     # Metrics
     "MetricsCollector",
     "get_metrics",
     "configure_metrics",
-
     # DI
     "Container",
     "get_container",
-
     # Plugins
     "Plugin",
     "PluginMetadata",
-
     # Utilities
     "deprecated",
     "deprecation_warning",
-
     # High-level API
     "analyze_file",
     "analyze_directory",

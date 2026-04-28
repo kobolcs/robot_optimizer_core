@@ -1,5 +1,6 @@
 # tests/unit/test_exceptions.py
 """Unit tests for custom exception hierarchy."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -57,7 +58,10 @@ class TestAnalysisError:
         assert AnalysisError("failed", file_path=path).file_path == path
 
     def test_with_analyzer(self) -> None:
-        assert AnalysisError("failed", analyzer="DeadCodeAnalyzer").analyzer == "DeadCodeAnalyzer"
+        assert (
+            AnalysisError("failed", analyzer="DeadCodeAnalyzer").analyzer
+            == "DeadCodeAnalyzer"
+        )
 
     def test_slots_not_mirrored_to_details(self) -> None:
         err = AnalysisError("msg", file_path=Path("a.robot"), analyzer="X")
@@ -157,7 +161,9 @@ class TestValidationError:
         assert err.validation_rule == "must be >= 0"
 
     def test_slots_not_mirrored_to_details(self) -> None:
-        err = ValidationError("msg", field_name="f", invalid_value=0, validation_rule="r")
+        err = ValidationError(
+            "msg", field_name="f", invalid_value=0, validation_rule="r"
+        )
         assert "field_name" not in err.details
         assert "invalid_value" not in err.details
         assert "validation_rule" not in err.details
@@ -170,7 +176,9 @@ class TestFileNotFoundError:
         assert "missing.robot" in str(err)
 
     def test_file_path_attribute(self) -> None:
-        assert FileNotFoundError(Path("missing.robot")).file_path == Path("missing.robot")
+        assert FileNotFoundError(Path("missing.robot")).file_path == Path(
+            "missing.robot"
+        )
 
     def test_inherits_from_analysis_error(self) -> None:
         assert isinstance(FileNotFoundError(Path("x.robot")), AnalysisError)
@@ -184,7 +192,9 @@ class TestRepositoryError:
         assert err.operation is None
 
     def test_with_context(self) -> None:
-        err = RepositoryError("failed", repository_name="TestResultRepo", operation="save")
+        err = RepositoryError(
+            "failed", repository_name="TestResultRepo", operation="save"
+        )
         assert err.repository_name == "TestResultRepo"
         assert err.operation == "save"
 

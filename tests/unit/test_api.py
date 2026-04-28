@@ -1,5 +1,6 @@
 # tests/unit/test_api.py
 """Unit tests for the high-level API — focused on file-size enforcement."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -38,9 +39,7 @@ class TestAnalyzeFileMaxSizeEnforcement:
         self, tmp_path: Path
     ) -> None:
         robot_file = tmp_path / "normal.robot"
-        robot_file.write_text(
-            "*** Test Cases ***\nSample Test\n    Log    hello\n"
-        )
+        robot_file.write_text("*** Test Cases ***\nSample Test\n    Log    hello\n")
 
         settings = Settings(max_file_size_mb=10.0)
         findings = analyze_file(robot_file, settings=settings)

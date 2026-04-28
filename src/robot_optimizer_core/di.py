@@ -1,5 +1,6 @@
 # src/robot_optimizer_core/di.py
 """Thread-safe dependency injection container."""
+
 from __future__ import annotations
 
 import inspect
@@ -30,14 +31,16 @@ logger = get_logger(__name__)
 
 class ServiceLifetime(StrEnum):
     """Service lifetime options for dependency injection."""
+
     TRANSIENT = auto()  # New instance each time
     SINGLETON = auto()  # Single instance for container lifetime
-    SCOPED = auto()     # Single instance per scope
+    SCOPED = auto()  # Single instance per scope
 
 
 @dataclass
 class ServiceDescriptor:
     """Thread-safe service descriptor."""
+
     service_type: str
     implementation: ServiceFactory
     lifetime: ServiceLifetime = ServiceLifetime.TRANSIENT
@@ -103,7 +106,7 @@ class ThreadSafeContainer:
         service_type: str,
         implementation: ServiceFactory,
         lifetime: ServiceLifetime = ServiceLifetime.TRANSIENT,
-        override: bool = False
+        override: bool = False,
     ) -> None:
         """Thread-safe service registration."""
         with self._services_lock:
@@ -111,7 +114,7 @@ class ThreadSafeContainer:
                 raise ConfigurationError(
                     f"Service already registered: {service_type}",
                     config_key="di.service",
-                    provided_value=service_type
+                    provided_value=service_type,
                 )
 
             descriptor = ServiceDescriptor(service_type, implementation, lifetime)
@@ -123,8 +126,8 @@ class ThreadSafeContainer:
                 "service": service_type,
                 "lifetime": lifetime,
                 "override": override,
-                "thread_id": threading.get_ident()
-            }
+                "thread_id": threading.get_ident(),
+            },
         )
 
     def resolve(self, service_type: str) -> Any:
@@ -135,7 +138,7 @@ class ThreadSafeContainer:
             raise ConfigurationError(
                 f"Circular dependency detected: {cycle}",
                 config_key="di.circular",
-                provided_value=service_type
+                provided_value=service_type,
             )
 
         # Try to find service descriptor
@@ -147,7 +150,7 @@ class ThreadSafeContainer:
                 f"Service not registered: {service_type}",
                 config_key="di.service",
                 provided_value=service_type,
-                details={"available": available}
+                details={"available": available},
             )
 
         # Add to resolution stack
@@ -263,25 +266,27 @@ class ThreadSafeContainer:
         finally:
             self._scope_instances_var.reset(token)
 
-    def register_singleton(self, service_type: str, implementation: ServiceFactory, override: bool = False) -> None:
+    def register_singleton(
+        self, service_type: str, implementation: ServiceFactory, override: bool = False
+    ) -> None:
         """Register a singleton service."""
         self.register(service_type, implementation, ServiceLifetime.SINGLETON, override)
 
-    def register_instance(self, service_type: str, instance: Any, override: bool = False) -> None:
+    def register_instance(
+        self, service_type: str, instance: Any, override: bool = False
+    ) -> None:
         """Register an existing instance as a singleton."""
         with self._services_lock:
             if service_type in self._services and not override:
                 raise ConfigurationError(
                     f"Service already registered: {service_type}",
                     config_key="di.service",
-                    provided_value=service_type
+                    provided_value=service_type,
                 )
 
             # Create descriptor with pre-cached instance
             descriptor = ServiceDescriptor(
-                service_type,
-                lambda: instance,
-                ServiceLifetime.SINGLETON
+                service_type, lambda: instance, ServiceLifetime.SINGLETON
             )
             descriptor.instance = instance  # Pre-cache
             self._services[service_type] = descriptor

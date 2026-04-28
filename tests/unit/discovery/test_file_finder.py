@@ -1,5 +1,6 @@
 # tests/unit/discovery/test_file_finder.py
 """Unit tests for OptimizedFileDiscoveryService and PatternMatcher."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -94,27 +95,37 @@ class TestOptimizedFileDiscoveryService:
 
         return tmp_path
 
-    def test_finds_robot_files(self, service: OptimizedFileDiscoveryService, robot_tree: Path) -> None:
+    def test_finds_robot_files(
+        self, service: OptimizedFileDiscoveryService, robot_tree: Path
+    ) -> None:
         files = service.find_files(robot_tree, patterns=["*.robot", "*.resource"])
         names = [f.name for f in files]
         assert "suite_a.robot" in names
         assert "suite_b.robot" in names
         assert "keywords.resource" in names
 
-    def test_ignores_non_matching_files(self, service: OptimizedFileDiscoveryService, robot_tree: Path) -> None:
+    def test_ignores_non_matching_files(
+        self, service: OptimizedFileDiscoveryService, robot_tree: Path
+    ) -> None:
         files = service.find_files(robot_tree, patterns=["*.robot"])
         assert not any(f.suffix == ".py" for f in files)
 
-    def test_recursive_discovery(self, service: OptimizedFileDiscoveryService, robot_tree: Path) -> None:
+    def test_recursive_discovery(
+        self, service: OptimizedFileDiscoveryService, robot_tree: Path
+    ) -> None:
         files = service.find_files(robot_tree, patterns=["*.robot"])
         names = [f.name for f in files]
         assert "nested.robot" in names
 
-    def test_non_recursive_skips_subdirs(self, service: OptimizedFileDiscoveryService, robot_tree: Path) -> None:
+    def test_non_recursive_skips_subdirs(
+        self, service: OptimizedFileDiscoveryService, robot_tree: Path
+    ) -> None:
         files = service.find_files(robot_tree, patterns=["*.robot"], recursive=False)
         assert not any(f.parent != robot_tree for f in files)
 
-    def test_exclude_patterns(self, service: OptimizedFileDiscoveryService, robot_tree: Path) -> None:
+    def test_exclude_patterns(
+        self, service: OptimizedFileDiscoveryService, robot_tree: Path
+    ) -> None:
         files = service.find_files(
             robot_tree,
             patterns=["*.robot"],
@@ -122,18 +133,26 @@ class TestOptimizedFileDiscoveryService:
         )
         assert not any("build" in str(f) for f in files)
 
-    def test_result_is_sorted(self, service: OptimizedFileDiscoveryService, robot_tree: Path) -> None:
+    def test_result_is_sorted(
+        self, service: OptimizedFileDiscoveryService, robot_tree: Path
+    ) -> None:
         files = service.find_files(robot_tree, patterns=["*.robot"])
         assert files == sorted(files)
 
-    def test_nonexistent_root_raises(self, service: OptimizedFileDiscoveryService) -> None:
+    def test_nonexistent_root_raises(
+        self, service: OptimizedFileDiscoveryService
+    ) -> None:
         with pytest.raises(RFFileNotFoundError):
             service.find_files(Path("/nonexistent/path/xyz"))
 
-    def test_empty_directory_returns_empty(self, service: OptimizedFileDiscoveryService, tmp_path: Path) -> None:
+    def test_empty_directory_returns_empty(
+        self, service: OptimizedFileDiscoveryService, tmp_path: Path
+    ) -> None:
         assert service.find_files(tmp_path, patterns=["*.robot"]) == []
 
-    def test_max_depth_limits_recursion(self, service: OptimizedFileDiscoveryService, tmp_path: Path) -> None:
+    def test_max_depth_limits_recursion(
+        self, service: OptimizedFileDiscoveryService, tmp_path: Path
+    ) -> None:
         deep = tmp_path / "a" / "b" / "c"
         deep.mkdir(parents=True)
         (deep / "deep.robot").write_text("*** Test Cases ***")

@@ -1,5 +1,6 @@
 # src/robot_optimizer_core/domain/entities/test_file.py
 """Timezone-aware test file entity with proper datetime handling."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timezone
@@ -40,14 +41,24 @@ class TZAwareTestFile(Entity[UUID]):
     path: Path = Field(..., description="Path to the test file")
     content: str = Field(..., description="Full content of the file")
     size_bytes: int = Field(..., ge=0, description="File size in bytes")
-    last_modified_utc: datetime = Field(..., description="Last modification time in UTC")
-    created_at_utc: datetime = Field(default_factory=utc_now, description="Entity creation time in UTC")
+    last_modified_utc: datetime = Field(
+        ..., description="Last modification time in UTC"
+    )
+    created_at_utc: datetime = Field(
+        default_factory=utc_now, description="Entity creation time in UTC"
+    )
     encoding: str = Field(default="utf-8", description="File encoding")
-    test_cases: list[str] = Field(default_factory=list, description="List of test case names")
-    keywords: list[str] = Field(default_factory=list, description="List of keyword names")
+    test_cases: list[str] = Field(
+        default_factory=list, description="List of test case names"
+    )
+    keywords: list[str] = Field(
+        default_factory=list, description="List of keyword names"
+    )
 
     # Optional timezone for display purposes
-    display_timezone: str = Field(default="UTC", description="Timezone for display purposes")
+    display_timezone: str = Field(
+        default="UTC", description="Timezone for display purposes"
+    )
 
     @field_validator("path", mode="before")
     @classmethod
@@ -108,8 +119,7 @@ class TZAwareTestFile(Entity[UUID]):
             content = raw.decode("utf-8")
 
             control_chars = sum(
-                1 for ch in content
-                if ord(ch) < 32 and ch not in "\n\r\t"
+                1 for ch in content if ord(ch) < 32 and ch not in "\n\r\t"
             )
             if control_chars > max(1, len(content) // 20):
                 raise ValueError(f"File contains too many control characters: {path}")
@@ -119,14 +129,15 @@ class TZAwareTestFile(Entity[UUID]):
         # Convert to UTC timestamps
         last_modified = datetime.fromtimestamp(stats.st_mtime, tz=UTC)
 
-        return cls.model_validate({
-            "path": path,
-            "content": content,
-            "size_bytes": stats.st_size,
-            "last_modified_utc": last_modified,
-            "encoding": "utf-8"
-        })
-
+        return cls.model_validate(
+            {
+                "path": path,
+                "content": content,
+                "size_bytes": stats.st_size,
+                "last_modified_utc": last_modified,
+                "encoding": "utf-8",
+            }
+        )
 
     @property
     def last_modified(self) -> datetime:
@@ -173,7 +184,7 @@ class TZAwareTestFile(Entity[UUID]):
         end = start if end_line is None else end_line
         if start > end:
             return []
-        return lines[start - 1:end]
+        return lines[start - 1 : end]
 
     @classmethod
     def get_schema(cls) -> dict[str, Any]:
@@ -223,13 +234,12 @@ class TZAwareTestFile(Entity[UUID]):
         return data
 
 
-
 class TimezoneAwareDomainEvent(BaseDomainEvent):
     """Domain event with proper UTC timezone handling."""
 
     occurred_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
-        description="When the event occurred (always UTC)"
+        description="When the event occurred (always UTC)",
     )
 
     @field_validator("occurred_at", mode="before")
@@ -254,12 +264,8 @@ class TimezoneAwareDomainEvent(BaseDomainEvent):
             "event_version": self.event_version,
             "occurred_at": self.occurred_at.isoformat(),
             "occurred_at_unix": int(self.occurred_at.timestamp()),
-            "data": self.model_dump(
-                exclude={"event_id", "occurred_at"},
-                mode="json"
-            )
+            "data": self.model_dump(exclude={"event_id", "occurred_at"}, mode="json"),
         }
-
 
 
 class TimezoneAwareTestResult(BaseTestResult):

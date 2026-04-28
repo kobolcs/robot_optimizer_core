@@ -16,6 +16,7 @@ Example:
         # Override with environment variables
         # ROBOT_OPTIMIZER_MAX_FILE_SIZE_MB=20
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -57,15 +58,12 @@ class Settings(BaseSettings):
 
     # File handling
     max_file_size_mb: float = Field(
-        default=10.0,
-        description="Maximum file size to analyze in MB",
-        ge=0.1,
-        le=100.0
+        default=10.0, description="Maximum file size to analyze in MB", ge=0.1, le=100.0
     )
 
     file_patterns: list[str] = Field(
         default=["*.robot", "*.resource"],
-        description="File patterns to include in analysis"
+        description="File patterns to include in analysis",
     )
 
     exclude_patterns: list[str] = Field(
@@ -80,29 +78,23 @@ class Settings(BaseSettings):
             "**/build/**",
             "**/dist/**",
         ],
-        description="File patterns to exclude from analysis"
+        description="File patterns to exclude from analysis",
     )
 
     # Analysis settings
     max_line_length: int = Field(
-        default=120,
-        description="Maximum recommended line length",
-        ge=80,
-        le=200
+        default=120, description="Maximum recommended line length", ge=80, le=200
     )
 
     max_test_case_lines: int = Field(
-        default=50,
-        description="Maximum lines for a test case",
-        ge=20,
-        le=200
+        default=50, description="Maximum lines for a test case", ge=20, le=200
     )
 
     max_keyword_complexity: int = Field(
         default=10,
         description="Maximum cyclomatic complexity for keywords",
         ge=5,
-        le=50
+        le=50,
     )
 
     # Sleep detection
@@ -110,7 +102,7 @@ class Settings(BaseSettings):
         default=1.0,
         description="Maximum acceptable sleep duration in seconds",
         ge=0.1,
-        le=10.0
+        le=10.0,
     )
 
     # Flakiness detection
@@ -118,48 +110,40 @@ class Settings(BaseSettings):
         default=0.05,
         description="Failure rate threshold for flaky test detection",
         ge=0.01,
-        le=0.5
+        le=0.5,
     )
 
     flakiness_min_runs: int = Field(
-        default=4,
-        description="Minimum test runs to determine flakiness",
-        ge=3,
-        le=100
+        default=4, description="Minimum test runs to determine flakiness", ge=3, le=100
     )
 
     # System settings
     enable_metrics: bool = Field(
-        default=True,
-        description="Whether to enable metrics collection"
+        default=True, description="Whether to enable metrics collection"
     )
 
     log_level: str = Field(
         default="INFO",
         description="Logging level",
-        pattern="^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$"
+        pattern="^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$",
     )
 
     log_format_json: bool = Field(
-        default=False,
-        description="Whether to use JSON log formatting"
+        default=False, description="Whether to use JSON log formatting"
     )
 
     # Plugin settings
     plugins_enabled: bool = Field(
-        default=True,
-        description="Whether to enable plugin loading"
+        default=True, description="Whether to enable plugin loading"
     )
 
     plugin_dirs: list[Path] = Field(
-        default_factory=list,
-        description="Directories to search for plugins"
+        default_factory=list, description="Directories to search for plugins"
     )
 
     # Pro version extension point
     custom_settings: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Custom settings for extensions"
+        default_factory=dict, description="Custom settings for extensions"
     )
 
     model_config = SettingsConfigDict(
@@ -226,10 +210,7 @@ class Settings(BaseSettings):
         return v.upper()
 
     def get_custom_setting(
-        self,
-        key: str,
-        default: Any = None,
-        setting_type: type | None = None
+        self, key: str, default: Any = None, setting_type: type | None = None
     ) -> Any:
         """Get a custom setting with type validation.
 
@@ -257,8 +238,8 @@ class Settings(BaseSettings):
                     provided_value=value,
                     details={
                         "expected_type": setting_type.__name__,
-                        "actual_type": type(value).__name__
-                    }
+                        "actual_type": type(value).__name__,
+                    },
                 )
 
         return value
@@ -286,7 +267,7 @@ class Settings(BaseSettings):
             raise ConfigurationError(
                 "Maximum file size must be positive",
                 config_key="max_file_size_mb",
-                provided_value=self.max_file_size_mb
+                provided_value=self.max_file_size_mb,
             )
 
         # Validate patterns don't conflict
@@ -295,7 +276,7 @@ class Settings(BaseSettings):
             raise ConfigurationError(
                 "File patterns overlap with exclude patterns",
                 config_key="patterns",
-                provided_value=list(pattern_overlap)
+                provided_value=list(pattern_overlap),
             )
 
     @property

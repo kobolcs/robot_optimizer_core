@@ -1,5 +1,6 @@
 # tests/unit/test_plugin.py
 """Unit tests for the secure plugin system."""
+
 from __future__ import annotations
 
 import ast

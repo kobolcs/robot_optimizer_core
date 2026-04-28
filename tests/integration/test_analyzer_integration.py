@@ -4,6 +4,7 @@
 These tests verify that analyzers work correctly together and with
 the infrastructure components like parsers and file discovery.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -38,10 +39,7 @@ from robot_optimizer_core.domain.value_objects import (
 class TestAnalyzerIntegration:
     """Test analyzer integration with other components."""
 
-    def test_multiple_analyzers_on_same_file(
-        self,
-        sample_robot_file: Path
-    ) -> None:
+    def test_multiple_analyzers_on_same_file(self, sample_robot_file: Path) -> None:
         """Test running multiple analyzers on the same file."""
         # Load file once
         test_file = TestFile.from_path(sample_robot_file)
@@ -62,10 +60,7 @@ class TestAnalyzerIntegration:
         sleep_patterns = {f.pattern.type for f in sleep_findings}
         assert dead_patterns.isdisjoint(sleep_patterns)
 
-    def test_analyzer_with_file_discovery(
-        self,
-        temp_dir: Path
-    ) -> None:
+    def test_analyzer_with_file_discovery(self, temp_dir: Path) -> None:
         """Test analyzers with file discovery service."""
         # Create multiple test files
         files = []
@@ -134,13 +129,14 @@ Unused Keyword {i}
         assert "test" in registry.list()
 
     def test_analyzer_with_dependency_injection(
-        self,
-        mock_test_result_repository: TestResultRepository
+        self, mock_test_result_repository: TestResultRepository
     ) -> None:
         """Test analyzer with DI container."""
         # Set up container
         container = Container()
-        container.register_instance("test_result_repository", mock_test_result_repository)
+        container.register_instance(
+            "test_result_repository", mock_test_result_repository
+        )
 
         # Configure mock
         mock_test_result_repository.get_flakiness_stats.return_value = [
@@ -148,7 +144,7 @@ Unused Keyword {i}
                 test_name="Flaky Test",
                 file_path=Path("test.robot"),
                 total_runs=100,
-                failures=10
+                failures=10,
             )
         ]
 
@@ -162,7 +158,7 @@ Unused Keyword {i}
                 path=Path("test.robot"),
                 content="*** Test Cases ***\nFlaky Test\n    Log    test",
                 size_bytes=100,
-                last_modified_utc=datetime.now(UTC)
+                last_modified_utc=datetime.now(UTC),
             )
 
             findings = analyzer.analyze(test_file)
@@ -171,9 +167,7 @@ Unused Keyword {i}
             assert findings[0].context["failure_rate"] == 0.1
 
     def test_analyze_file_integration(
-        self,
-        sample_robot_file: Path,
-        settings: Settings
+        self, sample_robot_file: Path, settings: Settings
     ) -> None:
         """Test high-level analyze_file function."""
         # Analyze with all default analyzers
@@ -185,8 +179,7 @@ Unused Keyword {i}
 
         # Analyze with specific analyzers
         findings = analyze_file(
-            sample_robot_file,
-            analyzers=["dead_code", "sleep_detector"]
+            sample_robot_file, analyzers=["dead_code", "sleep_detector"]
         )
 
         # Verify only requested analyzers ran
@@ -194,7 +187,7 @@ Unused Keyword {i}
             assert finding.pattern.type.name in [
                 "UNUSED_KEYWORD",
                 "DUPLICATE_KEYWORD",
-                "SLEEP_IN_TEST"
+                "SLEEP_IN_TEST",
             ]
 
         # Analyze with custom settings
@@ -203,19 +196,16 @@ Unused Keyword {i}
         )
 
         findings = analyze_file(
-            sample_robot_file,
-            analyzers=["sleep_detector"],
-            settings=strict_settings
+            sample_robot_file, analyzers=["sleep_detector"], settings=strict_settings
         )
 
         # All sleeps should be high severity now
         sleep_findings = [f for f in findings if "sleep" in f.message.lower()]
-        assert all(f.severity in [Severity.WARNING, Severity.ERROR] for f in sleep_findings)
+        assert all(
+            f.severity in [Severity.WARNING, Severity.ERROR] for f in sleep_findings
+        )
 
-    def test_analyzer_error_handling_integration(
-        self,
-        temp_dir: Path
-    ) -> None:
+    def test_analyzer_error_handling_integration(self, temp_dir: Path) -> None:
         """Test error handling across analyzer components."""
         # Create invalid file
         invalid_file = temp_dir / "invalid.robot"
@@ -232,7 +222,9 @@ Unused Keyword {i}
 
         # Create file with invalid encoding
         bad_encoding = temp_dir / "bad_encoding.robot"
-        bad_encoding.write_bytes("*** Test Cases ***\nTest\n    Log    Ã¢Ã¢".encode("latin-1"))
+        bad_encoding.write_bytes(
+            "*** Test Cases ***\nTest\n    Log    Ã¢Ã¢".encode("latin-1")
+        )
 
         # Should handle encoding issues
         try:
@@ -251,10 +243,7 @@ Unused Keyword {i}
 class TestAnalyzerChaining:
     """Test chaining multiple analyzers together."""
 
-    def test_analyzer_pipeline(
-        self,
-        sample_robot_file: Path
-    ) -> None:
+    def test_analyzer_pipeline(self, sample_robot_file: Path) -> None:
         """Test building an analyzer pipeline."""
         # Create a pipeline of analyzers
         analyzers = [
@@ -320,11 +309,11 @@ class TestAnalyzerChaining:
                                         name="Keyword Naming",
                                         description="Keyword should start with capital",
                                         recommendation="Use CamelCase for keywords",
-                                        auto_fixable=True
+                                        auto_fixable=True,
                                     ),
                                     severity=Severity.INFO,
                                     location=Location(test_file.path, i),
-                                    message=f"Keyword '{line.strip()}' should start with capital"
+                                    message=f"Keyword '{line.strip()}' should start with capital",
                                 )
                                 findings.append(finding)
 
@@ -347,6 +336,7 @@ unused keyword
 """
 
         from tempfile import NamedTemporaryFile
+
         with NamedTemporaryFile(mode="w", suffix=".robot", delete=False) as f:
             f.write(content)
             temp_path = Path(f.name)
@@ -370,9 +360,7 @@ class TestAnalyzerPerformance:
     """Test analyzer performance with larger files."""
 
     def test_analyzer_performance_large_file(
-        self,
-        large_robot_file: Path,
-        settings: Settings
+        self, large_robot_file: Path, settings: Settings
     ) -> None:
         """Test analyzer performance on large files."""
         from time import time
@@ -397,6 +385,7 @@ class TestAnalyzerPerformance:
 
         # Test memory efficiency
         import sys
+
         findings_size = sys.getsizeof(findings)
         avg_size_per_finding = findings_size / len(findings)
 

@@ -4,6 +4,7 @@
 Comprehensive tests for the TestResult value object including validation
 and all properties.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -27,7 +28,7 @@ class TestTestResult:
             file_path=Path("tests/login.robot"),
             status="PASS",
             execution_time=1.5,
-            timestamp=timestamp
+            timestamp=timestamp,
         )
 
         assert result.test_name == "Login Test"
@@ -46,7 +47,7 @@ class TestTestResult:
             status="FAIL",
             execution_time=2.3,
             error_message="Element 'id=username' not found",
-            timestamp=timestamp
+            timestamp=timestamp,
         )
 
         assert result.status == "FAIL"
@@ -61,7 +62,7 @@ class TestTestResult:
                 file_path=Path("test.robot"),
                 status="PASS",
                 execution_time=1.0,
-                timestamp=datetime.now()
+                timestamp=datetime.now(),
             )
         assert "at least 1 character" in str(exc_info.value)
 
@@ -76,7 +77,7 @@ class TestTestResult:
                 file_path=Path("test.robot"),
                 status=status,
                 execution_time=1.0,
-                timestamp=timestamp
+                timestamp=timestamp,
             )
             assert result.status == status
 
@@ -87,7 +88,7 @@ class TestTestResult:
                 file_path=Path("test.robot"),
                 status="SUCCESS",  # Invalid
                 execution_time=1.0,
-                timestamp=timestamp
+                timestamp=timestamp,
             )
         assert "String should match pattern" in str(exc_info.value)
 
@@ -100,7 +101,7 @@ class TestTestResult:
                 file_path=Path("test.robot"),
                 status="PASS",
                 execution_time=-1.0,
-                timestamp=datetime.now()
+                timestamp=datetime.now(),
             )
         assert "greater than or equal to 0" in str(exc_info.value)
 
@@ -110,7 +111,7 @@ class TestTestResult:
             file_path=Path("test.robot"),
             status="SKIP",
             execution_time=0.0,
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
         assert result.execution_time == 0.0
 
@@ -123,7 +124,7 @@ class TestTestResult:
             file_path=Path("test.robot"),
             status="FAIL",
             execution_time=1.0,
-            timestamp=timestamp
+            timestamp=timestamp,
         )
         assert fail_result.is_failure is True
         assert fail_result.is_success is False
@@ -133,7 +134,7 @@ class TestTestResult:
             file_path=Path("test.robot"),
             status="PASS",
             execution_time=1.0,
-            timestamp=timestamp
+            timestamp=timestamp,
         )
         assert pass_result.is_failure is False
         assert pass_result.is_success is True
@@ -143,7 +144,7 @@ class TestTestResult:
             file_path=Path("test.robot"),
             status="SKIP",
             execution_time=0.0,
-            timestamp=timestamp
+            timestamp=timestamp,
         )
         assert skip_result.is_failure is False
         assert skip_result.is_success is False
@@ -155,7 +156,7 @@ class TestTestResult:
             file_path="tests/suite/test.robot",  # String
             status="PASS",
             execution_time=1.0,
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
 
         assert isinstance(result.file_path, Path)
@@ -170,7 +171,7 @@ class TestTestResult:
             file_path=Path("test.robot"),
             status="PASS",
             execution_time=1.0,
-            timestamp=timestamp
+            timestamp=timestamp,
         )
 
         r2 = TestResult(
@@ -178,7 +179,7 @@ class TestTestResult:
             file_path=Path("test.robot"),
             status="PASS",
             execution_time=1.0,
-            timestamp=timestamp
+            timestamp=timestamp,
         )
 
         r3 = TestResult(
@@ -186,7 +187,7 @@ class TestTestResult:
             file_path=Path("test.robot"),
             status="PASS",
             execution_time=1.0,
-            timestamp=timestamp
+            timestamp=timestamp,
         )
 
         assert r1 == r2
@@ -200,7 +201,7 @@ class TestTestResult:
             file_path=Path("test.robot"),
             status="PASS",
             execution_time=1.0,
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
 
         with pytest.raises(ValidationError):

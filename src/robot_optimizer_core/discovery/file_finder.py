@@ -9,6 +9,7 @@ Note:
     backward compatibility and experimentation. Public imports should prefer
     :class:`OptimizedFileDiscoveryService` (aliased as ``FileDiscoveryService``).
 """
+
 from __future__ import annotations
 
 import fnmatch
@@ -54,7 +55,11 @@ class PatternMatcher:
 
         for pattern in patterns:
             # Check if it's a simple extension pattern
-            if pattern.startswith("*.") and "*" not in pattern[2:] and "?" not in pattern[2:]:
+            if (
+                pattern.startswith("*.")
+                and "*" not in pattern[2:]
+                and "?" not in pattern[2:]
+            ):
                 # Simple extension - use set lookup O(1)
                 matcher.extensions.add(pattern[1:].lower())  # Store ".robot"
             elif "*" not in pattern and "?" not in pattern:
@@ -172,7 +177,7 @@ class OptimizedFileDiscoveryService:
             "files_checked": 0,
             "dirs_checked": 0,
             "cache_hits": 0,
-            "pattern_checks": 0
+            "pattern_checks": 0,
         }
 
     def find_files(
@@ -181,7 +186,7 @@ class OptimizedFileDiscoveryService:
         patterns: list[str] | None = None,
         exclude_patterns: list[str] | None = None,
         recursive: bool = True,
-        max_depth: int = 20
+        max_depth: int = 20,
     ) -> list[Path]:
         """Find files with O(n) complexity where n is number of files."""
         # Reset stats
@@ -189,7 +194,7 @@ class OptimizedFileDiscoveryService:
             "files_checked": 0,
             "dirs_checked": 0,
             "cache_hits": 0,
-            "pattern_checks": 0
+            "pattern_checks": 0,
         }
         self._dir_cache.clear()
 
@@ -214,20 +219,13 @@ class OptimizedFileDiscoveryService:
             self._exclude_trie.add_exclusion(pattern)
 
         # Collect files - O(n) where n is total files
-        files = list(self._discover_optimized(
-            root_path,
-            root_path,
-            recursive,
-            max_depth,
-            0
-        ))
+        files = list(
+            self._discover_optimized(root_path, root_path, recursive, max_depth, 0)
+        )
 
         self.logger.info(
             "Optimized discovery complete",
-            extra={
-                "files_found": len(files),
-                "stats": self._stats
-            }
+            extra={"files_found": len(files), "stats": self._stats},
         )
 
         return sorted(files)  # O(n log n) for consistent ordering
@@ -238,7 +236,7 @@ class OptimizedFileDiscoveryService:
         root_path: Path,
         recursive: bool,
         max_depth: int,
-        current_depth: int
+        current_depth: int,
     ) -> Iterator[Path]:
         """Optimized discovery with caching and early termination."""
         # Check depth limit
@@ -265,17 +263,15 @@ class OptimizedFileDiscoveryService:
                 self._stats["pattern_checks"] += 1
 
                 # Check pattern match - O(1) for most patterns
-                if self._include_matcher.matches(entry.name) and self._is_text_file(entry):
+                if self._include_matcher.matches(entry.name) and self._is_text_file(
+                    entry
+                ):
                     yield entry
 
             elif entry.is_dir() and recursive:
                 # Recurse into subdirectory
                 yield from self._discover_optimized(
-                    entry,
-                    root_path,
-                    recursive,
-                    max_depth,
-                    current_depth + 1
+                    entry, root_path, recursive, max_depth, current_depth + 1
                 )
 
     def _is_text_file(self, path: Path) -> bool:
@@ -294,10 +290,7 @@ class OptimizedFileDiscoveryService:
             return False
 
         # Reject files that are mostly non-printable control bytes.
-        control_chars = sum(
-            1 for ch in text
-            if ord(ch) < 32 and ch not in "\n\r\t"
-        )
+        control_chars = sum(1 for ch in text if ord(ch) < 32 and ch not in "\n\r\t")
         return control_chars <= max(1, len(text) // 20)
 
     def _get_cached_listing(self, path: Path) -> list[Path]:
@@ -327,7 +320,9 @@ class OptimizedAnalyzer:
         # Metrics for performance tracking
         self._perf_metrics: defaultdict[str, float] = defaultdict(float)
 
-    def compile_pattern(self, name: str, pattern: str, flags: int = 0) -> re.Pattern[str]:
+    def compile_pattern(
+        self, name: str, pattern: str, flags: int = 0
+    ) -> re.Pattern[str]:
         """Compile and cache regex pattern."""
         if name not in self._compiled_patterns:
             self._compiled_patterns[name] = re.compile(pattern, flags)
@@ -341,7 +336,9 @@ class OptimizedAnalyzer:
         # Use process pool for CPU-bound analysis
         max_workers = min(multiprocessing.cpu_count(), len(test_files))
 
-        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+        with concurrent.futures.ProcessPoolExecutor(
+            max_workers=max_workers
+        ) as executor:
             # Submit all files
             future_to_file = {
                 executor.submit(self._analyze_single, test_file): test_file
@@ -379,19 +376,17 @@ class OptimizedSleepDetector(OptimizedAnalyzer):
         self.sleep_pattern = self.compile_pattern(
             "sleep",
             r"^\s*(?:BuiltIn\.)?Sleep\s+(\d+(?:\.\d+)?)\s*(s|seconds?|m|minutes?|ms|milliseconds?)?",
-            re.IGNORECASE
+            re.IGNORECASE,
         )
 
         self.wait_pattern = self.compile_pattern(
             "wait",
             r"^\s*(?:Wait|Pause|Delay)\s+(\d+(?:\.\d+)?)\s*(s|seconds?|m|minutes?)?",
-            re.IGNORECASE
+            re.IGNORECASE,
         )
 
         self.variable_sleep = self.compile_pattern(
-            "variable",
-            r"^\s*Sleep\s+\$\{([^}]+)\}",
-            re.IGNORECASE
+            "variable", r"^\s*Sleep\s+\$\{([^}]+)\}", re.IGNORECASE
         )
 
     def analyze(self, test_file: TestFile) -> list[Finding]:
@@ -408,17 +403,25 @@ class OptimizedSleepDetector(OptimizedAnalyzer):
                 continue
 
             # Check patterns - each pattern is O(1) average case
-            if (match := self.sleep_pattern.match(line)) or (match := self.wait_pattern.match(line)):
+            if (match := self.sleep_pattern.match(line)) or (
+                match := self.wait_pattern.match(line)
+            ):
                 findings.append(self._create_finding(match, line, line_num, test_file))
             elif match := self.variable_sleep.match(line):
-                findings.append(self._create_variable_finding(match, line, line_num, test_file))
+                findings.append(
+                    self._create_variable_finding(match, line, line_num, test_file)
+                )
 
         return findings
 
-    def _create_finding(self, match: re.Match[str], line: str, line_num: int, test_file: Any) -> Any:
+    def _create_finding(
+        self, match: re.Match[str], line: str, line_num: int, test_file: Any
+    ) -> Any:
         raise NotImplementedError
 
-    def _create_variable_finding(self, match: re.Match[str], line: str, line_num: int, test_file: Any) -> Any:
+    def _create_variable_finding(
+        self, match: re.Match[str], line: str, line_num: int, test_file: Any
+    ) -> Any:
         raise NotImplementedError
 
 

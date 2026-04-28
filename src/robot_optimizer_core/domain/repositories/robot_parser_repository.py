@@ -1,5 +1,6 @@
 # src/robot_optimizer/domain/repositories/robot_parser_repository.py
 """Repository interface for Robot Framework parsing."""
+
 from abc import ABC, abstractmethod
 
 from ..entities import TestFile

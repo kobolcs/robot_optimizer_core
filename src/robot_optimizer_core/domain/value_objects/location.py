@@ -24,6 +24,7 @@ Example:
             end_line=15, end_column=20
         )
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -66,30 +67,11 @@ class Location(ValueObject):
         test.robot:10:5-12:15
     """
 
-    file_path: Path = Field(
-        ...,
-        description="Path to the file"
-    )
-    line: int = Field(
-        ...,
-        ge=1,
-        description="Line number (1-based)"
-    )
-    column: int | None = Field(
-        None,
-        ge=1,
-        description="Column number (1-based)"
-    )
-    end_line: int | None = Field(
-        None,
-        ge=1,
-        description="End line for ranges"
-    )
-    end_column: int | None = Field(
-        None,
-        ge=1,
-        description="End column for ranges"
-    )
+    file_path: Path = Field(..., description="Path to the file")
+    line: int = Field(..., ge=1, description="Line number (1-based)")
+    column: int | None = Field(None, ge=1, description="Column number (1-based)")
+    end_line: int | None = Field(None, ge=1, description="End line for ranges")
+    end_column: int | None = Field(None, ge=1, description="End column for ranges")
 
     def __init__(
         self,
@@ -98,7 +80,7 @@ class Location(ValueObject):
         column: int | None = None,
         end_line: int | None = None,
         end_column: int | None = None,
-        **data: Any
+        **data: Any,
     ):
         """Initialize Location with flexible argument handling.
 
@@ -291,14 +273,23 @@ class Location(ValueObject):
         # Lines overlap, check columns if on same line
         if self.line == other_end_line or self_end_line == other.line:
             # Need column info for precise check
-            match (self.line == other_end_line, self.column, other.column, other.end_column):
-                case (True, start_col, _, other_end_col) if start_col is not None and other_end_col is not None:
+            match (
+                self.line == other_end_line,
+                self.column,
+                other.column,
+                other.end_column,
+            ):
+                case (True, start_col, _, other_end_col) if (
+                    start_col is not None and other_end_col is not None
+                ):
                     # Check if other ends before we start
                     if other_end_col < start_col:
                         return False
 
             match (self_end_line == other.line, self.end_column, other.column):
-                case (True, self_end_col, other_col) if self_end_col is not None and other_col is not None:
+                case (True, self_end_col, other_col) if (
+                    self_end_col is not None and other_col is not None
+                ):
                     # Check if we end before other starts
                     if self_end_col < other_col:
                         return False
@@ -333,7 +324,8 @@ class Location(ValueObject):
             case _:  # Same line
                 start_line = self.line
                 start_column = (
-                    None if self.column is None or other.column is None
+                    None
+                    if self.column is None or other.column is None
                     else min(self.column, other.column)
                 )
 
@@ -351,7 +343,8 @@ class Location(ValueObject):
             case _:  # Same end line
                 end_line = self_end_line
                 end_column = (
-                    None if self.end_column is None or other.end_column is None
+                    None
+                    if self.end_column is None or other.end_column is None
                     else max(self.end_column, other.end_column)
                 )
 
@@ -360,7 +353,7 @@ class Location(ValueObject):
             line=start_line,
             column=start_column,
             end_line=end_line,
-            end_column=end_column
+            end_column=end_column,
         )
 
     def offset(self, lines: int = 0, columns: int = 0) -> Location:
@@ -384,24 +377,30 @@ class Location(ValueObject):
         if self.column is not None:
             new_column = self.column + columns
             if new_column < 1:
-                raise ValueError(f"Offset would create invalid column number: {new_column}")
+                raise ValueError(
+                    f"Offset would create invalid column number: {new_column}"
+                )
 
         new_end_line = None
         if self.end_line is not None:
             new_end_line = self.end_line + lines
             if new_end_line < 1:
-                raise ValueError(f"Offset would create invalid end line: {new_end_line}")
+                raise ValueError(
+                    f"Offset would create invalid end line: {new_end_line}"
+                )
 
         new_end_column = None
         if self.end_column is not None:
             new_end_column = self.end_column + columns
             if new_end_column < 1:
-                raise ValueError(f"Offset would create invalid end column: {new_end_column}")
+                raise ValueError(
+                    f"Offset would create invalid end column: {new_end_column}"
+                )
 
         return Location(
             file_path=self.file_path,
             line=new_line,
             column=new_column,
             end_line=new_end_line,
-            end_column=new_end_column
+            end_column=new_end_column,
         )
