@@ -73,11 +73,11 @@ class SuiteAnalysisResult(TypedDict):
 
 
 __all__ = [
+    "SuiteAnalysisResult",
     "SuiteInfo",
     "SuiteStatistics",
-    "SuiteAnalysisResult",
-    "analyze_file",
     "analyze_directory",
+    "analyze_file",
     "analyze_suite",
 ]
 

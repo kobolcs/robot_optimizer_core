@@ -22,6 +22,7 @@ Example:
 
 from __future__ import annotations
 
+import dataclasses
 import re
 import sys
 from decimal import Decimal, InvalidOperation
@@ -46,6 +47,15 @@ from ..exceptions import ConfigurationError
 from .base import BaseAnalyzer, ConfigValue
 
 __all__ = ["SleepDetector"]
+
+
+@dataclasses.dataclass(slots=True)
+class _AnalyzeCtx:
+    """Per-analyze() call state; avoids instance mutation and is thread-safe."""
+
+    lines: list[str]
+    library: str | None
+    block_names: dict[int, str | None]
 
 
 class SleepDetector(BaseAnalyzer):
@@ -145,11 +155,14 @@ class SleepDetector(BaseAnalyzer):
         """
         findings = []
         lines = test_file.content.splitlines()
+        library = self._detect_library(lines) if self._suggest_alternatives else None
+        block_names, _ = self._build_file_index(lines)
+        ctx = _AnalyzeCtx(lines=lines, library=library, block_names=block_names)
 
         for line_num, line in enumerate(lines, 1):
             if sleep_info := self._detect_sleep(line):
                 if finding := self._create_finding(
-                    sleep_info, test_file, line_num, line.strip()
+                    sleep_info, test_file, line_num, line.strip(), ctx
                 ):
                     findings.append(finding)
 
@@ -257,6 +270,7 @@ class SleepDetector(BaseAnalyzer):
         test_file: TestFile,
         line_num: int,
         original_text: str,
+        ctx: _AnalyzeCtx | None = None,
     ) -> Finding | None:
         """Create a finding from sleep information.
 
@@ -293,8 +307,8 @@ class SleepDetector(BaseAnalyzer):
         # Create sleep pattern value object
         try:
             sleep_pattern = SleepPattern(
-                duration=cast(Decimal, sleep_info["duration"]),
-                unit=cast(str, sleep_info["unit"]),
+                duration=cast("Decimal", sleep_info["duration"]),
+                unit=cast("str", sleep_info["unit"]),
                 line_number=line_num,
                 original_text=original_text,
             )
@@ -315,7 +329,7 @@ class SleepDetector(BaseAnalyzer):
 
         if self._suggest_alternatives:
             if suggestion := self._suggest_alternative(
-                sleep_pattern, test_file, line_num
+                sleep_pattern, test_file, line_num, ctx
             ):
                 message += f". {suggestion}"
 
@@ -345,45 +359,156 @@ class SleepDetector(BaseAnalyzer):
             duration_seconds, self._severity_thresholds
         )
 
-    def _suggest_alternative(
-        self, sleep_pattern: SleepPattern, test_file: TestFile, line_num: int
-    ) -> str | None:
-        """Suggest alternative to sleep.
+    # Library-specific wait keywords keyed by context category
+    _LIBRARY_WAITS: dict[str, dict[str, str]] = {
+        "seleniumlibrary": {
+            "ui": "Wait Until Element Is Visible",
+            "page": "Wait Until Page Contains",
+            "verify": "Wait Until Keyword Succeeds",
+            "network": "Wait Until Keyword Succeeds",
+            "generic": "Wait Until Element Is Visible",
+        },
+        "browser": {
+            "ui": "Wait For Elements State",
+            "page": "Wait For Navigation",
+            "verify": "Wait Until Keyword Succeeds",
+            "network": "Wait For Response",
+            "generic": "Wait For Elements State",
+        },
+        "appiumlibrary": {
+            "ui": "Wait Until Element Is Visible",
+            "page": "Wait Until Page Contains",
+            "verify": "Wait Until Keyword Succeeds",
+            "network": "Wait Until Keyword Succeeds",
+            "generic": "Wait Until Element Is Visible",
+        },
+    }
+    _GENERIC_WAITS: dict[str, str] = {
+        "ui": "Wait Until Element Is Visible",
+        "page": "Wait Until Page Contains",
+        "verify": "Wait Until Keyword Succeeds",
+        "network": "Wait Until Keyword Succeeds",
+        "generic": "Wait Until Keyword Succeeds",
+    }
 
-        Args:
-            sleep_pattern: The sleep pattern.
-            test_file: The test file.
-            line_num: Line number of sleep.
+    def _detect_library(self, lines: list[str]) -> str | None:
+        """Return the canonical library name from *** Settings *** Library imports."""
+        in_settings = False
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("***"):
+                in_settings = "setting" in stripped.lower()
+                continue
+            if not in_settings:
+                continue
+            lower = stripped.lower()
+            if lower.startswith("library"):
+                for lib in self._LIBRARY_WAITS:
+                    if lib in lower:
+                        return lib
+        return None
+
+    # Precompiled regexes for fast context classification (used in the index pass).
+    _VERIFY_RE: re.Pattern[str] = re.compile(r"should|verify|check|assert|expect|contain|equal|match")
+    _PAGE_RE: re.Pattern[str] = re.compile(r"page|navigate|url|title|reload|refresh|location|tab|window")
+    _UI_RE: re.Pattern[str] = re.compile(r"click|element|button|input|checkbox|radio|select|focus|hover|drag|drop|type|fill|press")
+    _NETWORK_RE: re.Pattern[str] = re.compile(r"request|response|api|http|fetch|xhr|ajax|websocket")
+
+    def _build_file_index(
+        self, lines: list[str]
+    ) -> tuple[dict[int, str | None], dict[int, str]]:
+        """Build block-name index in O(n); category dict is empty (lazy per-finding).
 
         Returns:
-            Suggestion text or None.
+            (block_names, {}) — categories are computed on-demand in _suggest_alternative.
         """
-        # Look at context to determine best alternative
-        lines = test_file.content.splitlines()
+        block_names: dict[int, str | None] = {}
+        current_block: str | None = None
+        for idx, line in enumerate(lines):
+            stripped = line.strip()
+            if stripped.startswith("***"):
+                current_block = None
+            elif stripped and not line.startswith((" ", "\t")):
+                current_block = stripped
+            block_names[idx + 1] = current_block
+        return block_names, {}
 
-        # Check what comes after sleep
-        if line_num < len(lines):
-            next_line = lines[line_num].strip()
+    def _enclosing_block_name(
+        self,
+        lines: list[str],
+        line_num: int,
+        block_names: dict[int, str | None] | None = None,
+    ) -> str | None:
+        """Return the test case or keyword name that contains line_num (1-based)."""
+        if block_names:
+            return block_names.get(line_num)
+        # Fallback linear scan for callers without a pre-built index (e.g. tests)
+        for idx in range(line_num - 2, -1, -1):
+            line = lines[idx]
+            if line.startswith((" ", "\t")) or not line.strip():
+                continue
+            stripped = line.strip()
+            if stripped.startswith("***"):
+                return None
+            return stripped
+        return None
 
-            # Common patterns and their alternatives
-            match next_line.lower():
-                case line if any(kw in line for kw in ["click", "element", "button"]):
-                    return "Consider 'Wait Until Element Is Visible' or 'Wait Until Element Is Enabled'"
-                case line if "page" in line:
-                    return "Consider 'Wait Until Page Contains' or 'Wait Until Page Does Not Contain'"
-                case line if any(kw in line for kw in ["should", "verify", "check"]):
-                    return (
-                        "Consider 'Wait Until Keyword Succeeds' with the verification"
-                    )
+    def _classify_context(self, context_lines: list[str]) -> str:
+        """Classify context as verify / page / ui / network / generic.
 
-        # Generic suggestion based on duration
-        match sleep_pattern.duration_in_seconds:
-            case d if d < 1:
-                return "For sub-second waits, consider if this is really needed"
-            case d if d < 5:
-                return "Replace with explicit wait condition like 'Wait Until Element Is Visible'"
-            case _:
-                return "Long sleeps indicate missing synchronization - use proper wait conditions"
+        Verify is checked first: Robot Framework's 'Should' keywords are
+        assertion helpers even when the line also contains 'element'.
+        """
+        combined = " ".join(ln.lower() for ln in context_lines if ln)
+        if self._VERIFY_RE.search(combined):
+            return "verify"
+        if self._PAGE_RE.search(combined):
+            return "page"
+        if self._UI_RE.search(combined):
+            return "ui"
+        if self._NETWORK_RE.search(combined):
+            return "network"
+        return "generic"
+
+    def _suggest_alternative(
+        self,
+        sleep_pattern: SleepPattern,
+        test_file: TestFile,
+        line_num: int,
+        ctx: _AnalyzeCtx | None = None,
+    ) -> str | None:
+        """Suggest a context- and library-aware alternative to sleep."""
+        if ctx is not None:
+            lines = ctx.lines
+            library = ctx.library
+            block_names: dict[int, str | None] | None = ctx.block_names
+        else:
+            lines = test_file.content.splitlines()
+            library = self._detect_library(lines)
+            block_names = None
+
+        lo, hi = max(0, line_num - 4), min(len(lines), line_num + 3)
+        context_lines = [lines[i].strip() for i in range(lo, hi) if lines[i].strip()]
+        category = self._classify_context(context_lines)
+
+        waits = self._LIBRARY_WAITS.get(library, self._GENERIC_WAITS) if library else self._GENERIC_WAITS
+        wait_keyword = waits.get(category, waits["generic"])
+
+        block = self._enclosing_block_name(lines, line_num, block_names)
+        block_hint = f" in '{block}'" if block else ""
+
+        duration = sleep_pattern.duration_in_seconds
+        if duration < 1:
+            return (
+                f"Sub-second sleep{block_hint} — verify it is necessary; "
+                f"if so, replace with '{wait_keyword}'"
+            )
+        if duration < 5:
+            return f"Replace with '{wait_keyword}'{block_hint}"
+        return (
+            f"Long sleep ({duration:.0f}s){block_hint} indicates missing synchronization — "
+            f"use '{wait_keyword}' or redesign the wait strategy"
+        )
 
     @override
     def validate_config(self) -> None:

@@ -34,11 +34,11 @@ if TYPE_CHECKING:
 
 __all__ = [
     "AnalyzerRegistry",
-    "get_analyzer_registry",
-    "register_analyzer",
     "get_analyzer",
-    "list_analyzers",
     "get_analyzer_info",
+    "get_analyzer_registry",
+    "list_analyzers",
+    "register_analyzer",
 ]
 
 logger = get_logger(__name__)

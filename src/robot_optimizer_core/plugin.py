@@ -13,14 +13,14 @@ from .exceptions import PluginError
 from .logging import get_logger
 
 __all__ = [
-    "PluginMetadata",
+    "ALLOWED_BUILTINS",
+    "ALLOWED_IMPORTS",
     "Plugin",
+    "PluginMetadata",
     "PluginRegistry",
     "PluginSecurityValidator",
-    "SecurityVisitor",
     "SecurePluginManager",
-    "ALLOWED_IMPORTS",
-    "ALLOWED_BUILTINS",
+    "SecurityVisitor",
     "get_plugin_registry",
 ]
 

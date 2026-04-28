@@ -14,10 +14,10 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 __all__ = [
-    "TimingStats",
     "MetricsCollector",
-    "get_metrics",
+    "TimingStats",
     "configure_metrics",
+    "get_metrics",
 ]
 
 logger = _stdlib_logging.getLogger(__name__)

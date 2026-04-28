@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 import sys
 from collections import defaultdict
+from collections.abc import Sequence
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -118,6 +119,83 @@ class DeadCodeAnalyzer(BaseAnalyzer):
 
         return findings
 
+    def analyze_suite(self, files: Sequence[TestFile]) -> list[Finding]:
+        """Analyze a suite of files for dead code with cross-file awareness.
+
+        A keyword defined in one file is only reported as unused when it has
+        no callers in *any* file in the suite.  Duplicate detection and
+        unreachable-code detection remain per-file.
+
+        Args:
+            files: All test/resource files that form the suite.
+
+        Returns:
+            List of findings across all files.
+        """
+        if not files:
+            return []
+
+        # --- First pass: collect definitions and raw candidate calls -----------
+        all_definitions: dict[str, list[tuple[TestFile, int]]] = defaultdict(list)
+        raw_candidates: list[str] = []
+        per_file_display: dict[str, str] = {}
+        # Cache parsed keywords per file to avoid re-parsing in duplicate/unreachable pass
+        file_keywords: list[tuple[TestFile, dict[str, list[int]]]] = []
+
+        for test_file in files:
+            keywords, _ = self._extract_keywords_and_calls(test_file)
+            file_keywords.append((test_file, keywords))
+            for kw_name, line_numbers in keywords.items():
+                for line_num in line_numbers:
+                    all_definitions[kw_name].append((test_file, line_num))
+                per_file_display.setdefault(kw_name, self._keyword_display_names.get(kw_name, kw_name))
+            raw_candidates.extend(self._extract_candidate_calls(test_file))
+
+        # Resolve raw candidates against the full suite-wide keyword set
+        all_calls = self._resolve_calls(raw_candidates, set(all_definitions))
+
+        # --- Second pass: emit findings ---------------------------------------
+        findings: list[Finding] = []
+
+        if self._check_unused:
+            for kw_name, locations in all_definitions.items():
+                if kw_name in all_calls:
+                    continue
+                display_name = per_file_display.get(kw_name, kw_name)
+                if kw_name in _LIFECYCLE_KEYWORDS:
+                    continue
+                if any(p.match(display_name) for p in self._ignore_patterns):
+                    continue
+                pattern = Pattern(
+                    type=PatternType.UNUSED_KEYWORD,
+                    name="Unused Keyword",
+                    description=f"Keyword '{display_name}' is never called in the suite",
+                    recommendation="Remove this keyword or use it in your tests",
+                    documentation_url=None,
+                    auto_fixable=True,
+                )
+                # Report only the first definition site to avoid noise
+                test_file, line_num = locations[0]
+                findings.append(
+                    Finding.create(
+                        pattern=pattern,
+                        severity=Severity.WARNING,
+                        location=Location(file_path=test_file.path, line=line_num),
+                        message=f"Keyword '{display_name}' is defined but never used in the suite",
+                        keyword_name=display_name,
+                    )
+                )
+
+        if self._check_duplicates:
+            for test_file, keywords in file_keywords:
+                findings.extend(self._find_duplicate_keywords(keywords, test_file))
+
+        if self._check_unreachable:
+            for test_file in files:
+                findings.extend(self._find_unreachable_code(test_file))
+
+        return findings
+
     def _extract_keywords_and_calls(
         self, test_file: TestFile
     ) -> tuple[dict[str, list[int]], set[str]]:
@@ -204,6 +282,53 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                             calls.add(keyword)
 
         return dict(keywords), calls
+
+    def _extract_candidate_calls(self, test_file: TestFile) -> list[str]:
+        """Return all indented (call-site) stripped lines from test/keyword sections."""
+        candidates: list[str] = []
+        lines = test_file.content.splitlines()
+        in_test_or_keyword = False
+        for line in lines:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            if stripped.startswith("***"):
+                in_test_or_keyword = "test case" in stripped.lower() or "keyword" in stripped.lower()
+                continue
+            if in_test_or_keyword and line.startswith((" ", "\t")):
+                candidates.append(stripped)
+        return candidates
+
+    def _resolve_calls(self, candidates: list[str], keyword_names: set[str]) -> set[str]:
+        """Match raw candidate strings against a keyword set, returning matched names."""
+        calls: set[str] = set()
+        for call in candidates:
+            lowered = call.lower()
+            lowered_parts = lowered.split()
+
+            for keyword in keyword_names:
+                if lowered == keyword or lowered.startswith(keyword + " "):
+                    calls.add(keyword)
+
+            if lowered_parts and lowered_parts[0] in {"given", "when", "then", "and", "but"}:
+                bdd_call = " ".join(lowered_parts[1:])
+                for keyword in keyword_names:
+                    if bdd_call == keyword or bdd_call.startswith(keyword + " "):
+                        calls.add(keyword)
+
+            if lowered.startswith("run keyword "):
+                dynamic_call = lowered.removeprefix("run keyword ").strip()
+                for keyword in keyword_names:
+                    if dynamic_call == keyword or dynamic_call.startswith(keyword + " "):
+                        calls.add(keyword)
+
+            if lowered.startswith("run keywords "):
+                for part in re.split(r"\s+AND\s+", call[len("Run Keywords "):], flags=re.IGNORECASE):
+                    dynamic_call = part.strip().lower()
+                    for keyword in keyword_names:
+                        if dynamic_call == keyword or dynamic_call.startswith(keyword + " "):
+                            calls.add(keyword)
+        return calls
 
     def _find_unused_keywords(
         self, keywords: dict[str, list[int]], calls: set[str], test_file: TestFile
