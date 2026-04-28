@@ -24,6 +24,7 @@ Example:
 from __future__ import annotations
 
 import sys
+from typing import ClassVar
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -139,6 +140,8 @@ class FlakinessAnalyzer(BaseAnalyzer):
             List of tags.
         """
         return ["stability", "reliability", "test-quality"]
+
+    requires_external_repo: ClassVar[bool] = True
 
     @override
     def analyze(self, test_file: TestFile) -> list[Finding]:

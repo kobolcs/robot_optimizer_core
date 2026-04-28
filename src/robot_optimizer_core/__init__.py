@@ -46,7 +46,7 @@ from .analyzers import (
 )
 
 # High-level API functions
-from .api import analyze_directory, analyze_file, analyze_suite
+from .api import SuiteAnalysisResult, analyze_directory, analyze_file, analyze_suite
 
 # Configuration
 from .config import Settings, get_settings, reset_settings
@@ -168,6 +168,7 @@ __all__ = [
     "analyze_file",
     "analyze_directory",
     "analyze_suite",
+    "SuiteAnalysisResult",
 ]
 
 

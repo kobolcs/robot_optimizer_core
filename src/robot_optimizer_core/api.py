@@ -23,12 +23,11 @@ Example:
 """
 from __future__ import annotations
 
-import builtins
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, TypedDict
 
-from .analyzers import get_analyzer, list_analyzers
+from .analyzers import get_analyzer, get_analyzer_registry, list_analyzers
 from .config import get_settings
 from .di import get_container
 from .domain.entities import TestFile
@@ -40,6 +39,31 @@ from .metrics import get_metrics
 if TYPE_CHECKING:
     from .analyzers import BaseAnalyzer
     from .config import Settings
+    from .domain.value_objects.robot_ast import RobotImport, RobotKeyword, RobotTestCase
+
+
+class _SuiteInfo(TypedDict):
+    files: int
+    keywords: list[RobotKeyword]
+    test_cases: list[RobotTestCase]
+    imports: list[RobotImport]
+
+
+class _SuiteStatistics(TypedDict):
+    total_findings: int
+    findings_by_severity: dict[str, int]
+    findings_by_type: dict[str, int]
+    keyword_count: int
+    test_count: int
+    import_count: int
+
+
+class SuiteAnalysisResult(TypedDict):
+    """Typed result returned by :func:`analyze_suite`."""
+    findings: list[Finding]
+    file_findings: dict[Path, list[Finding]]
+    suite_info: _SuiteInfo
+    statistics: _SuiteStatistics
 
 logger = get_logger(__name__)
 
@@ -265,8 +289,7 @@ def analyze_directory(
     metrics.gauge("batch.files_failed", len(errors))
     metrics.gauge("batch.total_findings", total_findings)
 
-    # Use ExceptionGroup for multiple errors (Python 3.11+)
-    if errors and hasattr(builtins, "ExceptionGroup"):
+    if errors:
         raise ExceptionGroup(
             f"Analysis failed for {len(errors)} files",
             [e for _, e in errors]
@@ -279,7 +302,7 @@ def analyze_suite(
     suite_path: str | Path,
     analyzers: list[str | BaseAnalyzer] | None = None,
     settings: Settings | None = None
-) -> dict[str, Any]:
+) -> SuiteAnalysisResult:
     """Analyze a Robot Framework test suite with AST parsing.
 
     This function provides more detailed analysis using the AST parser,
@@ -302,23 +325,21 @@ def analyze_suite(
         >>> print(f"Keywords: {results['suite_info']['keyword_count']}")
     """
     path = Path(suite_path)
+    container = get_container()
 
     # Single file or directory?
-    files = [path] if path.is_file() else None
-
-    if files is None:
-        container = get_container()
+    if path.is_file():
+        files: list[Path] = [path]
+    else:
         discovery = container.resolve("file_discovery")
         files = discovery.find_files(path)
 
-    # Parse suite structure
-    container = get_container()
     parser = container.resolve("parser")
-    suite_info = {
+    suite_info: _SuiteInfo = {
         "files": len(files),
         "keywords": [],
         "test_cases": [],
-        "imports": []
+        "imports": [],
     }
 
     # Analyze files and collect suite info
@@ -326,58 +347,46 @@ def analyze_suite(
     file_findings: dict[Path, list[Finding]] = {}
 
     for file_path in files:
-        # Load and parse
         test_file = TestFile.from_path(file_path)
 
         try:
             robot_suite = parser.parse_suite(test_file)
-
-            # Collect suite info
             suite_info["keywords"].extend(robot_suite.keywords)
             suite_info["test_cases"].extend(robot_suite.test_cases)
             suite_info["imports"].extend(robot_suite.imports)
-
         except Exception as e:
             logger.warning(
                 f"Failed to parse suite structure: {file_path}",
                 extra={"error": str(e)}
             )
 
-        # Run analyzers
         findings = analyze_file(file_path, analyzers, settings)
         all_findings.extend(findings)
         file_findings[file_path] = findings
 
-    # Calculate statistics
-    statistics = {
+    findings_by_severity: dict[str, int] = {}
+    findings_by_type: dict[str, int] = {}
+    for finding in all_findings:
+        sev = finding.severity.name
+        findings_by_severity[sev] = findings_by_severity.get(sev, 0) + 1
+        pt = finding.pattern.type.name
+        findings_by_type[pt] = findings_by_type.get(pt, 0) + 1
+
+    statistics: _SuiteStatistics = {
         "total_findings": len(all_findings),
-        "findings_by_severity": {},
-        "findings_by_type": {},
+        "findings_by_severity": findings_by_severity,
+        "findings_by_type": findings_by_type,
         "keyword_count": len(suite_info["keywords"]),
         "test_count": len(suite_info["test_cases"]),
-        "import_count": len(suite_info["imports"])
+        "import_count": len(suite_info["imports"]),
     }
 
-    # Group findings
-    for finding in all_findings:
-        # By severity
-        severity = finding.severity.name
-        statistics["findings_by_severity"][severity] = (
-            statistics["findings_by_severity"].get(severity, 0) + 1
-        )
-
-        # By type
-        pattern_type = finding.pattern.type.name
-        statistics["findings_by_type"][pattern_type] = (
-            statistics["findings_by_type"].get(pattern_type, 0) + 1
-        )
-
-    return {
-        "findings": all_findings,
-        "file_findings": file_findings,
-        "suite_info": suite_info,
-        "statistics": statistics
-    }
+    return SuiteAnalysisResult(
+        findings=all_findings,
+        file_findings=file_findings,
+        suite_info=suite_info,
+        statistics=statistics,
+    )
 
 
 def _get_analyzer_instances(
@@ -394,11 +403,14 @@ def _get_analyzer_instances(
         List of analyzer instances.
     """
     if analyzers is None:
-        # Use all registered analyzers that are safe to construct without
-        # external dependencies. Flakiness requires a TestResultRepository and
-        # must be requested explicitly or injected.
-        analyzer_names = [name for name in list_analyzers() if name != "flakiness"]
-        return [get_analyzer(name) for name in analyzer_names]
+        # Check requires_external_repo at the class level before instantiation;
+        # analyzers that need an external repo raise on construction without one.
+        registry = get_analyzer_registry()
+        names = [
+            name for name in list_analyzers()
+            if not getattr(registry.analyzers.get(name), "requires_external_repo", False)
+        ]
+        return [get_analyzer(name) for name in names]
 
     instances = []
     for analyzer in analyzers:
