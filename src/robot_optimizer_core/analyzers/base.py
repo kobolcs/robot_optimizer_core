@@ -27,7 +27,7 @@ Example:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TypeAlias, TypeVar
+from typing import ClassVar, TypeAlias, TypeVar
 
 from ..domain.entities import TestFile
 from ..domain.value_objects import Finding, Severity
@@ -132,6 +132,11 @@ class BaseAnalyzer(ABC):
             True if auto-fix is supported (default: False).
         """
         return False
+
+    #: Set to True on subclasses that require an external repository to be
+    #: injected (e.g. TestResultRepository). The default API reads this at
+    #: the class level before instantiation to skip such analyzers.
+    requires_external_repo: ClassVar[bool] = False
 
     @abstractmethod
     def analyze(self, test_file: TestFile) -> list[Finding]:
