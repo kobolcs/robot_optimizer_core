@@ -159,6 +159,20 @@ class TestJsonFormat:
         assert len(parsed) == 1
         assert parsed[0]["message"] == "Use explicit wait"
 
+    def test_json_severity_is_plain_string(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Severity in JSON output must be a plain string, not 'Severity.WARNING'."""
+        rf_file = tmp_path / "t.robot"
+        rf_file.write_text("*** Test Cases ***\n")
+        findings = [_make_finding(rf_file, severity=Severity.WARNING)]
+        with patch("robot_optimizer_core.cli.analyze_file", return_value=findings):
+            with pytest.raises(SystemExit):
+                main(["analyze", str(rf_file), "--format", "json"])
+        out = capsys.readouterr().out
+        parsed = json.loads(out)
+        assert parsed[0]["severity"] == "WARNING"
+
     def test_json_empty_findings_is_empty_list(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:

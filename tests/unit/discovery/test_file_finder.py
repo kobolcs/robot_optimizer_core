@@ -70,6 +70,34 @@ class TestPathExclusionTrie:
         trie = PathExclusionTrie()
         assert trie.is_excluded(Path("anything")) is False
 
+    def test_glob_star_star_does_not_exclude_unrelated_paths(self) -> None:
+        """Adding **/__pycache__ must not exclude all other paths (regression)."""
+        trie = PathExclusionTrie()
+        trie.add_exclusion("**/__pycache__")
+        # __pycache__ at any depth should be excluded
+        assert trie.is_excluded(Path("__pycache__")) is True
+        assert trie.is_excluded(Path("src/__pycache__")) is True
+        # Unrelated paths must NOT be excluded
+        assert trie.is_excluded(Path("src")) is False
+        assert trie.is_excluded(Path("tests")) is False
+
+    def test_multiple_glob_patterns_independent(self) -> None:
+        """Multiple **-patterns each exclude only their own component."""
+        trie = PathExclusionTrie()
+        trie.add_exclusion("**/__pycache__")
+        trie.add_exclusion("**/node_modules")
+        assert trie.is_excluded(Path("__pycache__")) is True
+        assert trie.is_excluded(Path("node_modules")) is True
+        assert trie.is_excluded(Path("src")) is False
+
+    def test_hidden_file_pattern(self) -> None:
+        """**/.*  must match hidden files/dirs but not regular ones."""
+        trie = PathExclusionTrie()
+        trie.add_exclusion("**/.*")
+        assert trie.is_excluded(Path(".hidden")) is True
+        assert trie.is_excluded(Path(".venv")) is True
+        assert trie.is_excluded(Path("src")) is False
+
 
 @pytest.mark.unit
 class TestOptimizedFileDiscoveryService:

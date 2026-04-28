@@ -3,22 +3,15 @@
 
 This module is part of the test-suite analysis engine infrastructure.
 Its primary production responsibility is file discovery.
-
-Note:
-    Additional optimization helper classes in this module are retained for
-    backward compatibility and experimentation. Public imports should prefer
-    :class:`OptimizedFileDiscoveryService` (aliased as ``FileDiscoveryService``).
 """
 
 from __future__ import annotations
 
 import fnmatch
 import re
-from collections import defaultdict
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
 
 from ..config import Settings
 from ..exceptions import FileNotFoundError as RFFileNotFoundError
@@ -26,9 +19,6 @@ from ..logging import get_logger
 
 logger = get_logger(__name__)
 
-if TYPE_CHECKING:
-    from ..domain.entities import TestFile
-    from ..domain.value_objects import Finding
 
 __all__ = [
     "OptimizedFileDiscoveryService",
@@ -95,7 +85,13 @@ class PatternMatcher:
 
 @dataclass
 class PathExclusionTrie:
-    """Trie structure for efficient path exclusion checking."""
+    """Trie structure for efficient path exclusion checking.
+
+    Patterns containing ``**`` are handled separately via per-component fnmatch
+    matching so that patterns like ``**/.*`` or ``**/__pycache__/**`` correctly
+    match only the intended path components instead of marking the trie root as
+    excluded (which would exclude everything).
+    """
 
     class TrieNode:
         def __init__(self) -> None:
@@ -105,9 +101,30 @@ class PathExclusionTrie:
             self.pattern: re.Pattern[str] | None = None
 
     root: TrieNode = field(default_factory=TrieNode)
+    # Per-component patterns compiled from ** glob patterns (init=False keeps
+    # them out of the dataclass constructor signature).
+    _component_patterns: list[re.Pattern[str]] = field(
+        default_factory=list, init=False
+    )
 
     def add_exclusion(self, pattern: str) -> None:
-        """Add exclusion pattern to trie."""
+        """Add exclusion pattern to trie.
+
+        Patterns containing ``**`` are decomposed into their non-wildcard
+        segments and stored as per-component match patterns.  All other
+        patterns are inserted into the prefix trie as before.
+        """
+        if "**" in pattern:
+            # Extract the meaningful (non-**) components and compile each one
+            # as an fnmatch pattern so they can be matched against individual
+            # path parts at query time.
+            for part in pattern.split("/"):
+                if part and part != "**":
+                    self._component_patterns.append(
+                        re.compile(fnmatch.translate(part), re.IGNORECASE)
+                    )
+            return
+
         parts = pattern.split("/")
         node = self.root
 
@@ -127,9 +144,17 @@ class PathExclusionTrie:
     def is_excluded(self, path: Path) -> bool:
         """Check if path is excluded - O(d) where d is directory depth."""
         parts = path.parts
+
+        # Fast component-pattern check for ** patterns
+        if self._component_patterns:
+            for part in parts:
+                for cpat in self._component_patterns:
+                    if cpat.match(part):
+                        return True
+
         node = self.root
 
-        for _, part in enumerate(parts):
+        for part in parts:
             # Check if current node excludes
             if node.is_excluded:
                 return True
@@ -146,8 +171,8 @@ class PathExclusionTrie:
                 # Check for pattern children
                 for child_name, child_node in node.children.items():
                     if "*" in child_name or "?" in child_name:
-                        pattern = re.compile(fnmatch.translate(child_name))
-                        if pattern.match(part):
+                        pat = re.compile(fnmatch.translate(child_name))
+                        if pat.match(part):
                             node = child_node
                             break
                 else:
@@ -307,166 +332,3 @@ class OptimizedFileDiscoveryService:
             return []
 
 
-# Optimized analyzer base
-class OptimizedAnalyzer:
-    """Base analyzer with performance optimizations."""
-
-    def __init__(self) -> None:
-        """Initialize with optimizations."""
-        # Pre-compile all regex patterns
-        self._compiled_patterns: dict[str, re.Pattern[str]] = {}
-        # Cache for parsed structures
-        self._parse_cache: dict[str, Any] = {}
-        # Metrics for performance tracking
-        self._perf_metrics: defaultdict[str, float] = defaultdict(float)
-
-    def compile_pattern(
-        self, name: str, pattern: str, flags: int = 0
-    ) -> re.Pattern[str]:
-        """Compile and cache regex pattern."""
-        if name not in self._compiled_patterns:
-            self._compiled_patterns[name] = re.compile(pattern, flags)
-        return self._compiled_patterns[name]
-
-    def batch_analyze(self, test_files: list[TestFile]) -> dict[Path, list[Finding]]:
-        """Analyze multiple files in batch for better performance."""
-        import concurrent.futures
-        import multiprocessing
-
-        # Use process pool for CPU-bound analysis
-        max_workers = min(multiprocessing.cpu_count(), len(test_files))
-
-        with concurrent.futures.ProcessPoolExecutor(
-            max_workers=max_workers
-        ) as executor:
-            # Submit all files
-            future_to_file = {
-                executor.submit(self._analyze_single, test_file): test_file
-                for test_file in test_files
-            }
-
-            # Collect results
-            results = {}
-            for future in concurrent.futures.as_completed(future_to_file):
-                test_file = future_to_file[future]
-                try:
-                    findings = future.result()
-                    results[test_file.path] = findings
-                except Exception as e:
-                    logger.error(f"Analysis failed for {test_file.path}: {e}")
-                    results[test_file.path] = []
-
-            return results
-
-    def _analyze_single(self, test_file: TestFile) -> list[Finding]:
-        """Analyze single file (runs in separate process)."""
-        # Override in subclasses
-        raise NotImplementedError
-
-
-# Example: Optimized sleep detector
-class OptimizedSleepDetector(OptimizedAnalyzer):
-    """Sleep detector with pre-compiled patterns and caching."""
-
-    def __init__(self) -> None:
-        """Initialize with optimized patterns."""
-        super().__init__()
-
-        # Pre-compile all patterns once
-        self.sleep_pattern = self.compile_pattern(
-            "sleep",
-            r"^\s*(?:BuiltIn\.)?Sleep\s+(\d+(?:\.\d+)?)\s*(s|seconds?|m|minutes?|ms|milliseconds?)?",
-            re.IGNORECASE,
-        )
-
-        self.wait_pattern = self.compile_pattern(
-            "wait",
-            r"^\s*(?:Wait|Pause|Delay)\s+(\d+(?:\.\d+)?)\s*(s|seconds?|m|minutes?)?",
-            re.IGNORECASE,
-        )
-
-        self.variable_sleep = self.compile_pattern(
-            "variable", r"^\s*Sleep\s+\$\{([^}]+)\}", re.IGNORECASE
-        )
-
-    def analyze(self, test_file: TestFile) -> list[Finding]:
-        """Analyze with optimized pattern matching."""
-        findings = []
-
-        # Split lines once
-        lines = test_file.content.splitlines()
-
-        # Single pass through file - O(n) where n is lines
-        for line_num, line in enumerate(lines, 1):
-            # Skip empty lines early
-            if not line.strip():
-                continue
-
-            # Check patterns - each pattern is O(1) average case
-            if (match := self.sleep_pattern.match(line)) or (
-                match := self.wait_pattern.match(line)
-            ):
-                findings.append(self._create_finding(match, line, line_num, test_file))
-            elif match := self.variable_sleep.match(line):
-                findings.append(
-                    self._create_variable_finding(match, line, line_num, test_file)
-                )
-
-        return findings
-
-    def _create_finding(
-        self, match: re.Match[str], line: str, line_num: int, test_file: Any
-    ) -> Any:
-        raise NotImplementedError
-
-    def _create_variable_finding(
-        self, match: re.Match[str], line: str, line_num: int, test_file: Any
-    ) -> Any:
-        raise NotImplementedError
-
-
-# String matching optimization using Aho-Corasick
-class MultiPatternMatcher:
-    """Efficient multi-pattern string matching using Aho-Corasick algorithm."""
-
-    def __init__(self, patterns: list[str]) -> None:
-        """Build Aho-Corasick automaton for O(n + m) matching."""
-        self.patterns = patterns
-        self.root: dict[str, Any] = {}
-        self.outputs: defaultdict[int, list[int]] = defaultdict(list)
-        self._build_automaton()
-
-    def _build_automaton(self) -> None:
-        """Build the automaton - O(m) where m is total pattern length."""
-        # Build trie
-        for idx, pattern in enumerate(self.patterns):
-            node = self.root
-            for char in pattern:
-                if char not in node:
-                    node[char] = {}
-                node = node[char]
-            self.outputs[id(node)].append(idx)
-
-        # Build failure links (simplified version)
-        # Full implementation would include proper failure function
-
-    def find_all(self, text: str) -> list[tuple[int, int]]:
-        """Find all pattern occurrences - O(n) where n is text length."""
-        matches = []
-        node = self.root
-
-        for i, char in enumerate(text):
-            while node and char not in node:
-                # Follow failure link (simplified)
-                node = self.root
-
-            if char in node:
-                node = node[char]
-
-                # Check for matches
-                if id(node) in self.outputs:
-                    for pattern_idx in self.outputs[id(node)]:
-                        pattern_len = len(self.patterns[pattern_idx])
-                        matches.append((i - pattern_len + 1, pattern_idx))
-
-        return matches

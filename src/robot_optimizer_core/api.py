@@ -136,6 +136,8 @@ def analyze_file(
             )
 
         test_file = TestFile.from_path(path)
+    except AnalysisError:
+        raise
     except Exception as e:
         raise AnalysisError(f"Failed to load file: {e}", file_path=path) from e
 

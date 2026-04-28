@@ -475,3 +475,27 @@ class TestDeadCodeAnalyzerSuite:
         findings = DeadCodeAnalyzer().analyze_suite([file_])
         unused = [f for f in findings if f.pattern.type == PatternType.UNUSED_KEYWORD]
         assert not any("suite setup" in f.message.lower() for f in unused)
+
+    def test_return_in_test_case_not_flagged_as_unreachable(self) -> None:
+        """RETURN inside *** Test Cases *** must never be treated as unreachable code."""
+        content = """*** Test Cases ***
+My Test
+    Log    before
+    RETURN
+    Log    after RETURN in test case
+
+*** Keywords ***
+My Keyword
+    Log    keyword body
+    RETURN
+    Log    this IS unreachable
+"""
+        file_ = self._make("mixed.robot", content)
+        findings = DeadCodeAnalyzer().analyze_suite([file_])
+        unreachable = [
+            f for f in findings if f.pattern.type == PatternType.UNREACHABLE_CODE
+        ]
+        # Only one finding: the keyword body, not the test case body
+        assert len(unreachable) == 1
+        assert "My Keyword" in unreachable[0].message
+
