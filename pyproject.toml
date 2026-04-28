@@ -95,6 +95,9 @@ Repository = "https://github.com/rf-optimizer/robot-framework-optimizer-core"
 Issues = "https://github.com/rf-optimizer/robot-framework-optimizer-core/issues"
 Changelog = "https://github.com/rf-optimizer/robot-framework-optimizer-core/blob/main/CHANGELOG.md"
 
+[project.scripts]
+robot-optimizer = "robot_optimizer_core.cli:main"
+
 [project.entry-points."robot_optimizer.analyzers"]
 # Core analyzers available for discovery
 dead_code = "robot_optimizer_core.analyzers:DeadCodeAnalyzer"
