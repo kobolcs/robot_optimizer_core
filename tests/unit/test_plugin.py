@@ -292,19 +292,34 @@ class TestSecurePluginManager:
         assert "deadbeef" in manager.trusted_hashes
 
     def test_invalid_plugin_name_raises(self, tmp_path: Path) -> None:
-        # Plugin with traversal attempt in metadata name
-        # Uses trusted hash to skip validation and get past exec
+        # Plugin with traversal attempt in metadata name.
         plugin_file = tmp_path / "traversal.py"
-        # A Plugin subclass with a forbidden name -- but we can't actually exec it
-        # without the restricted globals having Plugin in scope, so we test the
-        # metadata validation path indirectly via the existing API.
-        plugin_file.write_text("x = 1\n")
+        plugin_file.write_text(
+            "from robot_optimizer_core.plugin import Plugin, PluginMetadata\n"
+            "\n"
+            "class TraversalPlugin(Plugin):\n"
+            "    @property\n"
+            "    def metadata(self) -> PluginMetadata:\n"
+            "        return PluginMetadata('../evil', '1.0.0', 'Bad name', 'Test')\n"
+            "\n"
+            "    def activate(self) -> None:\n"
+            "        self.is_active = True\n"
+            "\n"
+            "    def deactivate(self) -> None:\n"
+            "        self.is_active = False\n"
+        )
         plugin_file.chmod(0o644)
 
         manager = SecurePluginManager()
-        # Without a Plugin subclass, PluginError is raised for a different reason.
-        with pytest.raises(PluginError):
+        file_hash = hashlib.sha256(plugin_file.read_bytes()).hexdigest()
+        manager.add_trusted_plugin_hash(file_hash)
+
+        with pytest.raises(PluginError) as exc_info:
             manager.load_plugin_from_file(plugin_file)
+
+        error_message = str(exc_info.value).lower()
+        assert "name" in error_message
+        assert "../evil" in error_message
 
 
 @pytest.mark.unit
