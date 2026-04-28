@@ -14,6 +14,7 @@ Example:
         logger.info("Analysis started", extra={"file": "test.robot"})
         logger.error("Analysis failed", extra={"error": str(e)})
 """
+
 from __future__ import annotations
 
 import json
@@ -38,7 +39,9 @@ __all__ = [
 ]
 
 # Context variable for logging context
-logging_context: ContextVar[dict[str, Any] | None] = ContextVar("logging_context", default=None)
+logging_context: ContextVar[dict[str, Any] | None] = ContextVar(
+    "logging_context", default=None
+)
 
 
 class StructuredFormatter(logging.Formatter):
@@ -78,12 +81,31 @@ class StructuredFormatter(logging.Formatter):
 
         # Add extra fields
         extra_fields = {
-            k: v for k, v in record.__dict__.items()
-            if k not in {
-                "name", "msg", "args", "created", "filename", "funcName",
-                "levelname", "levelno", "lineno", "module", "msecs",
-                "message", "pathname", "process", "processName", "relativeCreated",
-                "thread", "threadName", "exc_info", "exc_text", "stack_info"
+            k: v
+            for k, v in record.__dict__.items()
+            if k
+            not in {
+                "name",
+                "msg",
+                "args",
+                "created",
+                "filename",
+                "funcName",
+                "levelname",
+                "levelno",
+                "lineno",
+                "module",
+                "msecs",
+                "message",
+                "pathname",
+                "process",
+                "processName",
+                "relativeCreated",
+                "thread",
+                "threadName",
+                "exc_info",
+                "exc_text",
+                "stack_info",
             }
         }
         if extra_fields:
@@ -177,7 +199,7 @@ def configure_logging(
     format_json: bool = True,
     log_file: Path | None = None,
     enable_metrics: bool = True,
-    extra_handlers: list[logging.Handler] | None = None
+    extra_handlers: list[logging.Handler] | None = None,
 ) -> None:
     """Configure the logging system.
 
@@ -214,9 +236,7 @@ def configure_logging(
         console_handler.setFormatter(StructuredFormatter())
     else:
         console_handler.setFormatter(
-            logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-            )
+            logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         )
     root_logger.addHandler(console_handler)
 
@@ -247,10 +267,7 @@ def configure_logging(
     _root_logger_configured = True
 
 
-def get_logger(
-    name: str,
-    context: dict[str, Any] | None = None
-) -> LoggerAdapter:
+def get_logger(name: str, context: dict[str, Any] | None = None) -> LoggerAdapter:
     """Get a logger with optional context.
 
     This function returns a logger adapter that can include persistent
@@ -280,9 +297,7 @@ def get_logger(
 
 
 def log_analysis_start(
-    file_path: Path,
-    analyzer: str,
-    logger: LoggerAdapter | None = None
+    file_path: Path, analyzer: str, logger: LoggerAdapter | None = None
 ) -> None:
     """Log the start of file analysis.
 
@@ -302,8 +317,8 @@ def log_analysis_start(
             "event": "analysis_start",
             "file": str(file_path),
             "analyzer": analyzer,
-            "file_size": file_path.stat().st_size if file_path.exists() else 0
-        }
+            "file_size": file_path.stat().st_size if file_path.exists() else 0,
+        },
     )
 
 
@@ -312,7 +327,7 @@ def log_analysis_complete(
     analyzer: str,
     findings_count: int,
     duration_seconds: float,
-    logger: LoggerAdapter | None = None
+    logger: LoggerAdapter | None = None,
 ) -> None:
     """Log the completion of file analysis.
 
@@ -335,15 +350,13 @@ def log_analysis_complete(
             "file": str(file_path),
             "analyzer": analyzer,
             "findings_count": findings_count,
-            "duration_seconds": duration_seconds
-        }
+            "duration_seconds": duration_seconds,
+        },
     )
 
 
 def log_error(
-    error: Exception,
-    context: dict[str, Any],
-    logger: LoggerAdapter | None = None
+    error: Exception, context: dict[str, Any], logger: LoggerAdapter | None = None
 ) -> None:
     """Log an error with context.
 
@@ -359,10 +372,6 @@ def log_error(
 
     logger.error(
         f"{type(error).__name__}: {error!s}",
-        extra={
-            "event": "error",
-            "error_type": type(error).__name__,
-            **context
-        },
-        exc_info=True
+        extra={"event": "error", "error_type": type(error).__name__, **context},
+        exc_info=True,
     )

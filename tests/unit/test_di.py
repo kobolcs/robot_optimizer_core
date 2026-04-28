@@ -1,5 +1,6 @@
 # tests/unit/test_di.py
 """Unit tests for the thread-safe DI container."""
+
 from __future__ import annotations
 
 import pytest
@@ -24,7 +25,9 @@ class TestThreadSafeContainer:
         b = container.resolve("svc")
         assert a is not b
 
-    def test_transient_is_default_lifetime(self, container: ThreadSafeContainer) -> None:
+    def test_transient_is_default_lifetime(
+        self, container: ThreadSafeContainer
+    ) -> None:
         container.register("svc", list)
         a = container.resolve("svc")
         b = container.resolve("svc")
@@ -32,13 +35,17 @@ class TestThreadSafeContainer:
 
     # --- Singleton lifetime ---
 
-    def test_singleton_returns_same_instance(self, container: ThreadSafeContainer) -> None:
+    def test_singleton_returns_same_instance(
+        self, container: ThreadSafeContainer
+    ) -> None:
         container.register("svc", list, ServiceLifetime.SINGLETON)
         a = container.resolve("svc")
         b = container.resolve("svc")
         assert a is b
 
-    def test_register_singleton_convenience(self, container: ThreadSafeContainer) -> None:
+    def test_register_singleton_convenience(
+        self, container: ThreadSafeContainer
+    ) -> None:
         container.register_singleton("svc", list)
         a = container.resolve("svc")
         b = container.resolve("svc")
@@ -53,7 +60,9 @@ class TestThreadSafeContainer:
             b = container.resolve("svc")
         assert a is b
 
-    def test_scoped_different_across_scopes(self, container: ThreadSafeContainer) -> None:
+    def test_scoped_different_across_scopes(
+        self, container: ThreadSafeContainer
+    ) -> None:
         container.register("svc", list, ServiceLifetime.SCOPED)
         with container.create_scope():
             a = container.resolve("svc")
@@ -85,7 +94,9 @@ class TestThreadSafeContainer:
         with pytest.raises(ConfigurationError, match="Service not registered"):
             container.resolve("nonexistent")
 
-    def test_duplicate_registration_raises(self, container: ThreadSafeContainer) -> None:
+    def test_duplicate_registration_raises(
+        self, container: ThreadSafeContainer
+    ) -> None:
         container.register("svc", list)
         with pytest.raises(ConfigurationError, match="already registered"):
             container.register("svc", dict)
@@ -129,9 +140,7 @@ class TestThreadSafeContainer:
         container.clear()
         assert container.has_service("svc") is False
 
-    def test_clear_allows_re_registration(
-        self, container: ThreadSafeContainer
-    ) -> None:
+    def test_clear_allows_re_registration(self, container: ThreadSafeContainer) -> None:
         container.register("svc", list)
         container.clear()
         container.register("svc", dict)

@@ -4,6 +4,7 @@
 Comprehensive tests for Pattern and PatternType to ensure complete coverage
 and mutation testing resilience.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -68,7 +69,7 @@ class TestPattern:
             type=PatternType.DUPLICATE_KEYWORD,
             name="Duplicate Keyword Definition",
             description="Found duplicate keyword 'Login'",
-            recommendation="Remove duplicate definitions or consolidate"
+            recommendation="Remove duplicate definitions or consolidate",
         )
 
         assert pattern.type == PatternType.DUPLICATE_KEYWORD
@@ -86,7 +87,7 @@ class TestPattern:
             description="Sleep usage detected",
             recommendation="Use explicit waits",
             documentation_url="https://docs.example.com/waits",
-            auto_fixable=True
+            auto_fixable=True,
         )
 
         assert pattern.documentation_url == "https://docs.example.com/waits"
@@ -100,7 +101,7 @@ class TestPattern:
                 type=PatternType.DUPLICATE_KEYWORD,
                 name="",
                 description="Description",
-                recommendation="Recommendation"
+                recommendation="Recommendation",
             )
         assert "at least 1 character" in str(exc_info.value)
 
@@ -110,7 +111,7 @@ class TestPattern:
                 type=PatternType.DUPLICATE_KEYWORD,
                 name="   ",
                 description="Description",
-                recommendation="Recommendation"
+                recommendation="Recommendation",
             )
         assert "Field cannot be empty" in str(exc_info.value)
 
@@ -120,7 +121,7 @@ class TestPattern:
                 type=PatternType.DUPLICATE_KEYWORD,
                 name="Name",
                 description="",
-                recommendation="Recommendation"
+                recommendation="Recommendation",
             )
 
         # Empty recommendation
@@ -129,7 +130,7 @@ class TestPattern:
                 type=PatternType.DUPLICATE_KEYWORD,
                 name="Name",
                 description="Description",
-                recommendation="   "
+                recommendation="   ",
             )
 
     def test_duplicate_keyword_factory(self) -> None:
@@ -190,55 +191,73 @@ class TestPattern:
         """Test pattern category classification."""
         # Keywords category
         assert Pattern.duplicate_keyword("Test").category == "Keywords"
-        assert Pattern(
-            type=PatternType.UNUSED_KEYWORD,
-            name="Unused",
-            description="Desc",
-            recommendation="Rec"
-        ).category == "Keywords"
+        assert (
+            Pattern(
+                type=PatternType.UNUSED_KEYWORD,
+                name="Unused",
+                description="Desc",
+                recommendation="Rec",
+            ).category
+            == "Keywords"
+        )
 
         # Waits category
         assert Pattern.sleep_in_test("1s").category == "Waits"
-        assert Pattern(
-            type=PatternType.INEFFICIENT_WAIT,
-            name="Bad Wait",
-            description="Desc",
-            recommendation="Rec"
-        ).category == "Waits"
+        assert (
+            Pattern(
+                type=PatternType.INEFFICIENT_WAIT,
+                name="Bad Wait",
+                description="Desc",
+                recommendation="Rec",
+            ).category
+            == "Waits"
+        )
 
         # Locators category
         assert Pattern.fragile_xpath("//div").category == "Locators"
-        assert Pattern(
-            type=PatternType.COMPLEX_CSS,
-            name="Complex CSS",
-            description="Desc",
-            recommendation="Rec"
-        ).category == "Locators"
+        assert (
+            Pattern(
+                type=PatternType.COMPLEX_CSS,
+                name="Complex CSS",
+                description="Desc",
+                recommendation="Rec",
+            ).category
+            == "Locators"
+        )
 
         # Structure category
         assert Pattern.long_test_case(100).category == "Structure"
-        assert Pattern(
-            type=PatternType.NO_TAGS,
-            name="No Tags",
-            description="Desc",
-            recommendation="Rec"
-        ).category == "Structure"
+        assert (
+            Pattern(
+                type=PatternType.NO_TAGS,
+                name="No Tags",
+                description="Desc",
+                recommendation="Rec",
+            ).category
+            == "Structure"
+        )
 
         # Variables category
-        assert Pattern(
-            type=PatternType.HARDCODED_VALUE,
-            name="Hardcoded",
-            description="Desc",
-            recommendation="Rec"
-        ).category == "Variables"
+        assert (
+            Pattern(
+                type=PatternType.HARDCODED_VALUE,
+                name="Hardcoded",
+                description="Desc",
+                recommendation="Rec",
+            ).category
+            == "Variables"
+        )
 
         # Imports category
-        assert Pattern(
-            type=PatternType.WILDCARD_IMPORT,
-            name="Wildcard",
-            description="Desc",
-            recommendation="Rec"
-        ).category == "Imports"
+        assert (
+            Pattern(
+                type=PatternType.WILDCARD_IMPORT,
+                name="Wildcard",
+                description="Desc",
+                recommendation="Rec",
+            ).category
+            == "Imports"
+        )
 
     def test_all_pattern_types_have_categories(self) -> None:
         """Ensure all pattern types have defined categories."""
@@ -247,12 +266,16 @@ class TestPattern:
                 type=pattern_type,
                 name=f"Test {pattern_type.name}",
                 description="Test description",
-                recommendation="Test recommendation"
+                recommendation="Test recommendation",
             )
             # All should have proper categories, not "Other"
             assert pattern.category in [
-                "Keywords", "Waits", "Locators",
-                "Structure", "Variables", "Imports"
+                "Keywords",
+                "Waits",
+                "Locators",
+                "Structure",
+                "Variables",
+                "Imports",
             ]
             assert pattern.category != "Other"
 
@@ -298,7 +321,7 @@ class TestPattern:
             type=PatternType.DUPLICATE_KEYWORD,
             name="  Duplicate Keyword  ",
             description="  Found duplicate  ",
-            recommendation="  Remove it  "
+            recommendation="  Remove it  ",
         )
 
         assert pattern.name == "Duplicate Keyword"

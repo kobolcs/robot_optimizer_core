@@ -1,5 +1,6 @@
 # tests/unit/test_plugin.py
 """Unit tests for the secure plugin system."""
+
 from __future__ import annotations
 
 import ast
@@ -149,6 +150,33 @@ class TestSecurityVisitor:
     def test_forbidden_attribute_dict_flagged(self) -> None:
         visitor = self._visit("x = obj.__dict__")
         assert any("__dict__" in v for v in visitor.violations)
+
+    def test_getattr_with_dangerous_attr_flagged(self) -> None:
+        visitor = self._visit("getattr(obj, '__dict__')")
+        assert any("__dict__" in v for v in visitor.violations)
+
+    def test_getattr_with_globals_flagged(self) -> None:
+        visitor = self._visit("getattr(obj, '__globals__')")
+        assert any("__globals__" in v for v in visitor.violations)
+
+    def test_setattr_with_dangerous_attr_flagged(self) -> None:
+        visitor = self._visit("setattr(obj, '__dict__', {})")
+        assert any("__dict__" in v for v in visitor.violations)
+
+    def test_getattr_with_non_literal_attr_flagged(self) -> None:
+        visitor = self._visit("getattr(obj, attr_name)")
+        assert any("non-literal" in v for v in visitor.violations)
+
+    def test_forbidden_attribute_class_flagged(self) -> None:
+        visitor = self._visit("x = obj.__class__")
+        assert any("__class__" in v for v in visitor.violations)
+
+    def test_forbidden_attribute_bases_flagged(self) -> None:
+        visitor = self._visit("x = obj.__bases__")
+        assert any("__bases__" in v for v in visitor.violations)
+
+    def test_getattr_with_safe_attr_accepted(self) -> None:
+        assert self._visit("getattr(obj, 'name')").violations == []
 
     def test_clean_code_has_no_violations(self) -> None:
         code = """

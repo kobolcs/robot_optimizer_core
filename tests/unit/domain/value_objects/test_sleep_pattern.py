@@ -4,6 +4,7 @@
 Comprehensive tests for the SleepPattern value object including validation,
 computed properties, and edge cases.
 """
+
 from __future__ import annotations
 
 from decimal import Decimal
@@ -24,7 +25,7 @@ class TestSleepPattern:
             duration=Decimal("5"),
             unit="s",
             line_number=10,
-            original_text="Sleep    5 s"
+            original_text="Sleep    5 s",
         )
 
         assert pattern.duration == Decimal("5")
@@ -40,7 +41,7 @@ class TestSleepPattern:
                 duration=Decimal("0"),
                 unit="s",
                 line_number=10,
-                original_text="Sleep    0 s"
+                original_text="Sleep    0 s",
             )
         assert "must be positive" in str(exc_info.value)
 
@@ -50,7 +51,7 @@ class TestSleepPattern:
                 duration=Decimal("-5"),
                 unit="s",
                 line_number=10,
-                original_text="Sleep    -5 s"
+                original_text="Sleep    -5 s",
             )
         assert "must be positive" in str(exc_info.value)
 
@@ -60,7 +61,7 @@ class TestSleepPattern:
                 duration=Decimal("3601"),
                 unit="s",
                 line_number=10,
-                original_text="Sleep    3601 s"
+                original_text="Sleep    3601 s",
             )
         assert "unreasonably long" in str(exc_info.value)
 
@@ -72,7 +73,7 @@ class TestSleepPattern:
                 duration=Decimal("1"),
                 unit=unit,
                 line_number=1,
-                original_text=f"Sleep    1 {unit}"
+                original_text=f"Sleep    1 {unit}",
             )
             assert pattern.unit == unit.lower()
 
@@ -82,7 +83,7 @@ class TestSleepPattern:
                 duration=Decimal("1"),
                 unit=unit,
                 line_number=1,
-                original_text=f"Sleep    1 {unit}"
+                original_text=f"Sleep    1 {unit}",
             )
             assert pattern.unit == unit.lower()
 
@@ -92,7 +93,7 @@ class TestSleepPattern:
                 duration=Decimal("100"),
                 unit=unit,
                 line_number=1,
-                original_text=f"Sleep    100 {unit}"
+                original_text=f"Sleep    100 {unit}",
             )
             assert pattern.unit == unit.lower()
 
@@ -102,7 +103,7 @@ class TestSleepPattern:
                 duration=Decimal("1"),
                 unit="hours",
                 line_number=1,
-                original_text="Sleep    1 hours"
+                original_text="Sleep    1 hours",
             )
         assert "Invalid time unit" in str(exc_info.value)
 
@@ -114,7 +115,7 @@ class TestSleepPattern:
                 duration=Decimal("1"),
                 unit="s",
                 line_number=0,
-                original_text="Sleep    1 s"
+                original_text="Sleep    1 s",
             )
         assert "greater than or equal to 1" in str(exc_info.value)
 
@@ -124,7 +125,7 @@ class TestSleepPattern:
                 duration=Decimal("1"),
                 unit="s",
                 line_number=-1,
-                original_text="Sleep    1 s"
+                original_text="Sleep    1 s",
             )
 
     def test_duration_in_seconds_conversion(self) -> None:
@@ -134,16 +135,13 @@ class TestSleepPattern:
             duration=Decimal("5.5"),
             unit="s",
             line_number=1,
-            original_text="Sleep    5.5 s"
+            original_text="Sleep    5.5 s",
         )
         assert pattern_s.duration_in_seconds == 5.5
 
         # Minutes
         pattern_m = SleepPattern(
-            duration=Decimal("2"),
-            unit="m",
-            line_number=1,
-            original_text="Sleep    2 m"
+            duration=Decimal("2"), unit="m", line_number=1, original_text="Sleep    2 m"
         )
         assert pattern_m.duration_in_seconds == 120.0
 
@@ -152,7 +150,7 @@ class TestSleepPattern:
             duration=Decimal("500"),
             unit="ms",
             line_number=1,
-            original_text="Sleep    500 ms"
+            original_text="Sleep    500 ms",
         )
         assert pattern_ms.duration_in_seconds == 0.5
 
@@ -161,7 +159,7 @@ class TestSleepPattern:
             duration=Decimal("3"),
             unit="seconds",
             line_number=1,
-            original_text="Sleep    3 seconds"
+            original_text="Sleep    3 seconds",
         )
         assert pattern_seconds.duration_in_seconds == 3.0
 
@@ -169,19 +167,13 @@ class TestSleepPattern:
         """Test the is_excessive property (> 5 seconds)."""
         # Not excessive
         pattern1 = SleepPattern(
-            duration=Decimal("3"),
-            unit="s",
-            line_number=1,
-            original_text="Sleep    3 s"
+            duration=Decimal("3"), unit="s", line_number=1, original_text="Sleep    3 s"
         )
         assert pattern1.is_excessive is False
 
         # Exactly 5 seconds - not excessive
         pattern2 = SleepPattern(
-            duration=Decimal("5"),
-            unit="s",
-            line_number=1,
-            original_text="Sleep    5 s"
+            duration=Decimal("5"), unit="s", line_number=1, original_text="Sleep    5 s"
         )
         assert pattern2.is_excessive is False
 
@@ -190,47 +182,80 @@ class TestSleepPattern:
             duration=Decimal("10"),
             unit="s",
             line_number=1,
-            original_text="Sleep    10 s"
+            original_text="Sleep    10 s",
         )
         assert pattern3.is_excessive is True
 
         # Excessive in minutes
         pattern4 = SleepPattern(
-            duration=Decimal("1"),
-            unit="m",
-            line_number=1,
-            original_text="Sleep    1 m"
+            duration=Decimal("1"), unit="m", line_number=1, original_text="Sleep    1 m"
         )
         assert pattern4.is_excessive is True
 
     def test_normalized_unit_property(self) -> None:
         """Test unit normalization."""
         # Seconds variants
-        assert SleepPattern(
-            duration=Decimal("1"), unit="s", line_number=1, original_text="Sleep 1 s"
-        ).normalized_unit == "seconds"
+        assert (
+            SleepPattern(
+                duration=Decimal("1"),
+                unit="s",
+                line_number=1,
+                original_text="Sleep 1 s",
+            ).normalized_unit
+            == "seconds"
+        )
 
-        assert SleepPattern(
-            duration=Decimal("1"), unit="second", line_number=1, original_text="Sleep 1 second"
-        ).normalized_unit == "seconds"
+        assert (
+            SleepPattern(
+                duration=Decimal("1"),
+                unit="second",
+                line_number=1,
+                original_text="Sleep 1 second",
+            ).normalized_unit
+            == "seconds"
+        )
 
         # Minutes variants
-        assert SleepPattern(
-            duration=Decimal("1"), unit="m", line_number=1, original_text="Sleep 1 m"
-        ).normalized_unit == "minutes"
+        assert (
+            SleepPattern(
+                duration=Decimal("1"),
+                unit="m",
+                line_number=1,
+                original_text="Sleep 1 m",
+            ).normalized_unit
+            == "minutes"
+        )
 
-        assert SleepPattern(
-            duration=Decimal("1"), unit="minute", line_number=1, original_text="Sleep 1 minute"
-        ).normalized_unit == "minutes"
+        assert (
+            SleepPattern(
+                duration=Decimal("1"),
+                unit="minute",
+                line_number=1,
+                original_text="Sleep 1 minute",
+            ).normalized_unit
+            == "minutes"
+        )
 
         # Milliseconds variants
-        assert SleepPattern(
-            duration=Decimal("100"), unit="ms", line_number=1, original_text="Sleep 100 ms"
-        ).normalized_unit == "milliseconds"
+        assert (
+            SleepPattern(
+                duration=Decimal("100"),
+                unit="ms",
+                line_number=1,
+                original_text="Sleep 100 ms",
+            ).normalized_unit
+            == "milliseconds"
+        )
 
-        assert SleepPattern(
-            duration=Decimal("100"), unit="millisecond", line_number=1, original_text="Sleep 100 millisecond"
-        ).normalized_unit == "milliseconds"
+        assert (
+            SleepPattern(
+                duration=Decimal("100"),
+                unit="millisecond",
+                line_number=1,
+                original_text="Sleep 100 millisecond",
+            ).normalized_unit
+            == "milliseconds"
+        )
 
     def test_severity_hint_property(self) -> None:
         """Test severity hint based on duration."""
@@ -239,16 +264,13 @@ class TestSleepPattern:
             duration=Decimal("0.5"),
             unit="s",
             line_number=1,
-            original_text="Sleep    0.5 s"
+            original_text="Sleep    0.5 s",
         )
         assert pattern1.severity_hint == "INFO"
 
         # WARNING level (1-5 seconds)
         pattern2 = SleepPattern(
-            duration=Decimal("3"),
-            unit="s",
-            line_number=1,
-            original_text="Sleep    3 s"
+            duration=Decimal("3"), unit="s", line_number=1, original_text="Sleep    3 s"
         )
         assert pattern2.severity_hint == "WARNING"
 
@@ -257,24 +279,18 @@ class TestSleepPattern:
             duration=Decimal("10"),
             unit="s",
             line_number=1,
-            original_text="Sleep    10 s"
+            original_text="Sleep    10 s",
         )
         assert pattern3.severity_hint == "ERROR"
 
         # Edge cases
         pattern4 = SleepPattern(
-            duration=Decimal("1"),
-            unit="s",
-            line_number=1,
-            original_text="Sleep    1 s"
+            duration=Decimal("1"), unit="s", line_number=1, original_text="Sleep    1 s"
         )
         assert pattern4.severity_hint == "WARNING"
 
         pattern5 = SleepPattern(
-            duration=Decimal("5"),
-            unit="s",
-            line_number=1,
-            original_text="Sleep    5 s"
+            duration=Decimal("5"), unit="s", line_number=1, original_text="Sleep    5 s"
         )
         assert pattern5.severity_hint == "WARNING"
 
@@ -284,7 +300,7 @@ class TestSleepPattern:
             duration=Decimal("2.5"),
             unit="s",
             line_number=42,
-            original_text="Sleep    2.5 s"
+            original_text="Sleep    2.5 s",
         )
 
         pattern = sleep_pattern.to_pattern()
@@ -299,35 +315,35 @@ class TestSleepPattern:
             duration=Decimal("5"),
             unit="s",
             line_number=10,
-            original_text="Sleep    5 s"
+            original_text="Sleep    5 s",
         )
 
         p2 = SleepPattern(
             duration=Decimal("5"),
             unit="s",
             line_number=10,
-            original_text="Sleep    5 s"
+            original_text="Sleep    5 s",
         )
 
         p3 = SleepPattern(
             duration=Decimal("10"),  # Different duration
             unit="s",
             line_number=10,
-            original_text="Sleep    10 s"
+            original_text="Sleep    10 s",
         )
 
         p4 = SleepPattern(
             duration=Decimal("5"),
             unit="m",  # Different unit
             line_number=10,
-            original_text="Sleep    5 m"
+            original_text="Sleep    5 m",
         )
 
         p5 = SleepPattern(
             duration=Decimal("5"),
             unit="s",
             line_number=20,  # Different line
-            original_text="Sleep    5 s"
+            original_text="Sleep    5 s",
         )
 
         # Same values
@@ -350,7 +366,7 @@ class TestSleepPattern:
             duration=Decimal("3.75"),
             unit="s",
             line_number=10,
-            original_text="Sleep    3.75 s"
+            original_text="Sleep    3.75 s",
         )
 
         # Normal mode
@@ -376,7 +392,7 @@ class TestSleepPattern:
             duration=Decimal("5"),
             unit="s",
             line_number=10,
-            original_text="Sleep    5 s"
+            original_text="Sleep    5 s",
         )
 
         with pytest.raises(ValidationError):
@@ -394,7 +410,7 @@ class TestSleepPattern:
             duration=Decimal("1"),
             unit="S",  # Uppercase
             line_number=1,
-            original_text="Sleep    1 S"
+            original_text="Sleep    1 S",
         )
         assert pattern1.unit == "s"
 
@@ -402,6 +418,6 @@ class TestSleepPattern:
             duration=Decimal("1"),
             unit="SECONDS",  # Uppercase
             line_number=1,
-            original_text="Sleep    1 SECONDS"
+            original_text="Sleep    1 SECONDS",
         )
         assert pattern2.unit == "seconds"

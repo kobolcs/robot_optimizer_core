@@ -1,5 +1,6 @@
 # src/robot_optimizer_core/domain/value_objects/pattern.py
 """Pattern value object for representing optimization patterns."""
+
 from enum import Enum, auto
 from typing import ClassVar
 
@@ -56,18 +57,12 @@ class Pattern(ValueObject):
 
     type: PatternType = Field(..., description="Type of pattern")  # type: ignore[valid-type]
     name: str = Field(..., min_length=1, description="Pattern name")
-    description: str = Field(
-        ..., min_length=1, description="Pattern description"
-    )
+    description: str = Field(..., min_length=1, description="Pattern description")
     recommendation: str = Field(
         ..., min_length=1, description="Recommendation for fixing"
     )
-    documentation_url: str | None = Field(
-        None, description="URL to documentation"
-    )
-    auto_fixable: bool = Field(
-        False, description="Whether this can be auto-fixed"
-    )
+    documentation_url: str | None = Field(None, description="URL to documentation")
+    auto_fixable: bool = Field(False, description="Whether this can be auto-fixed")
 
     @field_validator("name", "description", "recommendation", mode="before")
     @classmethod
@@ -85,15 +80,12 @@ class Pattern(ValueObject):
         return cls(
             type=PatternType.DUPLICATE_KEYWORD,
             name="Duplicate Keyword Definition",
-            description=(
-                f"Keyword '{keyword_name}' is defined multiple times"
-            ),
+            description=(f"Keyword '{keyword_name}' is defined multiple times"),
             recommendation=(
-                "Remove duplicate definitions or consolidate into a "
-                "single keyword"
+                "Remove duplicate definitions or consolidate into a single keyword"
             ),
             documentation_url=None,
-            auto_fixable=False
+            auto_fixable=False,
         )
 
     @classmethod
@@ -103,18 +95,16 @@ class Pattern(ValueObject):
             type=PatternType.SLEEP_IN_TEST,
             name="Sleep in Test Case",
             description=(
-                f"Test uses 'Sleep {sleep_duration}' which makes tests "
-                "slow and fragile"
+                f"Test uses 'Sleep {sleep_duration}' which makes tests slow and fragile"
             ),
             recommendation=(
-                "Replace with explicit waits (Wait Until Element Is "
-                "Visible, etc.)"
+                "Replace with explicit waits (Wait Until Element Is Visible, etc.)"
             ),
             documentation_url=(
                 "https://robotframework.org/robotframework/latest/"
                 "libraries/BuiltIn.html#Wait%20Until%20Keyword%20Succeeds"
             ),
-            auto_fixable=True
+            auto_fixable=True,
         )
 
     @classmethod
@@ -123,36 +113,27 @@ class Pattern(ValueObject):
         return cls(
             type=PatternType.FRAGILE_XPATH,
             name="Fragile XPath Selector",
-            description=(
-                f"XPath '{xpath}' uses positional indices which "
-                "break easily"
-            ),
+            description=(f"XPath '{xpath}' uses positional indices which break easily"),
             recommendation=(
-                "Use more stable attributes like @id, @class, "
-                "or @data-testid"
+                "Use more stable attributes like @id, @class, or @data-testid"
             ),
             documentation_url=None,
-            auto_fixable=False
+            auto_fixable=False,
         )
 
     @classmethod
-    def long_test_case(
-        cls, line_count: int, threshold: int = 50
-    ) -> "Pattern":
+    def long_test_case(cls, line_count: int, threshold: int = 50) -> "Pattern":
         """Create a pattern for overly long test cases."""
         return cls(
             type=PatternType.LONG_TEST_CASE,
             name="Long Test Case",
-            description=(
-                f"Test case has {line_count} lines "
-                f"(threshold: {threshold})"
-            ),
+            description=(f"Test case has {line_count} lines (threshold: {threshold})"),
             recommendation=(
                 "Break down into smaller, focused test cases or "
                 "extract common steps into keywords"
             ),
             documentation_url=None,
-            auto_fixable=False
+            auto_fixable=False,
         )
 
     @property

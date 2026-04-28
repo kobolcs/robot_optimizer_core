@@ -41,10 +41,7 @@ class TestLocation:
 
     def test_create_basic_location(self):
         """Test creating a basic location."""
-        loc = Location(
-            file_path=Path("test.robot"),
-            line=10
-        )
+        loc = Location(file_path=Path("test.robot"), line=10)
         assert loc.file_path == Path("test.robot")
         assert loc.line == 10
         assert loc.column is None
@@ -54,11 +51,7 @@ class TestLocation:
     def test_create_location_with_range(self):
         """Test creating a location with full range."""
         loc = Location(
-            file_path=Path("test.robot"),
-            line=10,
-            column=5,
-            end_line=15,
-            end_column=20
+            file_path=Path("test.robot"), line=10, column=5, end_line=15, end_column=20
         )
         assert loc.line == 10
         assert loc.column == 5
@@ -86,21 +79,13 @@ class TestLocation:
     def test_end_line_before_start_line(self):
         """Test that end line cannot be before start line."""
         with pytest.raises(ValidationError) as exc_info:
-            Location(
-                file_path=Path("test.robot"),
-                line=10,
-                end_line=5
-            )
+            Location(file_path=Path("test.robot"), line=10, end_line=5)
         assert "cannot be before start line" in str(exc_info.value)
 
     def test_end_column_without_start_column(self):
         """Test that end column requires start column."""
         with pytest.raises(ValidationError) as exc_info:
-            Location(
-                file_path=Path("test.robot"),
-                line=1,
-                end_column=10
-            )
+            Location(file_path=Path("test.robot"), line=1, end_column=10)
         assert "Cannot have end_column without column" in str(exc_info.value)
 
     def test_end_column_before_start_column_same_line(self):
@@ -111,7 +96,7 @@ class TestLocation:
                 line=10,
                 column=20,
                 end_line=10,
-                end_column=15
+                end_column=15,
             )
         assert "cannot be before start column" in str(exc_info.value)
 
@@ -122,21 +107,13 @@ class TestLocation:
 
     def test_range_str_with_column(self):
         """Test range string representation with column."""
-        loc = Location(
-            file_path=Path("test.robot"),
-            line=10,
-            column=5
-        )
+        loc = Location(file_path=Path("test.robot"), line=10, column=5)
         assert loc.range_str == "test.robot:10:5"
 
     def test_range_str_with_full_range(self):
         """Test range string representation with full range."""
         loc = Location(
-            file_path=Path("test.robot"),
-            line=10,
-            column=5,
-            end_line=15,
-            end_column=20
+            file_path=Path("test.robot"), line=10, column=5, end_line=15, end_column=20
         )
         assert loc.range_str == "test.robot:10:5-15:20"
 
@@ -153,11 +130,7 @@ class TestLocation:
 
     def test_contains_within_range(self):
         """Test location containment within range."""
-        outer = Location(
-            file_path=Path("test.robot"),
-            line=10,
-            end_line=20
-        )
+        outer = Location(file_path=Path("test.robot"), line=10, end_line=20)
         inner = Location(file_path=Path("test.robot"), line=15)
         assert outer.contains(inner)
 
@@ -189,7 +162,7 @@ class TestPattern:
             type=PatternType.DUPLICATE_KEYWORD,
             name="Duplicate Keyword",
             description="Found duplicate keyword",
-            recommendation="Remove duplicates"
+            recommendation="Remove duplicates",
         )
         assert pattern.type == PatternType.DUPLICATE_KEYWORD
         assert pattern.name == "Duplicate Keyword"
@@ -205,7 +178,7 @@ class TestPattern:
                 type=PatternType.DUPLICATE_KEYWORD,
                 name="",
                 description="Description",
-                recommendation="Recommendation"
+                recommendation="Recommendation",
             )
         assert "at least 1 character" in str(exc_info.value)
 
@@ -216,7 +189,7 @@ class TestPattern:
                 type=PatternType.DUPLICATE_KEYWORD,
                 name="Name",
                 description="  ",
-                recommendation="Recommendation"
+                recommendation="Recommendation",
             )
         assert "Field cannot be empty" in str(exc_info.value)
 
@@ -296,7 +269,7 @@ class TestFinding:
             pattern=sample_pattern,
             severity=Severity.WARNING,
             location=sample_location,
-            message="Using Sleep makes tests fragile"
+            message="Using Sleep makes tests fragile",
         )
 
         assert finding.id == finding_id
@@ -314,13 +287,13 @@ class TestFinding:
             location=sample_location,
             message="Using Sleep makes tests fragile",
             sleep_duration="2 seconds",
-            suggested_wait="Wait Until Element Is Visible"
+            suggested_wait="Wait Until Element Is Visible",
         )
 
         assert finding.id is not None
         assert finding.context == {
             "sleep_duration": "2 seconds",
-            "suggested_wait": "Wait Until Element Is Visible"
+            "suggested_wait": "Wait Until Element Is Visible",
         }
 
     def test_auto_generated_id(self, sample_pattern, sample_location):
@@ -329,7 +302,7 @@ class TestFinding:
             pattern=sample_pattern,
             severity=Severity.WARNING,
             location=sample_location,
-            message="Test message"
+            message="Test message",
         )
         assert finding.id is not None
 
@@ -340,7 +313,7 @@ class TestFinding:
                 pattern=sample_pattern,
                 severity=Severity.WARNING,
                 location=sample_location,
-                message="  "
+                message="  ",
             )
         assert "cannot be empty" in str(exc_info.value)
 
@@ -350,7 +323,7 @@ class TestFinding:
             pattern=sample_pattern,
             severity=Severity.WARNING,
             location=sample_location,
-            message="Test message"
+            message="Test message",
         )
 
         assert finding.file_path == "test.robot"
@@ -363,14 +336,14 @@ class TestFinding:
             type=PatternType.SLEEP_IN_TEST,
             name="Sleep in Test",
             description="Sleep usage detected",
-            recommendation="Use explicit waits instead"
+            recommendation="Use explicit waits instead",
         )
         finding = Finding.create(
             pattern=pattern,
             severity=Severity.WARNING,
             location=sample_location,
             message="Found Sleep 2 seconds",
-            duration="2 seconds"
+            duration="2 seconds",
         )
 
         output = finding.format_for_console()
@@ -387,7 +360,7 @@ class TestFinding:
             severity=Severity.WARNING,
             location=sample_location,
             message="Test message",
-            extra_info="test"
+            extra_info="test",
         )
 
         data = finding.to_dict()
@@ -406,7 +379,7 @@ class TestFinding:
             pattern=sample_pattern,
             severity=Severity.WARNING,
             location=sample_location,
-            message="Test message"
+            message="Test message",
         )
 
         with pytest.raises(ValidationError):
@@ -420,7 +393,7 @@ class TestFinding:
             severity=Severity.WARNING,
             location=sample_location,
             message="Test",
-            context=original_context
+            context=original_context,
         )
 
         # Modifying original should not affect finding

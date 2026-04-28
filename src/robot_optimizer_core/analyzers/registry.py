@@ -18,6 +18,7 @@ Example:
         # List all available analyzers
         analyzers = list_analyzers()
 """
+
 from __future__ import annotations
 
 from functools import cache
@@ -65,16 +66,10 @@ class AnalyzerRegistry:
         """Initialize the analyzer registry."""
         self.analyzers: dict[str, AnalyzerClass] = {}
         self.instances: dict[str, BaseAnalyzer] = {}
-        self.default_analyzers: list[str] = [
-            "dead_code",
-            "sleep_detector"
-        ]
+        self.default_analyzers: list[str] = ["dead_code", "sleep_detector"]
 
     def register(
-        self,
-        name: str,
-        analyzer_class: AnalyzerClass,
-        override: bool = False
+        self, name: str, analyzer_class: AnalyzerClass, override: bool = False
     ) -> None:
         """Register an analyzer.
 
@@ -90,7 +85,7 @@ class AnalyzerRegistry:
             raise PluginError(
                 f"Analyzer already registered: {name}",
                 plugin_name=name,
-                plugin_type="analyzer"
+                plugin_type="analyzer",
             )
 
         # Validate it's a proper analyzer
@@ -98,7 +93,7 @@ class AnalyzerRegistry:
             raise PluginError(
                 f"Analyzer must inherit from BaseAnalyzer: {analyzer_class}",
                 plugin_name=name,
-                plugin_type="analyzer"
+                plugin_type="analyzer",
             )
 
         self.analyzers[name] = analyzer_class
@@ -112,8 +107,8 @@ class AnalyzerRegistry:
             extra={
                 "name": name,
                 "class": analyzer_class.__name__,
-                "override": override
-            }
+                "override": override,
+            },
         )
 
     def get(self, name: str) -> BaseAnalyzer:
@@ -141,7 +136,7 @@ class AnalyzerRegistry:
                 f"Analyzer not found: {name}",
                 plugin_name=name,
                 plugin_type="analyzer",
-                details={"available": self.list()}
+                details={"available": self.list()},
             )
 
         # Create instance
@@ -186,7 +181,7 @@ class AnalyzerRegistry:
             "class": analyzer.__class__.__name__,
             "module": analyzer.__class__.__module__,
             "supports_auto_fix": str(analyzer.supports_auto_fix),
-            "tags": ", ".join(analyzer.tags) if analyzer.tags else ""
+            "tags": ", ".join(analyzer.tags) if analyzer.tags else "",
         }
 
     def get_default_analyzers(self) -> _list[BaseAnalyzer]:
@@ -210,7 +205,7 @@ class AnalyzerRegistry:
             raise PluginError(
                 f"Invalid analyzer names: {invalid}",
                 plugin_type="analyzer",
-                details={"available": sorted(available)}
+                details={"available": sorted(available)},
             )
 
         self.default_analyzers = names
@@ -270,9 +265,7 @@ def _register_built_in_analyzers(registry: AnalyzerRegistry) -> None:
 
 # Public API functions
 def register_analyzer(
-    name: str,
-    analyzer_class: AnalyzerClass,
-    override: bool = False
+    name: str, analyzer_class: AnalyzerClass, override: bool = False
 ) -> None:
     """Register an analyzer in the global registry.
 

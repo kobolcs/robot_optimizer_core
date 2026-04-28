@@ -1,5 +1,6 @@
 # src/robot_optimizer_core/domain/repositories/test_result_repository.py
 """Repository interface for test result storage."""
+
 from abc import ABC, abstractmethod
 from pathlib import Path
 
@@ -15,11 +16,15 @@ class TestResultRepository(ABC):
         """Save a test execution result."""
 
     @abstractmethod
-    def get_results_for_file(self, file_path: Path, days_back: int = 30) -> list[TestResult]:
+    def get_results_for_file(
+        self, file_path: Path, days_back: int = 30
+    ) -> list[TestResult]:
         """Get test results for a specific file within time period."""
 
     @abstractmethod
-    def get_flakiness_stats(self, file_path: Path, days_back: int = 30) -> list[FlakinessStats]:
+    def get_flakiness_stats(
+        self, file_path: Path, days_back: int = 30
+    ) -> list[FlakinessStats]:
         """Get flakiness statistics for tests in a file."""
 
     @abstractmethod

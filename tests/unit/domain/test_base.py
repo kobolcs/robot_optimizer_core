@@ -4,6 +4,7 @@
 Tests cover ValueObject, Entity, AggregateRoot, and DomainEvent
 with comprehensive branch coverage and mutation testing resilience.
 """
+
 from __future__ import annotations
 
 import json
@@ -28,12 +29,14 @@ from robot_optimizer_core.domain.base import (
 # Test implementations
 class Money(ValueObject):
     """Test value object."""
+
     amount: Decimal = Field(ge=0)
     currency: str = Field(pattern="^[A-Z]{3}$")
 
 
 class Address(ValueObject):
     """Another test value object."""
+
     street: str
     city: str
     country: str = "USA"
@@ -41,6 +44,7 @@ class Address(ValueObject):
 
 class Product(Entity[UUID]):
     """Test entity."""
+
     id: UUID = Field(default_factory=uuid4)
     name: str
     price: Money
@@ -48,24 +52,30 @@ class Product(Entity[UUID]):
 
 class Order(AggregateRoot[UUID]):
     """Test aggregate root."""
+
     id: UUID = Field(default_factory=uuid4)
     customer_id: UUID
     items: list[Product] = Field(default_factory=list)
-    total: Money = Field(default_factory=lambda: Money(amount=Decimal("0"), currency="USD"))
+    total: Money = Field(
+        default_factory=lambda: Money(amount=Decimal("0"), currency="USD")
+    )
 
     def add_item(self, product: Product) -> None:
         """Add item and emit event."""
         self.items.append(product)
-        self.add_event(ItemAddedEvent(
-            order_id=self.id,
-            product_id=product.id,
-            product_name=product.name,
-            price=product.price
-        ))
+        self.add_event(
+            ItemAddedEvent(
+                order_id=self.id,
+                product_id=product.id,
+                product_name=product.name,
+                price=product.price,
+            )
+        )
 
 
 class ItemAddedEvent(DomainEvent):
     """Test domain event."""
+
     order_id: UUID
     product_id: UUID
     product_name: str
@@ -74,6 +84,7 @@ class ItemAddedEvent(DomainEvent):
 
 class OrderCompletedEvent(DomainEvent):
     """Another test event."""
+
     order_id: UUID
     total_amount: Decimal
 
@@ -143,11 +154,7 @@ class TestValueObject:
 
     def test_value_object_whitespace_stripping(self) -> None:
         """Test automatic whitespace stripping."""
-        addr = Address(
-            street="  123 Main St  ",
-            city="  New York  ",
-            country="  USA  "
-        )
+        addr = Address(street="  123 Main St  ", city="  New York  ", country="  USA  ")
 
         assert addr.street == "123 Main St"
         assert addr.city == "New York"
@@ -159,37 +166,26 @@ class TestValueObject:
             Money(
                 amount=Decimal("100"),
                 currency="USD",
-                extra_field="not allowed"  # type: ignore
+                extra_field="not allowed",  # type: ignore
             )
         assert "extra" in str(exc_info.value).lower()
 
     def test_value_object_hash_with_collections(self) -> None:
         """Test hashing with list and dict fields."""
+
         class ComplexVO(ValueObject):
             name: str
             tags: list[str]
             metadata: dict[str, Any]
 
-        vo1 = ComplexVO(
-            name="test",
-            tags=["a", "b"],
-            metadata={"key": "value"}
-        )
-        vo2 = ComplexVO(
-            name="test",
-            tags=["a", "b"],
-            metadata={"key": "value"}
-        )
+        vo1 = ComplexVO(name="test", tags=["a", "b"], metadata={"key": "value"})
+        vo2 = ComplexVO(name="test", tags=["a", "b"], metadata={"key": "value"})
 
         assert vo1 == vo2
         assert hash(vo1) == hash(vo2)
 
         # Different list order
-        vo3 = ComplexVO(
-            name="test",
-            tags=["b", "a"],
-            metadata={"key": "value"}
-        )
+        vo3 = ComplexVO(name="test", tags=["b", "a"], metadata={"key": "value"})
         assert vo1 != vo3
 
     def test_value_object_repr(self) -> None:
@@ -254,6 +250,7 @@ class TestEntity:
 
     def test_entity_from_orm(self) -> None:
         """Test creating entity from ORM-like object."""
+
         class ORMProduct:
             def __init__(self) -> None:
                 self.id = uuid4()
@@ -271,9 +268,7 @@ class TestEntity:
         """Test entity string representation."""
         id_val = uuid4()
         product = Product(
-            id=id_val,
-            name="Test",
-            price=Money(amount=Decimal("10"), currency="USD")
+            id=id_val, name="Test", price=Money(amount=Decimal("10"), currency="USD")
         )
 
         repr_str = repr(product)
@@ -300,8 +295,7 @@ class TestAggregateRoot:
         """Test event management."""
         order = Order(customer_id=uuid4())
         product = Product(
-            name="Mouse",
-            price=Money(amount=Decimal("25"), currency="USD")
+            name="Mouse", price=Money(amount=Decimal("25"), currency="USD")
         )
 
         # Add item (emits event)
@@ -329,17 +323,16 @@ class TestAggregateRoot:
         for i in range(3):
             product = Product(
                 name=f"Product {i}",
-                price=Money(amount=Decimal(str(10 * i)), currency="USD")
+                price=Money(amount=Decimal(str(10 * i)), currency="USD"),
             )
             order.add_item(product)
 
         assert order.event_count == 3
 
         # Add completion event
-        order.add_event(OrderCompletedEvent(
-            order_id=order.id,
-            total_amount=Decimal("30")
-        ))
+        order.add_event(
+            OrderCompletedEvent(order_id=order.id, total_amount=Decimal("30"))
+        )
 
         assert order.event_count == 4
 
@@ -352,8 +345,7 @@ class TestAggregateRoot:
         """Test marking events as committed."""
         order = Order(customer_id=uuid4())
         product = Product(
-            name="Keyboard",
-            price=Money(amount=Decimal("50"), currency="USD")
+            name="Keyboard", price=Money(amount=Decimal("50"), currency="USD")
         )
 
         order.add_item(product)
@@ -377,10 +369,7 @@ class TestDomainEvent:
         price = Money(amount=Decimal("99.99"), currency="USD")
 
         event = ItemAddedEvent(
-            order_id=order_id,
-            product_id=product_id,
-            product_name="Tablet",
-            price=price
+            order_id=order_id, product_id=product_id, product_name="Tablet", price=price
         )
 
         assert isinstance(event.event_id, UUID)
@@ -395,7 +384,7 @@ class TestDomainEvent:
             order_id=uuid4(),
             product_id=uuid4(),
             product_name="Test",
-            price=Money(amount=Decimal("10"), currency="USD")
+            price=Money(amount=Decimal("10"), currency="USD"),
         )
 
         with pytest.raises(ValidationError):
@@ -407,14 +396,11 @@ class TestDomainEvent:
             order_id=uuid4(),
             product_id=uuid4(),
             product_name="Test",
-            price=Money(amount=Decimal("10"), currency="USD")
+            price=Money(amount=Decimal("10"), currency="USD"),
         )
         assert event1.event_name == "item_added"
 
-        event2 = OrderCompletedEvent(
-            order_id=uuid4(),
-            total_amount=Decimal("100")
-        )
+        event2 = OrderCompletedEvent(order_id=uuid4(), total_amount=Decimal("100"))
         assert event2.event_name == "order_completed"
 
         # Test without Event suffix
@@ -430,7 +416,7 @@ class TestDomainEvent:
             order_id=uuid4(),
             product_id=uuid4(),
             product_name="Test",
-            price=Money(amount=Decimal("10"), currency="USD")
+            price=Money(amount=Decimal("10"), currency="USD"),
         )
         assert event.event_version == "1.0"
 
@@ -442,7 +428,7 @@ class TestDomainEvent:
             order_id=order_id,
             product_id=product_id,
             product_name="Monitor",
-            price=Money(amount=Decimal("299.99"), currency="USD")
+            price=Money(amount=Decimal("299.99"), currency="USD"),
         )
 
         message = event.to_message()
@@ -475,7 +461,7 @@ class TestDomainEvent:
             order_id=uuid4(),
             product_id=uuid4(),
             product_name="Custom",
-            price=Money(amount=Decimal("1"), currency="USD")
+            price=Money(amount=Decimal("1"), currency="USD"),
         )
 
         assert event.event_id == custom_id
@@ -483,10 +469,7 @@ class TestDomainEvent:
 
     def test_event_repr(self) -> None:
         """Test event string representation."""
-        event = OrderCompletedEvent(
-            order_id=uuid4(),
-            total_amount=Decimal("500")
-        )
+        event = OrderCompletedEvent(order_id=uuid4(), total_amount=Decimal("500"))
 
         repr_str = repr(event)
         assert "OrderCompletedEvent" in repr_str

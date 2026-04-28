@@ -4,6 +4,7 @@
 Tests cover the base analyzer functionality including hooks, validation,
 configuration, and error handling.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -54,7 +55,7 @@ class ConcreteAnalyzer(BaseAnalyzer):
                 pattern=Pattern.sleep_in_test("1s"),
                 severity=Severity.WARNING,
                 location=Location(test_file.path, 1),
-                message="Test finding"
+                message="Test finding",
             )
         ]
 
@@ -85,7 +86,7 @@ class TestBaseAnalyzer:
             path=Path("test.robot"),
             content="*** Test Cases ***\nTest\n    Sleep    1s",
             size_bytes=100,
-            last_modified_utc=datetime.now(UTC)
+            last_modified_utc=datetime.now(UTC),
         )
 
     def test_create_analyzer(self) -> None:
@@ -129,7 +130,9 @@ class TestBaseAnalyzer:
         # Check metrics were recorded
         if mock_metrics:
             mock_metrics.increment.assert_called_with("analyzer.test_analyzer.success")
-            mock_metrics.gauge.assert_called_with("analyzer.test_analyzer.findings_count", 1)
+            mock_metrics.gauge.assert_called_with(
+                "analyzer.test_analyzer.findings_count", 1
+            )
 
     def test_safe_analyze_with_hooks(self, test_file: TestFile) -> None:
         """Test that hooks are called during safe_analyze."""
@@ -166,7 +169,7 @@ class TestBaseAnalyzer:
             pattern=Pattern.sleep_in_test("1s"),
             severity=Severity.WARNING,
             location=Location(test_file.path, 2),
-            message="Valid"
+            message="Valid",
         )
 
         # Finding with wrong file path
@@ -174,7 +177,7 @@ class TestBaseAnalyzer:
             pattern=Pattern.sleep_in_test("1s"),
             severity=Severity.WARNING,
             location=Location(Path("wrong.robot"), 10),
-            message="Wrong path"
+            message="Wrong path",
         )
 
         # Finding with invalid line number
@@ -182,7 +185,7 @@ class TestBaseAnalyzer:
             pattern=Pattern.sleep_in_test("1s"),
             severity=Severity.WARNING,
             location=Location(test_file.path, 999),
-            message="Invalid line"
+            message="Invalid line",
         )
 
         test_file.content = "Line 1\nLine 2\nLine 3"  # 3 lines
@@ -196,11 +199,7 @@ class TestBaseAnalyzer:
 
     def test_get_config_value(self) -> None:
         """Test configuration value retrieval."""
-        config = {
-            "threshold": 10,
-            "name": "test",
-            "options": {"nested": True}
-        }
+        config = {"threshold": 10, "name": "test", "options": {"nested": True}}
         analyzer = ConcreteAnalyzer(config=config)
 
         # Get existing value
@@ -223,6 +222,7 @@ class TestBaseAnalyzer:
 
     def test_pre_analyze_hook(self, test_file: TestFile) -> None:
         """Test pre_analyze hook."""
+
         class HookAnalyzer(ConcreteAnalyzer):
             def __init__(self):
                 super().__init__()
@@ -238,14 +238,17 @@ class TestBaseAnalyzer:
 
     def test_post_analyze_hook(self, test_file: TestFile) -> None:
         """Test post_analyze hook."""
+
         class HookAnalyzer(ConcreteAnalyzer):
-            def post_analyze(self, test_file: TestFile, findings: list[Finding]) -> list[Finding]:
+            def post_analyze(
+                self, test_file: TestFile, findings: list[Finding]
+            ) -> list[Finding]:
                 # Add extra finding
                 extra = Finding.create(
                     pattern=Pattern.duplicate_keyword("Test"),
                     severity=Severity.ERROR,
                     location=Location(test_file.path, 2),
-                    message="Added in post"
+                    message="Added in post",
                 )
                 return findings + [extra]
 
@@ -257,6 +260,7 @@ class TestBaseAnalyzer:
 
     def test_validate_config(self) -> None:
         """Test config validation."""
+
         class ValidatingAnalyzer(ConcreteAnalyzer):
             def validate_config(self) -> None:
                 threshold = self.get_config_value("threshold", required=True)
@@ -307,6 +311,7 @@ class TestBaseAnalyzer:
 
     def test_analysis_error_reraised(self, test_file: TestFile) -> None:
         """Test that AnalysisError is re-raised as-is."""
+
         class RaisesAnalysisError(BaseAnalyzer):
             @property
             def name(self) -> str:

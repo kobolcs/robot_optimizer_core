@@ -4,6 +4,7 @@
 This analyzer detects unused keywords and duplicate definitions
 that can be safely removed to improve maintainability.
 """
+
 from __future__ import annotations
 
 import re
@@ -21,9 +22,14 @@ from .base import BaseAnalyzer, ConfigValue
 
 __all__ = ["DeadCodeAnalyzer"]
 
-_LIFECYCLE_KEYWORDS = frozenset({
-    "suite setup", "suite teardown", "test setup", "test teardown",
-})
+_LIFECYCLE_KEYWORDS = frozenset(
+    {
+        "suite setup",
+        "suite teardown",
+        "test setup",
+        "test teardown",
+    }
+)
 
 
 class DeadCodeAnalyzer(BaseAnalyzer):
@@ -41,8 +47,12 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         self._check_unused = self.get_config_value("check_unused", True)
         self._check_duplicates = self.get_config_value("check_duplicates", True)
         self._check_unreachable = self.get_config_value("check_unreachable", True)
-        ignore_patterns: list[ConfigValue] = self.get_config_value("ignore_patterns", [])
-        self._ignore_patterns = [re.compile(str(pattern), re.IGNORECASE) for pattern in ignore_patterns]
+        ignore_patterns: list[ConfigValue] = self.get_config_value(
+            "ignore_patterns", []
+        )
+        self._ignore_patterns = [
+            re.compile(str(pattern), re.IGNORECASE) for pattern in ignore_patterns
+        ]
         self._keyword_display_names: dict[str, str] = {}
         self.validate_config()
 
@@ -70,20 +80,21 @@ class DeadCodeAnalyzer(BaseAnalyzer):
     def validate_config(self) -> None:
         """Validate analyzer configuration."""
         from ..exceptions import ConfigurationError
+
         for key in ("check_unused", "check_duplicates", "check_unreachable"):
             value = self.get_config_value(key, True)
             if not isinstance(value, bool):
                 raise ConfigurationError(
                     f"Config key '{key}' must be a boolean",
                     config_key=f"{self.name}.{key}",
-                    provided_value=value
+                    provided_value=value,
                 )
         patterns: list[ConfigValue] = self.get_config_value("ignore_patterns", [])
         if not isinstance(patterns, list):
             raise ConfigurationError(
                 "Config key 'ignore_patterns' must be a list",
                 config_key=f"{self.name}.ignore_patterns",
-                provided_value=type(patterns).__name__
+                provided_value=type(patterns).__name__,
             )
 
     @override
@@ -95,7 +106,9 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         keywords, keyword_calls = self._extract_keywords_and_calls(test_file)
 
         if self._check_unused:
-            findings.extend(self._find_unused_keywords(keywords, keyword_calls, test_file))
+            findings.extend(
+                self._find_unused_keywords(keywords, keyword_calls, test_file)
+            )
 
         if self._check_duplicates:
             findings.extend(self._find_duplicate_keywords(keywords, test_file))
@@ -106,8 +119,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         return findings
 
     def _extract_keywords_and_calls(
-        self,
-        test_file: TestFile
+        self, test_file: TestFile
     ) -> tuple[dict[str, list[int]], set[str]]:
         """Extract keyword definitions and resolved keyword calls."""
         keywords: dict[str, list[int]] = defaultdict(list)
@@ -156,7 +168,13 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                     calls.add(keyword)
 
             # BDD prefixes: Given/When/Then/And/But <keyword>
-            if lowered_parts and lowered_parts[0] in {"given", "when", "then", "and", "but"}:
+            if lowered_parts and lowered_parts[0] in {
+                "given",
+                "when",
+                "then",
+                "and",
+                "but",
+            }:
                 bdd_call = " ".join(lowered_parts[1:])
                 for keyword in keyword_names:
                     if bdd_call == keyword or bdd_call.startswith(keyword + " "):
@@ -166,38 +184,45 @@ class DeadCodeAnalyzer(BaseAnalyzer):
             if lowered.startswith("run keyword "):
                 dynamic_call = lowered.removeprefix("run keyword ").strip()
                 for keyword in keyword_names:
-                    if dynamic_call == keyword or dynamic_call.startswith(keyword + " "):
+                    if dynamic_call == keyword or dynamic_call.startswith(
+                        keyword + " "
+                    ):
                         calls.add(keyword)
 
             if lowered.startswith("run keywords "):
                 dynamic_parts = [
                     part.strip().lower()
-                    for part in re.split(r"\s+AND\s+", call[len("Run Keywords "):], flags=re.IGNORECASE)
+                    for part in re.split(
+                        r"\s+AND\s+", call[len("Run Keywords ") :], flags=re.IGNORECASE
+                    )
                 ]
                 for dynamic_call in dynamic_parts:
                     for keyword in keyword_names:
-                        if dynamic_call == keyword or dynamic_call.startswith(keyword + " "):
+                        if dynamic_call == keyword or dynamic_call.startswith(
+                            keyword + " "
+                        ):
                             calls.add(keyword)
 
         return dict(keywords), calls
 
     def _find_unused_keywords(
-        self,
-        keywords: dict[str, list[int]],
-        calls: set[str],
-        test_file: TestFile
+        self, keywords: dict[str, list[int]], calls: set[str], test_file: TestFile
     ) -> list[Finding]:
         """Find keywords that are never called."""
         findings = []
 
         for keyword_name, line_numbers in keywords.items():
             if keyword_name not in calls:
-                display_name = self._keyword_display_names.get(keyword_name, keyword_name)
+                display_name = self._keyword_display_names.get(
+                    keyword_name, keyword_name
+                )
 
                 # Skip special keywords and configured ignore patterns
                 if keyword_name in _LIFECYCLE_KEYWORDS:
                     continue
-                if any(pattern.match(display_name) for pattern in self._ignore_patterns):
+                if any(
+                    pattern.match(display_name) for pattern in self._ignore_patterns
+                ):
                     continue
 
                 pattern = Pattern(
@@ -206,7 +231,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                     description=f"Keyword '{display_name}' is never called",
                     recommendation="Remove this keyword or use it in your tests",
                     documentation_url=None,
-                    auto_fixable=True
+                    auto_fixable=True,
                 )
 
                 finding = Finding.create(
@@ -214,16 +239,14 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                     severity=Severity.WARNING,
                     location=Location(file_path=test_file.path, line=line_numbers[0]),
                     message=f"Keyword '{display_name}' is defined but never used",
-                    keyword_name=display_name
+                    keyword_name=display_name,
                 )
                 findings.append(finding)
 
         return findings
 
     def _find_duplicate_keywords(
-        self,
-        keywords: dict[str, list[int]],
-        test_file: TestFile
+        self, keywords: dict[str, list[int]], test_file: TestFile
     ) -> list[Finding]:
         """Find keywords defined multiple times."""
         findings = []
@@ -240,7 +263,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                         location=Location(file_path=test_file.path, line=line_num),
                         message=f"Keyword '{keyword_name}' is already defined at line {line_numbers[0]}",
                         first_definition_line=line_numbers[0],
-                        duplicate_count=len(line_numbers)
+                        duplicate_count=len(line_numbers),
                     )
                     findings.append(finding)
 
@@ -272,14 +295,19 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                 continue
 
             # Check for code after RETURN
-            if found_return and in_keyword and stripped and not stripped.startswith("#"):
+            if (
+                found_return
+                and in_keyword
+                and stripped
+                and not stripped.startswith("#")
+            ):
                 pattern = Pattern(
                     type=PatternType.UNREACHABLE_CODE,
                     name="Unreachable Code",
                     description="Code after RETURN statement will never execute",
                     recommendation="Remove the unreachable code or move it before RETURN",
                     documentation_url=None,
-                    auto_fixable=True
+                    auto_fixable=True,
                 )
 
                 finding = Finding.create(
@@ -287,7 +315,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                     severity=Severity.WARNING,
                     location=Location(file_path=test_file.path, line=line_num),
                     message=f"Unreachable code after RETURN in keyword '{current_keyword}'",
-                    keyword_name=current_keyword
+                    keyword_name=current_keyword,
                 )
                 findings.append(finding)
 

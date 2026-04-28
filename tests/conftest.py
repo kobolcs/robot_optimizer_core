@@ -1,4 +1,3 @@
-
 # tests/conftest.py
 """Pytest configuration and shared fixtures for Robot Framework Optimizer Core tests.
 
@@ -7,11 +6,13 @@ This module provides common fixtures and configuration for all test levels:
 - Integration tests: Component interaction tests
 - Component tests: End-to-end workflow tests
 """
+
 from __future__ import annotations
 
 # Prevent pytest from collecting imported domain model classes as test classes.
 try:
     from robot_optimizer_core.domain.entities import TestFile as _DomainTestFile
+
     _DomainTestFile.__test__ = False
 except Exception:
     pass
@@ -20,6 +21,7 @@ try:
     from robot_optimizer_core.domain.value_objects import (
         TestResult as _DomainTestResult,
     )
+
     _DomainTestResult.__test__ = False
 except Exception:
     pass
@@ -129,7 +131,7 @@ def settings() -> Generator[Settings, None, None]:
         max_file_size_mb=5.0,
         log_level="DEBUG",
         enable_metrics=False,
-        plugins_enabled=False
+        plugins_enabled=False,
     )
     yield test_settings
     reset_settings()
@@ -209,21 +211,21 @@ def flaky_test_stats() -> list[FlakinessStats]:
             file_path=Path("tests/login.robot"),
             total_runs=100,
             failures=15,
-            last_failure=datetime.now() - timedelta(days=1)
+            last_failure=datetime.now() - timedelta(days=1),
         ),
         FlakinessStats(
             test_name="Very Flaky Test",
             file_path=Path("tests/login.robot"),
             total_runs=50,
             failures=25,
-            last_failure=datetime.now() - timedelta(hours=6)
+            last_failure=datetime.now() - timedelta(hours=6),
         ),
         FlakinessStats(
             test_name="Stable Test",
             file_path=Path("tests/login.robot"),
             total_runs=200,
             failures=0,
-            last_failure=None
+            last_failure=None,
         ),
     ]
 
@@ -238,7 +240,7 @@ def test_results() -> list[TestResult]:
             file_path=Path("tests/login.robot"),
             status="PASS",
             execution_time=1.5,
-            timestamp=base_time
+            timestamp=base_time,
         ),
         TestResult(
             test_name="Login Test",
@@ -246,14 +248,14 @@ def test_results() -> list[TestResult]:
             status="FAIL",
             execution_time=2.1,
             error_message="Element not found",
-            timestamp=base_time - timedelta(hours=1)
+            timestamp=base_time - timedelta(hours=1),
         ),
         TestResult(
             test_name="Logout Test",
             file_path=Path("tests/login.robot"),
             status="PASS",
             execution_time=0.8,
-            timestamp=base_time - timedelta(hours=2)
+            timestamp=base_time - timedelta(hours=2),
         ),
     ]
 
@@ -261,21 +263,15 @@ def test_results() -> list[TestResult]:
 # Markers
 def pytest_configure(config: Any) -> None:
     """Configure custom pytest markers."""
-    config.addinivalue_line(
-        "markers", "unit: Unit tests - fast and isolated"
-    )
+    config.addinivalue_line("markers", "unit: Unit tests - fast and isolated")
     config.addinivalue_line(
         "markers", "integration: Integration tests - component interactions"
     )
     config.addinivalue_line(
         "markers", "component: Component tests - end-to-end workflows"
     )
-    config.addinivalue_line(
-        "markers", "slow: Slow tests that should be run separately"
-    )
-    config.addinivalue_line(
-        "markers", "performance: Performance tests"
-    )
+    config.addinivalue_line("markers", "slow: Slow tests that should be run separately")
+    config.addinivalue_line("markers", "performance: Performance tests")
 
 
 # Test helpers
@@ -286,7 +282,7 @@ class TestData:
     def create_robot_content(
         test_cases: list[str],
         keywords: list[str],
-        variables: dict[str, str] | None = None
+        variables: dict[str, str] | None = None,
     ) -> str:
         """Create robot file content from components."""
         content = "*** Settings ***\nDocumentation    Test suite\n\n"
@@ -311,11 +307,7 @@ class TestData:
         return content
 
     @staticmethod
-    def create_test_file(
-        path: Path,
-        content: str,
-        encoding: str = "utf-8"
-    ) -> TestFile:
+    def create_test_file(path: Path, content: str, encoding: str = "utf-8") -> TestFile:
         """Create a test file with given content."""
         path.write_text(content, encoding=encoding)
         return TestFile.from_path(path)
@@ -335,18 +327,19 @@ class PerformanceTimer:
     def __enter__(self) -> PerformanceTimer:
         """Start timing."""
         import time
+
         self.start_time = time.time()
         return self
 
     def __exit__(self, *args: Any) -> None:
         """Stop timing and check threshold."""
         import time
+
         self.duration = time.time() - self.start_time
 
         if self.duration > self.threshold:
             pytest.fail(
-                f"{self.name} took {self.duration:.2f}s "
-                f"(threshold: {self.threshold}s)"
+                f"{self.name} took {self.duration:.2f}s (threshold: {self.threshold}s)"
             )
 
 
@@ -365,7 +358,7 @@ class MockFactory:
             "severity": Severity.WARNING,
             "location": Location(Path("test.robot"), 10),
             "message": "Test finding",
-            "context": {}
+            "context": {},
         }
         defaults.update(kwargs)
 

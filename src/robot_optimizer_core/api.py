@@ -21,6 +21,7 @@ Example:
             analyzers=["dead_code", "sleep_detector"]
         )
 """
+
 from __future__ import annotations
 
 import time
@@ -44,6 +45,7 @@ if TYPE_CHECKING:
 
 class SuiteInfo(TypedDict):
     """Suite-level aggregate info returned inside :class:`SuiteAnalysisResult`."""
+
     files: int
     keywords: list[RobotKeyword]
     test_cases: list[RobotTestCase]
@@ -52,6 +54,7 @@ class SuiteInfo(TypedDict):
 
 class SuiteStatistics(TypedDict):
     """Finding statistics returned inside :class:`SuiteAnalysisResult`."""
+
     total_findings: int
     findings_by_severity: dict[str, int]
     findings_by_type: dict[str, int]
@@ -62,10 +65,12 @@ class SuiteStatistics(TypedDict):
 
 class SuiteAnalysisResult(TypedDict):
     """Typed result returned by :func:`analyze_suite`."""
+
     findings: list[Finding]
     file_findings: dict[Path, list[Finding]]
     suite_info: SuiteInfo
     statistics: SuiteStatistics
+
 
 __all__ = [
     "SuiteInfo",
@@ -82,7 +87,7 @@ logger = get_logger(__name__)
 def analyze_file(
     file_path: str | Path,
     analyzers: list[str | BaseAnalyzer] | None = None,
-    settings: Settings | None = None
+    settings: Settings | None = None,
 ) -> list[Finding]:
     """Analyze a single Robot Framework file.
 
@@ -132,10 +137,7 @@ def analyze_file(
 
         test_file = TestFile.from_path(path)
     except Exception as e:
-        raise AnalysisError(
-            f"Failed to load file: {e}",
-            file_path=path
-        ) from e
+        raise AnalysisError(f"Failed to load file: {e}", file_path=path) from e
 
     # Get analyzers
     analyzer_instances = _get_analyzer_instances(analyzers, settings)
@@ -157,9 +159,7 @@ def analyze_file(
 
             # Track success
             duration = time.time() - start_time
-            log_analysis_complete(
-                path, analyzer_name, len(findings), duration, logger
-            )
+            log_analysis_complete(path, analyzer_name, len(findings), duration, logger)
 
             metrics.increment("analysis.completed")
             metrics.increment(f"analysis.{analyzer_name}.completed")
@@ -172,9 +172,7 @@ def analyze_file(
             metrics.increment(f"analysis.{analyzer_name}.failed")
 
             raise AnalysisError(
-                f"Analysis failed: {e}",
-                file_path=path,
-                analyzer=analyzer_name
+                f"Analysis failed: {e}", file_path=path, analyzer=analyzer_name
             ) from e
 
     # Track total findings
@@ -190,7 +188,7 @@ def analyze_directory(
     recursive: bool = True,
     analyzers: list[str | BaseAnalyzer] | None = None,
     settings: Settings | None = None,
-    fail_fast: bool = False
+    fail_fast: bool = False,
 ) -> dict[Path, list[Finding]]:
     """Analyze all Robot Framework files in a directory.
 
@@ -226,10 +224,7 @@ def analyze_directory(
         raise FileNotFoundError(path)
 
     if not path.is_dir():
-        raise AnalysisError(
-            "Path is not a directory",
-            file_path=path
-        )
+        raise AnalysisError("Path is not a directory", file_path=path)
 
     # Get settings
     if settings is None:
@@ -250,7 +245,7 @@ def analyze_directory(
         root_path=path,
         patterns=patterns,
         exclude_patterns=exclude_patterns,
-        recursive=recursive
+        recursive=recursive,
     )
 
     logger.info(
@@ -258,8 +253,8 @@ def analyze_directory(
         extra={
             "directory": str(path),
             "file_count": len(files),
-            "recursive": recursive
-        }
+            "recursive": recursive,
+        },
     )
 
     # Analyze each file
@@ -279,7 +274,7 @@ def analyze_directory(
             logger.error(
                 f"Failed to analyze file: {file_path}",
                 extra={"file": str(file_path), "error": str(e)},
-                exc_info=True
+                exc_info=True,
             )
 
     # Log summary
@@ -290,8 +285,8 @@ def analyze_directory(
             "directory": str(path),
             "files_analyzed": len(results),
             "files_failed": len(errors),
-            "total_findings": total_findings
-        }
+            "total_findings": total_findings,
+        },
     )
 
     # Track metrics
@@ -302,8 +297,7 @@ def analyze_directory(
 
     if errors:
         raise ExceptionGroup(
-            f"Analysis failed for {len(errors)} files",
-            [e for _, e in errors]
+            f"Analysis failed for {len(errors)} files", [e for _, e in errors]
         )
 
     return results
@@ -312,7 +306,7 @@ def analyze_directory(
 def analyze_suite(
     suite_path: str | Path,
     analyzers: list[str | BaseAnalyzer] | None = None,
-    settings: Settings | None = None
+    settings: Settings | None = None,
 ) -> SuiteAnalysisResult:
     """Analyze a Robot Framework test suite with AST parsing.
 
@@ -367,8 +361,7 @@ def analyze_suite(
             suite_info["imports"].extend(robot_suite.imports)
         except Exception as e:
             logger.warning(
-                f"Failed to parse suite structure: {file_path}",
-                extra={"error": str(e)}
+                f"Failed to parse suite structure: {file_path}", extra={"error": str(e)}
             )
 
         findings = analyze_file(file_path, analyzers, settings)
@@ -401,8 +394,7 @@ def analyze_suite(
 
 
 def _get_analyzer_instances(
-    analyzers: list[str | BaseAnalyzer] | None,
-    settings: Settings
+    analyzers: list[str | BaseAnalyzer] | None, settings: Settings
 ) -> list[BaseAnalyzer]:
     """Get analyzer instances from names or objects.
 
@@ -418,8 +410,11 @@ def _get_analyzer_instances(
         # analyzers that need an external repo raise on construction without one.
         registry = get_analyzer_registry()
         names = [
-            name for name in list_analyzers()
-            if not getattr(registry.analyzers.get(name), "requires_external_repo", False)
+            name
+            for name in list_analyzers()
+            if not getattr(
+                registry.analyzers.get(name), "requires_external_repo", False
+            )
         ]
         return [get_analyzer(name) for name in names]
 

@@ -1,5 +1,6 @@
 # src/robot_optimizer_core/metrics.py
 """Modern memory-safe metrics collection with GDPR compliance."""
+
 from __future__ import annotations
 
 import logging as _stdlib_logging
@@ -25,11 +26,14 @@ logger = _stdlib_logging.getLogger(__name__)
 @dataclass
 class TimingStats:
     """Statistics for timing metrics with bounded memory."""
+
     count: int = 0
     total: float = 0.0
     min: float = float("inf")
     max: float = 0.0
-    samples: deque[tuple[float, datetime]] = field(default_factory=lambda: deque(maxlen=100))
+    samples: deque[tuple[float, datetime]] = field(
+        default_factory=lambda: deque(maxlen=100)
+    )
 
     @property
     def mean(self) -> float:
@@ -72,7 +76,7 @@ class MetricsCollector:
         max_counters: int = 10000,
         max_gauges: int = 5000,
         max_timings: int = 1000,
-        cleanup_interval: int = 300  # 5 minutes
+        cleanup_interval: int = 300,  # 5 minutes
     ):
         """Initialize metrics collector."""
         self.enabled = enabled
@@ -101,13 +105,13 @@ class MetricsCollector:
         self._stop_event = threading.Event()
         if enabled:
             self._cleanup_thread = threading.Thread(
-                target=self._cleanup_loop,
-                daemon=True,
-                name="metrics-cleanup"
+                target=self._cleanup_loop, daemon=True, name="metrics-cleanup"
             )
             self._cleanup_thread.start()
 
-    def increment(self, metric: str, value: int = 1, tags: dict[str, str] | None = None) -> None:
+    def increment(
+        self, metric: str, value: int = 1, tags: dict[str, str] | None = None
+    ) -> None:
         """Increment a counter metric."""
         if not self.enabled or not self._gdpr_filter(metric):
             return
@@ -123,7 +127,9 @@ class MetricsCollector:
             self._counters[key] = self._counters.get(key, 0) + value
             self._access_counts[key] += 1
 
-    def gauge(self, metric: str, value: float, tags: dict[str, str] | None = None) -> None:
+    def gauge(
+        self, metric: str, value: float, tags: dict[str, str] | None = None
+    ) -> None:
         """Set a gauge metric."""
         if not self.enabled or not self._gdpr_filter(metric):
             return
@@ -139,7 +145,9 @@ class MetricsCollector:
             self._gauges[key] = value
             self._access_counts[key] += 1
 
-    def timing(self, metric: str, value: float, tags: dict[str, str] | None = None) -> None:
+    def timing(
+        self, metric: str, value: float, tags: dict[str, str] | None = None
+    ) -> None:
         """Record a timing metric."""
         if not self.enabled or not self._gdpr_filter(metric):
             return
@@ -159,7 +167,9 @@ class MetricsCollector:
             self._access_counts[key] += 1
 
     @contextmanager
-    def timer(self, metric: str, tags: dict[str, str] | None = None) -> Generator[None, None, None]:
+    def timer(
+        self, metric: str, tags: dict[str, str] | None = None
+    ) -> Generator[None, None, None]:
         """Context manager for timing operations."""
         start_time = time.perf_counter()
         try:
@@ -186,19 +196,21 @@ class MetricsCollector:
                         "min": stats.min if stats.min != float("inf") else 0,
                         "max": stats.max,
                         "last": stats.last,
-                        "samples": len(stats.samples)
+                        "samples": len(stats.samples),
                     }
                     for metric, stats in self._timings.items()
                 },
                 "system": {
                     "uptime_seconds": time.time() - self._start_time,
-                    "total_metrics": len(self._counters) + len(self._gauges) + len(self._timings),
+                    "total_metrics": len(self._counters)
+                    + len(self._gauges)
+                    + len(self._timings),
                     "memory_usage": {
                         "counters": len(self._counters),
                         "gauges": len(self._gauges),
-                        "timings": len(self._timings)
-                    }
-                }
+                        "timings": len(self._timings),
+                    },
+                },
             }
 
     def reset(self) -> None:
@@ -266,8 +278,10 @@ class MetricsCollector:
                 "Metrics cleanup completed",
                 extra={
                     "removed": len(zero_access),
-                    "remaining": len(self._counters) + len(self._gauges) + len(self._timings)
-                }
+                    "remaining": len(self._counters)
+                    + len(self._gauges)
+                    + len(self._timings),
+                },
             )
 
     def _evict_least_used(self, store: dict[str, Any]) -> None:
@@ -289,10 +303,24 @@ class MetricsCollector:
     def _create_gdpr_filter(self) -> Callable[[str], bool]:
         """Create GDPR compliance filter."""
         blocked_patterns = [
-            "user.", "email.", "name.", "password.", "token.",
-            "path.full", "file.absolute", "personal.", "private.",
-            "ip.", "host.", "machine.", "username.", "address.",
-            "phone.", "ssn.", "credit", "account."
+            "user.",
+            "email.",
+            "name.",
+            "password.",
+            "token.",
+            "path.full",
+            "file.absolute",
+            "personal.",
+            "private.",
+            "ip.",
+            "host.",
+            "machine.",
+            "username.",
+            "address.",
+            "phone.",
+            "ssn.",
+            "credit",
+            "account.",
         ]
 
         def filter_func(metric: str) -> bool:
@@ -307,9 +335,19 @@ class MetricsCollector:
             return
 
         blocked_keys = {
-            "user", "email", "name", "password", "token",
-            "ip", "host", "username", "path", "address",
-            "phone", "ssn", "account"
+            "user",
+            "email",
+            "name",
+            "password",
+            "token",
+            "ip",
+            "host",
+            "username",
+            "path",
+            "address",
+            "phone",
+            "ssn",
+            "account",
         }
 
         for key in tags:

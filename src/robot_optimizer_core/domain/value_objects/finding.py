@@ -3,6 +3,7 @@
 
 100% Pydantic v2 compliant implementation with modern Python features.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -23,19 +24,19 @@ class Finding(ValueObject):
     file, including its location, severity, and contextual information.
     """
 
-    model_config = ConfigDict(frozen=True, str_strip_whitespace=True, validate_assignment=True, extra="forbid", use_enum_values=False)
+    model_config = ConfigDict(
+        frozen=True,
+        str_strip_whitespace=True,
+        validate_assignment=True,
+        extra="forbid",
+        use_enum_values=False,
+    )
 
-    id: UUID = Field(
-        default_factory=uuid4, description="Unique finding ID"
-    )
-    pattern: Pattern = Field(
-        ..., description="The pattern that was matched"
-    )
+    id: UUID = Field(default_factory=uuid4, description="Unique finding ID")
+    pattern: Pattern = Field(..., description="The pattern that was matched")
     severity: Severity = Field(..., description="Severity level")
     location: Location = Field(..., description="Location in the file")
-    message: str = Field(
-        ..., min_length=1, description="Human-readable message"
-    )
+    message: str = Field(..., min_length=1, description="Human-readable message")
     context: dict[str, Any] | None = Field(
         default=None, description="Additional context"
     )
@@ -62,9 +63,7 @@ class Finding(ValueObject):
 
     @field_validator("context")
     @classmethod
-    def ensure_context_copy(
-        cls, v: dict[str, Any] | None
-    ) -> dict[str, Any] | None:
+    def ensure_context_copy(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
         """Ensure context is a copy to maintain immutability.
 
         Args:
@@ -82,7 +81,7 @@ class Finding(ValueObject):
         severity: Severity,
         location: Location,
         message: str,
-        **context: Any
+        **context: Any,
     ) -> Finding:
         """Factory method to create a finding with context.
 
@@ -98,13 +97,15 @@ class Finding(ValueObject):
         Returns:
             A new Finding instance
         """
-        return cls.model_validate({
-            "pattern": pattern,
-            "severity": severity,
-            "location": location,
-            "message": message,
-            "context": context if context else None
-        })
+        return cls.model_validate(
+            {
+                "pattern": pattern,
+                "severity": severity,
+                "location": location,
+                "message": message,
+                "context": context if context else None,
+            }
+        )
 
     # Pydantic v2: computed fields for derived properties
     @computed_field  # type: ignore[prop-decorator]
@@ -144,7 +145,7 @@ class Finding(ValueObject):
         lines = [
             f"{severity_emoji} {self.pattern.name}",
             f"   {location}",
-            f"   {self.message}"
+            f"   {self.message}",
         ]
 
         # Add recommendation if different from message
@@ -165,7 +166,9 @@ class Finding(ValueObject):
         return {
             "id": self.id,
             "pattern": self.pattern,
-            "severity": self.severity if isinstance(self.severity, Severity) else Severity(self.severity),
+            "severity": self.severity
+            if isinstance(self.severity, Severity)
+            else Severity(self.severity),
             "location": self.location,
             "message": self.message,
             "context": self.context,
@@ -181,7 +184,9 @@ class Finding(ValueObject):
             "line_number": self.line_number,
             "column": self.location.column,
             "location": self.location.model_dump(),
-            "severity": self.severity if isinstance(self.severity, Severity) else Severity(self.severity),
+            "severity": self.severity
+            if isinstance(self.severity, Severity)
+            else Severity(self.severity),
             "message": self.message,
             "pattern": self.pattern.model_dump() | {"type": self.pattern.type},
             "pattern_type": self.pattern.type.name,  # type: ignore[attr-defined]

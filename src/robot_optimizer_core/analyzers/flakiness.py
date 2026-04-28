@@ -21,6 +21,7 @@ Example:
             failure_rate = finding.context['failure_rate']
             print(f"Flaky test: {failure_rate:.1%} failure rate")
 """
+
 from __future__ import annotations
 
 import sys
@@ -66,7 +67,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
     def __init__(
         self,
         test_result_repository: TestResultRepository | None = None,
-        config: dict[str, ConfigValue] | None = None
+        config: dict[str, ConfigValue] | None = None,
     ) -> None:
         """Initialize the analyzer.
 
@@ -84,7 +85,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
             else:
                 raise ConfigurationError(
                     "TestResultRepository not provided and not found in DI container",
-                    config_key="test_result_repository"
+                    config_key="test_result_repository",
                 )
 
         self._repository = test_result_repository
@@ -95,22 +96,18 @@ class FlakinessAnalyzer(BaseAnalyzer):
         # Configuration
         self._days_back = self.get_config_value("days_back", 30)
         self._failure_threshold = self.get_config_value(
-            "failure_threshold",
-            settings.flakiness_threshold
+            "failure_threshold", settings.flakiness_threshold
         )
-        self._min_runs = self.get_config_value(
-            "min_runs",
-            settings.flakiness_min_runs
-        )
+        self._min_runs = self.get_config_value("min_runs", settings.flakiness_min_runs)
 
         # Severity thresholds
         self._severity_thresholds = self.get_config_value(
             "severity_thresholds",
             {
-                "info": 0.05,     # 5% failure rate
+                "info": 0.05,  # 5% failure rate
                 "warning": 0.15,  # 15% failure rate
-                "error": 0.30     # 30% failure rate
-            }
+                "error": 0.30,  # 30% failure rate
+            },
         )
         self.validate_config()
 
@@ -161,14 +158,13 @@ class FlakinessAnalyzer(BaseAnalyzer):
         # Get flakiness statistics from repository
         try:
             stats_list = self._repository.get_flakiness_stats(
-                test_file.path,
-                days_back=self._days_back
+                test_file.path, days_back=self._days_back
             )
         except RepositoryError as e:
             self._logger.error(
                 f"Repository error getting flakiness stats: {e}",
                 extra={"file": str(test_file.path)},
-                exc_info=True
+                exc_info=True,
             )
             # Return empty list on error - don't fail analysis
             return findings
@@ -177,7 +173,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
             self._logger.error(
                 f"Unexpected error getting flakiness stats: {e}",
                 extra={"file": str(test_file.path)},
-                exc_info=True
+                exc_info=True,
             )
             # Return empty list on error - don't fail analysis
             return findings
@@ -211,11 +207,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
         # Check against threshold
         return stats.failure_rate >= self._failure_threshold
 
-    def _create_finding(
-        self,
-        stats: FlakinessStats,
-        test_file: TestFile
-    ) -> Finding:
+    def _create_finding(self, stats: FlakinessStats, test_file: TestFile) -> Finding:
         """Create a finding from flakiness statistics.
 
         Args:
@@ -234,13 +226,13 @@ class FlakinessAnalyzer(BaseAnalyzer):
             description=f"Test '{stats.test_name}' fails inconsistently",
             recommendation=self._get_recommendation(stats),
             documentation_url=None,
-            auto_fixable=False  # Can't auto-fix flakiness
+            auto_fixable=False,  # Can't auto-fix flakiness
         )
 
         # Build detailed message
         message_parts = [
             f"Flaky test: {stats.failure_rate:.1%} failure rate",
-            f"({stats.failures}/{stats.total_runs} runs)"
+            f"({stats.failures}/{stats.total_runs} runs)",
         ]
 
         if stats.last_failure:
@@ -259,10 +251,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
         return Finding.create(
             pattern=pattern,
             severity=severity,
-            location=Location(
-                file_path=test_file.path,
-                line=line_number
-            ),
+            location=Location(file_path=test_file.path, line=line_number),
             message=message,
             test_name=stats.test_name,
             failure_rate=stats.failure_rate,
@@ -270,7 +259,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
             failures=stats.failures,
             last_failure=stats.last_failure.isoformat() if stats.last_failure else None,
             time_wasted_hours=time_wasted,
-            flakiness_category=self._categorize_flakiness(stats, test_file)
+            flakiness_category=self._categorize_flakiness(stats, test_file),
         )
 
     def _determine_severity(self, failure_rate: float) -> Severity:
@@ -344,11 +333,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
 
         return None
 
-    def _categorize_flakiness(
-        self,
-        stats: FlakinessStats,
-        test_file: TestFile
-    ) -> str:
+    def _categorize_flakiness(self, stats: FlakinessStats, test_file: TestFile) -> str:
         """Categorize the type of flakiness using pattern matching.
 
         This is a simple categorization. The Pro version provides
@@ -370,7 +355,9 @@ class FlakinessAnalyzer(BaseAnalyzer):
 
         # Check test name for hints
         match test_lower:
-            case name if any(word in name for word in ["ui", "click", "element", "page"]):
+            case name if any(
+                word in name for word in ["ui", "click", "element", "page"]
+            ):
                 return "ui_timing"
             case name if any(word in name for word in ["api", "request", "response"]):
                 return "api_timing"
@@ -393,7 +380,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
             raise ConfigurationError(
                 "days_back must be at least 1",
                 config_key="days_back",
-                provided_value=self._days_back
+                provided_value=self._days_back,
             )
 
         # Validate failure_threshold
@@ -401,7 +388,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
             raise ConfigurationError(
                 "failure_threshold must be between 0 and 1",
                 config_key="failure_threshold",
-                provided_value=self._failure_threshold
+                provided_value=self._failure_threshold,
             )
 
         # Validate min_runs
@@ -409,7 +396,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
             raise ConfigurationError(
                 "min_runs must be at least 2",
                 config_key="min_runs",
-                provided_value=self._min_runs
+                provided_value=self._min_runs,
             )
 
         # Validate severity thresholds
@@ -419,7 +406,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
             if key not in thresholds:
                 raise ConfigurationError(
                     f"Missing severity threshold: {key}",
-                    config_key="severity_thresholds"
+                    config_key="severity_thresholds",
                 )
 
             value = thresholds[key]
@@ -427,5 +414,5 @@ class FlakinessAnalyzer(BaseAnalyzer):
                 raise ConfigurationError(
                     f"Severity threshold '{key}' must be between 0 and 1",
                     config_key=f"severity_thresholds.{key}",
-                    provided_value=value
+                    provided_value=value,
                 )

@@ -1,5 +1,6 @@
 # tests/unit/test_deprecation.py
 """Unit tests for the deprecation utilities."""
+
 from __future__ import annotations
 
 import warnings

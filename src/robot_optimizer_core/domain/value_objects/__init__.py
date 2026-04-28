@@ -3,6 +3,7 @@
 
 These immutable objects represent core concepts in the domain.
 """
+
 from .finding import Finding
 from .flakiness_stats import FlakinessStats
 from .location import Location

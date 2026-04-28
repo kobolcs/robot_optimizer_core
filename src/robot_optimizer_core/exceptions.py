@@ -16,6 +16,7 @@ Example:
             print(f"File: {e.file_path}")
             print(f"Details: {e.details}")
 """
+
 from __future__ import annotations
 
 import sys
@@ -54,11 +55,7 @@ class RobotOptimizerError(Exception):
 
     __slots__ = ("details", "message")
 
-    def __init__(
-        self,
-        message: str,
-        details: dict[str, object] | None = None
-    ) -> None:
+    def __init__(self, message: str, details: dict[str, object] | None = None) -> None:
         """Initialize the exception.
 
         Args:
@@ -100,7 +97,7 @@ class AnalysisError(RobotOptimizerError):
         message: str,
         file_path: Path | None = None,
         analyzer: str | None = None,
-        details: dict[str, object] | None = None
+        details: dict[str, object] | None = None,
     ) -> None:
         """Initialize the analysis error.
 
@@ -134,7 +131,7 @@ class ParsingError(AnalysisError):
         file_path: Path,
         line_number: int | None = None,
         column: int | None = None,
-        details: dict[str, object] | None = None
+        details: dict[str, object] | None = None,
     ) -> None:
         """Initialize the parsing error.
 
@@ -168,7 +165,7 @@ class ConfigurationError(RobotOptimizerError):
         message: str,
         config_key: str | None = None,
         provided_value: object = None,
-        details: dict[str, object] | None = None
+        details: dict[str, object] | None = None,
     ) -> None:
         """Initialize the configuration error.
 
@@ -201,7 +198,7 @@ class PluginError(RobotOptimizerError):
         message: str,
         plugin_name: str | None = None,
         plugin_type: str | None = None,
-        details: dict[str, object] | None = None
+        details: dict[str, object] | None = None,
     ) -> None:
         """Initialize the plugin error.
 
@@ -236,7 +233,7 @@ class ValidationError(RobotOptimizerError):
         field_name: str | None = None,
         invalid_value: object = None,
         validation_rule: str | None = None,
-        details: dict[str, object] | None = None
+        details: dict[str, object] | None = None,
     ) -> None:
         """Initialize the validation error.
 
@@ -260,9 +257,7 @@ class FileNotFoundError(AnalysisError):
     """
 
     def __init__(
-        self,
-        file_path: Path,
-        details: dict[str, object] | None = None
+        self, file_path: Path, details: dict[str, object] | None = None
     ) -> None:
         """Initialize the file not found error.
 
@@ -291,7 +286,7 @@ class RepositoryError(RobotOptimizerError):
         message: str,
         repository_name: str | None = None,
         operation: str | None = None,
-        details: dict[str, object] | None = None
+        details: dict[str, object] | None = None,
     ) -> None:
         """Initialize the repository error.
 
@@ -306,11 +301,7 @@ class RepositoryError(RobotOptimizerError):
         self.operation = operation
 
 
-def create_error(
-    error_class: type[E],
-    message: str,
-    **kwargs: object
-) -> E:
+def create_error(error_class: type[E], message: str, **kwargs: object) -> E:
     """Factory function to create errors with consistent formatting.
 
     Args:

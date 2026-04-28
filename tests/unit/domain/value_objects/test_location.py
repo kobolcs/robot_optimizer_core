@@ -4,6 +4,7 @@
 Comprehensive tests for the Location value object including edge cases,
 validation, and all methods to ensure mutation testing resilience.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -40,11 +41,7 @@ class TestLocation:
     def test_create_location_with_range(self) -> None:
         """Test creating a location with full range."""
         loc = Location(
-            file_path=Path("test.robot"),
-            line=10,
-            column=5,
-            end_line=15,
-            end_column=20
+            file_path=Path("test.robot"), line=10, column=5, end_line=15, end_column=20
         )
 
         assert loc.line == 10
@@ -88,30 +85,18 @@ class TestLocation:
         """Test end line validation rules."""
         # End line before start line
         with pytest.raises(ValidationError) as exc_info:
-            Location(
-                file_path=Path("test.robot"),
-                line=10,
-                end_line=5
-            )
+            Location(file_path=Path("test.robot"), line=10, end_line=5)
         assert "cannot be before start line" in str(exc_info.value)
 
         # End line equal to start line is valid
-        loc = Location(
-            file_path=Path("test.robot"),
-            line=10,
-            end_line=10
-        )
+        loc = Location(file_path=Path("test.robot"), line=10, end_line=10)
         assert loc.end_line == 10
 
     def test_end_column_validation(self) -> None:
         """Test end column validation rules."""
         # End column without start column
         with pytest.raises(ValidationError) as exc_info:
-            Location(
-                file_path=Path("test.robot"),
-                line=1,
-                end_column=10
-            )
+            Location(file_path=Path("test.robot"), line=1, end_column=10)
         assert "Cannot have end_column without column" in str(exc_info.value)
 
         # End column before start column on same line
@@ -121,17 +106,13 @@ class TestLocation:
                 line=10,
                 column=20,
                 end_line=10,
-                end_column=15
+                end_column=15,
             )
         assert "cannot be before start column" in str(exc_info.value)
 
         # End column before start column on different lines is valid
         loc = Location(
-            file_path=Path("test.robot"),
-            line=10,
-            column=20,
-            end_line=11,
-            end_column=5
+            file_path=Path("test.robot"), line=10, column=20, end_line=11, end_column=5
         )
         assert loc.end_column == 5
 
@@ -146,30 +127,17 @@ class TestLocation:
         assert loc2.range_str == "test.robot:10:5"
 
         # With end line only
-        loc3 = Location(
-            file_path=Path("test.robot"),
-            line=10,
-            end_line=15
-        )
+        loc3 = Location(file_path=Path("test.robot"), line=10, end_line=15)
         assert loc3.range_str == "test.robot:10-15:"
 
         # With full range
         loc4 = Location(
-            file_path=Path("test.robot"),
-            line=10,
-            column=5,
-            end_line=15,
-            end_column=20
+            file_path=Path("test.robot"), line=10, column=5, end_line=15, end_column=20
         )
         assert loc4.range_str == "test.robot:10:5-15:20"
 
         # With end line but no end column
-        loc5 = Location(
-            file_path=Path("test.robot"),
-            line=10,
-            column=5,
-            end_line=15
-        )
+        loc5 = Location(file_path=Path("test.robot"), line=10, column=5, end_line=15)
         assert loc5.range_str == "test.robot:10:5-15:"
 
     def test_is_range_and_is_point(self) -> None:
@@ -180,22 +148,14 @@ class TestLocation:
         assert not point.is_range
 
         # Range location
-        range_loc = Location(
-            file_path=Path("test.robot"),
-            line=10,
-            end_line=15
-        )
+        range_loc = Location(file_path=Path("test.robot"), line=10, end_line=15)
         assert range_loc.is_range
         assert not range_loc.is_point
 
     def test_contains_same_file(self) -> None:
         """Test contains method for locations in the same file."""
         # Range contains point
-        outer = Location(
-            file_path=Path("test.robot"),
-            line=10,
-            end_line=20
-        )
+        outer = Location(file_path=Path("test.robot"), line=10, end_line=20)
         inner = Location(file_path=Path("test.robot"), line=15)
         assert outer.contains(inner)
 
@@ -212,11 +172,7 @@ class TestLocation:
 
         # With column checks
         col_outer = Location(
-            file_path=Path("test.robot"),
-            line=10,
-            column=5,
-            end_line=10,
-            end_column=20
+            file_path=Path("test.robot"), line=10, column=5, end_line=10, end_column=20
         )
 
         col_inner = Location(file_path=Path("test.robot"), line=10, column=10)
@@ -238,30 +194,14 @@ class TestLocation:
     def test_overlaps(self) -> None:
         """Test overlap detection between locations."""
         # Same file, overlapping ranges
-        loc1 = Location(
-            file_path=Path("test.robot"),
-            line=10,
-            end_line=20
-        )
-        loc2 = Location(
-            file_path=Path("test.robot"),
-            line=15,
-            end_line=25
-        )
+        loc1 = Location(file_path=Path("test.robot"), line=10, end_line=20)
+        loc2 = Location(file_path=Path("test.robot"), line=15, end_line=25)
         assert loc1.overlaps(loc2)
         assert loc2.overlaps(loc1)
 
         # Non-overlapping ranges
-        loc3 = Location(
-            file_path=Path("test.robot"),
-            line=1,
-            end_line=5
-        )
-        loc4 = Location(
-            file_path=Path("test.robot"),
-            line=10,
-            end_line=15
-        )
+        loc3 = Location(file_path=Path("test.robot"), line=1, end_line=5)
+        loc4 = Location(file_path=Path("test.robot"), line=10, end_line=15)
         assert not loc3.overlaps(loc4)
         assert not loc4.overlaps(loc3)
 
@@ -272,18 +212,10 @@ class TestLocation:
 
         # Edge case: touching ranges with columns
         loc7 = Location(
-            file_path=Path("test.robot"),
-            line=10,
-            column=1,
-            end_line=10,
-            end_column=10
+            file_path=Path("test.robot"), line=10, column=1, end_line=10, end_column=10
         )
         loc8 = Location(
-            file_path=Path("test.robot"),
-            line=10,
-            column=11,
-            end_line=10,
-            end_column=20
+            file_path=Path("test.robot"), line=10, column=11, end_line=10, end_column=20
         )
         assert not loc7.overlaps(loc8)  # Adjacent but not overlapping
 
@@ -299,18 +231,10 @@ class TestLocation:
 
         # Merge with columns
         loc3 = Location(
-            file_path=Path("test.robot"),
-            line=10,
-            column=5,
-            end_line=10,
-            end_column=15
+            file_path=Path("test.robot"), line=10, column=5, end_line=10, end_column=15
         )
         loc4 = Location(
-            file_path=Path("test.robot"),
-            line=10,
-            column=10,
-            end_line=10,
-            end_column=20
+            file_path=Path("test.robot"), line=10, column=10, end_line=10, end_column=20
         )
 
         merged2 = loc3.merge(loc4)
@@ -352,11 +276,7 @@ class TestLocation:
 
         # Offset range
         range_loc = Location(
-            file_path=Path("test.robot"),
-            line=10,
-            column=5,
-            end_line=15,
-            end_column=20
+            file_path=Path("test.robot"), line=10, column=5, end_line=15, end_column=20
         )
 
         offset3 = range_loc.offset(lines=2, columns=3)

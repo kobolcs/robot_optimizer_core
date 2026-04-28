@@ -4,6 +4,7 @@
 Tests cover flakiness detection, severity determination, and integration
 with the test result repository.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -58,7 +59,7 @@ Very Flaky Test
             path=Path("tests/flaky.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified_utc=datetime.now()
+            last_modified_utc=datetime.now(),
         )
 
     def test_create_analyzer_with_repository(self, mock_repository: Mock) -> None:
@@ -88,16 +89,11 @@ Very Flaky Test
             "days_back": 60,
             "failure_threshold": 0.1,
             "min_runs": 10,
-            "severity_thresholds": {
-                "info": 0.1,
-                "warning": 0.2,
-                "error": 0.4
-            }
+            "severity_thresholds": {"info": 0.1, "warning": 0.2, "error": 0.4},
         }
 
         analyzer = FlakinessAnalyzer(
-            test_result_repository=mock_repository,
-            config=config
+            test_result_repository=mock_repository, config=config
         )
 
         assert analyzer._days_back == 60
@@ -105,7 +101,9 @@ Very Flaky Test
         assert analyzer._min_runs == 10
         assert analyzer._severity_thresholds["warning"] == 0.2
 
-    def test_analyze_no_flaky_tests(self, mock_repository: Mock, test_file: TestFile) -> None:
+    def test_analyze_no_flaky_tests(
+        self, mock_repository: Mock, test_file: TestFile
+    ) -> None:
         """Test analysis when no tests are flaky."""
         # All tests are stable
         mock_repository.get_flakiness_stats.return_value = [
@@ -113,7 +111,7 @@ Very Flaky Test
                 test_name="Stable Test",
                 file_path=test_file.path,
                 total_runs=100,
-                failures=0
+                failures=0,
             )
         ]
 
@@ -122,11 +120,12 @@ Very Flaky Test
 
         assert len(findings) == 0
         mock_repository.get_flakiness_stats.assert_called_once_with(
-            test_file.path,
-            days_back=30
+            test_file.path, days_back=30
         )
 
-    def test_analyze_flaky_tests(self, mock_repository: Mock, test_file: TestFile) -> None:
+    def test_analyze_flaky_tests(
+        self, mock_repository: Mock, test_file: TestFile
+    ) -> None:
         """Test analysis with flaky tests."""
         now = datetime.now()
 
@@ -137,7 +136,7 @@ Very Flaky Test
                 file_path=test_file.path,
                 total_runs=100,
                 failures=15,
-                last_failure=now - timedelta(hours=2)
+                last_failure=now - timedelta(hours=2),
             ),
             # Very flaky test (50% failure rate)
             FlakinessStats(
@@ -145,22 +144,22 @@ Very Flaky Test
                 file_path=test_file.path,
                 total_runs=50,
                 failures=25,
-                last_failure=now - timedelta(days=1)
+                last_failure=now - timedelta(days=1),
             ),
             # Stable test
             FlakinessStats(
                 test_name="Stable Test",
                 file_path=test_file.path,
                 total_runs=200,
-                failures=0
+                failures=0,
             ),
             # Always fails (not flaky)
             FlakinessStats(
                 test_name="Broken Test",
                 file_path=test_file.path,
                 total_runs=20,
-                failures=20
-            )
+                failures=20,
+            ),
         ]
 
         analyzer = FlakinessAnalyzer(test_result_repository=mock_repository)
@@ -170,7 +169,9 @@ Very Flaky Test
         assert len(findings) == 2
 
         # Check first finding (Flaky Login Test)
-        finding1 = next(f for f in findings if "Flaky Login Test" in f.context["test_name"])
+        finding1 = next(
+            f for f in findings if "Flaky Login Test" in f.context["test_name"]
+        )
         assert finding1.severity == Severity.WARNING
         assert finding1.context["failure_rate"] == 0.15
         assert finding1.context["total_runs"] == 100
@@ -180,7 +181,9 @@ Very Flaky Test
         assert "3.8 hours wasted" in finding1.message  # 15 * 0.25 hours
 
         # Check second finding (Very Flaky Test)
-        finding2 = next(f for f in findings if "Very Flaky Test" in f.context["test_name"])
+        finding2 = next(
+            f for f in findings if "Very Flaky Test" in f.context["test_name"]
+        )
         assert finding2.severity == Severity.ERROR  # High failure rate
         assert finding2.context["failure_rate"] == 0.5
         assert finding2.location.line == 11  # Found in file
@@ -192,37 +195,25 @@ Very Flaky Test
 
         # Too few runs
         stats1 = FlakinessStats(
-            test_name="Test",
-            file_path=Path("test.robot"),
-            total_runs=3,
-            failures=1
+            test_name="Test", file_path=Path("test.robot"), total_runs=3, failures=1
         )
         assert not analyzer._is_flaky(stats1)
 
         # Always passes
         stats2 = FlakinessStats(
-            test_name="Test",
-            file_path=Path("test.robot"),
-            total_runs=100,
-            failures=0
+            test_name="Test", file_path=Path("test.robot"), total_runs=100, failures=0
         )
         assert not analyzer._is_flaky(stats2)
 
         # Always fails
         stats3 = FlakinessStats(
-            test_name="Test",
-            file_path=Path("test.robot"),
-            total_runs=50,
-            failures=50
+            test_name="Test", file_path=Path("test.robot"), total_runs=50, failures=50
         )
         assert not analyzer._is_flaky(stats3)
 
         # Flaky - meets all criteria
         stats4 = FlakinessStats(
-            test_name="Test",
-            file_path=Path("test.robot"),
-            total_runs=100,
-            failures=10
+            test_name="Test", file_path=Path("test.robot"), total_runs=100, failures=10
         )
         assert analyzer._is_flaky(stats4)
 
@@ -231,7 +222,7 @@ Very Flaky Test
             test_name="Test",
             file_path=Path("test.robot"),
             total_runs=1000,
-            failures=2  # 0.2% < 5% threshold
+            failures=2,  # 0.2% < 5% threshold
         )
         assert not analyzer._is_flaky(stats5)
 
@@ -249,17 +240,10 @@ Very Flaky Test
 
     def test_custom_severity_thresholds(self, mock_repository: Mock) -> None:
         """Test custom severity thresholds."""
-        config = {
-            "severity_thresholds": {
-                "info": 0.01,
-                "warning": 0.05,
-                "error": 0.10
-            }
-        }
+        config = {"severity_thresholds": {"info": 0.01, "warning": 0.05, "error": 0.10}}
 
         analyzer = FlakinessAnalyzer(
-            test_result_repository=mock_repository,
-            config=config
+            test_result_repository=mock_repository, config=config
         )
 
         assert analyzer._determine_severity(0.005) == Severity.INFO
@@ -272,10 +256,7 @@ Very Flaky Test
         analyzer = FlakinessAnalyzer(test_result_repository=mock_repository)
 
         stats = FlakinessStats(
-            test_name="Test",
-            file_path=Path("test.robot"),
-            total_runs=100,
-            failures=10
+            test_name="Test", file_path=Path("test.robot"), total_runs=100, failures=10
         )
 
         # Very high failure rate
@@ -302,7 +283,9 @@ Very Flaky Test
         )
         assert "wait conditions" in recommendation
 
-    def test_flakiness_categorization(self, mock_repository: Mock, test_file: TestFile) -> None:
+    def test_flakiness_categorization(
+        self, mock_repository: Mock, test_file: TestFile
+    ) -> None:
         """Test categorizing flakiness types."""
         analyzer = FlakinessAnalyzer(test_result_repository=mock_repository)
 
@@ -311,7 +294,7 @@ Very Flaky Test
             test_name="Click Button Test",
             file_path=test_file.path,
             total_runs=100,
-            failures=20
+            failures=20,
         )
         assert analyzer._categorize_flakiness(ui_stats, test_file) == "ui_timing"
 
@@ -320,7 +303,7 @@ Very Flaky Test
             test_name="API Request Test",
             file_path=test_file.path,
             total_runs=100,
-            failures=15
+            failures=15,
         )
         assert analyzer._categorize_flakiness(api_stats, test_file) == "api_timing"
 
@@ -329,7 +312,7 @@ Very Flaky Test
             test_name="Database Query Test",
             file_path=test_file.path,
             total_runs=100,
-            failures=10
+            failures=10,
         )
         assert analyzer._categorize_flakiness(db_stats, test_file) == "database_timing"
 
@@ -338,7 +321,7 @@ Very Flaky Test
             test_name="File Upload Test",
             file_path=test_file.path,
             total_runs=100,
-            failures=8
+            failures=8,
         )
         assert analyzer._categorize_flakiness(file_stats, test_file) == "file_operation"
 
@@ -347,7 +330,7 @@ Very Flaky Test
             test_name="Complex Logic Test",
             file_path=test_file.path,
             total_runs=100,
-            failures=60
+            failures=60,
         )
         assert analyzer._categorize_flakiness(logic_stats, test_file) == "logic_issue"
 
@@ -356,7 +339,7 @@ Very Flaky Test
             test_name="Other Test",
             file_path=test_file.path,
             total_runs=100,
-            failures=12
+            failures=12,
         )
         assert analyzer._categorize_flakiness(other_stats, test_file) == "timing_issue"
 
@@ -372,7 +355,9 @@ Very Flaky Test
         # Not found
         assert analyzer._find_test_line(test_file, "Non-existent Test") is None
 
-    def test_repository_error_handling(self, mock_repository: Mock, test_file: TestFile) -> None:
+    def test_repository_error_handling(
+        self, mock_repository: Mock, test_file: TestFile
+    ) -> None:
         """Test handling repository errors gracefully."""
         mock_repository.get_flakiness_stats.side_effect = Exception("Database error")
 
@@ -387,8 +372,7 @@ Very Flaky Test
         # Invalid days_back
         with pytest.raises(ConfigurationError) as exc_info:
             analyzer = FlakinessAnalyzer(
-                test_result_repository=mock_repository,
-                config={"days_back": 0}
+                test_result_repository=mock_repository, config={"days_back": 0}
             )
             analyzer.validate_config()
         assert "days_back must be at least 1" in str(exc_info.value)
@@ -397,7 +381,7 @@ Very Flaky Test
         with pytest.raises(ConfigurationError) as exc_info:
             analyzer = FlakinessAnalyzer(
                 test_result_repository=mock_repository,
-                config={"failure_threshold": 1.5}
+                config={"failure_threshold": 1.5},
             )
             analyzer.validate_config()
         assert "failure_threshold must be between 0 and 1" in str(exc_info.value)
@@ -405,8 +389,7 @@ Very Flaky Test
         # Invalid min_runs
         with pytest.raises(ConfigurationError) as exc_info:
             analyzer = FlakinessAnalyzer(
-                test_result_repository=mock_repository,
-                config={"min_runs": 1}
+                test_result_repository=mock_repository, config={"min_runs": 1}
             )
             analyzer.validate_config()
         assert "min_runs must be at least 2" in str(exc_info.value)
@@ -415,7 +398,7 @@ Very Flaky Test
         with pytest.raises(ConfigurationError) as exc_info:
             analyzer = FlakinessAnalyzer(
                 test_result_repository=mock_repository,
-                config={"severity_thresholds": {"info": 0.1, "warning": 0.2}}
+                config={"severity_thresholds": {"info": 0.1, "warning": 0.2}},
             )
             analyzer.validate_config()
         assert "Missing severity threshold: error" in str(exc_info.value)
@@ -425,12 +408,8 @@ Very Flaky Test
             analyzer = FlakinessAnalyzer(
                 test_result_repository=mock_repository,
                 config={
-                    "severity_thresholds": {
-                        "info": 0.1,
-                        "warning": -0.1,
-                        "error": 0.3
-                    }
-                }
+                    "severity_thresholds": {"info": 0.1, "warning": -0.1, "error": 0.3}
+                },
             )
             analyzer.validate_config()
         assert "must be between 0 and 1" in str(exc_info.value)
@@ -452,7 +431,7 @@ Very Flaky Test
                 file_path=test_file.path,
                 total_runs=100,
                 failures=10,
-                last_failure=datetime.now()
+                last_failure=datetime.now(),
             )
         ]
 

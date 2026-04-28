@@ -24,6 +24,7 @@ Example:
                 # Analysis logic here
                 return findings
 """
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -38,7 +39,9 @@ from ..metrics import get_metrics
 # Type alias for analyzer configuration values
 __all__ = ["BaseAnalyzer", "ConfigValue"]
 
-ConfigValue: TypeAlias = str | int | float | bool | dict[str, object] | list[object] | None
+ConfigValue: TypeAlias = (
+    str | int | float | bool | dict[str, object] | list[object] | None
+)
 
 # Type variable for generic config value retrieval
 T = TypeVar("T")
@@ -61,9 +64,7 @@ class BaseAnalyzer(ABC):
     __slots__ = ("_logger", "_metrics", "config", "metrics_enabled")
 
     def __init__(
-        self,
-        config: dict[str, ConfigValue] | None = None,
-        metrics_enabled: bool = True
+        self, config: dict[str, ConfigValue] | None = None, metrics_enabled: bool = True
     ) -> None:
         """Initialize the analyzer.
 
@@ -75,8 +76,7 @@ class BaseAnalyzer(ABC):
         self.metrics_enabled = metrics_enabled
         self._metrics = get_metrics() if metrics_enabled else None
         self._logger = get_logger(
-            f"{__name__}.{self.__class__.__name__}",
-            {"analyzer": self.name}
+            f"{__name__}.{self.__class__.__name__}", {"analyzer": self.name}
         )
 
     @property
@@ -170,9 +170,7 @@ class BaseAnalyzer(ABC):
         """
 
     def post_analyze(
-        self,
-        test_file: TestFile,
-        findings: list[Finding]
+        self, test_file: TestFile, findings: list[Finding]
     ) -> list[Finding]:
         """Hook called after analysis.
 
@@ -215,10 +213,7 @@ class BaseAnalyzer(ABC):
         Raises:
             AnalysisError: If analysis fails.
         """
-        self._logger.debug(
-            "Starting analysis",
-            extra={"file": str(test_file.path)}
-        )
+        self._logger.debug("Starting analysis", extra={"file": str(test_file.path)})
 
         try:
             # Pre-analysis hook
@@ -237,16 +232,15 @@ class BaseAnalyzer(ABC):
             if self._metrics:
                 self._metrics.increment(f"analyzer.{self.name}.success")
                 self._metrics.gauge(
-                    f"analyzer.{self.name}.findings_count",
-                    len(final_findings)
+                    f"analyzer.{self.name}.findings_count", len(final_findings)
                 )
 
             self._logger.debug(
                 "Analysis complete",
                 extra={
                     "file": str(test_file.path),
-                    "findings_count": len(final_findings)
-                }
+                    "findings_count": len(final_findings),
+                },
             )
 
             return final_findings
@@ -264,23 +258,18 @@ class BaseAnalyzer(ABC):
 
             self._logger.error(
                 f"Analysis failed: {e}",
-                extra={
-                    "file": str(test_file.path),
-                    "error_type": type(e).__name__
-                },
-                exc_info=True
+                extra={"file": str(test_file.path), "error_type": type(e).__name__},
+                exc_info=True,
             )
 
             raise AnalysisError(
                 f"Analysis failed in {self.name}: {e}",
                 file_path=test_file.path,
-                analyzer=self.name
+                analyzer=self.name,
             ) from e
 
     def _validate_findings(
-        self,
-        findings: list[Finding],
-        test_file: TestFile
+        self, findings: list[Finding], test_file: TestFile
     ) -> list[Finding]:
         """Validate findings from analysis.
 
@@ -307,7 +296,7 @@ class BaseAnalyzer(ABC):
                         "expected": str(test_file.path),
                         "actual": str(finding.location.file_path),
                         "finding_message": finding.message,
-                    }
+                    },
                 )
                 continue
 
@@ -320,7 +309,7 @@ class BaseAnalyzer(ABC):
                         "line": finding.location.line,
                         "max_line": test_file.line_count,
                         "finding_message": finding.message,
-                    }
+                    },
                 )
                 continue
 
@@ -334,7 +323,7 @@ class BaseAnalyzer(ABC):
                     "kept": len(validated),
                     "total": len(findings),
                     "file": str(test_file.path),
-                }
+                },
             )
             if self._metrics:
                 self._metrics.increment(
@@ -347,13 +336,12 @@ class BaseAnalyzer(ABC):
     def get_config_value(self, key: str, default: T, required: bool = ...) -> T: ...
 
     @overload
-    def get_config_value(self, key: str, default: None = ..., required: bool = ...) -> ConfigValue: ...
+    def get_config_value(
+        self, key: str, default: None = ..., required: bool = ...
+    ) -> ConfigValue: ...
 
     def get_config_value(
-        self,
-        key: str,
-        default: T | None = None,
-        required: bool = False
+        self, key: str, default: T | None = None, required: bool = False
     ) -> T | ConfigValue:
         """Get a configuration value with type safety.
 
@@ -373,17 +361,16 @@ class BaseAnalyzer(ABC):
         """
         if required and key not in self.config:
             from ..exceptions import ConfigurationError
+
             raise ConfigurationError(
                 f"Required configuration key missing: {key}",
-                config_key=f"{self.name}.{key}"
+                config_key=f"{self.name}.{key}",
             )
 
         return self.config.get(key, default)
 
     def determine_severity_by_threshold(
-        self,
-        value: float,
-        thresholds: dict[str, float]
+        self, value: float, thresholds: dict[str, float]
     ) -> Severity:
         """Determine severity based on value and threshold mapping.
 
@@ -417,7 +404,5 @@ class BaseAnalyzer(ABC):
             String representation.
         """
         return (
-            f"{self.__class__.__name__}("
-            f"name={self.name!r}, "
-            f"version={self.version!r})"
+            f"{self.__class__.__name__}(name={self.name!r}, version={self.version!r})"
         )

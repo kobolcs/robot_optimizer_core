@@ -1,5 +1,6 @@
 # tests/unit/test_cli.py
 """Tests for the robot-optimizer CLI."""
+
 from __future__ import annotations
 
 import json
@@ -12,7 +13,6 @@ from robot_optimizer_core.cli import main
 from robot_optimizer_core.domain.value_objects import Finding, Severity
 from robot_optimizer_core.domain.value_objects.location import Location
 from robot_optimizer_core.domain.value_objects.pattern import Pattern, PatternType
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -67,7 +67,9 @@ class TestAnalyzePath:
         rf_file.write_text("*** Test Cases ***\n")
         from robot_optimizer_core.exceptions import AnalysisError
 
-        with patch("robot_optimizer_core.cli.analyze_file", side_effect=AnalysisError("boom")):
+        with patch(
+            "robot_optimizer_core.cli.analyze_file", side_effect=AnalysisError("boom")
+        ):
             with pytest.raises(SystemExit) as exc:
                 main(["analyze", str(rf_file)])
         assert exc.value.code == 2
@@ -143,7 +145,9 @@ class TestAnalyzeDirectory:
 
 
 class TestJsonFormat:
-    def test_json_format_is_valid_json(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_json_format_is_valid_json(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         rf_file = tmp_path / "t.robot"
         rf_file.write_text("*** Test Cases ***\n")
         findings = [_make_finding(rf_file)]
@@ -156,7 +160,9 @@ class TestJsonFormat:
         assert len(parsed) == 1
         assert parsed[0]["message"] == "Use explicit wait"
 
-    def test_json_empty_findings_is_empty_list(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_json_empty_findings_is_empty_list(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         rf_file = tmp_path / "t.robot"
         rf_file.write_text("*** Test Cases ***\n")
         with patch("robot_optimizer_core.cli.analyze_file", return_value=[]):
@@ -196,6 +202,8 @@ class TestAnalyzerSelection:
         mock = MagicMock(return_value=[])
         with patch("robot_optimizer_core.cli.analyze_file", mock):
             with pytest.raises(SystemExit):
-                main(["analyze", str(rf_file), "--analyzers", "dead_code,sleep_detector"])
+                main(
+                    ["analyze", str(rf_file), "--analyzers", "dead_code,sleep_detector"]
+                )
         call_kwargs = mock.call_args.kwargs
         assert call_kwargs["analyzers"] == ["dead_code", "sleep_detector"]

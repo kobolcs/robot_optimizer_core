@@ -4,6 +4,7 @@
 Comprehensive tests for all Severity methods and properties to ensure
 complete coverage and mutation testing resilience.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -57,15 +58,15 @@ class TestSeverity:
 
     def test_severity_ansi_codes(self) -> None:
         """Test ANSI color codes."""
-        assert Severity.ERROR.ansi_code == "\033[91m"    # Bright red
+        assert Severity.ERROR.ansi_code == "\033[91m"  # Bright red
         assert Severity.WARNING.ansi_code == "\033[93m"  # Bright yellow
-        assert Severity.INFO.ansi_code == "\033[94m"     # Bright blue
+        assert Severity.INFO.ansi_code == "\033[94m"  # Bright blue
 
     def test_severity_priority(self) -> None:
         """Test priority values (inverse of enum value)."""
-        assert Severity.ERROR.priority == 3    # Highest priority
+        assert Severity.ERROR.priority == 3  # Highest priority
         assert Severity.WARNING.priority == 2
-        assert Severity.INFO.priority == 1     # Lowest priority
+        assert Severity.INFO.priority == 1  # Lowest priority
 
     def test_severity_description(self) -> None:
         """Test human-readable descriptions."""

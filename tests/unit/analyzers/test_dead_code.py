@@ -4,6 +4,7 @@
 Comprehensive tests for dead code detection including unused keywords,
 duplicates, and edge cases.
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -55,13 +56,15 @@ Another Unused
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified_utc=datetime.now()
+            last_modified_utc=datetime.now(),
         )
 
         findings = analyzer.analyze(test_file)
 
         # Should find 2 unused keywords
-        unused_findings = [f for f in findings if f.pattern.type == PatternType.UNUSED_KEYWORD]
+        unused_findings = [
+            f for f in findings if f.pattern.type == PatternType.UNUSED_KEYWORD
+        ]
         assert len(unused_findings) == 2
 
         # Check the findings
@@ -98,13 +101,15 @@ Do Something
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified_utc=datetime.now()
+            last_modified_utc=datetime.now(),
         )
 
         findings = analyzer.analyze(test_file)
 
         # Should find duplicates
-        dup_findings = [f for f in findings if f.pattern.type == PatternType.DUPLICATE_KEYWORD]
+        dup_findings = [
+            f for f in findings if f.pattern.type == PatternType.DUPLICATE_KEYWORD
+        ]
         assert len(dup_findings) >= 2  # At least one finding per duplicate
 
         # Check severity
@@ -128,7 +133,7 @@ Normal Keyword
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified_utc=datetime.now()
+            last_modified_utc=datetime.now(),
         )
 
         findings = analyzer.analyze(test_file)
@@ -157,7 +162,7 @@ My Keyword
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified_utc=datetime.now()
+            last_modified_utc=datetime.now(),
         )
 
         findings = analyzer.analyze(test_file)
@@ -184,7 +189,7 @@ Local Keyword
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified_utc=datetime.now()
+            last_modified_utc=datetime.now(),
         )
 
         findings = analyzer.analyze(test_file)
@@ -224,7 +229,7 @@ exception should not occur
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified_utc=datetime.now()
+            last_modified_utc=datetime.now(),
         )
 
         findings = analyzer.analyze(test_file)
@@ -253,7 +258,7 @@ Duplicate
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified_utc=datetime.now()
+            last_modified_utc=datetime.now(),
         )
 
         findings = analyzer.analyze(test_file)
@@ -270,9 +275,9 @@ Duplicate
 
     def test_ignore_patterns(self) -> None:
         """Test ignoring keywords by pattern."""
-        analyzer = DeadCodeAnalyzer(config={
-            "ignore_patterns": ["^Test.*", ".*Helper$"]
-        })
+        analyzer = DeadCodeAnalyzer(
+            config={"ignore_patterns": ["^Test.*", ".*Helper$"]}
+        )
 
         content = """*** Keywords ***
 Test Setup Keyword
@@ -289,7 +294,7 @@ Normal Unused Keyword
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified_utc=datetime.now()
+            last_modified_utc=datetime.now(),
         )
 
         findings = analyzer.analyze(test_file)
@@ -305,7 +310,7 @@ Normal Unused Keyword
             path=Path("empty.robot"),
             content="",
             size_bytes=0,
-            last_modified_utc=datetime.now()
+            last_modified_utc=datetime.now(),
         )
         findings = analyzer.analyze(empty_file)
         assert len(findings) == 0
@@ -315,7 +320,7 @@ Normal Unused Keyword
             path=Path("no_keywords.robot"),
             content="*** Test Cases ***\nTest\n    Log    Hi",
             size_bytes=100,
-            last_modified_utc=datetime.now()
+            last_modified_utc=datetime.now(),
         )
         findings = analyzer.analyze(no_keywords)
         assert len(findings) == 0
@@ -334,7 +339,7 @@ Valid Keyword Name
     Log    This is fine but unused
 """,
             size_bytes=200,
-            last_modified_utc=datetime.now()
+            last_modified_utc=datetime.now(),
         )
         findings = analyzer.analyze(malformed)
 
@@ -358,7 +363,7 @@ My Keyword
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified_utc=datetime.now()
+            last_modified_utc=datetime.now(),
         )
 
         findings = analyzer.analyze(test_file)
@@ -392,7 +397,7 @@ Static Unused
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified_utc=datetime.now()
+            last_modified_utc=datetime.now(),
         )
 
         findings = analyzer.analyze(test_file)

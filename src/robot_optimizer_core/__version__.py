@@ -7,6 +7,7 @@ Attributes:
     __version__ (str): The version string.
     __version_info__ (VersionInfo): Structured version information.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -23,6 +24,7 @@ class VersionInfo:
         release: Release type (e.g., 'final', 'alpha', 'beta', 'rc').
         serial: Serial number for non-final releases.
     """
+
     major: int
     minor: int
     patch: int
@@ -48,8 +50,16 @@ class VersionInfo:
             return NotImplemented
 
         # Compare major.minor.patch first
-        if (self.major, self.minor, self.patch) != (other.major, other.minor, other.patch):
-            return (self.major, self.minor, self.patch) < (other.major, other.minor, other.patch)
+        if (self.major, self.minor, self.patch) != (
+            other.major,
+            other.minor,
+            other.patch,
+        ):
+            return (self.major, self.minor, self.patch) < (
+                other.major,
+                other.minor,
+                other.patch,
+            )
 
         # Then compare release types
         release_order = {"alpha": 1, "beta": 2, "rc": 3, "final": 4}
@@ -84,12 +94,6 @@ class VersionInfo:
         return (self.major, self.minor, self.patch)
 
 
-__version_info__ = VersionInfo(
-    major=1,
-    minor=0,
-    patch=0,
-    release="final",
-    serial=0
-)
+__version_info__ = VersionInfo(major=1, minor=0, patch=0, release="final", serial=0)
 
 __version__ = str(__version_info__)

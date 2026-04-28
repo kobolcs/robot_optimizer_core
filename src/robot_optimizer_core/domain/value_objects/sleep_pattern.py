@@ -3,6 +3,7 @@
 
 100% Pydantic v2 compliant implementation.
 """
+
 from decimal import Decimal
 from typing import Any
 
@@ -19,16 +20,10 @@ class SleepPattern(ValueObject):
     time unit, and location in the test file.
     """
 
-    duration: Decimal = Field(
-        ..., description="Sleep duration in the specified unit"
-    )
+    duration: Decimal = Field(..., description="Sleep duration in the specified unit")
     unit: str = Field(..., description="Time unit (s, seconds, m, minutes, etc.)")
-    line_number: int = Field(
-        ..., ge=1, description="Line number where sleep found"
-    )
-    original_text: str = Field(
-        ..., description="Original sleep command text"
-    )
+    line_number: int = Field(..., ge=1, description="Line number where sleep found")
+    original_text: str = Field(..., description="Original sleep command text")
 
     @field_validator("duration")
     @classmethod
@@ -47,9 +42,7 @@ class SleepPattern(ValueObject):
         if v <= 0:
             raise ValueError("Sleep duration must be positive")
         if v > 3600:  # More than 1 hour
-            raise ValueError(
-                "Sleep duration seems unreasonably long (>1 hour)"
-            )
+            raise ValueError("Sleep duration seems unreasonably long (>1 hour)")
         return v
 
     @field_validator("unit")
@@ -67,8 +60,15 @@ class SleepPattern(ValueObject):
             ValueError: If unit is not supported
         """
         valid_units = {
-            "s", "seconds", "second", "m", "minutes", "minute",
-            "ms", "milliseconds", "millisecond"
+            "s",
+            "seconds",
+            "second",
+            "m",
+            "minutes",
+            "minute",
+            "ms",
+            "milliseconds",
+            "millisecond",
         }
         normalized = v.lower().strip()
         if normalized not in valid_units:
@@ -140,9 +140,9 @@ class SleepPattern(ValueObject):
         if not isinstance(other, SleepPattern):
             return False
         return (
-            self.duration == other.duration and
-            self.unit == other.unit and
-            self.line_number == other.line_number
+            self.duration == other.duration
+            and self.unit == other.unit
+            and self.line_number == other.line_number
         )
 
     def __hash__(self) -> int:
@@ -159,10 +159,12 @@ class SleepPattern(ValueObject):
             # Convert Decimal to float for JSON
             data["duration"] = float(data["duration"])
             # Add computed fields
-            data.update({
-                "duration_in_seconds": self.duration_in_seconds,
-                "is_excessive": self.is_excessive,
-                "normalized_unit": self.normalized_unit,
-                "severity_hint": self.severity_hint,
-            })
+            data.update(
+                {
+                    "duration_in_seconds": self.duration_in_seconds,
+                    "is_excessive": self.is_excessive,
+                    "normalized_unit": self.normalized_unit,
+                    "severity_hint": self.severity_hint,
+                }
+            )
         return data

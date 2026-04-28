@@ -1,4 +1,5 @@
 """File discovery services."""
+
 from .file_finder import OptimizedFileDiscoveryService
 
 # Alias for backward compatibility

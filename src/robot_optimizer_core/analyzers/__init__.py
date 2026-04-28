@@ -29,6 +29,7 @@ Example:
         # Get analyzer by name
         analyzer = get_analyzer("dead_code")
 """
+
 from __future__ import annotations
 
 # Base classes
@@ -52,7 +53,6 @@ from .sleep_detector import SleepDetector
 __all__ = [
     # Base
     "BaseAnalyzer",
-
     # Registry
     "AnalyzerRegistry",
     "register_analyzer",
@@ -60,7 +60,6 @@ __all__ = [
     "list_analyzers",
     "get_analyzer_info",
     "get_analyzer_registry",
-
     # Built-in analyzers
     "DeadCodeAnalyzer",
     "SleepDetector",
