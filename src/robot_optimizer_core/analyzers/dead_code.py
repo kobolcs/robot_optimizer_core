@@ -41,6 +41,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         self._check_unreachable = self.get_config_value("check_unreachable", True)
         ignore_patterns = self.get_config_value("ignore_patterns", [])
         self._ignore_patterns = [re.compile(str(pattern), re.IGNORECASE) for pattern in ignore_patterns]
+        self._keyword_display_names: dict[str, str] = {}
 
     @property
     @override
@@ -61,6 +62,26 @@ class DeadCodeAnalyzer(BaseAnalyzer):
     @override
     def supports_auto_fix(self) -> bool:
         return True
+
+    @override
+    def validate_config(self) -> None:
+        """Validate analyzer configuration."""
+        from ..exceptions import ConfigurationError
+        for key in ("check_unused", "check_duplicates", "check_unreachable"):
+            value = self.get_config_value(key, True)
+            if not isinstance(value, bool):
+                raise ConfigurationError(
+                    f"Config key '{key}' must be a boolean",
+                    config_key=f"{self.name}.{key}",
+                    provided_value=value
+                )
+        patterns = self.get_config_value("ignore_patterns", [])
+        if not isinstance(patterns, list):
+            raise ConfigurationError(
+                "Config key 'ignore_patterns' must be a list",
+                config_key=f"{self.name}.ignore_patterns",
+                provided_value=type(patterns).__name__
+            )
 
     @override
     def analyze(self, test_file: TestFile) -> list[Finding]:
@@ -87,7 +108,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
     ) -> tuple[dict[str, list[int]], set[str]]:
         """Extract keyword definitions and resolved keyword calls."""
         keywords: dict[str, list[int]] = defaultdict(list)
-        self._keyword_display_names: dict[str, str] = {}
+        self._keyword_display_names = {}
         candidate_calls: list[str] = []
         calls: set[str] = set()
 
@@ -168,7 +189,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
 
         for keyword_name, line_numbers in keywords.items():
             if keyword_name not in calls:
-                display_name = getattr(self, "_keyword_display_names", {}).get(keyword_name, keyword_name)
+                display_name = self._keyword_display_names.get(keyword_name, keyword_name)
 
                 # Skip special keywords and configured ignore patterns
                 if keyword_name in _LIFECYCLE_KEYWORDS:

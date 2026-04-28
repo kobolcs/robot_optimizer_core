@@ -65,6 +65,10 @@ class PluginRegistry:
         """List all registered plugins."""
         return list(self.plugins.keys())
 
+    def unregister(self, name: str) -> None:
+        """Remove a plugin from the registry."""
+        self.plugins.pop(name, None)
+
 # Whitelist of allowed imports for plugins
 ALLOWED_IMPORTS = {
     "robot_optimizer_core",

@@ -42,14 +42,16 @@ if TYPE_CHECKING:
     from .domain.value_objects.robot_ast import RobotImport, RobotKeyword, RobotTestCase
 
 
-class _SuiteInfo(TypedDict):
+class SuiteInfo(TypedDict):
+    """Suite-level aggregate info returned inside :class:`SuiteAnalysisResult`."""
     files: int
     keywords: list[RobotKeyword]
     test_cases: list[RobotTestCase]
     imports: list[RobotImport]
 
 
-class _SuiteStatistics(TypedDict):
+class SuiteStatistics(TypedDict):
+    """Finding statistics returned inside :class:`SuiteAnalysisResult`."""
     total_findings: int
     findings_by_severity: dict[str, int]
     findings_by_type: dict[str, int]
@@ -62,8 +64,8 @@ class SuiteAnalysisResult(TypedDict):
     """Typed result returned by :func:`analyze_suite`."""
     findings: list[Finding]
     file_findings: dict[Path, list[Finding]]
-    suite_info: _SuiteInfo
-    statistics: _SuiteStatistics
+    suite_info: SuiteInfo
+    statistics: SuiteStatistics
 
 logger = get_logger(__name__)
 
@@ -335,7 +337,7 @@ def analyze_suite(
         files = discovery.find_files(path)
 
     parser = container.resolve("parser")
-    suite_info: _SuiteInfo = {
+    suite_info: SuiteInfo = {
         "files": len(files),
         "keywords": [],
         "test_cases": [],
@@ -372,7 +374,7 @@ def analyze_suite(
         pt = finding.pattern.type.name
         findings_by_type[pt] = findings_by_type.get(pt, 0) + 1
 
-    statistics: _SuiteStatistics = {
+    statistics: SuiteStatistics = {
         "total_findings": len(all_findings),
         "findings_by_severity": findings_by_severity,
         "findings_by_type": findings_by_type,
