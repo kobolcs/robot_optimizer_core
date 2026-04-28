@@ -1,10 +1,11 @@
 # src/robot_optimizer_core/repositories/json_test_result_repository.py
 """JSON file-backed TestResultRepository implementation."""
+
 from __future__ import annotations
 
 import json
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from ..domain.repositories import TestResultRepository
@@ -19,11 +20,17 @@ logger = get_logger(__name__)
 
 
 def _parse_ts(value: str | float | None) -> datetime:
-    """Parse an ISO-8601 string into a timezone-aware datetime."""
-    dt = datetime.fromisoformat(str(value))
+    """Parse an ISO-8601 string into a timezone-aware datetime.
+
+    Raises ValueError for None or non-ISO values so callers can skip the record.
+    """
+    if not isinstance(value, str):
+        raise ValueError(f"Expected ISO-8601 string for timestamp, got {value!r}")
+    dt = datetime.fromisoformat(value)
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
     return dt
+
 
 # Each line in the file is one JSON object (newline-delimited JSON).
 # Schema: {"test_name": str, "file_path": str, "status": str,
@@ -76,22 +83,29 @@ class JsonTestResultRepository(TestResultRepository):
         cutoff = self._cutoff(days_back)
         results: list[TestResult] = []
         for record in self._read_records():
-            if Path(str(record["file_path"])) != file_path:
-                continue
-            ts = _parse_ts(record["timestamp"])
-            if ts < cutoff:
-                continue
-            err = record.get("error_message")
-            results.append(
-                TestResult(
-                    test_name=str(record["test_name"]),
-                    file_path=Path(str(record["file_path"])),
-                    status=str(record["status"]),
-                    execution_time=float(record["execution_time"] or 0.0),
-                    error_message=str(err) if err is not None else None,
-                    timestamp=ts,
+            try:
+                record_path = Path(str(record["file_path"]))
+                if record_path != file_path:
+                    continue
+                ts = _parse_ts(record["timestamp"])
+                if ts < cutoff:
+                    continue
+                err = record.get("error_message")
+                results.append(
+                    TestResult(
+                        test_name=str(record["test_name"]),
+                        file_path=record_path,
+                        status=str(record["status"]),
+                        execution_time=float(record["execution_time"] or 0.0),
+                        error_message=str(err) if err is not None else None,
+                        timestamp=ts,
+                    )
                 )
-            )
+            except (KeyError, TypeError, ValueError) as exc:
+                logger.warning(
+                    "Skipping invalid test result record",
+                    extra={"record": record, "error": str(exc)},
+                )
         return results
 
     def get_flakiness_stats(
@@ -149,16 +163,24 @@ class JsonTestResultRepository(TestResultRepository):
             if not line:
                 continue
             try:
-                records.append(json.loads(line))
+                parsed = json.loads(line)
             except json.JSONDecodeError:
                 logger.warning(
                     "Skipping malformed JSON record",
                     extra={"path": str(self._path), "line": lineno},
                 )
+                continue
+            if not isinstance(parsed, dict):
+                logger.warning(
+                    "Skipping non-object JSON record",
+                    extra={"path": str(self._path), "line": lineno},
+                )
+                continue
+            records.append(parsed)
         return records
 
     @staticmethod
     def _cutoff(days_back: int) -> datetime:
         from datetime import timedelta
 
-        return datetime.now(tz=timezone.utc) - timedelta(days=days_back)
+        return datetime.now(tz=UTC) - timedelta(days=days_back)

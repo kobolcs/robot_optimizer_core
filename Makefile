@@ -4,7 +4,7 @@ PYTEST        := uv run pytest
 MYPY          := uv run mypy
 RUFF          := uv run ruff
 
-.PHONY: help install test test-fast lint type format clean coverage docs docs-serve
+.PHONY: help install test test-fast test-unit test-integration lint lint-full type format clean coverage docs docs-serve build check
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \

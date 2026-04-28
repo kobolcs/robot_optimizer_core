@@ -1,10 +1,11 @@
 # tests/unit/domain/repositories/test_json_test_result_repository.py
 """Tests for JsonTestResultRepository."""
+
 from __future__ import annotations
 
 import json
 import threading
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -15,7 +16,7 @@ from robot_optimizer_core.repositories import JsonTestResultRepository
 
 
 def _ts(days_ago: float = 0) -> datetime:
-    return datetime.now(tz=timezone.utc) - timedelta(days=days_ago)
+    return datetime.now(tz=UTC) - timedelta(days=days_ago)
 
 
 def _result(
@@ -68,8 +69,14 @@ class TestSaveResult:
         repo.save_result(_result())
         assert repo.get_total_results_count() == 2
 
-    def test_save_raises_repository_error_on_bad_path(self) -> None:
-        repo = JsonTestResultRepository(Path("/no_permission/results.jsonl"))
+    def test_save_raises_repository_error_on_bad_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def _raise(*args: object, **kwargs: object) -> object:
+            raise OSError("permission denied")
+
+        monkeypatch.setattr(Path, "open", _raise)
+        repo = JsonTestResultRepository(tmp_path / "results.jsonl")
         with pytest.raises(RepositoryError):
             repo.save_result(_result())
 

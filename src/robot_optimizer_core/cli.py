@@ -8,6 +8,7 @@ Usage::
     robot-optimizer analyze tests/ --analyzers dead_code,sleep_detector
     robot-optimizer analyze tests/ --no-fail   # always exit 0
 """
+
 from __future__ import annotations
 
 import argparse
@@ -32,9 +33,9 @@ _EXIT_ERROR = 2
 
 # ANSI colour helpers (disabled when not a tty)
 _COLOURS = {
-    Severity.ERROR: "\033[31m",    # red
+    Severity.ERROR: "\033[31m",  # red
     Severity.WARNING: "\033[33m",  # yellow
-    Severity.INFO: "\033[36m",     # cyan
+    Severity.INFO: "\033[36m",  # cyan
 }
 _RESET = "\033[0m"
 
@@ -49,12 +50,17 @@ def _colour(text: str, severity: Severity) -> str:
 # Formatters
 # ---------------------------------------------------------------------------
 
+
 def _format_text(findings: list[Finding], path: Path) -> str:
     if not findings:
         return f"No findings in {path}\n"
 
-    lines: list[str] = [f"\nAnalysis results for {path}  ({len(findings)} finding(s))\n"]
-    for f in sorted(findings, key=lambda x: (str(x.location.file_path), x.location.line)):
+    lines: list[str] = [
+        f"\nAnalysis results for {path}  ({len(findings)} finding(s))\n"
+    ]
+    for f in sorted(
+        findings, key=lambda x: (str(x.location.file_path), x.location.line)
+    ):
         sev_label = _colour(f.severity.name.upper(), f.severity)
         loc = f"{f.location.file_path}:{f.location.line}"
         lines.append(f"  {sev_label}  {loc}")
@@ -75,9 +81,12 @@ def _format_json(findings: list[Finding]) -> str:
 # analyse subcommand
 # ---------------------------------------------------------------------------
 
+
 def _run_analyze(args: argparse.Namespace) -> int:
     path = Path(args.path)
-    from .analyzers import BaseAnalyzer  # local import avoids circular import at module level
+    from .analyzers import (
+        BaseAnalyzer,  # local import avoids circular import at module level
+    )
 
     analyzer_names: list[str | BaseAnalyzer] | None = (
         [a.strip() for a in args.analyzers.split(",") if a.strip()]
@@ -111,7 +120,14 @@ def _run_analyze(args: argparse.Namespace) -> int:
     )
 
     if args.output_file:
-        Path(args.output_file).write_text(output, encoding="utf-8")
+        try:
+            Path(args.output_file).write_text(output, encoding="utf-8")
+        except OSError as exc:
+            print(
+                f"error: could not write output file {args.output_file}: {exc}",
+                file=sys.stderr,
+            )
+            return _EXIT_ERROR
         print(f"Results written to {args.output_file}")
     else:
         print(output, end="")
@@ -139,14 +155,14 @@ def _print_summary(findings: list[Finding]) -> None:
 # Argument parser
 # ---------------------------------------------------------------------------
 
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="robot-optimizer",
         description="Robot Framework test-suite analyser",
     )
     parser.add_argument(
-        "--version", action="version",
-        version=f"%(prog)s {_get_version()}"
+        "--version", action="version", version=f"%(prog)s {_get_version()}"
     )
 
     sub = parser.add_subparsers(dest="command", required=True)
@@ -189,15 +205,17 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def _get_version() -> str:
     try:
-        from importlib.metadata import version
+        from importlib.metadata import PackageNotFoundError, version
+
         return version("robot-framework-optimizer-core")
-    except Exception:
+    except PackageNotFoundError:
         return "unknown"
 
 
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 def main(argv: list[str] | None = None) -> NoReturn:
     """Entry point registered as ``robot-optimizer`` in pyproject.toml."""
