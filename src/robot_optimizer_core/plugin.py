@@ -207,6 +207,32 @@ class SecurityVisitor(ast.NodeVisitor):
             if func_name in dangerous_funcs:
                 self.violations.append(f"Forbidden function call: {func_name}")
 
+            # getattr/setattr with a dangerous or non-literal attr name bypass visit_Attribute
+            elif func_name in {"getattr", "setattr"} and len(node.args) >= 2:
+                attr_arg = node.args[1]
+                if isinstance(attr_arg, ast.Constant) and isinstance(
+                    attr_arg.value, str
+                ):
+                    dangerous_attrs = {
+                        "__dict__",
+                        "__globals__",
+                        "__builtins__",
+                        "__import__",
+                        "__code__",
+                        "__class__",
+                        "__bases__",
+                        "__subclasses__",
+                    }
+                    if attr_arg.value in dangerous_attrs:
+                        self.violations.append(
+                            f"Forbidden {func_name} with dangerous attribute: {attr_arg.value!r}"
+                        )
+                else:
+                    # Non-literal attribute name — can't verify safety at analysis time
+                    self.violations.append(
+                        f"Forbidden {func_name} with non-literal attribute name"
+                    )
+
         # Check for subprocess, os, sys modules
         elif isinstance(node.func, ast.Attribute):
             if isinstance(node.func.value, ast.Name):
@@ -235,7 +261,8 @@ class SecurityVisitor(ast.NodeVisitor):
                 "__builtins__",
                 "__import__",
                 "__code__",
-                "__class__.__bases__",
+                "__class__",
+                "__bases__",
                 "__subclasses__",
             }
             if node.attr in dangerous_attrs:
