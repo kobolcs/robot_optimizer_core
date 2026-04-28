@@ -32,13 +32,13 @@ R = TypeVar("R")
 T = TypeVar("T")
 
 __all__ = [
-    "RobotOptimizerDeprecationWarning",
-    "deprecated",
-    "deprecation_warning",
-    "deprecated_parameter",
-    "check_deprecated",
-    "get_deprecation_info",
     "DeprecatedMixin",
+    "RobotOptimizerDeprecationWarning",
+    "check_deprecated",
+    "deprecated",
+    "deprecated_parameter",
+    "deprecation_warning",
+    "get_deprecation_info",
     "renamed_parameter",
 ]
 

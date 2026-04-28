@@ -23,14 +23,11 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from .domain.repositories import TestResultRepository
 from .domain.value_objects import TestResult
 from .logging import get_logger
-
-if TYPE_CHECKING:
-    pass
 
 __all__ = ["FlakinessListener"]
 
@@ -75,13 +72,13 @@ class FlakinessListener:
     # Listener V3 protocol
     # ------------------------------------------------------------------
 
-    def start_suite(self, data: Any, result: Any) -> None:  # noqa: ANN401
+    def start_suite(self, data: Any, result: Any) -> None:
         """Record the suite source so end_test knows which file a test belongs to."""
         source = getattr(data, "source", None)
         if source is not None:
             self._current_source = Path(source)
 
-    def end_test(self, data: Any, result: Any) -> None:  # noqa: ANN401
+    def end_test(self, data: Any, result: Any) -> None:
         """Persist a test result after each test execution.
 
         Args:
@@ -128,7 +125,7 @@ class FlakinessListener:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _resolve_file_path(self, data: Any) -> Path:  # noqa: ANN401
+    def _resolve_file_path(self, data: Any) -> Path:
         """Return the .robot source file for the given test data object."""
         # Robot stores source on the parent Suite object; try both locations.
         source = (
@@ -150,8 +147,8 @@ class FlakinessListener:
             if container.has_service("test_result_repository"):
                 repo: TestResultRepository = container.resolve("test_result_repository")
                 return repo
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("DI container unavailable, falling back to JSON repo: %s", exc)
 
         from .repositories import JsonTestResultRepository
 

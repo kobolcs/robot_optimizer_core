@@ -31,14 +31,14 @@ else:
 E = TypeVar("E", bound="RobotOptimizerError")
 
 __all__ = [
-    "RobotOptimizerError",
     "AnalysisError",
-    "ParsingError",
     "ConfigurationError",
-    "PluginError",
-    "ValidationError",
     "FileNotFoundError",
+    "ParsingError",
+    "PluginError",
     "RepositoryError",
+    "RobotOptimizerError",
+    "ValidationError",
 ]
 
 

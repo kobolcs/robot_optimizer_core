@@ -16,8 +16,8 @@ from .exceptions import ConfigurationError
 from .logging import get_logger
 
 __all__ = [
-    "ServiceLifetime",
     "ServiceDescriptor",
+    "ServiceLifetime",
     "ThreadSafeContainer",
     "get_container",
     "get_thread_safe_container",

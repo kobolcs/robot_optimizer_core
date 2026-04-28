@@ -139,9 +139,12 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         all_definitions: dict[str, list[tuple[TestFile, int]]] = defaultdict(list)
         raw_candidates: list[str] = []
         per_file_display: dict[str, str] = {}
+        # Cache parsed keywords per file to avoid re-parsing in duplicate/unreachable pass
+        file_keywords: list[tuple[TestFile, dict[str, list[int]]]] = []
 
         for test_file in files:
             keywords, _ = self._extract_keywords_and_calls(test_file)
+            file_keywords.append((test_file, keywords))
             for kw_name, line_numbers in keywords.items():
                 for line_num in line_numbers:
                     all_definitions[kw_name].append((test_file, line_num))
@@ -184,8 +187,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                 )
 
         if self._check_duplicates:
-            for test_file in files:
-                keywords, _ = self._extract_keywords_and_calls(test_file)
+            for test_file, keywords in file_keywords:
                 findings.extend(self._find_duplicate_keywords(keywords, test_file))
 
         if self._check_unreachable:

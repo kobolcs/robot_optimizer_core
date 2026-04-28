@@ -22,6 +22,7 @@ Example:
 
 from __future__ import annotations
 
+import dataclasses
 import re
 import sys
 from decimal import Decimal, InvalidOperation
@@ -46,6 +47,15 @@ from ..exceptions import ConfigurationError
 from .base import BaseAnalyzer, ConfigValue
 
 __all__ = ["SleepDetector"]
+
+
+@dataclasses.dataclass(slots=True)
+class _AnalyzeCtx:
+    """Per-analyze() call state; avoids instance mutation and is thread-safe."""
+
+    lines: list[str]
+    library: str | None
+    block_names: dict[int, str | None]
 
 
 class SleepDetector(BaseAnalyzer):
@@ -145,30 +155,17 @@ class SleepDetector(BaseAnalyzer):
         """
         findings = []
         lines = test_file.content.splitlines()
-        self._cached_lines: list[str] | None = lines
-
-        # Precompute per-file metadata. _library_detected guards against calling
-        # _detect_library again when it returns None (files with no library import).
-        if self._suggest_alternatives:
-            self._cached_library = self._detect_library(lines)
-            self._library_detected = True
-        else:
-            self._cached_library = None
-            self._library_detected = False
-        self._cached_block_names: dict[int, str | None] = {}
-        self._cached_categories: dict[int, str] = {}
+        library = self._detect_library(lines) if self._suggest_alternatives else None
+        block_names, _ = self._build_file_index(lines)
+        ctx = _AnalyzeCtx(lines=lines, library=library, block_names=block_names)
 
         for line_num, line in enumerate(lines, 1):
             if sleep_info := self._detect_sleep(line):
                 if finding := self._create_finding(
-                    sleep_info, test_file, line_num, line.strip()
+                    sleep_info, test_file, line_num, line.strip(), ctx
                 ):
                     findings.append(finding)
 
-        self._cached_lines = None
-        self._cached_library = None
-        self._cached_block_names = {}
-        self._cached_categories = {}
         return findings
 
     def _compile_sleep_patterns(self) -> list[tuple[re.Pattern[str], str]]:
@@ -273,6 +270,7 @@ class SleepDetector(BaseAnalyzer):
         test_file: TestFile,
         line_num: int,
         original_text: str,
+        ctx: _AnalyzeCtx | None = None,
     ) -> Finding | None:
         """Create a finding from sleep information.
 
@@ -309,8 +307,8 @@ class SleepDetector(BaseAnalyzer):
         # Create sleep pattern value object
         try:
             sleep_pattern = SleepPattern(
-                duration=cast(Decimal, sleep_info["duration"]),
-                unit=cast(str, sleep_info["unit"]),
+                duration=cast("Decimal", sleep_info["duration"]),
+                unit=cast("str", sleep_info["unit"]),
                 line_number=line_num,
                 original_text=original_text,
             )
@@ -331,7 +329,7 @@ class SleepDetector(BaseAnalyzer):
 
         if self._suggest_alternatives:
             if suggestion := self._suggest_alternative(
-                sleep_pattern, test_file, line_num
+                sleep_pattern, test_file, line_num, ctx
             ):
                 message += f". {suggestion}"
 
@@ -360,21 +358,6 @@ class SleepDetector(BaseAnalyzer):
         return self.determine_severity_by_threshold(
             duration_seconds, self._severity_thresholds
         )
-
-    # Word sets used to classify surrounding context
-    _UI_KEYWORDS: frozenset[str] = frozenset(
-        {"click", "element", "button", "input", "checkbox", "radio", "select",
-         "focus", "hover", "drag", "drop", "type", "fill", "press"}
-    )
-    _PAGE_KEYWORDS: frozenset[str] = frozenset(
-        {"page", "navigate", "url", "title", "reload", "refresh", "location", "tab", "window"}
-    )
-    _VERIFY_KEYWORDS: frozenset[str] = frozenset(
-        {"should", "verify", "check", "assert", "expect", "contain", "equal", "match"}
-    )
-    _NETWORK_KEYWORDS: frozenset[str] = frozenset(
-        {"request", "response", "api", "http", "fetch", "xhr", "ajax", "websocket"}
-    )
 
     # Library-specific wait keywords keyed by context category
     _LIBRARY_WAITS: dict[str, dict[str, str]] = {
@@ -450,12 +433,16 @@ class SleepDetector(BaseAnalyzer):
             block_names[idx + 1] = current_block
         return block_names, {}
 
-    def _enclosing_block_name(self, lines: list[str], line_num: int) -> str | None:
+    def _enclosing_block_name(
+        self,
+        lines: list[str],
+        line_num: int,
+        block_names: dict[int, str | None] | None = None,
+    ) -> str | None:
         """Return the test case or keyword name that contains line_num (1-based)."""
-        cached: dict[int, str | None] = getattr(self, "_cached_block_names", {})
-        if cached:
-            return cached.get(line_num)
-        # Fallback for callers that bypass analyze()
+        if block_names:
+            return block_names.get(line_num)
+        # Fallback linear scan for callers without a pre-built index (e.g. tests)
         for idx in range(line_num - 2, -1, -1):
             line = lines[idx]
             if line.startswith((" ", "\t")) or not line.strip():
@@ -471,49 +458,43 @@ class SleepDetector(BaseAnalyzer):
 
         Verify is checked first: Robot Framework's 'Should' keywords are
         assertion helpers even when the line also contains 'element'.
-        Uses substring matching (not word-boundary split) to stay fast under
-        coverage instrumentation on large files.
         """
-        combined = " ".join(context_lines).lower()
-        if any(kw in combined for kw in self._VERIFY_KEYWORDS):
+        combined = " ".join(ln.lower() for ln in context_lines if ln)
+        if self._VERIFY_RE.search(combined):
             return "verify"
-        if any(kw in combined for kw in self._PAGE_KEYWORDS):
+        if self._PAGE_RE.search(combined):
             return "page"
-        if any(kw in combined for kw in self._UI_KEYWORDS):
+        if self._UI_RE.search(combined):
             return "ui"
-        if any(kw in combined for kw in self._NETWORK_KEYWORDS):
+        if self._NETWORK_RE.search(combined):
             return "network"
         return "generic"
 
     def _suggest_alternative(
-        self, sleep_pattern: SleepPattern, test_file: TestFile, line_num: int
+        self,
+        sleep_pattern: SleepPattern,
+        test_file: TestFile,
+        line_num: int,
+        ctx: _AnalyzeCtx | None = None,
     ) -> str | None:
         """Suggest a context- and library-aware alternative to sleep."""
-        # Use the lines cached by analyze(); fall back to splitting on-demand.
-        lines: list[str] = getattr(self, "_cached_lines", None) or test_file.content.splitlines()
-
-        # Compute context category for the ±3 lines window around this sleep.
-        lo, hi = max(0, line_num - 4), min(len(lines), line_num + 3)
-        combined = " ".join(lines[i].strip().lower() for i in range(lo, hi) if lines[i].strip())
-        if self._VERIFY_RE.search(combined):
-            category = "verify"
-        elif self._PAGE_RE.search(combined):
-            category = "page"
-        elif self._UI_RE.search(combined):
-            category = "ui"
-        elif self._NETWORK_RE.search(combined):
-            category = "network"
+        if ctx is not None:
+            lines = ctx.lines
+            library = ctx.library
+            block_names: dict[int, str | None] | None = ctx.block_names
         else:
-            category = "generic"
-
-        if getattr(self, "_library_detected", False):
-            library = self._cached_library
-        else:
+            lines = test_file.content.splitlines()
             library = self._detect_library(lines)
+            block_names = None
+
+        lo, hi = max(0, line_num - 4), min(len(lines), line_num + 3)
+        context_lines = [lines[i].strip() for i in range(lo, hi) if lines[i].strip()]
+        category = self._classify_context(context_lines)
+
         waits = self._LIBRARY_WAITS.get(library, self._GENERIC_WAITS) if library else self._GENERIC_WAITS
         wait_keyword = waits.get(category, waits["generic"])
 
-        block = self._enclosing_block_name(lines, line_num)
+        block = self._enclosing_block_name(lines, line_num, block_names)
         block_hint = f" in '{block}'" if block else ""
 
         duration = sleep_pattern.duration_in_seconds

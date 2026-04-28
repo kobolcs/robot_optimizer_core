@@ -69,9 +69,8 @@ class TestAnalyzePath:
 
         with patch(
             "robot_optimizer_core.cli.analyze_file", side_effect=AnalysisError("boom")
-        ):
-            with pytest.raises(SystemExit) as exc:
-                main(["analyze", str(rf_file)])
+        ), pytest.raises(SystemExit) as exc:
+            main(["analyze", str(rf_file)])
         assert exc.value.code == 2
 
 
