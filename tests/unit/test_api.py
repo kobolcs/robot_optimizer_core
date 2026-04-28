@@ -56,11 +56,15 @@ class TestAnalyzeFileMaxSizeEnforcement:
         limit = settings.max_file_size_bytes  # 104857
 
         robot_file = tmp_path / "edge.robot"
-        robot_file.write_bytes(b"x" * limit)
+        base_content = "*** Test Cases ***\nSample Test\n    Log    hello\n"
+        padding = "x" * (limit - len(base_content.encode("utf-8")))
+        robot_file.write_text(base_content + padding)
 
         try:
-            analyze_file(robot_file, settings=settings)
+            findings = analyze_file(robot_file, settings=settings)
         except AnalysisError as exc:
-            assert "exceeds maximum size" not in str(exc), (
-                f"File at exactly the limit must not trigger the size guard, got: {exc}"
+            pytest.fail(
+                f"File at exactly the limit must analyze successfully without triggering the size guard, got: {exc}"
             )
+
+        assert isinstance(findings, list)
