@@ -27,7 +27,7 @@ Example:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import ClassVar, TypeAlias, TypeVar
+from typing import ClassVar, TypeAlias, TypeVar, overload
 
 from ..domain.entities import TestFile
 from ..domain.value_objects import Finding, Severity
@@ -340,6 +340,12 @@ class BaseAnalyzer(ABC):
                 )
 
         return validated
+
+    @overload
+    def get_config_value(self, key: str, default: T, required: bool = ...) -> T: ...
+
+    @overload
+    def get_config_value(self, key: str, default: None = ..., required: bool = ...) -> ConfigValue: ...
 
     def get_config_value(
         self,
