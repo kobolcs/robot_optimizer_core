@@ -406,3 +406,72 @@ Static Unused
         unused = [f for f in findings if f.pattern.type == PatternType.UNUSED_KEYWORD]
         assert len(unused) == 1
         assert unused[0].context["keyword_name"] == "Static Unused"
+
+
+@pytest.mark.unit
+class TestDeadCodeAnalyzerSuite:
+    """Cross-file (suite-level) analysis via analyze_suite."""
+
+    def _make(self, path: str, content: str) -> TestFile:
+        return TestFile(
+            path=Path(path),
+            content=content,
+            size_bytes=len(content),
+            last_modified_utc=datetime.now(),
+        )
+
+    def test_empty_suite_returns_no_findings(self) -> None:
+        assert DeadCodeAnalyzer().analyze_suite([]) == []
+
+    def test_keyword_used_in_another_file_is_not_flagged(self) -> None:
+        keywords_file = self._make(
+            "keywords.robot",
+            "*** Keywords ***\nShared Keyword\n    Log    shared\n",
+        )
+        tests_file = self._make(
+            "tests.robot",
+            "*** Test Cases ***\nMy Test\n    Shared Keyword\n",
+        )
+        findings = DeadCodeAnalyzer().analyze_suite([keywords_file, tests_file])
+        unused = [f for f in findings if f.pattern.type == PatternType.UNUSED_KEYWORD]
+        assert not any(f.context["keyword_name"] == "Shared Keyword" for f in unused)
+
+    def test_keyword_unused_across_all_files_is_flagged(self) -> None:
+        keywords_file = self._make(
+            "keywords.robot",
+            "*** Keywords ***\nNever Used\n    Log    dead\n",
+        )
+        tests_file = self._make(
+            "tests.robot",
+            "*** Test Cases ***\nMy Test\n    Log    hello\n",
+        )
+        findings = DeadCodeAnalyzer().analyze_suite([keywords_file, tests_file])
+        unused = [f for f in findings if f.pattern.type == PatternType.UNUSED_KEYWORD]
+        assert any(f.context["keyword_name"] == "Never Used" for f in unused)
+
+    def test_keyword_used_only_within_same_file_not_flagged(self) -> None:
+        """Single-file self-call should suppress unused report suite-wide too."""
+        content = (
+            "*** Test Cases ***\nT\n    Local KW\n"
+            "*** Keywords ***\nLocal KW\n    Log    ok\n"
+        )
+        file_ = self._make("solo.robot", content)
+        findings = DeadCodeAnalyzer().analyze_suite([file_])
+        unused = [f for f in findings if f.pattern.type == PatternType.UNUSED_KEYWORD]
+        assert not any(f.context["keyword_name"] == "Local KW" for f in unused)
+
+    def test_duplicate_still_reported_suite_wide(self) -> None:
+        content = (
+            "*** Keywords ***\nDuplicate KW\n    Log    first\n\n"
+            "Duplicate KW\n    Log    second\n"
+        )
+        file_ = self._make("dups.robot", content)
+        findings = DeadCodeAnalyzer().analyze_suite([file_])
+        assert any(f.pattern.type == PatternType.DUPLICATE_KEYWORD for f in findings)
+
+    def test_lifecycle_keywords_not_flagged_suite_wide(self) -> None:
+        content = "*** Keywords ***\nSuite Setup\n    Log    setup\n"
+        file_ = self._make("lifecycle.robot", content)
+        findings = DeadCodeAnalyzer().analyze_suite([file_])
+        unused = [f for f in findings if f.pattern.type == PatternType.UNUSED_KEYWORD]
+        assert not any("suite setup" in f.message.lower() for f in unused)

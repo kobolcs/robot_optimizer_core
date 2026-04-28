@@ -145,6 +145,18 @@ class SleepDetector(BaseAnalyzer):
         """
         findings = []
         lines = test_file.content.splitlines()
+        self._cached_lines: list[str] | None = lines
+
+        # Precompute per-file metadata. _library_detected guards against calling
+        # _detect_library again when it returns None (files with no library import).
+        if self._suggest_alternatives:
+            self._cached_library = self._detect_library(lines)
+            self._library_detected = True
+        else:
+            self._cached_library = None
+            self._library_detected = False
+        self._cached_block_names: dict[int, str | None] = {}
+        self._cached_categories: dict[int, str] = {}
 
         for line_num, line in enumerate(lines, 1):
             if sleep_info := self._detect_sleep(line):
@@ -153,6 +165,10 @@ class SleepDetector(BaseAnalyzer):
                 ):
                     findings.append(finding)
 
+        self._cached_lines = None
+        self._cached_library = None
+        self._cached_block_names = {}
+        self._cached_categories = {}
         return findings
 
     def _compile_sleep_patterns(self) -> list[tuple[re.Pattern[str], str]]:
@@ -345,45 +361,173 @@ class SleepDetector(BaseAnalyzer):
             duration_seconds, self._severity_thresholds
         )
 
+    # Word sets used to classify surrounding context
+    _UI_KEYWORDS: frozenset[str] = frozenset(
+        {"click", "element", "button", "input", "checkbox", "radio", "select",
+         "focus", "hover", "drag", "drop", "type", "fill", "press"}
+    )
+    _PAGE_KEYWORDS: frozenset[str] = frozenset(
+        {"page", "navigate", "url", "title", "reload", "refresh", "location", "tab", "window"}
+    )
+    _VERIFY_KEYWORDS: frozenset[str] = frozenset(
+        {"should", "verify", "check", "assert", "expect", "contain", "equal", "match"}
+    )
+    _NETWORK_KEYWORDS: frozenset[str] = frozenset(
+        {"request", "response", "api", "http", "fetch", "xhr", "ajax", "websocket"}
+    )
+
+    # Library-specific wait keywords keyed by context category
+    _LIBRARY_WAITS: dict[str, dict[str, str]] = {
+        "seleniumlibrary": {
+            "ui": "Wait Until Element Is Visible",
+            "page": "Wait Until Page Contains",
+            "verify": "Wait Until Keyword Succeeds",
+            "network": "Wait Until Keyword Succeeds",
+            "generic": "Wait Until Element Is Visible",
+        },
+        "browser": {
+            "ui": "Wait For Elements State",
+            "page": "Wait For Navigation",
+            "verify": "Wait Until Keyword Succeeds",
+            "network": "Wait For Response",
+            "generic": "Wait For Elements State",
+        },
+        "appiumlibrary": {
+            "ui": "Wait Until Element Is Visible",
+            "page": "Wait Until Page Contains",
+            "verify": "Wait Until Keyword Succeeds",
+            "network": "Wait Until Keyword Succeeds",
+            "generic": "Wait Until Element Is Visible",
+        },
+    }
+    _GENERIC_WAITS: dict[str, str] = {
+        "ui": "Wait Until Element Is Visible",
+        "page": "Wait Until Page Contains",
+        "verify": "Wait Until Keyword Succeeds",
+        "network": "Wait Until Keyword Succeeds",
+        "generic": "Wait Until Keyword Succeeds",
+    }
+
+    def _detect_library(self, lines: list[str]) -> str | None:
+        """Return the canonical library name from *** Settings *** Library imports."""
+        in_settings = False
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("***"):
+                in_settings = "setting" in stripped.lower()
+                continue
+            if not in_settings:
+                continue
+            lower = stripped.lower()
+            if lower.startswith("library"):
+                for lib in self._LIBRARY_WAITS:
+                    if lib in lower:
+                        return lib
+        return None
+
+    # Precompiled regexes for fast context classification (used in the index pass).
+    _VERIFY_RE: re.Pattern[str] = re.compile(r"should|verify|check|assert|expect|contain|equal|match")
+    _PAGE_RE: re.Pattern[str] = re.compile(r"page|navigate|url|title|reload|refresh|location|tab|window")
+    _UI_RE: re.Pattern[str] = re.compile(r"click|element|button|input|checkbox|radio|select|focus|hover|drag|drop|type|fill|press")
+    _NETWORK_RE: re.Pattern[str] = re.compile(r"request|response|api|http|fetch|xhr|ajax|websocket")
+
+    def _build_file_index(
+        self, lines: list[str]
+    ) -> tuple[dict[int, str | None], dict[int, str]]:
+        """Build block-name index in O(n); category dict is empty (lazy per-finding).
+
+        Returns:
+            (block_names, {}) — categories are computed on-demand in _suggest_alternative.
+        """
+        block_names: dict[int, str | None] = {}
+        current_block: str | None = None
+        for idx, line in enumerate(lines):
+            stripped = line.strip()
+            if stripped.startswith("***"):
+                current_block = None
+            elif stripped and not line.startswith((" ", "\t")):
+                current_block = stripped
+            block_names[idx + 1] = current_block
+        return block_names, {}
+
+    def _enclosing_block_name(self, lines: list[str], line_num: int) -> str | None:
+        """Return the test case or keyword name that contains line_num (1-based)."""
+        cached: dict[int, str | None] = getattr(self, "_cached_block_names", {})
+        if cached:
+            return cached.get(line_num)
+        # Fallback for callers that bypass analyze()
+        for idx in range(line_num - 2, -1, -1):
+            line = lines[idx]
+            if line.startswith((" ", "\t")) or not line.strip():
+                continue
+            stripped = line.strip()
+            if stripped.startswith("***"):
+                return None
+            return stripped
+        return None
+
+    def _classify_context(self, context_lines: list[str]) -> str:
+        """Classify context as verify / page / ui / network / generic.
+
+        Verify is checked first: Robot Framework's 'Should' keywords are
+        assertion helpers even when the line also contains 'element'.
+        Uses substring matching (not word-boundary split) to stay fast under
+        coverage instrumentation on large files.
+        """
+        combined = " ".join(context_lines).lower()
+        if any(kw in combined for kw in self._VERIFY_KEYWORDS):
+            return "verify"
+        if any(kw in combined for kw in self._PAGE_KEYWORDS):
+            return "page"
+        if any(kw in combined for kw in self._UI_KEYWORDS):
+            return "ui"
+        if any(kw in combined for kw in self._NETWORK_KEYWORDS):
+            return "network"
+        return "generic"
+
     def _suggest_alternative(
         self, sleep_pattern: SleepPattern, test_file: TestFile, line_num: int
     ) -> str | None:
-        """Suggest alternative to sleep.
+        """Suggest a context- and library-aware alternative to sleep."""
+        # Use the lines cached by analyze(); fall back to splitting on-demand.
+        lines: list[str] = getattr(self, "_cached_lines", None) or test_file.content.splitlines()
 
-        Args:
-            sleep_pattern: The sleep pattern.
-            test_file: The test file.
-            line_num: Line number of sleep.
+        # Compute context category for the ±3 lines window around this sleep.
+        lo, hi = max(0, line_num - 4), min(len(lines), line_num + 3)
+        combined = " ".join(lines[i].strip().lower() for i in range(lo, hi) if lines[i].strip())
+        if self._VERIFY_RE.search(combined):
+            category = "verify"
+        elif self._PAGE_RE.search(combined):
+            category = "page"
+        elif self._UI_RE.search(combined):
+            category = "ui"
+        elif self._NETWORK_RE.search(combined):
+            category = "network"
+        else:
+            category = "generic"
 
-        Returns:
-            Suggestion text or None.
-        """
-        # Look at context to determine best alternative
-        lines = test_file.content.splitlines()
+        if getattr(self, "_library_detected", False):
+            library = self._cached_library
+        else:
+            library = self._detect_library(lines)
+        waits = self._LIBRARY_WAITS.get(library, self._GENERIC_WAITS) if library else self._GENERIC_WAITS
+        wait_keyword = waits.get(category, waits["generic"])
 
-        # Check what comes after sleep
-        if line_num < len(lines):
-            next_line = lines[line_num].strip()
+        block = self._enclosing_block_name(lines, line_num)
+        block_hint = f" in '{block}'" if block else ""
 
-            # Common patterns and their alternatives
-            match next_line.lower():
-                case line if any(kw in line for kw in ["click", "element", "button"]):
-                    return "Consider 'Wait Until Element Is Visible' or 'Wait Until Element Is Enabled'"
-                case line if "page" in line:
-                    return "Consider 'Wait Until Page Contains' or 'Wait Until Page Does Not Contain'"
-                case line if any(kw in line for kw in ["should", "verify", "check"]):
-                    return (
-                        "Consider 'Wait Until Keyword Succeeds' with the verification"
-                    )
-
-        # Generic suggestion based on duration
-        match sleep_pattern.duration_in_seconds:
-            case d if d < 1:
-                return "For sub-second waits, consider if this is really needed"
-            case d if d < 5:
-                return "Replace with explicit wait condition like 'Wait Until Element Is Visible'"
-            case _:
-                return "Long sleeps indicate missing synchronization - use proper wait conditions"
+        duration = sleep_pattern.duration_in_seconds
+        if duration < 1:
+            return (
+                f"Sub-second sleep{block_hint} — verify it is necessary; "
+                f"if so, replace with '{wait_keyword}'"
+            )
+        if duration < 5:
+            return f"Replace with '{wait_keyword}'{block_hint}"
+        return (
+            f"Long sleep ({duration:.0f}s){block_hint} indicates missing synchronization — "
+            f"use '{wait_keyword}' or redesign the wait strategy"
+        )
 
     @override
     def validate_config(self) -> None:

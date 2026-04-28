@@ -90,6 +90,9 @@ from .exceptions import (
     RobotOptimizerError,
 )
 
+# Listener
+from .listener import FlakinessListener
+
 # Logging
 from .logging import configure_logging, get_logger
 
@@ -157,6 +160,8 @@ __all__ = [
     # Plugins
     "Plugin",
     "PluginMetadata",
+    # Listener
+    "FlakinessListener",
     # Utilities
     "deprecated",
     "deprecation_warning",
