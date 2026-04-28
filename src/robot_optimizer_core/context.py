@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
@@ -10,7 +11,7 @@ from typing import Any, Protocol, runtime_checkable
 from .analyzers.registry import AnalyzerRegistry
 from .config.settings import Settings
 from .di import ThreadSafeContainer
-from .discovery.file_finder import FileDiscoveryService
+from .discovery import FileDiscoveryService
 from .logging import LoggerAdapter, configure_logging
 from .metrics import MetricsCollector
 from .parsers.robot_ast_parser import RobotASTParser
@@ -121,9 +122,7 @@ class ApplicationContext:
 
             # Initialize plugin manager
             if self.config.enable_plugins:
-                self._plugin_manager = SecurePluginManager(
-                    registry=self._analyzer_registry
-                )
+                self._plugin_manager = SecurePluginManager()
                 self._container.register_instance("plugin_manager", self._plugin_manager)
 
             self._initialized = True
@@ -214,6 +213,7 @@ class ApplicationContext:
 
     def _setup_container(self) -> None:
         """Set up the DI container with services."""
+        assert self._container is not None
         # Register settings
         self._container.register_instance("settings", self.config.settings)
 
@@ -233,6 +233,7 @@ class ApplicationContext:
 
     def _register_builtin_analyzers(self) -> None:
         """Register built-in analyzers."""
+        assert self._analyzer_registry is not None
         from .analyzers.dead_code import DeadCodeAnalyzer
         from .analyzers.flakiness import FlakinessAnalyzer
         from .analyzers.sleep_detector import SleepDetector
@@ -242,7 +243,7 @@ class ApplicationContext:
         self._analyzer_registry.register("flakiness", FlakinessAnalyzer)
 
     @contextmanager
-    def request_scope(self, **context: Any):
+    def request_scope(self, **context: Any) -> Iterator[ThreadSafeContainer]:
         """Create a request-scoped context.
 
         Args:
@@ -274,7 +275,7 @@ class ApplicationContext:
         self.initialize()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: object) -> None:
         """Context manager exit."""
         self.shutdown()
 

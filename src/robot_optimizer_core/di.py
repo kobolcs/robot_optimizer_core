@@ -127,7 +127,7 @@ class ThreadSafeContainer:
             }
         )
 
-    def resolve(self, service_type: str) -> T:
+    def resolve(self, service_type: str) -> Any:
         """Thread-safe service resolution."""
         # Check for circular dependencies (thread-local)
         if service_type in self._resolution_stack:
@@ -173,7 +173,7 @@ class ThreadSafeContainer:
 
     def _list_all_services(self) -> list[str]:
         """List all available services across hierarchy."""
-        services = set()
+        services: set[str] = set()
 
         # This container's services
         with self._services_lock:
@@ -221,7 +221,7 @@ class ThreadSafeContainer:
     def _create_with_injection(self, cls: type[T]) -> T:
         """Create instance with constructor injection."""
         signature = inspect.signature(cls.__init__)
-        kwargs = {}
+        kwargs: dict[str, Any] = {}
 
         for param_name, param in signature.parameters.items():
             if param_name == "self":
