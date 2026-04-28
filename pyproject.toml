@@ -237,7 +237,8 @@ ignore_missing_imports = true
 
 # TODO: Restore strict mypy progressively for these modules.
 # Current debt: strict violations (misc, object, operator, union-attr, no-untyped-def).
-# Priority order: api → boundaries → context → di → registry → sleep_detector →
+# Done: api, boundaries.
+# Remaining order: context → di → registry → sleep_detector →
 #   dead_code → deprecation → file_finder → flakiness.
 [[tool.mypy.overrides]]
 module = [
@@ -245,8 +246,6 @@ module = [
     "robot_optimizer_core.analyzers.sleep_detector",
     "robot_optimizer_core.analyzers.dead_code",
     "robot_optimizer_core.analyzers.registry",
-    "robot_optimizer_core.api",
-    "robot_optimizer_core.boundaries",
     "robot_optimizer_core.context",
     "robot_optimizer_core.deprecation",
     "robot_optimizer_core.di",

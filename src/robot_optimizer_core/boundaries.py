@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import functools
 import traceback
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -94,22 +94,22 @@ class ErrorBoundary:
         """
         self.operation_name = operation_name
         self.fallback = fallback
-        self._error_handlers: dict[type[Exception], Callable] = {}
-        self._finally_handlers: list[Callable] = []
+        self._error_handlers: dict[type[Exception], Callable[..., Any]] = {}
+        self._finally_handlers: list[Callable[..., Any]] = []
 
-    def handle(self, exception_type: type[Exception]) -> Callable:
+    def handle(self, exception_type: type[Exception]) -> Callable[..., Any]:
         """Decorator to register error handler."""
-        def decorator(handler: Callable) -> Callable:
+        def decorator(handler: Callable[..., Any]) -> Callable[..., Any]:
             self._error_handlers[exception_type] = handler
             return handler
         return decorator
 
-    def add_finally(self, handler: Callable) -> None:
+    def add_finally(self, handler: Callable[..., Any]) -> None:
         """Add a finally handler."""
         self._finally_handlers.append(handler)
 
     @contextmanager
-    def guard(self, **context: Any):
+    def guard(self, **context: Any) -> Iterator[TransactionContext]:
         """Context manager for error boundary."""
         transaction = TransactionContext(
             metadata={"operation": self.operation_name, **context}
@@ -141,7 +141,7 @@ class ErrorBoundary:
                 try:
                     result = handler(e, transaction)
                     if result is not None:
-                        return result
+                        return  # handler recovered; suppress exception
                 except Exception as handler_error:
                     logger.error(
                         f"Error handler failed: {handler_error}",
@@ -151,9 +151,9 @@ class ErrorBoundary:
             # Rollback
             transaction.rollback()
 
-            # Re-raise or return fallback
+            # Re-raise or suppress with fallback
             if self.fallback is not None:
-                return self.fallback
+                return  # suppress exception; caller reads self.fallback
             raise
 
         finally:
@@ -266,7 +266,7 @@ def transactional(
 class UnitOfWork:
     """Unit of Work pattern for managing aggregate transactions."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize unit of work."""
         self._new: list[Any] = []
         self._dirty: list[Any] = []
@@ -313,7 +313,7 @@ class UnitOfWork:
         return self._repositories[name]
 
     @contextmanager
-    def transaction(self):
+    def transaction(self) -> Iterator["UnitOfWork"]:
         """Start a transaction context."""
         assert self._transaction is None, "Transaction already in progress"
 

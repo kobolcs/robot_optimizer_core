@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from .analyzers import get_analyzer, get_analyzer_registry, list_analyzers
 from .config import get_settings
@@ -237,7 +237,7 @@ def analyze_directory(
 
     # Get file discovery service
     container = get_container()
-    discovery = container.resolve("file_discovery")
+    discovery: Any = container.resolve("file_discovery")
 
     # Discover files
     if patterns is None:
@@ -342,10 +342,10 @@ def analyze_suite(
     if path.is_file():
         files: list[Path] = [path]
     else:
-        discovery = container.resolve("file_discovery")
+        discovery: Any = container.resolve("file_discovery")
         files = discovery.find_files(path)
 
-    parser = container.resolve("parser")
+    parser: Any = container.resolve("parser")
     suite_info: SuiteInfo = {
         "files": len(files),
         "keywords": [],
@@ -380,7 +380,7 @@ def analyze_suite(
     for finding in all_findings:
         sev = finding.severity.name
         findings_by_severity[sev] = findings_by_severity.get(sev, 0) + 1
-        pt = finding.pattern.type.name
+        pt = finding.pattern.type.name  # type: ignore[attr-defined]
         findings_by_type[pt] = findings_by_type.get(pt, 0) + 1
 
     statistics: SuiteStatistics = {
