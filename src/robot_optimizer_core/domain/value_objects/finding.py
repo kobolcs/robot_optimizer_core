@@ -166,9 +166,7 @@ class Finding(ValueObject):
         return {
             "id": self.id,
             "pattern": self.pattern,
-            "severity": self.severity
-            if isinstance(self.severity, Severity)
-            else Severity(self.severity),
+            "severity": self.severity,
             "location": self.location,
             "message": self.message,
             "context": self.context,
@@ -184,9 +182,7 @@ class Finding(ValueObject):
             "line_number": self.line_number,
             "column": self.location.column,
             "location": self.location.model_dump(),
-            "severity": self.severity
-            if isinstance(self.severity, Severity)
-            else Severity(self.severity),
+            "severity": self.severity.name,
             "message": self.message,
             "pattern": self.pattern.model_dump() | {"type": self.pattern.type},
             "pattern_type": self.pattern.type.name,  # type: ignore[attr-defined]

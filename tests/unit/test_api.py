@@ -67,3 +67,19 @@ class TestAnalyzeFileMaxSizeEnforcement:
             )
 
         assert isinstance(findings, list)
+
+    def test_size_error_not_double_wrapped(self, tmp_path: Path) -> None:
+        """AnalysisError from the size guard must not be re-wrapped (fix 5b)."""
+        robot_file = tmp_path / "large.robot"
+        robot_file.write_bytes(b"x" * 150_000)
+        settings = Settings(max_file_size_mb=0.1)
+
+        with pytest.raises(AnalysisError) as exc_info:
+            analyze_file(robot_file, settings=settings)
+
+        # The message must be the original size-guard message, NOT 'Failed to load file:'
+        assert "Failed to load file" not in str(exc_info.value)
+        assert "exceeds maximum size" in str(exc_info.value).lower()
+        # file_path must be preserved directly, not nested
+        assert exc_info.value.file_path == robot_file
+

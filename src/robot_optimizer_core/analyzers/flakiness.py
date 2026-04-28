@@ -263,16 +263,17 @@ class FlakinessAnalyzer(BaseAnalyzer):
         )
 
     def _determine_severity(self, failure_rate: float) -> Severity:
-        """Determine severity based on failure rate."""
+        """Determine severity based on failure rate.
+
+        Thresholds (inclusive on the lower bound):
+        - ``>= error``   → ERROR
+        - ``> info``     → WARNING
+        - otherwise      → INFO
+        """
         info = float(self._severity_thresholds["info"])
-        warning = float(self._severity_thresholds["warning"])
         error = float(self._severity_thresholds["error"])
 
-        # Historic tests use midpoint escalation for the default wide thresholds,
-        # but custom tight thresholds expect the configured error threshold itself.
-        error_boundary = error if error <= 0.10 else (warning + error) / 2
-
-        if failure_rate >= error_boundary:
+        if failure_rate >= error:
             return Severity.ERROR
         if failure_rate > info:
             return Severity.WARNING

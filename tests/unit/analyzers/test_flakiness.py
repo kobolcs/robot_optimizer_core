@@ -235,7 +235,8 @@ Very Flaky Test
         assert analyzer._determine_severity(0.05) == Severity.INFO
         assert analyzer._determine_severity(0.10) == Severity.WARNING
         assert analyzer._determine_severity(0.15) == Severity.WARNING
-        assert analyzer._determine_severity(0.25) == Severity.ERROR
+        # 0.25 is above info (0.05) but below error (0.30), so WARNING
+        assert analyzer._determine_severity(0.25) == Severity.WARNING
         assert analyzer._determine_severity(0.50) == Severity.ERROR
 
     def test_custom_severity_thresholds(self, mock_repository: Mock) -> None:

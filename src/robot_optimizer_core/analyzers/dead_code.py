@@ -395,10 +395,11 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         return findings
 
     def _find_unreachable_code(self, test_file: TestFile) -> list[Finding]:
-        """Find code after RETURN statements."""
+        """Find code after RETURN statements inside Keyword definitions."""
         findings = []
         lines = test_file.content.splitlines()
 
+        in_keywords_section = False
         in_keyword = False
         found_return = False
         current_keyword = None
@@ -406,15 +407,27 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         for line_num, line in enumerate(lines, 1):
             stripped = line.strip()
 
-            # Track keyword boundaries
-            if not line.startswith((" ", "\t")) and stripped:
+            if not stripped or stripped.startswith("#"):
+                continue
+
+            # Track section changes
+            if stripped.startswith("***"):
+                section = stripped.lower()
+                in_keywords_section = "keyword" in section
                 in_keyword = False
                 found_return = False
-                if "***" not in line:
+                continue
+
+            # Non-indented line: start of a new keyword (only inside Keywords section)
+            if not line.startswith((" ", "\t")):
+                in_keyword = False
+                found_return = False
+                if in_keywords_section:
                     current_keyword = stripped
                     in_keyword = True
+                continue
 
-            # Check for RETURN
+            # Check for RETURN inside a keyword body
             if in_keyword and stripped.upper().startswith("RETURN"):
                 found_return = True
                 continue

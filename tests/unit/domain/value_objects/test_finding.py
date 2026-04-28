@@ -255,7 +255,7 @@ class TestFinding:
         assert data["pattern_name"] == pattern.name
         assert data["recommendation"] == pattern.recommendation
         assert data["pattern"]["type"] == PatternType.SLEEP_IN_TEST
-        assert data["severity"] == Severity.ERROR
+        assert data["severity"] == "ERROR"
         assert data["location"]["line"] == 42
         assert data["location"]["column"] == 15
         assert data["message"] == "Critical sleep usage"
