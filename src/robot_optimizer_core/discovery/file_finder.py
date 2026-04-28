@@ -459,23 +459,3 @@ class MultiPatternMatcher:
                         matches.append((i - pattern_len + 1, pattern_idx))
 
         return matches
-
-
-# Example usage
-def example_optimized_discovery():
-    """Example of using optimized discovery."""
-    from ..context import create_application
-
-    with create_application() as app:
-        # Use optimized discovery
-        discovery = OptimizedFileDiscoveryService(app.settings)
-
-        # Find files - O(n) instead of O(n*m)
-        files = discovery.find_files(
-            Path("/path/to/project"),
-            patterns=["*.robot", "*.resource"],
-            exclude_patterns=["**/build/**", "**/.*", "**/__pycache__/**"]
-        )
-
-        print(f"Found {len(files)} files")
-        print(f"Stats: {discovery._stats}")

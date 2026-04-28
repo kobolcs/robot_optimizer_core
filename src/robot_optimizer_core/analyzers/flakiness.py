@@ -46,6 +46,8 @@ from ..domain.value_objects import (
 from ..exceptions import ConfigurationError, RepositoryError
 from .base import BaseAnalyzer, ConfigValue
 
+__all__ = ["FlakinessAnalyzer"]
+
 
 class FlakinessAnalyzer(BaseAnalyzer):
     """Analyzer for detecting flaky tests.
