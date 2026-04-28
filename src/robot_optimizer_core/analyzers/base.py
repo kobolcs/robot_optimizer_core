@@ -304,7 +304,7 @@ class BaseAnalyzer(ABC):
                     extra={
                         "expected": str(test_file.path),
                         "actual": str(finding.location.file_path),
-                        "message": finding.message,
+                        "finding_message": finding.message,
                     }
                 )
                 continue
@@ -317,7 +317,7 @@ class BaseAnalyzer(ABC):
                     extra={
                         "line": finding.location.line,
                         "max_line": test_file.line_count,
-                        "message": finding.message,
+                        "finding_message": finding.message,
                     }
                 )
                 continue
