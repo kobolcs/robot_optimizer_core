@@ -2,13 +2,15 @@
 """Unit tests for the metrics collector."""
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 import pytest
 
 from robot_optimizer_core.metrics import MetricsCollector, TimingStats, get_metrics
 
 
 @pytest.fixture
-def collector() -> MetricsCollector:  # type: ignore[misc]
+def collector() -> Iterator[MetricsCollector]:
     m = MetricsCollector(enabled=True)
     yield m
     m.stop()
@@ -87,8 +89,11 @@ class TestMetricsCollector:
 
     def test_get_metrics_singleton(self) -> None:
         m1 = get_metrics()
-        m2 = get_metrics()
-        assert m1 is m2
+        try:
+            m2 = get_metrics()
+            assert m1 is m2
+        finally:
+            m1.stop()
 
     def test_tags_create_separate_keys(self, collector: MetricsCollector) -> None:
         collector.increment("hits", tags={"env": "prod"})
