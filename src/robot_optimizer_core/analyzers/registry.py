@@ -26,11 +26,19 @@ from typing import TYPE_CHECKING, TypeAlias
 from ..di import get_container
 from ..exceptions import PluginError
 from ..logging import get_logger
-from ..plugin import get_plugin_registry
 from .base import BaseAnalyzer
 
 if TYPE_CHECKING:
     AnalyzerClass: TypeAlias = type[BaseAnalyzer]
+
+__all__ = [
+    "AnalyzerRegistry",
+    "get_analyzer_registry",
+    "register_analyzer",
+    "get_analyzer",
+    "list_analyzers",
+    "get_analyzer_info",
+]
 
 logger = get_logger(__name__)
 
@@ -154,19 +162,7 @@ class AnalyzerRegistry:
         Returns:
             List of analyzer names.
         """
-        # Get built-in analyzers
-        names = set(self.analyzers.keys())
-
-        # Add plugin analyzers
-        try:
-            plugin_registry = get_plugin_registry()
-            # Use list() method instead of list_components()
-            plugin_names = plugin_registry.list()
-            names.update(plugin_names)
-        except Exception as e:
-            logger.debug(f"Could not load plugin analyzers: {e}")
-
-        return sorted(names)
+        return sorted(self.analyzers.keys())
 
     def get_info(self, name: str) -> dict[str, str]:
         """Get information about an analyzer.

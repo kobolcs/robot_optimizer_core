@@ -12,6 +12,13 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+__all__ = [
+    "TimingStats",
+    "MetricsCollector",
+    "get_metrics",
+    "configure_metrics",
+]
+
 logger = _stdlib_logging.getLogger(__name__)
 
 

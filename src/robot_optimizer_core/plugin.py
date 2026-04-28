@@ -11,6 +11,18 @@ from pathlib import Path
 from .exceptions import PluginError
 from .logging import get_logger
 
+__all__ = [
+    "PluginMetadata",
+    "Plugin",
+    "PluginRegistry",
+    "PluginSecurityValidator",
+    "SecurityVisitor",
+    "SecurePluginManager",
+    "ALLOWED_IMPORTS",
+    "ALLOWED_BUILTINS",
+    "get_plugin_registry",
+]
+
 logger = get_logger(__name__)
 
 
@@ -315,57 +327,6 @@ class SecurePluginManager:
             plugin = self.plugins[name]
             plugin.deactivate()
             del self.plugins[name]
-
-
-# Example of a safe plugin implementation
-SAFE_PLUGIN_TEMPLATE = '''
-"""Example of a safe plugin implementation."""
-from robot_optimizer_core import Plugin, PluginMetadata, BaseAnalyzer, register_analyzer
-from robot_optimizer_core.domain.entities import TestFile
-from robot_optimizer_core.domain.value_objects import Finding
-
-
-class ExampleAnalyzer(BaseAnalyzer):
-    """Example analyzer that follows security guidelines."""
-
-    @property
-    def name(self) -> str:
-        return "example"
-
-    @property
-    def description(self) -> str:
-        return "Example analyzer"
-
-    def analyze(self, test_file: TestFile) -> list[Finding]:
-        # Only access allowed attributes and methods
-        findings = []
-        # ... analysis logic ...
-        return findings
-
-
-class ExamplePlugin(Plugin):
-    """Example plugin following security best practices."""
-
-    def __init__(self, registry=None):
-        super().__init__(registry)
-
-    @property
-    def metadata(self) -> PluginMetadata:
-        return PluginMetadata(
-            name="example-plugin",
-            version="1.0.0",
-            description="Safe example plugin",
-            author="Your Name"
-        )
-
-    def activate(self) -> None:
-        """Register components using the module-level registry."""
-        register_analyzer("example", ExampleAnalyzer)
-
-    def deactivate(self) -> None:
-        """Clean up resources."""
-        pass
-'''
 
 
 # Global plugin registry instance

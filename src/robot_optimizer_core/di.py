@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import inspect
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
@@ -13,6 +13,14 @@ from typing import Any, TypeAlias, TypeVar
 
 from .exceptions import ConfigurationError
 from .logging import get_logger
+
+__all__ = [
+    "ServiceLifetime",
+    "ServiceDescriptor",
+    "ThreadSafeContainer",
+    "get_container",
+    "get_thread_safe_container",
+]
 
 ServiceFactory: TypeAlias = type[Any] | Callable[..., Any]
 T = TypeVar("T")
@@ -247,7 +255,7 @@ class ThreadSafeContainer:
         return self.parent.has_service(service_type) if self.parent else False
 
     @contextmanager
-    def create_scope(self):
+    def create_scope(self) -> Iterator[ThreadSafeContainer]:
         """Create a new resolution scope."""
         token = self._scope_instances_var.set({})
         try:
@@ -326,23 +334,3 @@ def _register_defaults(container: ThreadSafeContainer) -> None:
     container.register("file_discovery", OptimizedFileDiscoveryService)
 
     logger.debug("Default services registered with optimized discovery")
-
-
-# Example usage with scoped resolution
-def example_scoped_usage():
-    """Example of using scoped services."""
-    container = get_thread_safe_container()
-
-    # Register a scoped service
-    container.register("request_context", dict, ServiceLifetime.SCOPED)
-
-    # Use in a scope
-    with container.create_scope():
-        ctx1 = container.resolve("request_context")
-        ctx2 = container.resolve("request_context")
-        assert ctx1 is ctx2  # Same instance within scope
-
-    # Different scope gets different instance
-    with container.create_scope():
-        ctx3 = container.resolve("request_context")
-        assert ctx3 is not ctx1  # Different instance in new scope

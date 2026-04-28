@@ -29,6 +29,17 @@ else:
 
 E = TypeVar("E", bound="RobotOptimizerError")
 
+__all__ = [
+    "RobotOptimizerError",
+    "AnalysisError",
+    "ParsingError",
+    "ConfigurationError",
+    "PluginError",
+    "ValidationError",
+    "FileNotFoundError",
+    "RepositoryError",
+]
+
 
 class RobotOptimizerError(Exception):
     """Base exception for all Robot Framework Optimizer errors.

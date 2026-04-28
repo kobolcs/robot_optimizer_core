@@ -441,6 +441,49 @@ python -m build
 python -m twine upload dist/*
 ```
 
+## Complete Plugin Example
+
+A minimal but complete plugin that registers a custom analyzer:
+
+```python
+# my_plugin.py
+from robot_optimizer_core import (
+    Plugin, PluginMetadata, BaseAnalyzer, register_analyzer,
+)
+from robot_optimizer_core.domain.entities import TestFile
+from robot_optimizer_core.domain.value_objects import Finding
+
+
+class ExampleAnalyzer(BaseAnalyzer):
+    @property
+    def name(self) -> str:
+        return "example"
+
+    @property
+    def description(self) -> str:
+        return "Example analyzer"
+
+    def analyze(self, test_file: TestFile) -> list[Finding]:
+        return []
+
+
+class ExamplePlugin(Plugin):
+    @property
+    def metadata(self) -> PluginMetadata:
+        return PluginMetadata(
+            name="example-plugin",
+            version="1.0.0",
+            description="Safe example plugin",
+            author="Your Name",
+        )
+
+    def activate(self) -> None:
+        register_analyzer("example", ExampleAnalyzer)
+
+    def deactivate(self) -> None:
+        pass
+```
+
 ## Next Steps
 
 - See [API Reference](api/analyzers.md) for complete analyzer API
