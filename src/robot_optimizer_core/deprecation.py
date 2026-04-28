@@ -105,11 +105,12 @@ def deprecated(
             )
             return obj(*args, **kwargs)
 
-        # Add deprecation metadata (setattr avoids attr-defined errors on _Wrapped)
-        setattr(wrapper, "__deprecated__", True)
-        setattr(wrapper, "__deprecated_since__", since)
-        setattr(wrapper, "__deprecated_removed_in__", removed_in)
-        setattr(wrapper, "__deprecated_replacement__", replacement)
+        # Cast to Any so mypy does not inspect _Wrapped[P, R, P, R] attributes
+        _w: Any = wrapper
+        _w.__deprecated__ = True
+        _w.__deprecated_since__ = since
+        _w.__deprecated_removed_in__ = removed_in
+        _w.__deprecated_replacement__ = replacement
 
         return wrapper
 
@@ -137,8 +138,10 @@ def _deprecate_class(cls: type[T], message: str) -> type[T]:
         )
         original_init(self, *args, **kwargs)
 
-    setattr(cls, "__init__", new_init)
-    setattr(cls, "__deprecated__", True)
+    # Cast to Any so mypy does not flag method-assign / attr-defined on type[T]
+    _c: Any = cls
+    _c.__init__ = new_init
+    _c.__deprecated__ = True
 
     return cls
 
