@@ -105,11 +105,11 @@ def deprecated(
             )
             return obj(*args, **kwargs)
 
-        # Add deprecation metadata
-        wrapper.__deprecated__ = True
-        wrapper.__deprecated_since__ = since
-        wrapper.__deprecated_removed_in__ = removed_in
-        wrapper.__deprecated_replacement__ = replacement
+        # Add deprecation metadata (setattr avoids attr-defined errors on _Wrapped)
+        setattr(wrapper, "__deprecated__", True)
+        setattr(wrapper, "__deprecated_since__", since)
+        setattr(wrapper, "__deprecated_removed_in__", removed_in)
+        setattr(wrapper, "__deprecated_replacement__", replacement)
 
         return wrapper
 
@@ -137,8 +137,8 @@ def _deprecate_class(cls: type[T], message: str) -> type[T]:
         )
         original_init(self, *args, **kwargs)
 
-    cls.__init__ = new_init
-    cls.__deprecated__ = True
+    setattr(cls, "__init__", new_init)
+    setattr(cls, "__deprecated__", True)
 
     return cls
 

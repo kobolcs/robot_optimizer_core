@@ -156,7 +156,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
         Returns:
             List of findings.
         """
-        findings = []
+        findings: list[Finding] = []
 
         # Get flakiness statistics from repository
         try:
@@ -233,6 +233,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
             name="Flaky Test",
             description=f"Test '{stats.test_name}' fails inconsistently",
             recommendation=self._get_recommendation(stats),
+            documentation_url=None,
             auto_fixable=False  # Can't auto-fix flakiness
         )
 

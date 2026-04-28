@@ -33,6 +33,7 @@ class PatternType(Enum):
     NO_TAGS = auto()
     DUPLICATE_TEST = auto()
     MISSING_SETUP_TEARDOWN = auto()
+    UNREACHABLE_CODE = auto()
 
     # Variable patterns
     HARDCODED_VALUE = auto()
@@ -173,6 +174,7 @@ class Pattern(ValueObject):
             PatternType.NO_TAGS: "Structure",
             PatternType.DUPLICATE_TEST: "Structure",
             PatternType.MISSING_SETUP_TEARDOWN: "Structure",
+            PatternType.UNREACHABLE_CODE: "Structure",
             PatternType.HARDCODED_VALUE: "Variables",
             PatternType.UNUSED_VARIABLE: "Variables",
             PatternType.GLOBAL_VARIABLE_MISUSE: "Variables",

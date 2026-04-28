@@ -42,6 +42,10 @@ __all__ = [
 
 logger = get_logger(__name__)
 
+# Alias needed because AnalyzerRegistry defines a method named `list`, which
+# shadows the builtin inside the class body and breaks return-type annotations.
+_list = list
+
 
 class AnalyzerRegistry:
     """Registry for managing analyzers.
@@ -146,7 +150,7 @@ class AnalyzerRegistry:
         # Try dependency injection
         container = get_container()
         if container.has_service(f"analyzer.{name}"):
-            instance = container.resolve(f"analyzer.{name}")
+            instance: BaseAnalyzer = container.resolve(f"analyzer.{name}")
         else:
             # Create with default config
             instance = analyzer_class()
@@ -185,7 +189,7 @@ class AnalyzerRegistry:
             "tags": ", ".join(analyzer.tags) if analyzer.tags else ""
         }
 
-    def get_default_analyzers(self) -> list[BaseAnalyzer]:
+    def get_default_analyzers(self) -> _list[BaseAnalyzer]:
         """Get default analyzer instances.
 
         Returns:
@@ -193,7 +197,7 @@ class AnalyzerRegistry:
         """
         return [self.get(name) for name in self.default_analyzers]
 
-    def set_default_analyzers(self, names: list[str]) -> None:
+    def set_default_analyzers(self, names: _list[str]) -> None:
         """Set the default analyzers.
 
         Args:
@@ -201,7 +205,8 @@ class AnalyzerRegistry:
         """
         # Validate all names exist
         available = set(self.list())
-        if invalid := set(names) - available:
+        invalid: set[str] = set(names) - available
+        if invalid:
             raise PluginError(
                 f"Invalid analyzer names: {invalid}",
                 plugin_type="analyzer",

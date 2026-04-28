@@ -24,6 +24,7 @@ from __future__ import annotations
 import re
 import sys
 from decimal import Decimal, InvalidOperation
+from typing import cast
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -156,7 +157,7 @@ class SleepDetector(BaseAnalyzer):
 
         return findings
 
-    def _compile_sleep_patterns(self) -> list[tuple[re.Pattern, str]]:
+    def _compile_sleep_patterns(self) -> list[tuple[re.Pattern[str], str]]:
         """Compile regex patterns for sleep detection.
 
         Returns:
@@ -227,7 +228,7 @@ class SleepDetector(BaseAnalyzer):
                     case _:
                         # Numeric sleep
                         duration_str = match.group(1)
-                        unit = match.group(2) if match.lastindex >= 2 else "s"
+                        unit = match.group(2) if match.lastindex is not None and match.lastindex >= 2 else "s"
 
                         try:
                             duration = Decimal(duration_str)
@@ -271,6 +272,7 @@ class SleepDetector(BaseAnalyzer):
                 name="Variable Sleep",
                 description=f"Sleep with variable duration: ${{{sleep_info['variable']}}}",
                 recommendation="Replace with explicit wait condition",
+                documentation_url=None,
                 auto_fixable=False  # Can't auto-fix without knowing duration
             )
 
@@ -287,8 +289,8 @@ class SleepDetector(BaseAnalyzer):
         # Create sleep pattern value object
         try:
             sleep_pattern = SleepPattern(
-                duration=sleep_info["duration"],
-                unit=sleep_info["unit"],
+                duration=cast(Decimal, sleep_info["duration"]),
+                unit=cast(str, sleep_info["unit"]),
                 line_number=line_num,
                 original_text=original_text
             )

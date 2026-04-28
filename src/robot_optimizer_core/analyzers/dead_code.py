@@ -41,7 +41,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         self._check_unused = self.get_config_value("check_unused", True)
         self._check_duplicates = self.get_config_value("check_duplicates", True)
         self._check_unreachable = self.get_config_value("check_unreachable", True)
-        ignore_patterns = self.get_config_value("ignore_patterns", [])
+        ignore_patterns: list[ConfigValue] = self.get_config_value("ignore_patterns", [])
         self._ignore_patterns = [re.compile(str(pattern), re.IGNORECASE) for pattern in ignore_patterns]
         self._keyword_display_names: dict[str, str] = {}
         self.validate_config()
@@ -78,7 +78,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                     config_key=f"{self.name}.{key}",
                     provided_value=value
                 )
-        patterns = self.get_config_value("ignore_patterns", [])
+        patterns: list[ConfigValue] = self.get_config_value("ignore_patterns", [])
         if not isinstance(patterns, list):
             raise ConfigurationError(
                 "Config key 'ignore_patterns' must be a list",
@@ -205,6 +205,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                     name="Unused Keyword",
                     description=f"Keyword '{display_name}' is never called",
                     recommendation="Remove this keyword or use it in your tests",
+                    documentation_url=None,
                     auto_fixable=True
                 )
 
@@ -277,6 +278,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                     name="Unreachable Code",
                     description="Code after RETURN statement will never execute",
                     recommendation="Remove the unreachable code or move it before RETURN",
+                    documentation_url=None,
                     auto_fixable=True
                 )
 

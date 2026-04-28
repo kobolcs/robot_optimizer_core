@@ -23,6 +23,8 @@ from ..config import Settings
 from ..exceptions import FileNotFoundError as RFFileNotFoundError
 from ..logging import get_logger
 
+logger = get_logger(__name__)
+
 if TYPE_CHECKING:
     from ..domain.entities import TestFile
     from ..domain.value_objects import Finding
@@ -39,7 +41,7 @@ class PatternMatcher:
     """Optimized pattern matcher using pre-compiled patterns and tries."""
 
     # Pre-compiled patterns for better performance
-    patterns: list[re.Pattern] = field(default_factory=list)
+    patterns: list[re.Pattern[str]] = field(default_factory=list)
     # Trie structure for exact matches
     exact_matches: set[str] = field(default_factory=set)
     # Suffix tree for extension matching
@@ -91,11 +93,11 @@ class PathExclusionTrie:
     """Trie structure for efficient path exclusion checking."""
 
     class TrieNode:
-        def __init__(self):
+        def __init__(self) -> None:
             self.children: dict[str, PathExclusionTrie.TrieNode] = {}
             self.is_excluded = False
             self.is_pattern = False
-            self.pattern: re.Pattern | None = None
+            self.pattern: re.Pattern[str] | None = None
 
     root: TrieNode = field(default_factory=TrieNode)
 
@@ -158,9 +160,9 @@ class OptimizedFileDiscoveryService:
         self.settings = settings or Settings()
         self.logger = get_logger(__name__)
 
-        # Pre-compile patterns for O(1) matching
-        self._include_matcher: PatternMatcher | None = None
-        self._exclude_trie: PathExclusionTrie | None = None
+        # Pre-compile patterns for O(1) matching (reset to real values in find_files)
+        self._include_matcher: PatternMatcher = PatternMatcher()
+        self._exclude_trie: PathExclusionTrie = PathExclusionTrie()
 
         # Cache for directory listings
         self._dir_cache: dict[Path, list[Path]] = {}
@@ -316,16 +318,16 @@ class OptimizedFileDiscoveryService:
 class OptimizedAnalyzer:
     """Base analyzer with performance optimizations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize with optimizations."""
         # Pre-compile all regex patterns
-        self._compiled_patterns: dict[str, re.Pattern] = {}
+        self._compiled_patterns: dict[str, re.Pattern[str]] = {}
         # Cache for parsed structures
         self._parse_cache: dict[str, Any] = {}
         # Metrics for performance tracking
-        self._perf_metrics = defaultdict(float)
+        self._perf_metrics: defaultdict[str, float] = defaultdict(float)
 
-    def compile_pattern(self, name: str, pattern: str, flags: int = 0) -> re.Pattern:
+    def compile_pattern(self, name: str, pattern: str, flags: int = 0) -> re.Pattern[str]:
         """Compile and cache regex pattern."""
         if name not in self._compiled_patterns:
             self._compiled_patterns[name] = re.compile(pattern, flags)
@@ -354,7 +356,7 @@ class OptimizedAnalyzer:
                     findings = future.result()
                     results[test_file.path] = findings
                 except Exception as e:
-                    self.logger.error(f"Analysis failed for {test_file.path}: {e}")
+                    logger.error(f"Analysis failed for {test_file.path}: {e}")
                     results[test_file.path] = []
 
             return results
@@ -369,7 +371,7 @@ class OptimizedAnalyzer:
 class OptimizedSleepDetector(OptimizedAnalyzer):
     """Sleep detector with pre-compiled patterns and caching."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize with optimized patterns."""
         super().__init__()
 
@@ -413,19 +415,25 @@ class OptimizedSleepDetector(OptimizedAnalyzer):
 
         return findings
 
+    def _create_finding(self, match: re.Match[str], line: str, line_num: int, test_file: Any) -> Any:
+        raise NotImplementedError
+
+    def _create_variable_finding(self, match: re.Match[str], line: str, line_num: int, test_file: Any) -> Any:
+        raise NotImplementedError
+
 
 # String matching optimization using Aho-Corasick
 class MultiPatternMatcher:
     """Efficient multi-pattern string matching using Aho-Corasick algorithm."""
 
-    def __init__(self, patterns: list[str]):
+    def __init__(self, patterns: list[str]) -> None:
         """Build Aho-Corasick automaton for O(n + m) matching."""
         self.patterns = patterns
-        self.root = {}
-        self.outputs = defaultdict(list)
+        self.root: dict[str, Any] = {}
+        self.outputs: defaultdict[int, list[int]] = defaultdict(list)
         self._build_automaton()
 
-    def _build_automaton(self):
+    def _build_automaton(self) -> None:
         """Build the automaton - O(m) where m is total pattern length."""
         # Build trie
         for idx, pattern in enumerate(self.patterns):
