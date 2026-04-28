@@ -293,31 +293,51 @@ class BaseAnalyzer(ABC):
             Validated findings.
         """
         validated = []
+        dropped = 0
 
         for finding in findings:
             # Ensure file path matches
             if finding.location.file_path != test_file.path:
+                dropped += 1
                 self._logger.warning(
-                    "Finding has incorrect file path",
+                    "Dropping finding: file path mismatch",
                     extra={
                         "expected": str(test_file.path),
-                        "actual": str(finding.location.file_path)
+                        "actual": str(finding.location.file_path),
+                        "message": finding.message,
                     }
                 )
                 continue
 
             # Ensure line number is valid
             if finding.location.line > test_file.line_count:
+                dropped += 1
                 self._logger.warning(
-                    "Finding has invalid line number",
+                    "Dropping finding: line number out of range",
                     extra={
                         "line": finding.location.line,
-                        "max_line": test_file.line_count
+                        "max_line": test_file.line_count,
+                        "message": finding.message,
                     }
                 )
                 continue
 
             validated.append(finding)
+
+        if dropped:
+            self._logger.warning(
+                "Dropped invalid findings",
+                extra={
+                    "dropped": dropped,
+                    "kept": len(validated),
+                    "total": len(findings),
+                    "file": str(test_file.path),
+                }
+            )
+            if self._metrics:
+                self._metrics.increment(
+                    f"analyzer.{self.name}.findings_dropped", dropped
+                )
 
         return validated
 
