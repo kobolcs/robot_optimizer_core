@@ -69,6 +69,7 @@ class PluginRegistry:
         """Remove a plugin from the registry."""
         self.plugins.pop(name, None)
 
+
 # Whitelist of allowed imports for plugins
 ALLOWED_IMPORTS = {
     "robot_optimizer_core",

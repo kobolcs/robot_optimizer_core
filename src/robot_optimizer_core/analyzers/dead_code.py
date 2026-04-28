@@ -42,6 +42,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         ignore_patterns = self.get_config_value("ignore_patterns", [])
         self._ignore_patterns = [re.compile(str(pattern), re.IGNORECASE) for pattern in ignore_patterns]
         self._keyword_display_names: dict[str, str] = {}
+        self.validate_config()
 
     @property
     @override

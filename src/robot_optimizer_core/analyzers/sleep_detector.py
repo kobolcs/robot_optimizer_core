@@ -87,6 +87,7 @@ class SleepDetector(BaseAnalyzer):
 
         # Compile patterns
         self._sleep_patterns = self._compile_sleep_patterns()
+        self.validate_config()
 
     @property
     @override
