@@ -224,6 +224,31 @@ class TestSecurePluginManager:
         with pytest.raises(PluginError, match="[Ss]ecurity validation"):
             manager.load_plugin_from_file(plugin_file)
 
+    def test_load_valid_plugin_registers_and_activates(self, tmp_path: Path) -> None:
+        plugin_file = tmp_path / "valid_plugin.py"
+        plugin_file.write_text(
+            "from robot_optimizer_core.plugin import Plugin, PluginMetadata\n"
+            "\n"
+            "class ValidPlugin(Plugin):\n"
+            "    @property\n"
+            "    def metadata(self) -> PluginMetadata:\n"
+            '        return PluginMetadata("valid_plugin", "1.0.0", "Valid test plugin", "Test")\n'
+            "\n"
+            "    def activate(self) -> None:\n"
+            "        self.is_active = True\n"
+            "\n"
+            "    def deactivate(self) -> None:\n"
+            "        self.is_active = False\n"
+        )
+        plugin_file.chmod(0o644)
+
+        manager = SecurePluginManager()
+        manager.load_plugin_from_file(plugin_file)
+
+        assert "valid_plugin" in manager.plugins
+        assert isinstance(manager.plugins["valid_plugin"], Plugin)
+        assert manager.plugins["valid_plugin"].is_active is True
+
     def test_no_plugin_subclass_raises_plugin_error(self, tmp_path: Path) -> None:
         plugin_file = tmp_path / "no_subclass.py"
         plugin_file.write_text("x = 1\n")
