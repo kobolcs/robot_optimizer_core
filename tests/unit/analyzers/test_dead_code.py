@@ -78,6 +78,54 @@ Another Unused
             assert finding.is_auto_fixable is True
             assert "never used" in finding.message.lower()
 
+    def test_extract_keywords_and_calls_returns_three_values(
+        self, analyzer: DeadCodeAnalyzer
+    ) -> None:
+        """Regression test for display-name refactor tuple shape."""
+        content = """*** Test Cases ***
+Case
+    My Keyword
+
+*** Keywords ***
+My Keyword
+    No Operation
+"""
+        test_file = TestFile(
+            path=Path("test.robot"),
+            content=content,
+            size_bytes=len(content),
+            last_modified_utc=datetime.now(),
+        )
+
+        keywords, calls, display_names = analyzer._extract_keywords_and_calls(test_file)
+
+        assert isinstance(keywords, dict)
+        assert isinstance(calls, set)
+        assert isinstance(display_names, dict)
+        assert "my keyword" in display_names
+        assert display_names["my keyword"] == "My Keyword"
+
+    def test_unused_keyword_preserves_original_display_case(
+        self, analyzer: DeadCodeAnalyzer
+    ) -> None:
+        content = """*** Keywords ***
+MiXeD Case Keyword
+    No Operation
+"""
+        test_file = TestFile(
+            path=Path("test.robot"),
+            content=content,
+            size_bytes=len(content),
+            last_modified_utc=datetime.now(),
+        )
+
+        findings = analyzer.analyze(test_file)
+        unused = [f for f in findings if f.pattern.type == PatternType.UNUSED_KEYWORD]
+
+        assert len(unused) == 1
+        assert unused[0].context["keyword_name"] == "MiXeD Case Keyword"
+        assert "MiXeD Case Keyword" in unused[0].message
+
     def test_find_duplicate_keywords(self, analyzer: DeadCodeAnalyzer) -> None:
         """Test detection of duplicate keyword definitions."""
         content = """*** Keywords ***
@@ -498,4 +546,3 @@ My Keyword
         # Only one finding: the keyword body, not the test case body
         assert len(unreachable) == 1
         assert "My Keyword" in unreachable[0].message
-
