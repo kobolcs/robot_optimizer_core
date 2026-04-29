@@ -107,7 +107,6 @@ from .parsers import RobotASTParser
 
 # Plugin system
 from .plugin import Plugin, PluginMetadata
-
 from .premium import PremiumFeatureError, is_premium_installed
 
 # Alias for backward compatibility
