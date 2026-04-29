@@ -56,6 +56,14 @@ conda run pip install robot-framework-optimizer-core
 robot-optimizer analyze tests/
 ```
 
+### Try the demo suite
+
+```bash
+robot-optimizer analyze examples/bad_robot_suite --format text --no-fail
+robot-optimizer analyze examples/bad_robot_suite --format json --no-fail
+```
+
+Expected findings include Sleep usage, unused or duplicate keywords, hardcoded URLs/localhost values, and naming/documentation/tag consistency issues across suites and resources.
 
 ```python
 from robot_optimizer_core import analyze_file, analyze_directory
