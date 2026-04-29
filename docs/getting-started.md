@@ -6,8 +6,8 @@ This guide will help you get started with Robot Framework Optimizer Core quickly
 
 ### Requirements
 
-- **Python 3.11+** (Required - supports Python 3.11, 3.12, and 3.13)
-- **Robot Framework 7.1+** (Required for core functionality)
+- **Python 3.11+** (Required - tested on Python 3.11, 3.12, 3.13, and 3.14)
+- **Robot Framework 7.1+** (Required for core functionality; CI tests against the latest compatible Robot Framework release)
 
 ### Install from PyPI
 
