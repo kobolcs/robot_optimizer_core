@@ -258,7 +258,7 @@ class TestHtmlFormat:
             auto_fixable=True,
         )
         not_auto_fixable_pattern = Pattern(
-            type=PatternType.HARDCODED_URL,
+            type=PatternType.HARDCODED_VALUE,
             name="Hardcoded URL",
             description="URL detected",
             recommendation="Move URL to variable",
