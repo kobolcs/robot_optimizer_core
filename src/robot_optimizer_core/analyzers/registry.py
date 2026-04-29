@@ -66,7 +66,15 @@ class AnalyzerRegistry:
         """Initialize the analyzer registry."""
         self.analyzers: dict[str, AnalyzerClass] = {}
         self.instances: dict[str, BaseAnalyzer] = {}
-        self.default_analyzers: list[str] = ["dead_code", "sleep_detector"]
+        self.default_analyzers: list[str] = [
+            "dead_code",
+            "sleep_detector",
+            "hardcoded_value",
+            "naming_convention",
+            "setup_teardown",
+            "tag_consistency",
+            "test_documentation",
+        ]
 
     def register(
         self, name: str, analyzer_class: AnalyzerClass, override: bool = False
@@ -254,11 +262,21 @@ def _register_built_in_analyzers(registry: AnalyzerRegistry) -> None:
     # Import here to avoid circular imports
     from .dead_code import DeadCodeAnalyzer
     from .flakiness import FlakinessAnalyzer
+    from .hardcoded_value import HardcodedValueAnalyzer
+    from .naming_convention import NamingConventionAnalyzer
+    from .setup_teardown import SetupTeardownAnalyzer
     from .sleep_detector import SleepDetector
+    from .tag_consistency import TagConsistencyAnalyzer
+    from .test_documentation import TestDocumentationAnalyzer
 
     registry.register("dead_code", DeadCodeAnalyzer)
     registry.register("sleep_detector", SleepDetector)
     registry.register("flakiness", FlakinessAnalyzer)
+    registry.register("hardcoded_value", HardcodedValueAnalyzer)
+    registry.register("naming_convention", NamingConventionAnalyzer)
+    registry.register("setup_teardown", SetupTeardownAnalyzer)
+    registry.register("tag_consistency", TagConsistencyAnalyzer)
+    registry.register("test_documentation", TestDocumentationAnalyzer)
 
     logger.debug("Built-in analyzers registered")
 

@@ -6,7 +6,11 @@ Usage::
     robot-optimizer analyze path/to/suite/
     robot-optimizer analyze tests/login.robot --format json
     robot-optimizer analyze tests/ --analyzers dead_code,sleep_detector
-    robot-optimizer analyze tests/ --no-fail   # always exit 0
+    robot-optimizer analyze tests/ --no-fail           # always exit 0
+    robot-optimizer analyze tests/ --min-severity WARNING
+    robot-optimizer analyze tests/ --config robot.toml
+    robot-optimizer list-analyzers
+    robot-optimizer list-analyzers --format json
 """
 
 from __future__ import annotations
@@ -30,6 +34,7 @@ logger = get_logger(__name__)
 _EXIT_OK = 0
 _EXIT_FINDINGS = 1
 _EXIT_ERROR = 2
+_EXIT_PARTIAL = 3  # Task 19: partial failure (some files could not be analysed)
 
 # ANSI colour helpers (disabled when not a tty)
 _COLOURS = {
@@ -94,12 +99,48 @@ def _run_analyze(args: argparse.Namespace) -> int:
         else None
     )
 
+    # Task 17: parse --min-severity
+    severity_filter: Severity | None = None
+    if args.min_severity:
+        try:
+            severity_filter = Severity.from_string(args.min_severity)
+        except ValueError as exc:
+            print(f"error: invalid --min-severity value: {exc}", file=sys.stderr)
+            return _EXIT_ERROR
+
+    # Task 18: load --config file
+    settings = None
+    if getattr(args, "config", None):
+        try:
+            from .config.toml_loader import load_settings_from_toml
+
+            settings = load_settings_from_toml(Path(args.config).parent)
+        except Exception as exc:
+            print(f"error: failed to load config '{args.config}': {exc}", file=sys.stderr)
+            return _EXIT_ERROR
+
+    partial_failure = False
+
     try:
         if path.is_dir():
-            results = analyze_directory(path, analyzers=analyzer_names)
+            # Task 15+19: use error_handling="warn" to get partial results
+            results = analyze_directory(
+                path,
+                analyzers=analyzer_names,
+                settings=settings,
+                severity_filter=severity_filter,
+                error_handling="warn",
+            )
+            # Check if we had partial failures
+            partial_failure = bool(getattr(results, "errors", []))
             all_findings: list[Finding] = [f for fs in results.values() for f in fs]
         elif path.is_file():
-            all_findings = analyze_file(path, analyzers=analyzer_names)
+            all_findings = analyze_file(
+                path,
+                analyzers=analyzer_names,
+                settings=settings,
+                severity_filter=severity_filter,
+            )
         else:
             print(f"error: path does not exist: {path}", file=sys.stderr)
             return _EXIT_ERROR
@@ -135,6 +176,10 @@ def _run_analyze(args: argparse.Namespace) -> int:
     # Summary line on stderr so it doesn't pollute --format json stdout
     _print_summary(all_findings)
 
+    # Task 19: partial failure takes precedence over findings exit code
+    if partial_failure:
+        return _EXIT_PARTIAL
+
     if all_findings and not args.no_fail:
         return _EXIT_FINDINGS
     return _EXIT_OK
@@ -149,6 +194,42 @@ def _print_summary(findings: list[Finding]) -> None:
         counts[key] = counts.get(key, 0) + 1
     parts = ", ".join(f"{v} {k}" for k, v in sorted(counts.items()))
     print(f"Summary: {len(findings)} finding(s)  [{parts}]", file=sys.stderr)
+
+
+# ---------------------------------------------------------------------------
+# list-analyzers subcommand (Task 16)
+# ---------------------------------------------------------------------------
+
+
+def _run_list_analyzers(args: argparse.Namespace) -> int:
+    from .analyzers import get_analyzer_registry
+
+    registry = get_analyzer_registry()
+    names = registry.list()
+
+    if args.format == "json":
+        records = []
+        for name in names:
+            info = registry.get_info(name)
+            records.append(info)
+        print(json.dumps(records, indent=2))
+    else:
+        print(f"Available analyzers ({len(names)}):\n")
+        for name in names:
+            try:
+                info = registry.get_info(name)
+                tags = info.get("tags", "")
+                version = info.get("version", "?")
+                desc = info.get("description", "")
+                print(f"  {name}  [v{version}]")
+                print(f"    {desc}")
+                if tags:
+                    print(f"    Tags: {tags}")
+                print()
+            except Exception as exc:
+                print(f"  {name}  (error loading info: {exc})")
+
+    return _EXIT_OK
 
 
 # ---------------------------------------------------------------------------
@@ -167,6 +248,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     sub = parser.add_subparsers(dest="command", required=True)
 
+    # -- analyze subcommand --------------------------------------------------
     analyze_cmd = sub.add_parser(
         "analyze",
         help="Analyse a Robot Framework file or directory",
@@ -199,6 +281,38 @@ def _build_parser() -> argparse.ArgumentParser:
         default=False,
         help="Always exit 0 even when findings are present",
     )
+    # Task 17: --min-severity flag
+    analyze_cmd.add_argument(
+        "--min-severity",
+        metavar="LEVEL",
+        default=None,
+        help=(
+            "Only report findings at or above this severity "
+            "(INFO, WARNING, ERROR). Default: all severities."
+        ),
+    )
+    # Task 18: --config flag
+    analyze_cmd.add_argument(
+        "--config",
+        metavar="PATH",
+        default=None,
+        help=(
+            "Path to a TOML configuration file (robot.toml or pyproject.toml). "
+            "Overrides settings defaults."
+        ),
+    )
+
+    # -- list-analyzers subcommand (Task 16) ---------------------------------
+    list_cmd = sub.add_parser(
+        "list-analyzers",
+        help="List available analyzers with their description and tags",
+    )
+    list_cmd.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
 
     return parser
 
@@ -225,6 +339,8 @@ def main(argv: list[str] | None = None) -> NoReturn:
     match args.command:
         case "analyze":
             code = _run_analyze(args)
+        case "list-analyzers":
+            code = _run_list_analyzers(args)
         case _:
             parser.print_help()
             code = _EXIT_ERROR

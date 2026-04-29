@@ -192,3 +192,118 @@ class Finding(ValueObject):
             "auto_fixable": self.is_auto_fixable,
             "context": self.context,
         }
+
+    def to_sarif(self) -> dict[str, Any]:
+        """Return a SARIF-compatible result dict (Task 23).
+
+        The returned dict conforms to the SARIF 2.1.0 ``result`` object schema
+        (https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html).
+        It can be embedded inside a ``runs[].results`` array.
+
+        Severity mapping:
+            - ERROR   → "error"
+            - WARNING → "warning"
+            - INFO    → "note"
+
+        Returns:
+            SARIF result dictionary.
+        """
+        _SARIF_LEVEL: dict[Severity, str] = {
+            Severity.ERROR: "error",
+            Severity.WARNING: "warning",
+            Severity.INFO: "note",
+        }
+        pattern_type = self.pattern.type
+        if hasattr(pattern_type, "name"):
+            rule_id: str = pattern_type.name  # type: ignore[attr-defined]
+        else:
+            rule_id = str(pattern_type)
+
+        physical_location: dict[str, Any] = {
+            "artifactLocation": {
+                "uri": self.file_path.replace("\\", "/"),
+                "uriBaseId": "%SRCROOT%",
+            },
+            "region": {
+                "startLine": self.location.line,
+            },
+        }
+        if self.location.column is not None:
+            physical_location["region"]["startColumn"] = self.location.column
+        if self.location.end_line is not None:
+            physical_location["region"]["endLine"] = self.location.end_line
+        if self.location.end_column is not None:
+            physical_location["region"]["endColumn"] = self.location.end_column
+
+        return {
+            "ruleId": rule_id,
+            "level": _SARIF_LEVEL.get(self.severity, "warning"),
+            "message": {"text": self.message},
+            "locations": [{"physicalLocation": physical_location}],
+            "properties": {
+                "pattern_name": self.pattern.name,
+                "recommendation": self.pattern.recommendation,
+                "auto_fixable": self.is_auto_fixable,
+                "finding_id": str(self.id),
+            },
+        }
+
+    def is_suppressed_by(self, source_line: str) -> bool:
+        """Check whether *source_line* carries a suppression comment (Task 24).
+
+        Supported inline comment syntax::
+
+            Some Keyword    # robot-optimizer: ignore
+            Some Keyword    # robot-optimizer: ignore[dead_code]
+            Some Keyword    # robot-optimizer: ignore[dead_code,sleep_detector]
+
+        The check is case-insensitive on the tag names and the ``ignore``
+        keyword.
+
+        Args:
+            source_line: The raw source line at this finding's location.
+
+        Returns:
+            True when the line carries a suppression that covers this finding.
+        """
+        import re
+
+        pattern_str = r"#\s*robot-optimizer\s*:\s*ignore(?:\[([^\]]*)\])?"
+        m = re.search(pattern_str, source_line, re.IGNORECASE)
+        if not m:
+            return False
+
+        tags_str = m.group(1)
+        if not tags_str:
+            # Bare ``ignore`` → suppress all findings on this line
+            return True
+
+        tags = {t.strip().lower() for t in tags_str.split(",")}
+        rule_id = (
+            self.pattern.type.name.lower()  # type: ignore[attr-defined]
+            if hasattr(self.pattern.type, "name")
+            else str(self.pattern.type).lower()
+        )
+        return rule_id in tags
+
+    @classmethod
+    def filter_suppressed(
+        cls, findings: list[Finding], source_lines: list[str]
+    ) -> list[Finding]:
+        """Filter out findings that are suppressed by inline comments (Task 24).
+
+        Args:
+            findings: Findings to filter.
+            source_lines: All source lines of the file (1-based: index 0 = line 1).
+
+        Returns:
+            Findings not suppressed by any inline comment.
+        """
+        result: list[Finding] = []
+        for finding in findings:
+            line_idx = finding.location.line - 1  # convert to 0-based
+            if 0 <= line_idx < len(source_lines):
+                if finding.is_suppressed_by(source_lines[line_idx]):
+                    continue
+            result.append(finding)
+        return result

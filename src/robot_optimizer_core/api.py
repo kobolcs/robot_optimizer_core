@@ -20,19 +20,28 @@ Example:
             "tests/login.robot",
             analyzers=["dead_code", "sleep_detector"]
         )
+
+        # Filter by severity or pattern
+        findings = analyze_file(
+            "tests/login.robot",
+            severity_filter=Severity.WARNING,
+            pattern_filter=["dead_code"],
+        )
 """
 
 from __future__ import annotations
 
+import os
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
 from .analyzers import get_analyzer, get_analyzer_registry, list_analyzers
 from .config import get_settings
 from .di import get_container
 from .domain.entities import TestFile
-from .domain.value_objects import Finding
+from .domain.value_objects import Finding, Severity
 from .exceptions import AnalysisError, FileNotFoundError
 from .logging import get_logger, log_analysis_complete, log_analysis_start
 from .metrics import get_metrics
@@ -41,6 +50,24 @@ if TYPE_CHECKING:
     from .analyzers import BaseAnalyzer
     from .config import Settings
     from .domain.value_objects.robot_ast import RobotImport, RobotKeyword, RobotTestCase
+
+# Task 15: supported error_handling values
+ErrorHandling = Literal["raise", "skip", "warn"]
+
+
+class DirectoryResults(dict):  # type: ignore[type-arg]
+    """Mapping of file paths to findings returned by :func:`analyze_directory`.
+
+    Behaves exactly like a plain :class:`dict` but carries an ``errors`` field
+    (Task 15) that lists ``(path, exception)`` pairs for files that could not
+    be analysed.  This avoids dynamically patching a plain dict.
+    """
+
+    errors: list[tuple[Path, Exception]]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.errors = []
 
 
 class SuiteInfo(TypedDict):
@@ -88,6 +115,8 @@ def analyze_file(
     file_path: str | Path,
     analyzers: list[str | BaseAnalyzer] | None = None,
     settings: Settings | None = None,
+    severity_filter: Severity | None = None,
+    pattern_filter: list[str] | None = None,
 ) -> list[Finding]:
     """Analyze a single Robot Framework file.
 
@@ -98,6 +127,10 @@ def analyze_file(
         file_path: Path to the Robot Framework file.
         analyzers: List of analyzer names or instances (default: all).
         settings: Configuration settings (default: global settings).
+        severity_filter: When given, only findings at or more severe than
+            this level are returned (e.g. ``Severity.WARNING`` drops INFO).
+        pattern_filter: When given, only findings whose analyzer name
+            matches one of these strings are returned.
 
     Returns:
         List of findings from all analyzers.
@@ -150,6 +183,10 @@ def analyze_file(
     for analyzer in analyzer_instances:
         analyzer_name = analyzer.name
 
+        # Task 14: skip by pattern filter early to avoid running the analyzer at all
+        if pattern_filter is not None and analyzer_name not in pattern_filter:
+            continue
+
         # Log and track analysis start
         log_analysis_start(path, analyzer_name, logger)
         start_time = time.time()
@@ -180,6 +217,10 @@ def analyze_file(
     # Track total findings
     metrics.gauge("findings.total", len(all_findings))
 
+    # Task 14: apply severity filter
+    if severity_filter is not None:
+        all_findings = [f for f in all_findings if f.severity <= severity_filter]
+
     return all_findings
 
 
@@ -191,6 +232,10 @@ def analyze_directory(
     analyzers: list[str | BaseAnalyzer] | None = None,
     settings: Settings | None = None,
     fail_fast: bool = False,
+    error_handling: ErrorHandling = "raise",
+    severity_filter: Severity | None = None,
+    pattern_filter: list[str] | None = None,
+    max_workers: int | None = None,
 ) -> dict[Path, list[Finding]]:
     """Analyze all Robot Framework files in a directory.
 
@@ -204,14 +249,25 @@ def analyze_directory(
         recursive: Whether to search subdirectories.
         analyzers: List of analyzer names or instances.
         settings: Configuration settings.
-        fail_fast: Stop on first error.
+        fail_fast: Stop on first error (deprecated; prefer ``error_handling``).
+        error_handling: How to handle per-file analysis errors.
+            ``"raise"`` re-raises as ExceptionGroup (default legacy behaviour).
+            ``"skip"`` silently discards failed files and returns partial results.
+            ``"warn"`` logs a warning and returns partial results (exit-code 3
+            on the CLI).
+        severity_filter: Only return findings at or more severe than this level.
+        pattern_filter: Only run/return findings from analyzers with these names.
+        max_workers: Maximum number of threads for parallel file analysis
+            (Task 29).  Defaults to ``min(4, cpu_count)``.  Pass ``1`` to
+            force sequential behaviour.
 
     Returns:
         Dictionary mapping file paths to findings.
 
     Raises:
         FileNotFoundError: If directory doesn't exist.
-        AnalysisError: If analysis fails (when fail_fast=True).
+        AnalysisError: If analysis fails (when fail_fast=True or
+            ``error_handling="raise"``).
 
     Example:
         >>> findings_map = analyze_directory("tests/", recursive=True)
@@ -259,50 +315,93 @@ def analyze_directory(
         },
     )
 
-    # Analyze each file
-    results: dict[Path, list[Finding]] = {}
-    errors: list[tuple[Path, Exception]] = []
+    # Analyze each file — Task 29: use ThreadPoolExecutor when max_workers != 1
+    dir_results: DirectoryResults = DirectoryResults()
+    file_errors: list[tuple[Path, Exception]] = []
 
-    for file_path in files:
-        try:
-            findings = analyze_file(file_path, analyzers, settings)
-            results[file_path] = findings
+    _default_workers = min(4, (os.cpu_count() or 1))
+    effective_workers = max_workers if max_workers is not None else _default_workers
 
-        except Exception as e:
-            if fail_fast:
-                raise
+    def _analyze_one(file_path: Path) -> tuple[Path, list[Finding]]:
+        findings = analyze_file(
+            file_path,
+            analyzers,
+            settings,
+            severity_filter=severity_filter,
+            pattern_filter=pattern_filter,
+        )
+        return file_path, findings
 
-            errors.append((file_path, e))
-            logger.error(
-                f"Failed to analyze file: {file_path}",
-                extra={"file": str(file_path), "error": str(e)},
-                exc_info=True,
-            )
+    if effective_workers == 1 or len(files) <= 1:
+        # Sequential path (also used when fail_fast=True for predictable ordering)
+        for file_path in files:
+            try:
+                _, file_findings = _analyze_one(file_path)
+                dir_results[file_path] = file_findings
+            except Exception as e:
+                if fail_fast:
+                    raise
+                file_errors.append((file_path, e))
+                logger.error(
+                    f"Failed to analyze file: {file_path}",
+                    extra={"file": str(file_path), "error": str(e)},
+                    exc_info=True,
+                )
+    else:
+        # Parallel path
+        with ThreadPoolExecutor(max_workers=effective_workers) as pool:
+            future_to_path = {pool.submit(_analyze_one, fp): fp for fp in files}
+            for future in as_completed(future_to_path):
+                fp = future_to_path[future]
+                try:
+                    _, file_findings = future.result()
+                    dir_results[fp] = file_findings
+                except Exception as e:
+                    file_errors.append((fp, e))
+                    logger.error(
+                        f"Failed to analyze file: {fp}",
+                        extra={"file": str(fp), "error": str(e)},
+                        exc_info=True,
+                    )
 
     # Log summary
-    total_findings = sum(len(findings) for findings in results.values())
+    total_findings = sum(len(findings) for findings in dir_results.values())
     logger.info(
         "Directory analysis complete",
         extra={
             "directory": str(path),
-            "files_analyzed": len(results),
-            "files_failed": len(errors),
+            "files_analyzed": len(dir_results),
+            "files_failed": len(file_errors),
             "total_findings": total_findings,
         },
     )
 
     # Track metrics
     metrics = get_metrics()
-    metrics.gauge("batch.files_analyzed", len(results))
-    metrics.gauge("batch.files_failed", len(errors))
+    metrics.gauge("batch.files_analyzed", len(dir_results))
+    metrics.gauge("batch.files_failed", len(file_errors))
     metrics.gauge("batch.total_findings", total_findings)
 
-    if errors:
-        raise ExceptionGroup(
-            f"Analysis failed for {len(errors)} files", [e for _, e in errors]
-        )
+    # Task 15: configurable error handling
+    if file_errors:
+        effective_handling = error_handling
+        if fail_fast:
+            effective_handling = "raise"
 
-    return results
+        if effective_handling == "raise":
+            raise ExceptionGroup(
+                f"Analysis failed for {len(file_errors)} files",
+                [e for _, e in file_errors],
+            )
+        if effective_handling == "warn":
+            logger.warning(
+                f"Analysis had partial failures: {len(file_errors)} file(s) could not be analyzed",
+                extra={"failed_files": [str(p) for p, _ in file_errors]},
+            )
+            dir_results.errors = file_errors
+        # "skip": silently continue
+
+    return dir_results
 
 
 def analyze_suite(
@@ -312,8 +411,12 @@ def analyze_suite(
 ) -> SuiteAnalysisResult:
     """Analyze a Robot Framework test suite with AST parsing.
 
-    This function provides more detailed analysis using the AST parser,
-    including cross-file references and suite-level insights.
+    Task 13: When the ``dead_code`` analyzer is active, this function uses
+    :meth:`~robot_optimizer_core.analyzers.DeadCodeAnalyzer.analyze_suite`
+    for cross-file unused keyword detection.  Per-file findings from all other
+    analyzers are preserved; dead-code findings are replaced with the
+    suite-level ones to avoid false positives caused by keywords that are
+    called from *other* files in the suite.
 
     Args:
         suite_path: Path to suite file or directory.
@@ -349,26 +452,70 @@ def analyze_suite(
         "imports": [],
     }
 
-    # Analyze files and collect suite info
-    all_findings: list[Finding] = []
-    file_findings: dict[Path, list[Finding]] = {}
-
+    # Task 13: load all TestFile objects once for cross-file dead code
+    test_files: list[TestFile] = []
     for file_path in files:
-        test_file = TestFile.from_path(file_path)
-
         try:
-            robot_suite = parser.parse_suite(test_file)
+            tf = TestFile.from_path(file_path)
+            test_files.append(tf)
+        except Exception as e:
+            logger.warning(f"Failed to load file for suite analysis: {file_path}", extra={"error": str(e)})
+
+    # Gather suite structure info
+    for tf in test_files:
+        try:
+            robot_suite = parser.parse_suite(tf)
             suite_info["keywords"].extend(robot_suite.keywords)
             suite_info["test_cases"].extend(robot_suite.test_cases)
             suite_info["imports"].extend(robot_suite.imports)
         except Exception as e:
             logger.warning(
-                f"Failed to parse suite structure: {file_path}", extra={"error": str(e)}
+                f"Failed to parse suite structure: {tf.path}", extra={"error": str(e)}
             )
 
-        findings = analyze_file(file_path, analyzers, settings)
-        all_findings.extend(findings)
-        file_findings[file_path] = findings
+    # Determine effective analyzer list
+    if settings is None:
+        settings = get_settings()
+    analyzer_instances = _get_analyzer_instances(analyzers, settings)
+
+    # Task 13: separate dead_code analyzer for suite-level analysis
+    from .analyzers import DeadCodeAnalyzer
+
+    dead_code_analyzer: DeadCodeAnalyzer | None = None
+    other_analyzers: list[BaseAnalyzer] = []
+    for a in analyzer_instances:
+        if isinstance(a, DeadCodeAnalyzer):
+            dead_code_analyzer = a
+        else:
+            other_analyzers.append(a)
+
+    # Run non-dead-code analyzers per file
+    all_findings: list[Finding] = []
+    file_findings: dict[Path, list[Finding]] = {tf.path: [] for tf in test_files}
+
+    for tf in test_files:
+        for analyzer in other_analyzers:
+            try:
+                findings = analyzer.analyze(tf)
+                all_findings.extend(findings)
+                file_findings[tf.path].extend(findings)
+            except Exception as e:
+                logger.error(
+                    f"Analyzer {analyzer.name} failed on {tf.path}: {e}",
+                    exc_info=True,
+                )
+
+    # Task 13: run dead_code at suite level for cross-file accuracy
+    if dead_code_analyzer is not None and test_files:
+        dc_findings = dead_code_analyzer.analyze_suite(test_files)
+        all_findings.extend(dc_findings)
+        # Distribute findings back to file_findings map
+        for f in dc_findings:
+            fpath = f.location.file_path
+            if fpath in file_findings:
+                file_findings[fpath].append(f)
+            else:
+                file_findings[fpath] = [f]
 
     findings_by_severity: dict[str, int] = {}
     findings_by_type: dict[str, int] = {}
@@ -431,3 +578,4 @@ def _get_analyzer_instances(
                 instances.append(analyzer)
 
     return instances
+

@@ -13,7 +13,6 @@ from unittest.mock import Mock
 
 import pytest
 
-from robot_optimizer_core import Container
 from robot_optimizer_core.analyzers import FlakinessAnalyzer
 from robot_optimizer_core.config import Settings
 from robot_optimizer_core.domain.entities import TestFile
@@ -73,15 +72,10 @@ Very Flaky Test
         assert analyzer._repository == mock_repository
 
     def test_create_analyzer_from_container(self, mock_repository: Mock) -> None:
-        """Test creating analyzer from DI container."""
-        container = Container()
-        container.register_instance("test_result_repository", mock_repository)
-
-        with pytest.raises(ConfigurationError) as exc_info:
-            # Without container setup
-            FlakinessAnalyzer()
-
-        assert "TestResultRepository not provided" in str(exc_info.value)
+        """Test creating analyzer without repository returns None repo (Task 11)."""
+        # Without a repository, construction succeeds but _repository is None
+        analyzer = FlakinessAnalyzer()
+        assert analyzer._repository is None
 
     def test_configuration_options(self, mock_repository: Mock) -> None:
         """Test analyzer configuration."""

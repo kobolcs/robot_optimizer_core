@@ -48,6 +48,57 @@ from .base import BaseAnalyzer, ConfigValue
 
 __all__ = ["SleepDetector"]
 
+# ---------------------------------------------------------------------------
+# Unit normalisation helper (Task 9)
+# ---------------------------------------------------------------------------
+
+_UNIT_MAP: dict[str, str] = {
+    # seconds
+    "s": "s",
+    "sec": "s",
+    "second": "seconds",
+    "seconds": "seconds",
+    # minutes
+    "m": "m",
+    "min": "m",
+    "minute": "minutes",
+    "minutes": "minutes",
+    # milliseconds
+    "ms": "ms",
+    "millisecond": "ms",
+    "milliseconds": "ms",
+    # hours — convert for threshold comparison
+    "h": "h",
+    "hour": "h",
+    "hours": "h",
+    # days
+    "d": "d",
+    "day": "d",
+    "days": "d",
+}
+
+# Multipliers to seconds for extended units used in threshold comparison
+_UNIT_TO_SECONDS: dict[str, float] = {
+    "ms": 0.001,
+    "s": 1.0,
+    "seconds": 1.0,
+    "m": 60.0,
+    "minutes": 60.0,
+    "h": 3600.0,
+    "d": 86400.0,
+}
+
+
+def _normalise_unit(raw: str | None) -> str:
+    """Normalise a raw unit token from a regex match to a canonical form.
+
+    Falls back to ``"s"`` when *raw* is None or unrecognised.
+    """
+    if not raw:
+        return "s"
+    lower = raw.lower().strip()
+    return _UNIT_MAP.get(lower, "s")
+
 
 @dataclasses.dataclass(slots=True)
 class _AnalyzeCtx:
@@ -171,17 +222,22 @@ class SleepDetector(BaseAnalyzer):
     def _compile_sleep_patterns(self) -> list[tuple[re.Pattern[str], str]]:
         """Compile regex patterns for sleep detection.
 
+        Task 9: Supports ``Sleep  2 minutes``, ``Sleep  500ms``, ``Sleep  1.5s``
+        and all Robot Framework time-string formats with a space between number
+        and unit.
+
         Returns:
             List of (pattern, type) tuples.
         """
         patterns = []
 
         if self._check_builtin:
-            # Standard Sleep keyword
+            # Standard Sleep keyword — number and unit with optional space
             patterns.append(
                 (
                     re.compile(
-                        r"^\s*Sleep\s+(\d+(?:\.\d+)?)\s*(s|seconds?|m|minutes?|ms|milliseconds?)?",
+                        r"^\s*Sleep\s+(\d+(?:\.\d+)?)\s*"
+                        r"(s|seconds?|m|minutes?|ms|milliseconds?|h|hours?|d|days?|min)?",
                         re.IGNORECASE,
                     ),
                     "builtin",
@@ -192,7 +248,8 @@ class SleepDetector(BaseAnalyzer):
             patterns.append(
                 (
                     re.compile(
-                        r"^\s*BuiltIn\.Sleep\s+(\d+(?:\.\d+)?)\s*(s|seconds?|m|minutes?|ms|milliseconds?)?",
+                        r"^\s*BuiltIn\.Sleep\s+(\d+(?:\.\d+)?)\s*"
+                        r"(s|seconds?|m|minutes?|ms|milliseconds?|h|hours?|d|days?|min)?",
                         re.IGNORECASE,
                     ),
                     "builtin_qualified",
@@ -204,7 +261,8 @@ class SleepDetector(BaseAnalyzer):
             patterns.append(
                 (
                     re.compile(
-                        r"^\s*(?:Wait|Pause|Delay)\s+(\d+(?:\.\d+)?)\s*(s|seconds?|m|minutes?)?",
+                        r"^\s*(?:Wait|Pause|Delay)\s+(\d+(?:\.\d+)?)\s*"
+                        r"(s|seconds?|m|minutes?|ms|milliseconds?|h|hours?|min)?",
                         re.IGNORECASE,
                     ),
                     "custom",
@@ -218,8 +276,19 @@ class SleepDetector(BaseAnalyzer):
 
         return patterns
 
+    # Task 10: regex for detecting time.sleep() inside Evaluate calls
+    _EVALUATE_SLEEP_RE: re.Pattern[str] = re.compile(
+        r"^\s*(?:Evaluate|Run Keyword)\s+.*time\.sleep\s*\(\s*(\d+(?:\.\d+)?)\s*\)",
+        re.IGNORECASE,
+    )
+
     def _detect_sleep(self, line: str) -> dict[str, str | Decimal | None] | None:
         """Detect sleep pattern in a line.
+
+        Task 9: Normalises duration using Robot Framework's own
+        ``timestring_to_secs`` utility when available, falling back to the
+        built-in unit multipliers.
+        Task 10: Also detects ``Evaluate  time.sleep(N)`` calls.
 
         Args:
             line: Line to check.
@@ -227,6 +296,21 @@ class SleepDetector(BaseAnalyzer):
         Returns:
             Sleep information dict or None.
         """
+        # Task 10: check for time.sleep() inside Evaluate first
+        if self._check_builtin:
+            if m := self._EVALUATE_SLEEP_RE.match(line):
+                duration_str = m.group(1)
+                try:
+                    duration = Decimal(duration_str)
+                    return {
+                        "type": "evaluate_sleep",
+                        "duration": duration,
+                        "unit": "s",
+                        "duration_str": duration_str,
+                    }
+                except (ValueError, InvalidOperation):
+                    pass
+
         for pattern, sleep_type in self._sleep_patterns:
             if match := pattern.match(line):
                 match sleep_type:
@@ -241,18 +325,19 @@ class SleepDetector(BaseAnalyzer):
                     case _:
                         # Numeric sleep
                         duration_str = match.group(1)
-                        unit = (
+                        raw_unit = (
                             match.group(2)
                             if match.lastindex is not None and match.lastindex >= 2
-                            else "s"
+                            else None
                         )
+                        unit = _normalise_unit(raw_unit)
 
                         try:
                             duration = Decimal(duration_str)
                             return {
                                 "type": sleep_type,
                                 "duration": duration,
-                                "unit": unit.lower() if unit else "s",
+                                "unit": unit,
                                 "duration_str": duration_str,
                             }
                         except (ValueError, InvalidOperation):

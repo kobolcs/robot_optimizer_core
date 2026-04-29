@@ -146,6 +146,17 @@ class Settings(BaseSettings):
         default_factory=dict, description="Custom settings for extensions"
     )
 
+    # Task 20: per-analyzer configuration
+    analyzer_config: dict[str, dict[str, Any]] = Field(
+        default_factory=dict,
+        description=(
+            "Per-analyzer configuration overrides. "
+            "Keys are analyzer names; values are dicts passed to each analyzer "
+            "at instantiation.  Example: "
+            '{"sleep_detector": {"max_acceptable_sleep_seconds": 0.5}}'
+        ),
+    )
+
     model_config = SettingsConfigDict(
         env_prefix="ROBOT_OPTIMIZER_",
         env_file=".env",

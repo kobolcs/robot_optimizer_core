@@ -3,10 +3,13 @@
 
 from datetime import datetime
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, computed_field
 
 from ..base import ValueObject
+
+FlakinessTrend = Literal["improving", "stable", "worsening", "unknown"]
 
 
 class FlakinessStats(ValueObject):
@@ -17,6 +20,28 @@ class FlakinessStats(ValueObject):
     total_runs: int = Field(..., ge=0)
     failures: int = Field(..., ge=0)
     last_failure: datetime | None = Field(default=None)
+
+    # Task 12: trend field — compares recent vs older failure rates
+    recent_failures: int = Field(
+        default=0,
+        ge=0,
+        description="Failures in the most recent half of the run window",
+    )
+    older_failures: int = Field(
+        default=0,
+        ge=0,
+        description="Failures in the older half of the run window",
+    )
+    recent_runs: int = Field(
+        default=0,
+        ge=0,
+        description="Total runs in the most recent half of the window",
+    )
+    older_runs: int = Field(
+        default=0,
+        ge=0,
+        description="Total runs in the older half of the window",
+    )
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -41,3 +66,27 @@ class FlakinessStats(ValueObject):
         if self.failure_rate > 0.05:
             return "WARNING"
         return "INFO"
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def trend(self) -> FlakinessTrend:
+        """Determine whether flakiness is improving, stable, or worsening.
+
+        Compares the failure rate in the recent half of the run window against
+        the older half.  Requires at least 2 runs in each window to be
+        meaningful; otherwise reports 'unknown'.
+        """
+        if self.recent_runs < 2 or self.older_runs < 2:
+            return "unknown"
+
+        recent_rate = self.recent_failures / self.recent_runs
+        older_rate = self.older_failures / self.older_runs
+
+        delta = recent_rate - older_rate
+        # Use a 5% absolute threshold to avoid noise
+        if delta < -0.05:
+            return "improving"
+        if delta > 0.05:
+            return "worsening"
+        return "stable"
+
