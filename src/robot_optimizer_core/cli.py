@@ -21,7 +21,7 @@ import sys
 from datetime import UTC, datetime
 from html import escape
 from pathlib import Path
-from typing import NoReturn
+from typing import NoReturn, TypedDict
 
 from .api import analyze_directory, analyze_file
 from .domain.value_objects import Finding, Severity
@@ -142,6 +142,11 @@ def _format_sarif(findings: list[Finding], path: Path) -> str:
 
 
 def _format_html(findings: list[Finding], path: Path) -> str:
+    class _CategoryInfo(TypedDict):
+        count: int
+        impact: str
+        action: str
+
     def _display_path(file_path: Path) -> str:
         try:
             return str(file_path.resolve().relative_to(path.resolve()))
@@ -206,15 +211,15 @@ def _format_html(findings: list[Finding], path: Path) -> str:
     timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
     sev_counts = {"ERROR": 0, "WARNING": 0, "INFO": 0}
     affected_files: set[str] = set()
-    category_summary: dict[str, dict[str, str | int]] = {}
-    findings_by_category: dict[str, list[Finding]] = {}
+    category_summary: dict[str, _CategoryInfo] = {}
+    category_groups: dict[str, list[Finding]] = {}
 
     for finding in findings:
         sev_counts[finding.severity.name.upper()] += 1
         display_path = _display_path(finding.location.file_path)
         affected_files.add(display_path)
         category, impact, action = _category_metadata(finding.pattern.name)
-        findings_by_category.setdefault(category, []).append(finding)
+        category_groups.setdefault(category, []).append(finding)
         if category not in category_summary:
             category_summary[category] = {
                 "count": 0,
@@ -242,6 +247,7 @@ def _format_html(findings: list[Finding], path: Path) -> str:
     top_categories = sorted(
         category_summary.items(), key=lambda item: int(item[1]["count"]), reverse=True
     )
+    sorted_category_names = [category_name for category_name, _ in top_categories]
     top_category_names = ", ".join(category for category, _ in top_categories[:3])
     summary_paragraph = (
         "The analyzed suite shows no significant maintainability or stability risk based on the selected checks. "
@@ -305,20 +311,24 @@ def _format_html(findings: list[Finding], path: Path) -> str:
         for category, meta in top_categories
     )
 
-    grouped_findings = "".join(
-        f"<section><h3>{escape(category)}</h3>"
-        + "".join(
-            "<article class='finding-card'>"
-            f"<span class='sev sev-{escape(f.severity.name.lower())}'>{escape(f.severity.name.upper())}</span> "
-            f"<span>{escape(_display_path(f.location.file_path))}:{escape(str(f.location.line))}</span>"
-            f"<p>{escape(f.message)}</p>"
-            f"<p><strong>Recommendation:</strong> {escape(f.pattern.recommendation)}</p>"
-            "</article>"
-            for f in sorted(items, key=lambda x: (str(x.location.file_path), x.location.line))
+    grouped_sections: list[str] = []
+    for category_name in sorted_category_names:
+        items = category_groups.get(category_name, [])
+        sorted_items: list[Finding] = sorted(
+            items,
+            key=lambda item: (str(item.location.file_path), item.location.line or 0),
         )
-        + "</section>"
-        for category, items in top_categories
-    )
+        item_cards = "".join(
+            "<article class='finding-card'>"
+            f"<span class='sev sev-{escape(item.severity.name.lower())}'>{escape(item.severity.name.upper())}</span> "
+            f"<span>{escape(_display_path(item.location.file_path))}:{escape(str(item.location.line))}</span>"
+            f"<p>{escape(item.message)}</p>"
+            f"<p><strong>Recommendation:</strong> {escape(item.pattern.recommendation)}</p>"
+            "</article>"
+            for item in sorted_items
+        )
+        grouped_sections.append(f"<section><h3>{escape(category_name)}</h3>{item_cards}</section>")
+    grouped_findings = "".join(grouped_sections)
 
     return f"""<!doctype html>
 <html lang="en">
