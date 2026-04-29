@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Python 3.11+
+- Python 3.11+ (tested on Python 3.11, 3.12, 3.13, and 3.14)
 - Robot Framework dependency is installed automatically
 - CLI command: `robot-optimizer`
 
@@ -79,6 +79,7 @@ uv add robot-framework-optimizer-core
 git clone https://github.com/kobolcs/robot_optimizer_core.git
 cd robot_optimizer_core
 uv sync --extra dev
+uv run mkdocs build --strict
 uv run robot-optimizer --version
 uv run tox -e lint,type,build
 uv run tox -e py
@@ -134,3 +135,17 @@ robot-optimizer analyze examples/bad_robot_suite --format html --output-file dem
   - Reinstall with `python -m pip install -e ".[dev]" --force-reinstall`.
 - Generated local files (for example `demo-report.html`)
   - Remove generated artifacts before committing if they are not part of source docs.
+
+
+## Documentation-only setup with uv
+
+```bash
+uv sync --extra docs
+uv run mkdocs build --strict
+```
+
+If you explicitly want both extras, use:
+
+```bash
+uv sync --extra dev --extra docs
+```

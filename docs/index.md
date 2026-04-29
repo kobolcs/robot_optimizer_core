@@ -6,7 +6,7 @@
 
 **Beta-quality analysis engine for Robot Framework test suite optimization.**
 
-Robot Framework Optimizer Core is a modern, type-safe Python library that helps you find and fix issues in your Robot Framework test suites. Built with Domain-Driven Design principles and Python 3.11+ compatibility.
+Robot Framework Optimizer Core is a modern, type-safe Python library that helps you find and fix issues in your Robot Framework test suites. Built with Domain-Driven Design principles and tested compatibility across Python 3.11–3.14.
 
 ## Features
 
@@ -19,7 +19,7 @@ Robot Framework Optimizer Core is a modern, type-safe Python library that helps 
 
 ### Architecture Highlights
 
-- **Modern Python 3.11+** - Typed APIs and runtime validation for maintainable analysis workflows
+- **Modern Python 3.11+** - Tested on Python 3.11, 3.12, 3.13, and 3.14 for maintainable analysis workflows
 - **Type-Safe** - Full type hints with Pydantic v2 validation
 - **Domain-Driven Design** - Clean separation of concerns with proper layering
 - **Extensible** - Plugin system for custom analyzers
@@ -33,6 +33,8 @@ pip install robot-framework-optimizer-core
 ```
 
 **Requirements:** Python 3.11+
+
+Robot Framework 7.1+ is required. CI tests against the latest compatible Robot Framework release.
 
 ## Quick Start
 

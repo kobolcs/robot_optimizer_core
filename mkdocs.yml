@@ -2,13 +2,13 @@
 site_name: Robot Framework Optimizer Core
 site_description: Core analysis engine for Robot Framework test optimization
 site_author: RF Optimizer Team
-site_url: https://rf-optimizer.github.io/robot-framework-optimizer-core
+site_url: https://kobolcs.github.io/robot_optimizer_core
 
-repo_url: https://github.com/rf-optimizer/robot-framework-optimizer-core
-repo_name: rf-optimizer/core
-edit_uri: edit/main/docs/
+repo_url: https://github.com/kobolcs/robot_optimizer_core
+repo_name: kobolcs/robot_optimizer_core
+edit_uri: edit/master/docs/
 
-copyright: Copyright &copy; 2024 Robot Framework Optimizer Team
+copyright: Copyright © 2026 Kobolcs
 
 theme:
   name: material
@@ -132,12 +132,9 @@ extra:
     provider: mike
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/rf-optimizer
+      link: https://github.com/kobolcs/robot_optimizer_core
     - icon: fontawesome/brands/python
       link: https://pypi.org/project/robot-framework-optimizer-core/
-  analytics:
-    provider: google
-    property: G-XXXXXXXXXX
 
 extra_css:
   - stylesheets/extra.css

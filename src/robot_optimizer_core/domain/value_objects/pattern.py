@@ -1,6 +1,7 @@
 # src/robot_optimizer_core/domain/value_objects/pattern.py
 """Pattern value object for representing optimization patterns."""
 
+import builtins
 from enum import Enum, auto
 from typing import ClassVar
 
@@ -53,7 +54,7 @@ class Pattern(ValueObject):
     model_config = ConfigDict(use_enum_values=False)
 
     # Backward-compatible nested enum access: Pattern.PatternType.X
-    PatternType: ClassVar[type[PatternType]] = PatternType
+    PatternType: ClassVar[builtins.type[PatternType]] = PatternType
 
     type: PatternType = Field(..., description="Type of pattern")  # type: ignore[valid-type]
     name: str = Field(..., min_length=1, description="Pattern name")

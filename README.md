@@ -17,12 +17,14 @@ Core analysis engine for Robot Framework test suite optimization. This package p
 - **Flakiness Detection**: Detect tests that fail intermittently
 - **Extensible Architecture**: Plugin system for custom analyzers
 - **Type-Safe**: Full type hints and Pydantic v2 models
-- **Python 3.11+**: Compatible with Python 3.11, 3.12, and 3.13
+- **Python 3.11+**: Tested on Python 3.11, 3.12, 3.13, and 3.14
 - **High Quality**: Comprehensive test coverage with property-based testing
 
 ## 📦 Installation
 
 **Requirements:** Python 3.11+
+
+Robot Framework 7.1+ is required. CI tests against the latest compatible Robot Framework release.
 
 ```bash
 python -m pip install robot-framework-optimizer-core

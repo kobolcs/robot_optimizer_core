@@ -63,6 +63,12 @@ class TestPatternType:
 class TestPattern:
     """Test the Pattern value object."""
 
+
+    def test_pattern_type_classvar_uses_builtin_type(self) -> None:
+        """Regression test: class-level PatternType alias remains usable."""
+        assert Pattern.PatternType is PatternType
+        assert Pattern.PatternType.SLEEP_IN_TEST is PatternType.SLEEP_IN_TEST
+
     def test_create_pattern(self) -> None:
         """Test creating a basic pattern."""
         pattern = Pattern(

@@ -4,6 +4,28 @@
 
 See the [Installation and Upgrade Guide](install.md) for contributor setup paths using pip, pipx, uv, and source checkouts.
 
+## Contributor environment setup
+
+For full contributor setup (including docs build tooling):
+
+```bash
+uv sync --extra dev
+uv run mkdocs build --strict
+```
+
+For documentation-only setup:
+
+```bash
+uv sync --extra docs
+uv run mkdocs build --strict
+```
+
+If you intentionally want both extras:
+
+```bash
+uv sync --extra dev --extra docs
+```
+
 ## Dependency lockfile policy
 
 This repository does not track `uv.lock` because it is a reusable Python library/CLI. `pyproject.toml` is the dependency source of truth. Contributors may use uv locally, but generated lockfile changes should not be committed.
