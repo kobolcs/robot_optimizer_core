@@ -82,6 +82,65 @@ def _format_json(findings: list[Finding]) -> str:
     return json.dumps(records, indent=2, default=str)
 
 
+def _format_sarif(findings: list[Finding], path: Path) -> str:
+    """Produce a SARIF 2.1.0 JSON string from a list of findings."""
+    _SEV_MAP = {
+        Severity.ERROR: "error",
+        Severity.WARNING: "warning",
+        Severity.INFO: "note",
+    }
+
+    # Build unique rules list
+    seen_rules: dict[str, dict[str, object]] = {}
+    for f in findings:
+        rule_id = f.pattern.name.replace(" ", "_").lower()
+        if rule_id not in seen_rules:
+            seen_rules[rule_id] = {
+                "id": rule_id,
+                "name": f.pattern.name,
+                "shortDescription": {"text": f.pattern.name},
+                "helpUri": str(path),
+            }
+
+    results = []
+    for f in findings:
+        rule_id = f.pattern.name.replace(" ", "_").lower()
+        results.append(
+            {
+                "ruleId": rule_id,
+                "level": _SEV_MAP.get(f.severity, "note"),
+                "message": {"text": f.message},
+                "locations": [
+                    {
+                        "physicalLocation": {
+                            "artifactLocation": {
+                                "uri": str(f.location.file_path),
+                            },
+                            "region": {"startLine": f.location.line or 1},
+                        }
+                    }
+                ],
+            }
+        )
+
+    sarif = {
+        "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [
+            {
+                "tool": {
+                    "driver": {
+                        "name": "robot-optimizer",
+                        "rules": list(seen_rules.values()),
+                    }
+                },
+                "results": results,
+            }
+        ],
+    }
+    return json.dumps(sarif, indent=2, default=str)
+
+
 # ---------------------------------------------------------------------------
 # analyse subcommand
 # ---------------------------------------------------------------------------
@@ -154,11 +213,13 @@ def _run_analyze(args: argparse.Namespace) -> int:
         return _EXIT_ERROR
 
     # Output
-    output = (
-        _format_json(all_findings)
-        if args.format == "json"
-        else _format_text(all_findings, path)
-    )
+    output: str
+    if args.format == "json":
+        output = _format_json(all_findings)
+    elif args.format == "sarif":
+        output = _format_sarif(all_findings, path)
+    else:
+        output = _format_text(all_findings, path)
 
     if args.output_file:
         try:
@@ -194,6 +255,53 @@ def _print_summary(findings: list[Finding]) -> None:
         counts[key] = counts.get(key, 0) + 1
     parts = ", ".join(f"{v} {k}" for k, v in sorted(counts.items()))
     print(f"Summary: {len(findings)} finding(s)  [{parts}]", file=sys.stderr)
+
+
+# ---------------------------------------------------------------------------
+# upgrade subcommand
+# ---------------------------------------------------------------------------
+
+
+def _run_upgrade(args: argparse.Namespace) -> int:  # noqa: ARG001
+    from .premium import PREMIUM_PACKAGE_NAME, UPGRADE_URL, is_premium_installed
+
+    version = _get_version()
+
+    print(f"Robot Framework Optimizer  v{version}")
+    print("=" * 50)
+    print()
+    print("Feature Comparison:")
+    print()
+    print(f"{'Feature':<38} {'Free':<10} {'Pro'}")
+    print("-" * 55)
+    features = [
+        ("Dead code detection", True, True),
+        ("Sleep pattern analysis", True, True),
+        ("Flakiness detection", True, True),
+        ("Naming convention checks", True, True),
+        ("Hardcoded value detection", True, True),
+        ("Custom analyzer plugins", True, True),
+        ("SARIF output format", True, True),
+        ("Auto-fix suggestions", False, True),
+        ("HTML / PDF reports", False, True),
+        ("Baseline diffing", False, True),
+        ("CI/CD dashboard integration", False, True),
+        ("Priority support", False, True),
+    ]
+    for name, free, pro in features:
+        free_mark = "✓" if free else "—"
+        pro_mark = "✓" if pro else "—"
+        print(f"  {name:<36} {free_mark:<10} {pro_mark}")
+    print()
+
+    if is_premium_installed():
+        print(f"✓ {PREMIUM_PACKAGE_NAME} is installed.")
+    else:
+        print("Upgrade to Pro:")
+        print(f"  pip install {PREMIUM_PACKAGE_NAME}")
+        print(f"  More info: {UPGRADE_URL}")
+
+    return _EXIT_OK
 
 
 # ---------------------------------------------------------------------------
@@ -265,7 +373,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     analyze_cmd.add_argument(
         "--format",
-        choices=["text", "json"],
+        choices=["text", "json", "sarif"],
         default="text",
         help="Output format (default: text)",
     )
@@ -314,6 +422,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Output format (default: text)",
     )
 
+    # -- upgrade subcommand --------------------------------------------------
+    sub.add_parser(
+        "upgrade",
+        help="Show feature comparison and upgrade information",
+    )
+
     return parser
 
 
@@ -341,6 +455,8 @@ def main(argv: list[str] | None = None) -> NoReturn:
             code = _run_analyze(args)
         case "list-analyzers":
             code = _run_list_analyzers(args)
+        case "upgrade":
+            code = _run_upgrade(args)
         case _:
             parser.print_help()
             code = _EXIT_ERROR

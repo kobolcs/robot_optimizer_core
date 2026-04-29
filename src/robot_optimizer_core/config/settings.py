@@ -122,6 +122,15 @@ class Settings(BaseSettings):
         default=True, description="Whether to enable metrics collection"
     )
 
+    enable_telemetry: bool = Field(
+        default=False,
+        description=(
+            "Opt-in telemetry for premium conversion tracking. "
+            "No PII is collected. No network calls are made by the free edition. "
+            "Set ROBOT_OPTIMIZER_ENABLE_TELEMETRY=1 to enable."
+        ),
+    )
+
     log_level: str = Field(
         default="INFO",
         description="Logging level",

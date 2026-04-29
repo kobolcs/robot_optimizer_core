@@ -39,7 +39,12 @@ from .analyzers import (
     BaseAnalyzer,
     DeadCodeAnalyzer,
     FlakinessAnalyzer,
+    HardcodedValueAnalyzer,
+    NamingConventionAnalyzer,
+    SetupTeardownAnalyzer,
     SleepDetector,
+    TagConsistencyAnalyzer,
+    TestDocumentationAnalyzer,
     get_analyzer,
     get_analyzer_registry,
     list_analyzers,
@@ -103,6 +108,8 @@ from .parsers import RobotASTParser
 # Plugin system
 from .plugin import Plugin, PluginMetadata
 
+from .premium import PremiumFeatureError, is_premium_installed
+
 # Alias for backward compatibility
 Container = ThreadSafeContainer
 
@@ -131,6 +138,11 @@ __all__ = [
     "DeadCodeAnalyzer",
     "SleepDetector",
     "FlakinessAnalyzer",
+    "HardcodedValueAnalyzer",
+    "NamingConventionAnalyzer",
+    "SetupTeardownAnalyzer",
+    "TagConsistencyAnalyzer",
+    "TestDocumentationAnalyzer",
     "register_analyzer",
     "get_analyzer",
     "get_analyzer_registry",
@@ -162,6 +174,9 @@ __all__ = [
     "PluginMetadata",
     # Listener
     "FlakinessListener",
+    # Premium
+    "PremiumFeatureError",
+    "is_premium_installed",
     # Utilities
     "deprecated",
     "deprecation_warning",

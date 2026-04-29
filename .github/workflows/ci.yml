@@ -33,6 +33,13 @@ jobs:
       - name: Run test matrix through tox
         run: tox -e py
 
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          flags: py${{ matrix.python-version }}
+          fail_ci_if_error: false
+
   quality:
     runs-on: ubuntu-latest
 

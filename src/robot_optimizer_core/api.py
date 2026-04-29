@@ -51,6 +51,8 @@ if TYPE_CHECKING:
     from .config import Settings
     from .domain.value_objects.robot_ast import RobotImport, RobotKeyword, RobotTestCase
 
+from .premium import PremiumFeatureError, fire_telemetry_event, is_premium_installed
+
 # Task 15: supported error_handling values
 ErrorHandling = Literal["raise", "skip", "warn"]
 
@@ -100,6 +102,7 @@ class SuiteAnalysisResult(TypedDict):
 
 
 __all__ = [
+    "PremiumFeatureError",
     "SuiteAnalysisResult",
     "SuiteInfo",
     "SuiteStatistics",
@@ -117,6 +120,9 @@ def analyze_file(
     settings: Settings | None = None,
     severity_filter: Severity | None = None,
     pattern_filter: list[str] | None = None,
+    auto_fix: bool = False,
+    report_format: Literal["html", "pdf"] | None = None,
+    baseline: Path | None = None,
 ) -> list[Finding]:
     """Analyze a single Robot Framework file.
 
@@ -131,6 +137,11 @@ def analyze_file(
             this level are returned (e.g. ``Severity.WARNING`` drops INFO).
         pattern_filter: When given, only findings whose analyzer name
             matches one of these strings are returned.
+        auto_fix: Automatically apply suggested fixes (available in Pro).
+        report_format: Output report format, ``"html"`` or ``"pdf"``
+            (available in Pro).
+        baseline: Path to a baseline file for diffing
+            (available in Pro).
 
     Returns:
         List of findings from all analyzers.
@@ -138,6 +149,8 @@ def analyze_file(
     Raises:
         FileNotFoundError: If the file doesn't exist.
         AnalysisError: If analysis fails.
+        PremiumFeatureError: If a Pro-only feature is requested without Pro
+            installed.
 
     Example:
         >>> findings = analyze_file("tests/login.robot")
@@ -146,6 +159,17 @@ def analyze_file(
     """
     # Convert to Path
     path = Path(file_path)
+
+    # Premium feature guards
+    if auto_fix and not is_premium_installed():
+        fire_telemetry_event("premium_stub_triggered", feature="auto_fix")
+        raise PremiumFeatureError("auto_fix")
+    if report_format is not None and not is_premium_installed():
+        fire_telemetry_event("premium_stub_triggered", feature="report_format")
+        raise PremiumFeatureError("report_format")
+    if baseline is not None and not is_premium_installed():
+        fire_telemetry_event("premium_stub_triggered", feature="baseline")
+        raise PremiumFeatureError("baseline")
 
     # Validate file exists
     if not path.exists():
@@ -236,6 +260,9 @@ def analyze_directory(
     severity_filter: Severity | None = None,
     pattern_filter: list[str] | None = None,
     max_workers: int | None = None,
+    auto_fix: bool = False,
+    report_format: Literal["html", "pdf"] | None = None,
+    baseline: Path | None = None,
 ) -> dict[Path, list[Finding]]:
     """Analyze all Robot Framework files in a directory.
 
@@ -260,6 +287,10 @@ def analyze_directory(
         max_workers: Maximum number of threads for parallel file analysis
             (Task 29).  Defaults to ``min(4, cpu_count)``.  Pass ``1`` to
             force sequential behaviour.
+        auto_fix: Automatically apply suggested fixes (available in Pro).
+        report_format: Output report format, ``"html"`` or ``"pdf"``
+            (available in Pro).
+        baseline: Path to a baseline file for diffing (available in Pro).
 
     Returns:
         Dictionary mapping file paths to findings.
@@ -268,6 +299,8 @@ def analyze_directory(
         FileNotFoundError: If directory doesn't exist.
         AnalysisError: If analysis fails (when fail_fast=True or
             ``error_handling="raise"``).
+        PremiumFeatureError: If a Pro-only feature is requested without Pro
+            installed.
 
     Example:
         >>> findings_map = analyze_directory("tests/", recursive=True)
@@ -276,6 +309,17 @@ def analyze_directory(
     """
     # Convert to Path
     path = Path(directory_path)
+
+    # Premium feature guards
+    if auto_fix and not is_premium_installed():
+        fire_telemetry_event("premium_stub_triggered", feature="auto_fix")
+        raise PremiumFeatureError("auto_fix")
+    if report_format is not None and not is_premium_installed():
+        fire_telemetry_event("premium_stub_triggered", feature="report_format")
+        raise PremiumFeatureError("report_format")
+    if baseline is not None and not is_premium_installed():
+        fire_telemetry_event("premium_stub_triggered", feature="baseline")
+        raise PremiumFeatureError("baseline")
 
     # Validate directory exists
     if not path.exists():
@@ -329,6 +373,9 @@ def analyze_directory(
             settings,
             severity_filter=severity_filter,
             pattern_filter=pattern_filter,
+            auto_fix=auto_fix,
+            report_format=report_format,
+            baseline=baseline,
         )
         return file_path, findings
 

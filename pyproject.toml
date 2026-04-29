@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
-    {name = "Robot Framework Optimizer Team", email = "team@rf-optimizer.com"}
+    {name = "Robot Framework Optimizer Team", email = "kobolcs@users.noreply.github.com"}
 ]
 keywords = [
     "robotframework",
@@ -89,11 +89,11 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/rf-optimizer/robot-framework-optimizer-core"
-Documentation = "https://rf-optimizer.github.io/robot-framework-optimizer-core"
-Repository = "https://github.com/rf-optimizer/robot-framework-optimizer-core"
-Issues = "https://github.com/rf-optimizer/robot-framework-optimizer-core/issues"
-Changelog = "https://github.com/rf-optimizer/robot-framework-optimizer-core/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/kobolcs/robot_optimizer_core"
+Documentation = "https://kobolcs.github.io/robot_optimizer_core"
+Repository = "https://github.com/kobolcs/robot_optimizer_core"
+Issues = "https://github.com/kobolcs/robot_optimizer_core/issues"
+Changelog = "https://github.com/kobolcs/robot_optimizer_core/blob/main/CHANGELOG.md"
 
 [project.scripts]
 robot-optimizer = "robot_optimizer_core.cli:main"
@@ -103,6 +103,11 @@ robot-optimizer = "robot_optimizer_core.cli:main"
 dead_code = "robot_optimizer_core.analyzers:DeadCodeAnalyzer"
 sleep_detector = "robot_optimizer_core.analyzers:SleepDetector"
 flakiness = "robot_optimizer_core.analyzers:FlakinessAnalyzer"
+hardcoded_value = "robot_optimizer_core.analyzers:HardcodedValueAnalyzer"
+naming_convention = "robot_optimizer_core.analyzers:NamingConventionAnalyzer"
+setup_teardown = "robot_optimizer_core.analyzers:SetupTeardownAnalyzer"
+tag_consistency = "robot_optimizer_core.analyzers:TagConsistencyAnalyzer"
+test_documentation = "robot_optimizer_core.analyzers:TestDocumentationAnalyzer"
 
 [tool.hatch.build]
 packages = ["src/robot_optimizer_core"]
@@ -142,7 +147,11 @@ markers = [
 ]
 filterwarnings = [
     "error",
-    "ignore::DeprecationWarning:robotframework.*",
+    "ignore::DeprecationWarning:robot.*",
+    "ignore::PendingDeprecationWarning:robot.*",
+    "ignore::DeprecationWarning:pydantic.*",
+    "ignore::DeprecationWarning:pydantic_settings.*",
+    "ignore::ResourceWarning",
 ]
 
 # Coverage configuration

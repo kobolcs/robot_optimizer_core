@@ -4,7 +4,7 @@ PYTEST        := uv run pytest
 MYPY          := uv run mypy
 RUFF          := uv run ruff
 
-.PHONY: help install test test-fast test-unit test-integration lint lint-full type format clean coverage docs docs-serve build check
+.PHONY: help install test test-fast test-unit test-integration lint lint-full type format clean coverage docs docs-serve build check publish-test publish
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -58,5 +58,18 @@ docs-serve: ## Serve documentation locally
 
 build: ## Build sdist and wheel
 	uv run python -m build
+
+publish-test: clean build ## Build and upload to TestPyPI (dry-run)
+	uv run twine upload --repository testpypi dist/*
+	@echo "TestPyPI URL: https://test.pypi.org/project/robot-framework-optimizer-core/"
+
+publish: ## Build and upload to PyPI (requires confirmation)
+	@read -p "Publish to PyPI? [y/N] " ans; \
+	  if [ "$$ans" = "y" ] || [ "$$ans" = "Y" ]; then \
+	    $(MAKE) clean build && uv run twine upload dist/*; \
+	    echo "Published: https://pypi.org/project/robot-framework-optimizer-core/"; \
+	  else \
+	    echo "Aborted."; \
+	  fi
 
 check: lint type test-fast ## Run lint + type + fast tests (pre-PR sanity check)
