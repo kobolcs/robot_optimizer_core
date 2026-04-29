@@ -64,7 +64,7 @@ robot-optimizer analyze examples/bad_robot_suite --format json --no-fail
 robot-optimizer analyze examples/bad_robot_suite --format html --output-file demo-report.html --no-fail
 ```
 
-The HTML report is useful for quick local review or sharing with stakeholders.
+The HTML report provides an executive summary, risk categories, prioritized remediation actions, and a detailed findings appendix for stakeholder-ready QA audits.
 
 Expected findings include Sleep usage, unused or duplicate keywords, hardcoded URLs/localhost values, and naming/documentation/tag consistency issues across suites and resources.
 
