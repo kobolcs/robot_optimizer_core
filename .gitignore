@@ -181,3 +181,4 @@ site/
 
 # mutmut cache
 .mutmut-cache
+uv.lock
