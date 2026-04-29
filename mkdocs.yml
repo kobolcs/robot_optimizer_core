@@ -156,6 +156,8 @@ nav:
     - Plugins: api/plugins.md
   - Extending: extending.md
   - Architecture: architecture/ci.md
+  - Examples:
+    - Sample Audit Report: examples/sample-audit-report.md
 
 watch:
   - src/robot_optimizer_core
