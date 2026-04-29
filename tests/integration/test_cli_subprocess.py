@@ -16,18 +16,6 @@ from pathlib import Path
 import pytest
 
 
-def _extract_json_array(output: str) -> list:
-    """Extract the last JSON array from stdout (logs may precede it)."""
-    # Split on newlines and find the first line starting with '['
-    for i, line in enumerate(output.splitlines()):
-        stripped = line.strip()
-        if stripped.startswith("["):
-            # Found the start of the JSON array; reconstruct from here
-            json_str = "\n".join(output.splitlines()[i:])
-            return json.loads(json_str)
-    return []
-
-
 def _run(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
     """Run robot-optimizer as a module so it works without install."""
     cmd = [sys.executable, "-m", "robot_optimizer_core", *args]
@@ -104,7 +92,7 @@ class TestAnalyzeFormatSubprocess:
             "*** Test Cases ***\nMy Test\n    Sleep    10\n"
         )
         result = _run("analyze", str(f), "--format", "json")
-        parsed = _extract_json_array(result.stdout)
+        parsed = json.loads(result.stdout)
         assert isinstance(parsed, list)
 
     def test_text_output_contains_finding_info(self, tmp_path: Path) -> None:
@@ -131,7 +119,7 @@ class TestMinSeveritySubprocess:
             "*** Test Cases ***\nMy Test\n    Sleep    2\n"
         )
         result = _run("analyze", str(f), "--format", "json", "--min-severity", "ERROR")
-        findings = _extract_json_array(result.stdout)
+        findings = json.loads(result.stdout)
         severities = {finding["severity"] for finding in findings}
         assert "WARNING" not in severities
         assert "INFO" not in severities
@@ -159,7 +147,7 @@ class TestListAnalyzersSubprocess:
         result = _run("list-analyzers", "--format", "json")
         assert result.returncode == 0
         # Extract the JSON array from stdout (logs may precede it)
-        parsed = _extract_json_array(result.stdout)
+        parsed = json.loads(result.stdout)
         assert isinstance(parsed, list)
         names = [r["name"] for r in parsed]
         assert "dead_code" in names
@@ -168,7 +156,7 @@ class TestListAnalyzersSubprocess:
 
     def test_all_new_analyzers_listed(self) -> None:
         result = _run("list-analyzers", "--format", "json")
-        parsed = _extract_json_array(result.stdout)
+        parsed = json.loads(result.stdout)
         names = {r["name"] for r in parsed}
         expected = {
             "dead_code",
@@ -180,3 +168,38 @@ class TestListAnalyzersSubprocess:
             "test_documentation",
         }
         assert expected.issubset(names)
+
+
+    def test_list_analyzers_stdout_has_no_structured_logs(self) -> None:
+        result = _run("list-analyzers")
+        assert result.returncode == 0
+        assert '{"timestamp":' not in result.stdout
+
+
+@pytest.mark.integration
+class TestHtmlFormatSubprocess:
+    def test_html_output_contains_expected_sections(self) -> None:
+        demo = Path(__file__).resolve().parents[2] / "examples" / "bad_robot_suite"
+        result = _run("analyze", str(demo), "--format", "html", "--no-fail")
+        assert result.returncode == 0
+        assert "<html" in result.stdout.lower()
+        assert "Robot Framework Suite Health Report" in result.stdout
+        assert "Total findings" in result.stdout
+
+    def test_html_output_file_writes_without_dumping_html(self, tmp_path: Path) -> None:
+        demo = Path(__file__).resolve().parents[2] / "examples" / "bad_robot_suite"
+        out = tmp_path / "report.html"
+        result = _run(
+            "analyze",
+            str(demo),
+            "--format",
+            "html",
+            "--output-file",
+            str(out),
+            "--no-fail",
+        )
+        assert result.returncode == 0
+        assert out.exists()
+        assert "<html" in out.read_text(encoding="utf-8").lower()
+        assert "Results written to" in result.stdout
+        assert "Robot Framework Suite Health Report" not in result.stdout

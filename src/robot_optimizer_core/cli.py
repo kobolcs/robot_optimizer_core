@@ -18,17 +18,17 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import UTC, datetime
+from html import escape
 from pathlib import Path
 from typing import NoReturn
 
 from .api import analyze_directory, analyze_file
 from .domain.value_objects import Finding, Severity
 from .exceptions import AnalysisError
-from .logging import get_logger
+from .logging import configure_logging
 
 __all__ = ["main"]
-
-logger = get_logger(__name__)
 
 # Exit codes
 _EXIT_OK = 0
@@ -141,6 +141,69 @@ def _format_sarif(findings: list[Finding], path: Path) -> str:
     return json.dumps(sarif, indent=2, default=str)
 
 
+def _format_html(findings: list[Finding], path: Path) -> str:
+    timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
+    sev_counts = {"ERROR": 0, "WARNING": 0, "INFO": 0}
+    for finding in findings:
+        sev_counts[finding.severity.name.upper()] += 1
+
+    rows = []
+    for finding in sorted(findings, key=lambda x: (str(x.location.file_path), x.location.line)):
+        rows.append(
+            "<tr>"
+            f"<td>{escape(finding.severity.name.upper())}</td>"
+            f"<td>{escape(str(finding.location.file_path))}</td>"
+            f"<td>{escape(str(finding.location.line))}</td>"
+            f"<td>{escape(finding.pattern.name)}</td>"
+            f"<td>{escape(finding.message)}</td>"
+            f"<td>{escape(finding.pattern.recommendation)}</td>"
+            "</tr>"
+        )
+
+    no_findings = "<p class='no-findings'>No findings.</p>" if not findings else ""
+    table = ""
+    if findings:
+        table = (
+            "<table><thead><tr><th>Severity</th><th>File</th><th>Line</th><th>Pattern</th>"
+            "<th>Message</th><th>Recommendation</th></tr></thead><tbody>"
+            + "".join(rows)
+            + "</tbody></table>"
+        )
+
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Robot Framework Suite Health Report</title>
+  <style>
+    body {{ font-family: Arial, sans-serif; margin: 2rem; color: #1f2937; }}
+    h1 {{ margin-bottom: 0.2rem; }}
+    .meta {{ color: #4b5563; margin-bottom: 1.5rem; }}
+    .cards {{ display: flex; gap: 1rem; margin: 1rem 0; }}
+    .card {{ border: 1px solid #d1d5db; border-radius: 8px; padding: 0.75rem 1rem; min-width: 110px; }}
+    table {{ border-collapse: collapse; width: 100%; margin-top: 1rem; }}
+    th, td {{ border: 1px solid #e5e7eb; padding: 0.5rem; text-align: left; vertical-align: top; }}
+    th {{ background: #f3f4f6; }}
+    .no-findings {{ padding: 0.75rem; background: #ecfeff; border: 1px solid #bae6fd; border-radius: 8px; }}
+  </style>
+</head>
+<body>
+  <h1>Robot Framework Suite Health Report</h1>
+  <div class="meta">Analyzed path: {escape(str(path))}<br>Generated: {escape(timestamp)}</div>
+  <h2>Total findings: {len(findings)}</h2>
+  <div class="cards">
+    <div class="card"><strong>ERROR</strong><div>{sev_counts['ERROR']}</div></div>
+    <div class="card"><strong>WARNING</strong><div>{sev_counts['WARNING']}</div></div>
+    <div class="card"><strong>INFO</strong><div>{sev_counts['INFO']}</div></div>
+  </div>
+  {no_findings}
+  {table}
+</body>
+</html>
+"""
+
+
 # ---------------------------------------------------------------------------
 # analyse subcommand
 # ---------------------------------------------------------------------------
@@ -218,6 +281,8 @@ def _run_analyze(args: argparse.Namespace) -> int:
         output = _format_json(all_findings)
     elif args.format == "sarif":
         output = _format_sarif(all_findings, path)
+    elif args.format == "html":
+        output = _format_html(all_findings, path)
     else:
         output = _format_text(all_findings, path)
 
@@ -353,6 +418,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--version", action="version", version=f"%(prog)s {_get_version()}"
     )
+    parser.add_argument("--verbose", action="store_true", help="Enable INFO logs to stderr")
+    parser.add_argument("--debug", action="store_true", help="Enable DEBUG logs to stderr")
 
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -373,7 +440,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     analyze_cmd.add_argument(
         "--format",
-        choices=["text", "json", "sarif"],
+        choices=["text", "json", "sarif", "html"],
         default="text",
         help="Output format (default: text)",
     )
@@ -449,6 +516,13 @@ def main(argv: list[str] | None = None) -> NoReturn:
     """Entry point registered as ``robot-optimizer`` in pyproject.toml."""
     parser = _build_parser()
     args = parser.parse_args(argv)
+
+    log_level = "WARNING"
+    if getattr(args, "debug", False):
+        log_level = "DEBUG"
+    elif getattr(args, "verbose", False):
+        log_level = "INFO"
+    configure_logging(level=log_level, format_json=False)
 
     match args.command:
         case "analyze":

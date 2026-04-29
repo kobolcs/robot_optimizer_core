@@ -61,7 +61,10 @@ robot-optimizer analyze tests/
 ```bash
 robot-optimizer analyze examples/bad_robot_suite --format text --no-fail
 robot-optimizer analyze examples/bad_robot_suite --format json --no-fail
+robot-optimizer analyze examples/bad_robot_suite --format html --output-file demo-report.html --no-fail
 ```
+
+The HTML report is useful for quick local review or sharing with stakeholders.
 
 Expected findings include Sleep usage, unused or duplicate keywords, hardcoded URLs/localhost values, and naming/documentation/tag consistency issues across suites and resources.
 
