@@ -68,7 +68,8 @@ free Core package.
 | Feature | Notes |
 |---|---|
 | ⭐ **Auto-fix** — apply safe, mechanical fixes automatically | `analyze_file(auto_fix=True)` |
-| ⭐ **HTML / PDF reports** — rich, shareable analysis reports | `analyze_file(report_format="html")` |
+| ⭐ **Advanced branded HTML reports** — executive customization and theming | `analyze_file(report_format="html")` |
+| ⭐ **PDF export** — formal document export for audits | `analyze_file(report_format="pdf")` |
 | ⭐ **Baseline diffing** — suppress already-known findings | `analyze_file(baseline=Path("baseline.json"))` |
 | ⭐ **CI/CD dashboard** — trend tracking across builds | Webhook + hosted dashboard |
 | ⭐ **Team rule management** — shared rule sets via URL | Central policy server |

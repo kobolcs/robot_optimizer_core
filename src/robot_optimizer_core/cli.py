@@ -34,7 +34,7 @@ __all__ = ["main"]
 _EXIT_OK = 0
 _EXIT_FINDINGS = 1
 _EXIT_ERROR = 2
-_EXIT_PARTIAL = 3  # Task 19: partial failure (some files could not be analysed)
+_EXIT_PARTIAL = 3  # Partial failure (some files could not be analysed).
 
 # ANSI colour helpers (disabled when not a tty)
 _COLOURS = {
@@ -272,7 +272,7 @@ def _format_html(findings: list[Finding], path: Path) -> str:
         )
 
     no_findings = "<p class='no-findings'>No findings were detected for the selected analyzers.</p>" if not findings else ""
-    auto_fixable_count = sum(1 for finding in findings if finding.pattern.recommendation)
+    auto_fixable_count = sum(1 for finding in findings if finding.pattern.auto_fixable)
     table = ""
     if findings:
         table = (
@@ -413,7 +413,7 @@ def _run_analyze(args: argparse.Namespace) -> int:
         else None
     )
 
-    # Task 17: parse --min-severity
+    # Parse --min-severity.
     severity_filter: Severity | None = None
     if args.min_severity:
         try:
@@ -422,7 +422,7 @@ def _run_analyze(args: argparse.Namespace) -> int:
             print(f"error: invalid --min-severity value: {exc}", file=sys.stderr)
             return _EXIT_ERROR
 
-    # Task 18: load --config file
+    # Load --config file.
     settings = None
     if getattr(args, "config", None):
         try:
@@ -437,7 +437,7 @@ def _run_analyze(args: argparse.Namespace) -> int:
 
     try:
         if path.is_dir():
-            # Task 15+19: use error_handling="warn" to get partial results
+            # Use error_handling="warn" so directory analysis can return partial results.
             results = analyze_directory(
                 path,
                 analyzers=analyzer_names,
@@ -494,7 +494,7 @@ def _run_analyze(args: argparse.Namespace) -> int:
     # Summary line on stderr so it doesn't pollute --format json stdout
     _print_summary(all_findings)
 
-    # Task 19: partial failure takes precedence over findings exit code
+    # Partial failures take precedence over findings exit code.
     if partial_failure:
         return _EXIT_PARTIAL
 
@@ -539,10 +539,13 @@ def _run_upgrade(args: argparse.Namespace) -> int:  # noqa: ARG001
         ("Hardcoded value detection", True, True),
         ("Custom analyzer plugins", True, True),
         ("SARIF output format", True, True),
-        ("Auto-fix suggestions", False, True),
-        ("HTML / PDF reports", False, True),
+        ("Auto-fix workflows", False, True),
+        ("Basic HTML report", True, True),
+        ("Advanced branded HTML reports", False, True),
+        ("PDF export", False, True),
         ("Baseline diffing", False, True),
-        ("CI/CD dashboard integration", False, True),
+        ("Historical trend reports", False, True),
+        ("Dashboards", False, True),
         ("Priority support", False, True),
     ]
     for name, free, pro in features:
@@ -562,7 +565,7 @@ def _run_upgrade(args: argparse.Namespace) -> int:  # noqa: ARG001
 
 
 # ---------------------------------------------------------------------------
-# list-analyzers subcommand (Task 16)
+# list-analyzers subcommand
 # ---------------------------------------------------------------------------
 
 
@@ -648,7 +651,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=False,
         help="Always exit 0 even when findings are present",
     )
-    # Task 17: --min-severity flag
+    # --min-severity flag
     analyze_cmd.add_argument(
         "--min-severity",
         metavar="LEVEL",
@@ -658,7 +661,7 @@ def _build_parser() -> argparse.ArgumentParser:
             "(INFO, WARNING, ERROR). Default: all severities."
         ),
     )
-    # Task 18: --config flag
+    # --config flag
     analyze_cmd.add_argument(
         "--config",
         metavar="PATH",
@@ -669,7 +672,7 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
 
-    # -- list-analyzers subcommand (Task 16) ---------------------------------
+    # -- list-analyzers subcommand ---------------------------------
     list_cmd = sub.add_parser(
         "list-analyzers",
         help="List available analyzers with their description and tags",
