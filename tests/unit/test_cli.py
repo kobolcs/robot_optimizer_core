@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from robot_optimizer_core.cli import main
+from robot_optimizer_core.cli import _format_html, main
 from robot_optimizer_core.domain.value_objects import Finding, Severity
 from robot_optimizer_core.domain.value_objects.location import Location
 from robot_optimizer_core.domain.value_objects.pattern import Pattern, PatternType
@@ -220,3 +220,17 @@ class TestAnalyzerSelection:
                 )
         call_kwargs = mock.call_args.kwargs
         assert call_kwargs["analyzers"] == ["dead_code", "sleep_detector"]
+
+
+class TestHtmlFormat:
+    def test_format_html_escapes_and_contains_metadata(self, tmp_path: Path) -> None:
+        finding = _make_finding(file_path=Path("<suite>.robot"), message="Use <wait>")
+        html = _format_html([finding], tmp_path)
+        assert "Robot Framework Suite Health Report" in html
+        assert "Total findings: 1" in html
+        assert "&lt;suite&gt;.robot" in html
+        assert "Use &lt;wait&gt;" in html
+
+    def test_format_html_no_findings_message(self, tmp_path: Path) -> None:
+        html = _format_html([], tmp_path)
+        assert "No findings." in html

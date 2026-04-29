@@ -195,7 +195,7 @@ _root_logger_configured = False
 
 
 def configure_logging(
-    level: str | int = logging.INFO,
+    level: str | int = logging.WARNING,
     format_json: bool = True,
     log_file: Path | None = None,
     enable_metrics: bool = True,
@@ -231,7 +231,7 @@ def configure_logging(
     root_logger.handlers.clear()
 
     # Console handler
-    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler = logging.StreamHandler(sys.stderr)
     if format_json:
         console_handler.setFormatter(StructuredFormatter())
     else:
@@ -285,10 +285,6 @@ def get_logger(name: str, context: dict[str, Any] | None = None) -> LoggerAdapte
         >>> logger = get_logger(__name__, {"component": "analyzer"})
         >>> logger.info("Starting analysis", extra={"file": "test.robot"})
     """
-    # Auto-configure if not done yet
-    if not _root_logger_configured:
-        configure_logging()
-
     # Create new logger
     logger = logging.getLogger(name)
     adapter = LoggerAdapter(logger, context or {})
