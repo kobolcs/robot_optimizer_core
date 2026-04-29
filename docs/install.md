@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Python 3.11+
+- Python 3.11+ (tested on Python 3.11, 3.12, 3.13, and 3.14)
 - Robot Framework dependency is installed automatically
 - CLI command: `robot-optimizer`
 
