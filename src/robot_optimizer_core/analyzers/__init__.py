@@ -40,9 +40,6 @@ from .dead_code import DeadCodeAnalyzer
 from .flakiness import FlakinessAnalyzer
 from .hardcoded_value import HardcodedValueAnalyzer
 from .naming_convention import NamingConventionAnalyzer
-from .setup_teardown import SetupTeardownAnalyzer
-from .tag_consistency import TagConsistencyAnalyzer
-from .test_documentation import TestDocumentationAnalyzer
 
 # Registry
 from .registry import (
@@ -53,7 +50,10 @@ from .registry import (
     list_analyzers,
     register_analyzer,
 )
+from .setup_teardown import SetupTeardownAnalyzer
 from .sleep_detector import SleepDetector
+from .tag_consistency import TagConsistencyAnalyzer
+from .test_documentation import TestDocumentationAnalyzer
 
 __all__ = [
     # Base

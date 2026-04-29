@@ -20,7 +20,6 @@ from robot_optimizer_core.analyzers import DeadCodeAnalyzer
 from robot_optimizer_core.domain.entities import TestFile
 from robot_optimizer_core.domain.value_objects import PatternType
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

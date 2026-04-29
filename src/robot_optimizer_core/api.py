@@ -393,7 +393,7 @@ def analyze_directory(
                 f"Analysis failed for {len(file_errors)} files",
                 [e for _, e in file_errors],
             )
-        elif effective_handling == "warn":
+        if effective_handling == "warn":
             logger.warning(
                 f"Analysis had partial failures: {len(file_errors)} file(s) could not be analyzed",
                 extra={"failed_files": [str(p) for p, _ in file_errors]},

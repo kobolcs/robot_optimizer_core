@@ -20,7 +20,7 @@ logger = get_logger(__name__)
 
 # Task 28: per-run file cache keyed by (resolved_path, mtime)
 # This avoids double-reading the same unchanged file in analyze_suite / analyze_directory.
-_from_path_cache: dict[tuple[Path, float], "TZAwareTestFile"] = {}
+_from_path_cache: dict[tuple[Path, float], TZAwareTestFile] = {}
 
 
 def utc_now() -> datetime:

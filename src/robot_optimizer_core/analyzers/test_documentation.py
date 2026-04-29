@@ -15,7 +15,7 @@ else:
     from typing_extensions import override
 
 from ..domain.entities import TestFile
-from ..domain.value_objects import Finding, Location, Pattern, PatternType, Severity
+from ..domain.value_objects import Finding, Location, Pattern, PatternType
 from .base import BaseAnalyzer, ConfigValue
 
 __all__ = ["TestDocumentationAnalyzer"]

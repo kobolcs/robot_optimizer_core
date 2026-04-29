@@ -51,7 +51,7 @@ def _is_camel_case_name(name: str) -> bool:
 def _variable_is_camel(inner: str) -> bool:
     """Return True when the variable inner name uses CamelCase."""
     # Ignore index expressions like "LIST[0]"
-    bare = inner.split("[")[0].strip()
+    bare = inner.split("[", maxsplit=1)[0].strip()
     if "_" in bare:
         return False
     return bool(_VAR_CAMEL_RE.search(bare))

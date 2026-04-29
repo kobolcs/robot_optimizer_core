@@ -3,12 +3,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from pathlib import Path
 
 import pytest
 
-from robot_optimizer_core.domain.entities import TestFile
 from robot_optimizer_core.domain.value_objects import (
     Finding,
     Location,

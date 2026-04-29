@@ -18,7 +18,7 @@ from robot_optimizer_core.analyzers.test_documentation import (
     TestDocumentationAnalyzer as DocAnalyzer,
 )
 from robot_optimizer_core.domain.entities import TestFile
-from robot_optimizer_core.domain.value_objects import PatternType, Severity
+from robot_optimizer_core.domain.value_objects import Severity
 
 
 def _make_file(content: str, name: str = "test.robot") -> TestFile:

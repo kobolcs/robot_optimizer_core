@@ -9,7 +9,10 @@ from pathlib import Path
 import pytest
 
 from robot_optimizer_core.config import Settings, load_settings_from_toml
-from robot_optimizer_core.config.toml_loader import _find_toml_root, _read_optimizer_section
+from robot_optimizer_core.config.toml_loader import (
+    _find_toml_root,
+    _read_optimizer_section,
+)
 from robot_optimizer_core.domain.value_objects import Severity
 
 
@@ -48,7 +51,7 @@ class TestTomlLoader:
         if sys.version_info < (3, 11):
             pytest.importorskip("tomli")
         (tmp_path / "robot.toml").write_text(
-            '[tool.robot-optimizer]\nmax_acceptable_sleep_seconds = 0.5\n'
+            "[tool.robot-optimizer]\nmax_acceptable_sleep_seconds = 0.5\n"
         )
         settings = load_settings_from_toml(tmp_path)
         assert settings.max_acceptable_sleep_seconds == 0.5
@@ -57,7 +60,7 @@ class TestTomlLoader:
         if sys.version_info < (3, 11):
             pytest.importorskip("tomli")
         (tmp_path / "pyproject.toml").write_text(
-            '[tool.robot-optimizer]\nmax_acceptable_sleep_seconds = 2.0\n'
+            "[tool.robot-optimizer]\nmax_acceptable_sleep_seconds = 2.0\n"
         )
         settings = load_settings_from_toml(tmp_path)
         assert settings.max_acceptable_sleep_seconds == 2.0
@@ -66,7 +69,7 @@ class TestTomlLoader:
         if sys.version_info < (3, 11):
             pytest.importorskip("tomli")
         (tmp_path / "robot.toml").write_text(
-            '[tool.robot-optimizer]\nmax_acceptable_sleep_seconds = 0.5\n'
+            "[tool.robot-optimizer]\nmax_acceptable_sleep_seconds = 0.5\n"
         )
         settings = load_settings_from_toml(tmp_path, max_acceptable_sleep_seconds=5.0)
         assert settings.max_acceptable_sleep_seconds == 5.0
