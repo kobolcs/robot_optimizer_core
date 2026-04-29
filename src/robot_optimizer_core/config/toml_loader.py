@@ -52,9 +52,6 @@ def _read_optimizer_section(toml_path: Path) -> dict[str, Any] | None:
 
     Returns the section dict or ``None`` when not found / not parseable.
     """
-    if tomllib is None:
-        return None
-
     try:
         with open(toml_path, "rb") as fh:
             data = tomllib.load(fh)

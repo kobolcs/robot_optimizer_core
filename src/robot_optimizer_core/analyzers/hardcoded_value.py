@@ -144,21 +144,19 @@ class HardcodedValueAnalyzer(BaseAnalyzer):
                     )
                 )
 
-        if self._check_localhost:
-            for _m in _LOCALHOST_RE.finditer(line):
-                # Don't double-report if URL check already caught this line
-                if not (self._check_urls and _URL_RE.search(line)):
-                    results.append(
-                        self._make_finding(
-                            line_num,
-                            test_file,
-                            "Hardcoded 'localhost' reference",
-                            "Replace with ${HOST} or ${BASE_URL} variable",
-                            value="localhost",
-                            value_type="localhost",
-                        )
+        if self._check_localhost and _LOCALHOST_RE.search(line):
+            # Don't double-report if URL check already caught this line
+            if not (self._check_urls and _URL_RE.search(line)):
+                results.append(
+                    self._make_finding(
+                        line_num,
+                        test_file,
+                        "Hardcoded 'localhost' reference",
+                        "Replace with ${HOST} or ${BASE_URL} variable",
+                        value="localhost",
+                        value_type="localhost",
                     )
-                    break  # one finding per line for localhost
+                )
 
         if self._check_ips:
             for m in _IP_RE.finditer(line):
