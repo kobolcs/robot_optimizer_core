@@ -18,6 +18,10 @@ from ..value_objects.test_result import TestResult as BaseTestResult
 
 logger = get_logger(__name__)
 
+# Task 28: per-run file cache keyed by (resolved_path, mtime)
+# This avoids double-reading the same unchanged file in analyze_suite / analyze_directory.
+_from_path_cache: dict[tuple[Path, float], "TZAwareTestFile"] = {}
+
 
 def utc_now() -> datetime:
     """Get current UTC time with timezone info."""
@@ -104,11 +108,24 @@ class TZAwareTestFile(Entity[UUID]):
 
     @classmethod
     def from_path(cls, file_path: Path, content: str | None = None) -> TZAwareTestFile:
-        """Create TestFile from path with UTC timestamps."""
+        """Create TestFile from path with UTC timestamps.
+
+        Task 28: Results are cached by ``(resolved_path, mtime)`` so that a
+        single analysis run never reads the same unchanged file twice.
+        """
         path = Path(file_path)
 
         if not path.exists():
             raise FileNotFoundError(f"File not found: {path}")
+
+        # Check cache first (Task 28)
+        resolved = path.resolve()
+        if content is None:
+            stats = path.stat()
+            cache_key = (resolved, stats.st_mtime)
+            cached = _from_path_cache.get(cache_key)
+            if cached is not None:
+                return cached
 
         if content is None:
             raw = path.read_bytes()
@@ -129,7 +146,7 @@ class TZAwareTestFile(Entity[UUID]):
         # Convert to UTC timestamps
         last_modified = datetime.fromtimestamp(stats.st_mtime, tz=UTC)
 
-        return cls.model_validate(
+        result = cls.model_validate(
             {
                 "path": path,
                 "content": content,
@@ -138,6 +155,11 @@ class TZAwareTestFile(Entity[UUID]):
                 "encoding": "utf-8",
             }
         )
+
+        # Populate cache only when we read from disk (content is None on entry)
+        cache_key = (resolved, stats.st_mtime)
+        _from_path_cache[cache_key] = result
+        return result
 
     @property
     def last_modified(self) -> datetime:
