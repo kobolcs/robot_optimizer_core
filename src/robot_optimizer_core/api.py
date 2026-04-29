@@ -37,7 +37,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
-from .analyzers import get_analyzer, get_analyzer_registry, list_analyzers
+from .analyzers import get_analyzer_registry, list_analyzers
 from .config import get_settings
 from .di import get_container
 from .domain.entities import TestFile
@@ -53,7 +53,7 @@ if TYPE_CHECKING:
 
 from .premium import PremiumFeatureError, fire_telemetry_event, is_premium_installed
 
-# Task 15: supported error_handling values
+# Supported error_handling values.
 ErrorHandling = Literal["raise", "skip", "warn"]
 
 
@@ -61,7 +61,7 @@ class DirectoryResults(dict):  # type: ignore[type-arg]
     """Mapping of file paths to findings returned by :func:`analyze_directory`.
 
     Behaves exactly like a plain :class:`dict` but carries an ``errors`` field
-    (Task 15) that lists ``(path, exception)`` pairs for files that could not
+    that lists ``(path, exception)`` pairs for files that could not
     be analysed.  This avoids dynamically patching a plain dict.
     """
 
@@ -207,7 +207,7 @@ def analyze_file(
     for analyzer in analyzer_instances:
         analyzer_name = analyzer.name
 
-        # Task 14: skip by pattern filter early to avoid running the analyzer at all
+        # Skip filtered analyzers early to avoid unnecessary analyzer work.
         if pattern_filter is not None and analyzer_name not in pattern_filter:
             continue
 
@@ -217,7 +217,7 @@ def analyze_file(
 
         try:
             # Run analyzer
-            findings = analyzer.analyze(test_file)
+            findings = analyzer.safe_analyze(test_file)
             all_findings.extend(findings)
 
             # Track success
@@ -241,7 +241,7 @@ def analyze_file(
     # Track total findings
     metrics.gauge("findings.total", len(all_findings))
 
-    # Task 14: apply severity filter
+    # Apply severity filter after all analyzers complete.
     if severity_filter is not None:
         all_findings = [f for f in all_findings if f.severity <= severity_filter]
 
@@ -285,7 +285,7 @@ def analyze_directory(
         severity_filter: Only return findings at or more severe than this level.
         pattern_filter: Only run/return findings from analyzers with these names.
         max_workers: Maximum number of threads for parallel file analysis
-            (Task 29).  Defaults to ``min(4, cpu_count)``.  Pass ``1`` to
+            Defaults to ``min(4, cpu_count)``. Pass ``1`` to
             force sequential behaviour.
         auto_fix: Automatically apply suggested fixes (available in Pro).
         report_format: Output report format, ``"html"`` or ``"pdf"``
@@ -359,7 +359,7 @@ def analyze_directory(
         },
     )
 
-    # Analyze each file — Task 29: use ThreadPoolExecutor when max_workers != 1
+    # Analyze files sequentially or with a thread pool based on worker settings.
     dir_results: DirectoryResults = DirectoryResults()
     file_errors: list[tuple[Path, Exception]] = []
 
@@ -429,7 +429,7 @@ def analyze_directory(
     metrics.gauge("batch.files_failed", len(file_errors))
     metrics.gauge("batch.total_findings", total_findings)
 
-    # Task 15: configurable error handling
+    # Configurable per-file error handling.
     if file_errors:
         effective_handling = error_handling
         if fail_fast:
@@ -458,7 +458,7 @@ def analyze_suite(
 ) -> SuiteAnalysisResult:
     """Analyze a Robot Framework test suite with AST parsing.
 
-    Task 13: When the ``dead_code`` analyzer is active, this function uses
+    When the ``dead_code`` analyzer is active, this function uses
     :meth:`~robot_optimizer_core.analyzers.DeadCodeAnalyzer.analyze_suite`
     for cross-file unused keyword detection.  Per-file findings from all other
     analyzers are preserved; dead-code findings are replaced with the
@@ -499,7 +499,7 @@ def analyze_suite(
         "imports": [],
     }
 
-    # Task 13: load all TestFile objects once for cross-file dead code
+    # Load TestFile objects once for suite-level dead-code analysis.
     test_files: list[TestFile] = []
     for file_path in files:
         try:
@@ -525,7 +525,7 @@ def analyze_suite(
         settings = get_settings()
     analyzer_instances = _get_analyzer_instances(analyzers, settings)
 
-    # Task 13: separate dead_code analyzer for suite-level analysis
+    # Separate dead_code for suite-level cross-file analysis.
     from .analyzers import DeadCodeAnalyzer
 
     dead_code_analyzer: DeadCodeAnalyzer | None = None
@@ -536,14 +536,14 @@ def analyze_suite(
         else:
             other_analyzers.append(a)
 
-    # Run non-dead-code analyzers per file
+    # Run non-dead-code analyzers per file using safe analyzer execution.
     all_findings: list[Finding] = []
     file_findings: dict[Path, list[Finding]] = {tf.path: [] for tf in test_files}
 
     for tf in test_files:
         for analyzer in other_analyzers:
             try:
-                findings = analyzer.analyze(tf)
+                findings = analyzer.safe_analyze(tf)
                 all_findings.extend(findings)
                 file_findings[tf.path].extend(findings)
             except Exception as e:
@@ -552,7 +552,7 @@ def analyze_suite(
                     exc_info=True,
                 )
 
-    # Task 13: run dead_code at suite level for cross-file accuracy
+    # Run dead_code at suite level for cross-file accuracy.
     if dead_code_analyzer is not None and test_files:
         dc_findings = dead_code_analyzer.analyze_suite(test_files)
         all_findings.extend(dc_findings)
@@ -589,6 +589,11 @@ def analyze_suite(
     )
 
 
+def _create_analyzer_instance(name: str) -> BaseAnalyzer:
+    """Create a fresh analyzer instance for each analysis execution."""
+    return get_analyzer_registry().create(name)
+
+
 def _get_analyzer_instances(
     analyzers: list[str | BaseAnalyzer] | None, settings: Settings
 ) -> list[BaseAnalyzer]:
@@ -612,14 +617,14 @@ def _get_analyzer_instances(
                 registry.analyzers.get(name), "requires_external_repo", False
             )
         ]
-        return [get_analyzer(name) for name in names]
+        return [_create_analyzer_instance(name) for name in names]
 
     instances = []
     for analyzer in analyzers:
         match analyzer:
             case str():
                 # Get by name
-                instances.append(get_analyzer(analyzer))
+                instances.append(_create_analyzer_instance(analyzer))
             case _:
                 # Already an instance
                 instances.append(analyzer)

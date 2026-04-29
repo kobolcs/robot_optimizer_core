@@ -22,6 +22,7 @@ Example:
 from __future__ import annotations
 
 from functools import cache
+from importlib.metadata import entry_points
 from typing import TYPE_CHECKING, TypeAlias
 
 from ..di import get_container
@@ -46,6 +47,15 @@ logger = get_logger(__name__)
 # Alias needed because AnalyzerRegistry defines a method named `list`, which
 # shadows the builtin inside the class body and breaks return-type annotations.
 _list = list
+
+
+def _iter_analyzer_entry_points() -> list[object]:
+    """Return analyzer entry points for the canonical group."""
+    eps = entry_points()
+    try:
+        return list(eps.select(group="robot_optimizer_core.analyzers"))
+    except AttributeError:
+        return list(eps.get("robot_optimizer_core.analyzers", []))
 
 
 class AnalyzerRegistry:
@@ -147,21 +157,29 @@ class AnalyzerRegistry:
                 details={"available": self.list()},
             )
 
-        # Create instance
-        analyzer_class = self.analyzers[name]
-
-        # Try dependency injection
-        container = get_container()
-        if container.has_service(f"analyzer.{name}"):
-            instance: BaseAnalyzer = container.resolve(f"analyzer.{name}")
-        else:
-            # Create with default config
-            instance = analyzer_class()
+        instance = self.create(name)
 
         # Cache instance
         self.instances[name] = instance
 
         return instance
+
+
+    def create(self, name: str) -> BaseAnalyzer:
+        """Create a fresh analyzer instance without using the cache."""
+        if name not in self.analyzers:
+            raise PluginError(
+                f"Analyzer not found: {name}",
+                plugin_name=name,
+                plugin_type="analyzer",
+                details={"available": self.list()},
+            )
+
+        analyzer_class = self.analyzers[name]
+        container = get_container()
+        if container.has_service(f"analyzer.{name}"):
+            return container.resolve(f"analyzer.{name}")
+        return analyzer_class()
 
     def list(self) -> list[str]:
         """List all registered analyzer names.
@@ -250,6 +268,7 @@ def get_analyzer_registry() -> AnalyzerRegistry:
     if _analyzer_registry is None:
         _analyzer_registry = AnalyzerRegistry()
         _register_built_in_analyzers(_analyzer_registry)
+        _register_entry_point_analyzers(_analyzer_registry)
     return _analyzer_registry
 
 
@@ -279,6 +298,20 @@ def _register_built_in_analyzers(registry: AnalyzerRegistry) -> None:
     registry.register("test_documentation", TestDocumentationAnalyzer)
 
     logger.debug("Built-in analyzers registered")
+
+
+def _register_entry_point_analyzers(registry: AnalyzerRegistry) -> None:
+    """Register third-party analyzers from Python entry points."""
+    for ep in _iter_analyzer_entry_points():
+        try:
+            analyzer_class = ep.load()
+            registry.register(ep.name, analyzer_class, override=True)
+        except Exception as exc:  # pragma: no cover - defensive logging path
+            logger.warning(
+                "Failed to load analyzer entry point",
+                extra={"entry_point": getattr(ep, "name", "<unknown>"), "error": str(exc)},
+            )
+
 
 
 # Public API functions

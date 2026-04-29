@@ -53,7 +53,7 @@ conda run pip install robot-framework-optimizer-core
 ### Basic Usage
 
 ```bash
-robot-optimizer upgrade
+robot-optimizer analyze tests/
 ```
 
 
@@ -224,7 +224,7 @@ with metrics.timer("analysis.duration"):
 
 ## 🧪 Testing
 
-The Core package maintains 99%+ test coverage:
+The Core package enforces an 80%+ coverage gate in CI:
 
 ```bash
 # Install dev dependencies

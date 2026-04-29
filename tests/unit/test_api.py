@@ -7,8 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from robot_optimizer_core.api import analyze_file
+from robot_optimizer_core.api import analyze_directory, analyze_file
 from robot_optimizer_core.config import Settings
+from robot_optimizer_core.domain.value_objects import Finding
 from robot_optimizer_core.exceptions import AnalysisError
 
 
@@ -83,3 +84,46 @@ class TestAnalyzeFileMaxSizeEnforcement:
         # file_path must be preserved directly, not nested
         assert exc_info.value.file_path == robot_file
 
+
+
+@pytest.mark.unit
+def test_analyze_file_uses_safe_analyze(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    robot_file = tmp_path / "sample.robot"
+    robot_file.write_text("*** Test Cases ***\nCase\n    Log    ok\n")
+
+    calls: list[str] = []
+
+    class HookedAnalyzer:
+        name = "hooked"
+
+        def safe_analyze(self, test_file: object) -> list[Finding]:
+            calls.append("safe")
+            return []
+
+    monkeypatch.setattr(
+        "robot_optimizer_core.api._get_analyzer_instances",
+        lambda analyzers, settings: [HookedAnalyzer()],
+    )
+
+    analyze_file(robot_file)
+    assert calls == ["safe"]
+
+
+@pytest.mark.unit
+def test_analyze_directory_parallel_is_deterministic(tmp_path: Path) -> None:
+    one = tmp_path / "one.robot"
+    two = tmp_path / "two.robot"
+    one.write_text("*** Keywords ***\nAlpha\n    No Operation\n")
+    two.write_text("*** Test Cases ***\nUse\n    Alpha\n")
+
+    first = analyze_directory(tmp_path, analyzers=["dead_code"], max_workers=4)
+    second = analyze_directory(tmp_path, analyzers=["dead_code"], max_workers=4)
+
+    first_messages = {
+        str(path): sorted(f.message for f in findings) for path, findings in first.items()
+    }
+    second_messages = {
+        str(path): sorted(f.message for f in findings) for path, findings in second.items()
+    }
+
+    assert first_messages == second_messages

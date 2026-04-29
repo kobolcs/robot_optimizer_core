@@ -32,7 +32,7 @@ _LIFECYCLE_KEYWORDS = frozenset(
     }
 )
 
-# Control-flow keywords that open a nested scope (Task 8)
+# Control-flow keywords that open a nested scope.
 _CONTROL_FLOW_OPENERS = frozenset(
     {"IF", "ELSE IF", "ELSE", "FOR", "WHILE", "TRY", "EXCEPT", "FINALLY"}
 )
@@ -59,7 +59,6 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         self._ignore_patterns = [
             re.compile(str(pattern), re.IGNORECASE) for pattern in ignore_patterns
         ]
-        self._keyword_display_names: dict[str, str] = {}
         self.validate_config()
 
     @property
@@ -109,11 +108,11 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         findings = []
 
         # Parse the file structure in a single pass (optimization)
-        keywords, keyword_calls = self._extract_keywords_and_calls(test_file)
+        keywords, keyword_calls, keyword_display_names = self._extract_keywords_and_calls(test_file)
 
         if self._check_unused:
             findings.extend(
-                self._find_unused_keywords(keywords, keyword_calls, test_file)
+                self._find_unused_keywords(keywords, keyword_calls, keyword_display_names, test_file)
             )
 
         if self._check_duplicates:
@@ -148,12 +147,12 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         file_keywords: list[tuple[TestFile, dict[str, list[int]]]] = []
 
         for test_file in files:
-            keywords, _ = self._extract_keywords_and_calls(test_file)
+            keywords, _, display_names = self._extract_keywords_and_calls(test_file)
             file_keywords.append((test_file, keywords))
             for kw_name, line_numbers in keywords.items():
                 for line_num in line_numbers:
                     all_definitions[kw_name].append((test_file, line_num))
-                per_file_display.setdefault(kw_name, self._keyword_display_names.get(kw_name, kw_name))
+                per_file_display.setdefault(kw_name, display_names.get(kw_name, kw_name))
             raw_candidates.extend(self._extract_candidate_calls(test_file))
 
         # Resolve raw candidates against the full suite-wide keyword set
@@ -203,14 +202,14 @@ class DeadCodeAnalyzer(BaseAnalyzer):
 
     def _extract_keywords_and_calls(
         self, test_file: TestFile
-    ) -> tuple[dict[str, list[int]], set[str]]:
+    ) -> tuple[dict[str, list[int]], set[str], dict[str, str]]:
         """Extract keyword definitions and resolved keyword calls.
 
-        Task 7: Also captures doubly-indented lines inside FOR loops so that
+        Also captures doubly-indented lines inside FOR loops so that
         keywords called inside ``FOR … END`` blocks are no longer missed.
         """
         keywords: dict[str, list[int]] = defaultdict(list)
-        self._keyword_display_names = {}
+        keyword_display_names: dict[str, str] = {}
         candidate_calls: list[str] = []
         calls: set[str] = set()
 
@@ -236,10 +235,10 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                     continue
                 normalized = stripped.lower()
                 keywords[normalized].append(line_num)
-                self._keyword_display_names.setdefault(normalized, stripped)
+                keyword_display_names.setdefault(normalized, stripped)
                 continue
 
-            # Task 7: capture any indented line (including doubly-indented FOR bodies)
+            # Capture any indented line, including nested FOR bodies.
             if in_test_or_keyword and line.startswith((" ", "\t")):
                 candidate_calls.append(stripped)
 
@@ -407,7 +406,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
     def _find_unreachable_code(self, test_file: TestFile) -> list[Finding]:
         """Find code after RETURN statements inside Keyword definitions.
 
-        Task 8: A RETURN inside an IF/ELSE branch does not make the lines
+        A RETURN inside an IF/ELSE branch does not make the lines
         *after* the END unreachable.  We track IF/ELSE/END nesting depth so
         that ``found_return`` is only propagated when we exit a keyword body
         without any intervening control-flow block.
