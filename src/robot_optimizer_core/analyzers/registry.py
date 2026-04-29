@@ -22,8 +22,8 @@ Example:
 from __future__ import annotations
 
 from functools import cache
-from importlib.metadata import entry_points
-from typing import TYPE_CHECKING, TypeAlias
+from importlib.metadata import EntryPoint, entry_points
+from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
 from ..di import get_container
 from ..exceptions import PluginError
@@ -49,13 +49,18 @@ logger = get_logger(__name__)
 _list = list
 
 
-def _iter_analyzer_entry_points() -> list[object]:
+def _iter_analyzer_entry_points() -> list[EntryPoint]:
     """Return analyzer entry points for the canonical group."""
-    eps = entry_points()
-    try:
-        return list(eps.select(group="robot_optimizer_core.analyzers"))
-    except AttributeError:
-        return list(eps.get("robot_optimizer_core.analyzers", []))
+    eps: Any = entry_points()
+    if hasattr(eps, "select"):
+        return cast(
+            list[EntryPoint],
+            list(eps.select(group="robot_optimizer_core.analyzers")),
+        )
+    return cast(
+        list[EntryPoint],
+        list(eps.get("robot_optimizer_core.analyzers", [])),
+    )
 
 
 class AnalyzerRegistry:
@@ -178,7 +183,7 @@ class AnalyzerRegistry:
         analyzer_class = self.analyzers[name]
         container = get_container()
         if container.has_service(f"analyzer.{name}"):
-            return container.resolve(f"analyzer.{name}")
+            return cast(BaseAnalyzer, container.resolve(f"analyzer.{name}"))
         return analyzer_class()
 
     def list(self) -> list[str]:

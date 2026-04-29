@@ -114,7 +114,7 @@ def is_premium_installed() -> bool:
         ``False`` otherwise.
     """
     try:
-        from importlib.metadata import PackageNotFoundError, distribution
+        from importlib.metadata import distribution
 
         distribution(PREMIUM_PACKAGE_NAME)
         return True
