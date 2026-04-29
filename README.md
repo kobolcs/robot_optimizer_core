@@ -25,28 +25,37 @@ Core analysis engine for Robot Framework test suite optimization. This package p
 **Requirements:** Python 3.11+
 
 ```bash
-pip install robot-framework-optimizer-core
+python -m pip install robot-framework-optimizer-core
 ```
 
-### With uv
+### CLI install options
+
+```bash
+pipx install robot-framework-optimizer-core
+uv tool install robot-framework-optimizer-core
+```
+
+### Add as a project dependency
 
 ```bash
 uv add robot-framework-optimizer-core
 ```
 
-### With pipx (CLI only)
+For full install paths (pip/pipx/uv/source) and troubleshooting, see [docs/install.md](docs/install.md).
+
+### Upgrade
 
 ```bash
-pipx install robot-framework-optimizer-core
-robot-optimizer --version
+python -m pip install --upgrade robot-framework-optimizer-core
+pipx upgrade robot-framework-optimizer-core
+uv tool upgrade robot-framework-optimizer-core
 ```
 
-### With conda / mamba
+For compatibility fallbacks and detailed upgrade flows, see [docs/install.md](docs/install.md).
 
-```bash
-# Install from conda-forge (once available) or fall back to pip:
-conda run pip install robot-framework-optimizer-core
-```
+### Contributor setup
+
+Contributor setup instructions are documented in [docs/install.md](docs/install.md) and [docs/development.md](docs/development.md).
 
 ## 🎯 Quick Start
 
