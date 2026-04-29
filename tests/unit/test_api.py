@@ -127,3 +127,13 @@ def test_analyze_directory_parallel_is_deterministic(tmp_path: Path) -> None:
     }
 
     assert first_messages == second_messages
+
+
+@pytest.mark.unit
+def test_analyze_file_with_dead_code_analyzer_does_not_crash(tmp_path: Path) -> None:
+    robot_file = tmp_path / "sample.robot"
+    robot_file.write_text("*** Test Cases ***\nCase\n    Log    ok\n")
+
+    findings = analyze_file(robot_file, analyzers=["dead_code"])
+
+    assert isinstance(findings, list)

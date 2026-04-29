@@ -290,7 +290,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                         ):
                             calls.add(keyword)
 
-        return dict(keywords), calls
+        return dict(keywords), calls, keyword_display_names
 
     def _extract_candidate_calls(self, test_file: TestFile) -> list[str]:
         """Return all indented (call-site) stripped lines from test/keyword sections."""
@@ -340,16 +340,18 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         return calls
 
     def _find_unused_keywords(
-        self, keywords: dict[str, list[int]], calls: set[str], test_file: TestFile
+        self,
+        keywords: dict[str, list[int]],
+        calls: set[str],
+        keyword_display_names: dict[str, str],
+        test_file: TestFile,
     ) -> list[Finding]:
         """Find keywords that are never called."""
         findings = []
 
         for keyword_name, line_numbers in keywords.items():
             if keyword_name not in calls:
-                display_name = self._keyword_display_names.get(
-                    keyword_name, keyword_name
-                )
+                display_name = keyword_display_names.get(keyword_name, keyword_name)
 
                 # Skip special keywords and configured ignore patterns
                 if keyword_name in _LIFECYCLE_KEYWORDS:
