@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
-    {name = "Robot Framework Optimizer Team", email = "kobolcs@users.noreply.github.com"}
+    {name = "Kobolcs", email = "kobolcs@users.noreply.github.com"}
 ]
 keywords = [
     "robotframework",
@@ -114,6 +114,7 @@ packages = ["src/robot_optimizer_core"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/robot_optimizer_core"]
+artifacts = ["src/robot_optimizer_core/py.typed"]
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -149,6 +150,7 @@ filterwarnings = [
     "error",
     "ignore::DeprecationWarning:robot.*",
     "ignore::PendingDeprecationWarning:robot.*",
+    "ignore::FutureWarning:robot.*",
     "ignore::DeprecationWarning:pydantic.*",
     "ignore::DeprecationWarning:pydantic_settings.*",
     "ignore::ResourceWarning",

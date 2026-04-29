@@ -6,6 +6,7 @@
 [![Coverage](https://img.shields.io/codecov/c/github/kobolcs/robot_optimizer_core)](https://codecov.io/gh/kobolcs/robot_optimizer_core)
 [![Documentation](https://img.shields.io/badge/docs-mkdocs-blue)](https://kobolcs.github.io/robot_optimizer_core)
 [![CI](https://github.com/kobolcs/robot_optimizer_core/actions/workflows/ci.yml/badge.svg)](https://github.com/kobolcs/robot_optimizer_core/actions/workflows/ci.yml)
+[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/kobolcs/robot_optimizer_core/main.svg)](https://results.pre-commit.ci/latest/github/kobolcs/robot_optimizer_core/main)
 
 Core analysis engine for Robot Framework test suite optimization. This package provides the foundation for analyzing Robot Framework test suites and identifying optimization opportunities.
 
@@ -50,6 +51,11 @@ conda run pip install robot-framework-optimizer-core
 ## 🎯 Quick Start
 
 ### Basic Usage
+
+```bash
+robot-optimizer upgrade
+```
+
 
 ```python
 from robot_optimizer_core import analyze_file, analyze_directory
@@ -246,6 +252,15 @@ To build docs locally:
 pip install -e ".[docs]"
 mkdocs serve
 ```
+
+
+## 🔐 Security
+
+If you discover a vulnerability, please follow our private disclosure process in [SECURITY.md](SECURITY.md).
+
+## 🗺️ Roadmap
+
+See [ROADMAP.md](ROADMAP.md) for always-free core features, upcoming community work, and Pro previews.
 
 ## 🤝 Contributing
 
