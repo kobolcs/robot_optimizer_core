@@ -145,7 +145,7 @@ class HardcodedValueAnalyzer(BaseAnalyzer):
                 )
 
         if self._check_localhost:
-            for m in _LOCALHOST_RE.finditer(line):
+            for _m in _LOCALHOST_RE.finditer(line):
                 # Don't double-report if URL check already caught this line
                 if not (self._check_urls and _URL_RE.search(line)):
                     results.append(

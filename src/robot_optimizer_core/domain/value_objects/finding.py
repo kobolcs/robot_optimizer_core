@@ -215,7 +215,7 @@ class Finding(ValueObject):
         }
         pattern_type = self.pattern.type
         if hasattr(pattern_type, "name"):
-            rule_id: str = pattern_type.name  # type: ignore[union-attr]
+            rule_id: str = pattern_type.name  # type: ignore[attr-defined]
         else:
             rule_id = str(pattern_type)
 

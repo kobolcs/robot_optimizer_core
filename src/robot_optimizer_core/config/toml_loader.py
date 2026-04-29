@@ -18,20 +18,9 @@ is absent, it falls back to the standard ``Settings()`` behaviour.
 
 from __future__ import annotations
 
-import sys
+import tomllib
 from pathlib import Path
 from typing import Any
-
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    try:
-        import tomllib  # type: ignore[no-redef]
-    except ImportError:
-        try:
-            import tomli as tomllib  # type: ignore[no-redef]
-        except ImportError:
-            tomllib = None  # type: ignore[assignment]
 
 from .settings import Settings
 

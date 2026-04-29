@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import pytest
@@ -48,8 +47,6 @@ class TestTomlLoader:
         assert isinstance(settings, Settings)
 
     def test_reads_robot_toml(self, tmp_path: Path) -> None:
-        if sys.version_info < (3, 11):
-            pytest.importorskip("tomli")
         (tmp_path / "robot.toml").write_text(
             "[tool.robot-optimizer]\nmax_acceptable_sleep_seconds = 0.5\n"
         )
@@ -57,8 +54,6 @@ class TestTomlLoader:
         assert settings.max_acceptable_sleep_seconds == 0.5
 
     def test_reads_pyproject_toml(self, tmp_path: Path) -> None:
-        if sys.version_info < (3, 11):
-            pytest.importorskip("tomli")
         (tmp_path / "pyproject.toml").write_text(
             "[tool.robot-optimizer]\nmax_acceptable_sleep_seconds = 2.0\n"
         )
@@ -66,8 +61,6 @@ class TestTomlLoader:
         assert settings.max_acceptable_sleep_seconds == 2.0
 
     def test_overrides_take_precedence_over_toml(self, tmp_path: Path) -> None:
-        if sys.version_info < (3, 11):
-            pytest.importorskip("tomli")
         (tmp_path / "robot.toml").write_text(
             "[tool.robot-optimizer]\nmax_acceptable_sleep_seconds = 0.5\n"
         )
@@ -75,8 +68,6 @@ class TestTomlLoader:
         assert settings.max_acceptable_sleep_seconds == 5.0
 
     def test_missing_section_gives_defaults(self, tmp_path: Path) -> None:
-        if sys.version_info < (3, 11):
-            pytest.importorskip("tomli")
         (tmp_path / "robot.toml").write_text("[project]\nname = 'foo'\n")
         settings = load_settings_from_toml(tmp_path)
         # Should fall back to defaults without error
@@ -94,8 +85,6 @@ class TestTomlLoader:
     def test_read_optimizer_section_returns_none_for_empty_file(
         self, tmp_path: Path
     ) -> None:
-        if sys.version_info < (3, 11):
-            pytest.importorskip("tomli")
         toml_path = tmp_path / "robot.toml"
         toml_path.write_text("")
         assert _read_optimizer_section(toml_path) is None
@@ -134,5 +123,4 @@ class TestSeverityFilter:
         }
         # Only sleep-related findings should be present
         assert "SLEEP_IN_TEST" in analyzer_names or findings == []
-
 
