@@ -149,6 +149,9 @@ nav:
   - Home:
     - Overview: index.md
     - Getting Started: getting-started.md
+    - Installation: install.md
+    - Development: development.md
+    - Developer Manual: developer-manual.md
     - Changelog: changelog.md
   - API Reference:
     - Analyzers: api/analyzers.md

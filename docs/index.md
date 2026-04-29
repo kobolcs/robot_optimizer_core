@@ -1,12 +1,12 @@
 # Robot Framework Optimizer Core
 
-[![Python Version](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
+[![Python Version](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Code Quality](https://img.shields.io/badge/quality-reviewed-brightgreen.svg)](https://github.com/kobolcs/robot_optimizer_core)
 
-**Production-ready analysis engine for Robot Framework test suite optimization.**
+**Beta-quality analysis engine for Robot Framework test suite optimization.**
 
-Robot Framework Optimizer Core is a modern, type-safe Python library that helps you find and fix issues in your Robot Framework test suites. Built with Domain-Driven Design principles and Python 3.13+ features.
+Robot Framework Optimizer Core is a modern, type-safe Python library that helps you find and fix issues in your Robot Framework test suites. Built with Domain-Driven Design principles and Python 3.11+ compatibility.
 
 ## Features
 
@@ -19,11 +19,11 @@ Robot Framework Optimizer Core is a modern, type-safe Python library that helps 
 
 ### Architecture Highlights
 
-- **Modern Python 3.13+** - Uses PEP 695 type parameters and PEP 698 @override decorators
+- **Modern Python 3.11+** - Typed APIs and runtime validation for maintainable analysis workflows
 - **Type-Safe** - Full type hints with Pydantic v2 validation
 - **Domain-Driven Design** - Clean separation of concerns with proper layering
 - **Extensible** - Plugin system for custom analyzers
-- **Production-Ready** - Structured logging, GDPR-compliant metrics, 65%+ test coverage
+- **Quality-Gated** - Structured logging, GDPR-compliant metrics, and an 80%+ CI coverage gate
 - **Thread-Safe** - Dependency injection container with circular dependency detection
 
 ## Installation
@@ -32,7 +32,7 @@ Robot Framework Optimizer Core is a modern, type-safe Python library that helps 
 pip install robot-framework-optimizer-core
 ```
 
-**Requirements:** Python 3.13+
+**Requirements:** Python 3.11+
 
 ## Quick Start
 
