@@ -2,9 +2,10 @@
 
 [![Python Version](https://img.shields.io/pypi/pyversions/robot-framework-optimizer-core.svg)](https://pypi.org/project/robot-framework-optimizer-core/)
 [![PyPI Version](https://img.shields.io/pypi/v/robot-framework-optimizer-core.svg)](https://pypi.org/project/robot-framework-optimizer-core/)
-[![License](https://img.shields.io/pypi/l/robot-framework-optimizer-core.svg)](https://github.com/rf-optimizer/robot-framework-optimizer-core/blob/main/LICENSE)
-[![Coverage](https://img.shields.io/codecov/c/github/rf-optimizer/robot-framework-optimizer-core)](https://codecov.io/gh/rf-optimizer/robot-framework-optimizer-core)
-[![Documentation](https://img.shields.io/badge/docs-mkdocs-blue)](https://rf-optimizer.github.io/robot-framework-optimizer-core)
+[![License](https://img.shields.io/pypi/l/robot-framework-optimizer-core.svg)](https://github.com/kobolcs/robot_optimizer_core/blob/main/LICENSE)
+[![Coverage](https://img.shields.io/codecov/c/github/kobolcs/robot_optimizer_core)](https://codecov.io/gh/kobolcs/robot_optimizer_core)
+[![Documentation](https://img.shields.io/badge/docs-mkdocs-blue)](https://kobolcs.github.io/robot_optimizer_core)
+[![CI](https://github.com/kobolcs/robot_optimizer_core/actions/workflows/ci.yml/badge.svg)](https://github.com/kobolcs/robot_optimizer_core/actions/workflows/ci.yml)
 
 Core analysis engine for Robot Framework test suite optimization. This package provides the foundation for analyzing Robot Framework test suites and identifying optimization opportunities.
 
@@ -24,6 +25,26 @@ Core analysis engine for Robot Framework test suite optimization. This package p
 
 ```bash
 pip install robot-framework-optimizer-core
+```
+
+### With uv
+
+```bash
+uv add robot-framework-optimizer-core
+```
+
+### With pipx (CLI only)
+
+```bash
+pipx install robot-framework-optimizer-core
+robot-optimizer --version
+```
+
+### With conda / mamba
+
+```bash
+# Install from conda-forge (once available) or fall back to pip:
+conda run pip install robot-framework-optimizer-core
 ```
 
 ## 🎯 Quick Start
@@ -217,7 +238,7 @@ pytest -m component   # End-to-end tests
 
 ## 📚 Documentation
 
-Full documentation is available at [https://rf-optimizer.github.io/robot-framework-optimizer-core](https://rf-optimizer.github.io/robot-framework-optimizer-core)
+Full documentation is available at [https://kobolcs.github.io/robot_optimizer_core](https://kobolcs.github.io/robot_optimizer_core)
 
 To build docs locally:
 
@@ -234,8 +255,8 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ```bash
 # Clone the repository
-git clone https://github.com/rf-optimizer/robot-framework-optimizer-core.git
-cd robot-framework-optimizer-core
+git clone https://github.com/kobolcs/robot_optimizer_core.git
+cd robot_optimizer_core
 
 # Create virtual environment
 python -m venv venv
@@ -262,8 +283,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🔗 Related Projects
 
-- [robot-framework-optimizer](https://github.com/rf-optimizer/robot-framework-optimizer) - Free CLI tool
-- [robot-framework-optimizer-pro](https://github.com/rf-optimizer/robot-framework-optimizer-pro) - Professional edition with advanced features
+- [robot-framework-optimizer](https://github.com/kobolcs/robot_optimizer_core) - Free CLI tool
+- [robot-framework-optimizer-pro](https://github.com/kobolcs/robot_optimizer_core) - Professional edition with advanced features
 
 ---
 
