@@ -184,7 +184,9 @@ class TestHtmlFormatSubprocess:
         assert result.returncode == 0
         assert "<html" in result.stdout.lower()
         assert "Robot Framework Suite Health Report" in result.stdout
-        assert "Total findings" in result.stdout
+        assert "Executive summary" in result.stdout
+        assert "Recommended actions" in result.stdout
+        assert "Appendix — Detailed Findings" in result.stdout
 
     def test_html_output_file_writes_without_dumping_html(self, tmp_path: Path) -> None:
         demo = Path(__file__).resolve().parents[2] / "examples" / "bad_robot_suite"

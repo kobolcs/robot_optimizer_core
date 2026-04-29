@@ -142,17 +142,122 @@ def _format_sarif(findings: list[Finding], path: Path) -> str:
 
 
 def _format_html(findings: list[Finding], path: Path) -> str:
+    def _display_path(file_path: Path) -> str:
+        try:
+            return str(file_path.resolve().relative_to(path.resolve()))
+        except ValueError:
+            return str(file_path)
+
+    def _category_metadata(pattern_name: str) -> tuple[str, str, str]:
+        normalized = pattern_name.lower()
+        mappings = [
+            (
+                ("sleep",),
+                "Stability / flakiness risk",
+                "Fixed sleeps increase execution variance and flaky outcomes.",
+                "Replace fixed sleeps with condition-based explicit waits.",
+            ),
+            (
+                ("unused keyword",),
+                "Maintainability / legacy debt",
+                "Unused legacy keywords create noise and increase maintenance cost.",
+                "Remove or confirm legacy keywords and archive obsolete helpers.",
+            ),
+            (
+                ("documentation",),
+                "Knowledge transfer / onboarding risk",
+                "Missing documentation slows onboarding and raises review effort.",
+                "Add concise business-focused documentation to critical tests and keywords.",
+            ),
+            (
+                ("hardcoded",),
+                "Environment/configuration risk",
+                "Hardcoded values reduce portability between environments.",
+                "Move environment-specific data into variables or configuration.",
+            ),
+            (
+                ("tag",),
+                "Governance / test selection risk",
+                "Tag inconsistency weakens filtering, reporting, and release gates.",
+                "Normalize tag taxonomy and enforce conventions in review checks.",
+            ),
+            (
+                ("naming",),
+                "Readability / consistency risk",
+                "Naming inconsistency reduces readability and increases review friction.",
+                "Adopt naming standards and align keywords/tests incrementally.",
+            ),
+            (
+                ("setup", "teardown"),
+                "Structure / duplication risk",
+                "Setup/teardown issues can duplicate logic and hide dependencies.",
+                "Refactor shared setup/teardown behavior into reusable keywords.",
+            ),
+        ]
+        for keywords, category, impact, action in mappings:
+            if any(keyword in normalized for keyword in keywords):
+                return (category, impact, action)
+        return (
+            "General quality risk",
+            "General quality issues can accumulate into delivery and maintenance cost.",
+            "Review and remediate recurring findings as part of sprint quality work.",
+        )
+
     timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
     sev_counts = {"ERROR": 0, "WARNING": 0, "INFO": 0}
+    affected_files: set[str] = set()
+    category_summary: dict[str, dict[str, str | int]] = {}
+    findings_by_category: dict[str, list[Finding]] = {}
+
     for finding in findings:
         sev_counts[finding.severity.name.upper()] += 1
+        display_path = _display_path(finding.location.file_path)
+        affected_files.add(display_path)
+        category, impact, action = _category_metadata(finding.pattern.name)
+        findings_by_category.setdefault(category, []).append(finding)
+        if category not in category_summary:
+            category_summary[category] = {
+                "count": 0,
+                "impact": impact,
+                "action": action,
+            }
+        category_summary[category]["count"] = int(category_summary[category]["count"]) + 1
+
+    if sev_counts["ERROR"] > 0 or sev_counts["WARNING"] >= 10:
+        health_status = "High Risk"
+    elif sev_counts["WARNING"] > 0:
+        health_status = "Moderate Risk"
+    elif len(findings) == 0:
+        health_status = "Healthy"
+    elif len(findings) <= 5 and sev_counts["WARNING"] == 0 and sev_counts["ERROR"] == 0:
+        health_status = "Low Risk"
+    else:
+        health_status = "Moderate Risk"
+
+    severity_phrase = (
+        "no significant"
+        if not findings
+        else "high" if health_status == "High Risk" else "moderate"
+    )
+    top_categories = sorted(
+        category_summary.items(), key=lambda item: int(item[1]["count"]), reverse=True
+    )
+    top_category_names = ", ".join(category for category, _ in top_categories[:3])
+    summary_paragraph = (
+        "The analyzed suite shows no significant maintainability or stability risk based on the selected checks. "
+        "Continue periodic review to keep this baseline healthy."
+        if not findings
+        else "The analyzed suite shows "
+        f"{severity_phrase} maintainability and stability risk. The most common issues are "
+        f"{top_category_names}, which can increase maintenance cost, execution instability, and delivery risk if left unaddressed."
+    )
 
     rows = []
     for finding in sorted(findings, key=lambda x: (str(x.location.file_path), x.location.line)):
         rows.append(
             "<tr>"
             f"<td>{escape(finding.severity.name.upper())}</td>"
-            f"<td>{escape(str(finding.location.file_path))}</td>"
+            f"<td>{escape(_display_path(finding.location.file_path))}</td>"
             f"<td>{escape(str(finding.location.line))}</td>"
             f"<td>{escape(finding.pattern.name)}</td>"
             f"<td>{escape(finding.message)}</td>"
@@ -160,7 +265,8 @@ def _format_html(findings: list[Finding], path: Path) -> str:
             "</tr>"
         )
 
-    no_findings = "<p class='no-findings'>No findings.</p>" if not findings else ""
+    no_findings = "<p class='no-findings'>No findings were detected for the selected analyzers.</p>" if not findings else ""
+    auto_fixable_count = sum(1 for finding in findings if finding.pattern.recommendation)
     table = ""
     if findings:
         table = (
@@ -170,6 +276,50 @@ def _format_html(findings: list[Finding], path: Path) -> str:
             + "</tbody></table>"
         )
 
+    recommended_actions = [
+        ("Replace fixed sleeps with explicit waits", "sleep"),
+        ("Remove or confirm unused legacy keywords", "unused keyword"),
+        ("Move hardcoded URLs/config into variables", "hardcoded"),
+        ("Add documentation to business-critical tests/keywords", "documentation"),
+        ("Normalize tags and naming conventions", "tag|naming"),
+    ]
+    action_items = []
+    for label, matcher in recommended_actions:
+        if matcher == "tag|naming":
+            is_relevant = any(
+                any(part in f.pattern.name.lower() for part in ("tag", "naming"))
+                for f in findings
+            )
+        else:
+            is_relevant = any(matcher in f.pattern.name.lower() for f in findings)
+        if is_relevant:
+            action_items.append(f"<li>{escape(label)}</li>")
+
+    category_cards = "".join(
+        "<div class='category-card'>"
+        f"<h3>{escape(category)}</h3>"
+        f"<p><strong>{meta['count']}</strong> finding(s)</p>"
+        f"<p><strong>Why it matters:</strong> {escape(str(meta['impact']))}</p>"
+        f"<p><strong>Suggested action:</strong> {escape(str(meta['action']))}</p>"
+        "</div>"
+        for category, meta in top_categories
+    )
+
+    grouped_findings = "".join(
+        f"<section><h3>{escape(category)}</h3>"
+        + "".join(
+            "<article class='finding-card'>"
+            f"<span class='sev sev-{escape(f.severity.name.lower())}'>{escape(f.severity.name.upper())}</span> "
+            f"<span>{escape(_display_path(f.location.file_path))}:{escape(str(f.location.line))}</span>"
+            f"<p>{escape(f.message)}</p>"
+            f"<p><strong>Recommendation:</strong> {escape(f.pattern.recommendation)}</p>"
+            "</article>"
+            for f in sorted(items, key=lambda x: (str(x.location.file_path), x.location.line))
+        )
+        + "</section>"
+        for category, items in top_categories
+    )
+
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -177,11 +327,18 @@ def _format_html(findings: list[Finding], path: Path) -> str:
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Robot Framework Suite Health Report</title>
   <style>
-    body {{ font-family: Arial, sans-serif; margin: 2rem; color: #1f2937; }}
-    h1 {{ margin-bottom: 0.2rem; }}
-    .meta {{ color: #4b5563; margin-bottom: 1.5rem; }}
-    .cards {{ display: flex; gap: 1rem; margin: 1rem 0; }}
-    .card {{ border: 1px solid #d1d5db; border-radius: 8px; padding: 0.75rem 1rem; min-width: 110px; }}
+    body {{ font-family: Arial, sans-serif; margin: 0; color: #1f2937; background: #f8fafc; }}
+    main {{ max-width: 1080px; margin: 0 auto; padding: 2rem; }}
+    h1, h2 {{ margin-bottom: 0.4rem; }}
+    .cover, .panel {{ background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }}
+    .meta {{ color: #4b5563; }}
+    .badge {{ display: inline-block; background: #e2e8f0; color: #0f172a; padding: 0.2rem 0.6rem; border-radius: 999px; font-weight: 600; }}
+    .cards {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; margin: 1rem 0; }}
+    .card, .category-card, .finding-card {{ border: 1px solid #d1d5db; border-radius: 8px; padding: 0.75rem 1rem; background: #fff; }}
+    .sev {{ display: inline-block; padding: 0.1rem 0.4rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700; }}
+    .sev-error {{ background: #fee2e2; color: #991b1b; }}
+    .sev-warning {{ background: #fef3c7; color: #92400e; }}
+    .sev-info {{ background: #dbeafe; color: #1e3a8a; }}
     table {{ border-collapse: collapse; width: 100%; margin-top: 1rem; }}
     th, td {{ border: 1px solid #e5e7eb; padding: 0.5rem; text-align: left; vertical-align: top; }}
     th {{ background: #f3f4f6; }}
@@ -189,16 +346,41 @@ def _format_html(findings: list[Finding], path: Path) -> str:
   </style>
 </head>
 <body>
-  <h1>Robot Framework Suite Health Report</h1>
-  <div class="meta">Analyzed path: {escape(str(path))}<br>Generated: {escape(timestamp)}</div>
-  <h2>Total findings: {len(findings)}</h2>
-  <div class="cards">
+<main>
+  <section class="cover">
+    <h1>Robot Framework Optimizer</h1>
+    <h2>Robot Framework Suite Health Report</h2>
+    <p>Static analysis summary for Robot Framework test-suite maintainability and stability.</p>
+    <div class="meta">Analyzed path: {escape(str(path))}<br>Generated: {escape(timestamp)}</div>
+  </section>
+  <section class="panel">
+    <h2>Executive summary</h2>
+    <p>Total findings: {len(findings)} · Warnings/Errors: {sev_counts['WARNING'] + sev_counts['ERROR']} · Main risk categories: {escape(top_category_names or 'None')}</p>
+    <p>{escape(summary_paragraph)}</p>
+  </section>
+  <section class="panel">
+    <h2>Health status</h2>
+    <p><span class="badge">{escape(health_status)}</span></p>
+  </section>
+  <section class="panel">
+    <h2>Key metrics</h2>
+    <div class="cards">
     <div class="card"><strong>ERROR</strong><div>{sev_counts['ERROR']}</div></div>
     <div class="card"><strong>WARNING</strong><div>{sev_counts['WARNING']}</div></div>
     <div class="card"><strong>INFO</strong><div>{sev_counts['INFO']}</div></div>
+    <div class="card"><strong>Total findings</strong><div>{len(findings)}</div></div>
+    <div class="card"><strong>Affected files</strong><div>{len(affected_files)}</div></div>
+    <div class="card"><strong>Auto-fixable findings</strong><div>{auto_fixable_count}</div></div>
   </div>
+  </section>
+  <section class="panel"><h2>Risk categories</h2>{category_cards or '<p>No risk categories detected.</p>'}</section>
+  <section class="panel"><h2>Recommended actions</h2><ol>{''.join(action_items) or '<li>Maintain current standards and monitor new findings.</li>'}</ol></section>
+  <section class="panel"><h2>Findings by category</h2>{no_findings}{grouped_findings}</section>
+  <section class="panel"><h2>Appendix — Detailed Findings</h2>
   {no_findings}
   {table}
+</section>
+</main>
 </body>
 </html>
 """

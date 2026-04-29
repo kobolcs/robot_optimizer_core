@@ -224,13 +224,27 @@ class TestAnalyzerSelection:
 
 class TestHtmlFormat:
     def test_format_html_escapes_and_contains_metadata(self, tmp_path: Path) -> None:
-        finding = _make_finding(file_path=Path("<suite>.robot"), message="Use <wait>")
-        html = _format_html([finding], tmp_path)
+        suite_dir = tmp_path / "<suite>"
+        suite_dir.mkdir()
+        finding = _make_finding(
+            file_path=suite_dir / "<suite>.robot",
+            message="Use <wait>",
+        )
+        html = _format_html([finding], suite_dir)
         assert "Robot Framework Suite Health Report" in html
+        assert "Executive summary" in html
+        assert "Health status" in html
+        assert "Recommended actions" in html
+        assert "Appendix — Detailed Findings" in html
         assert "Total findings: 1" in html
         assert "&lt;suite&gt;.robot" in html
         assert "Use &lt;wait&gt;" in html
+        assert str((suite_dir / "<suite>.robot").resolve()) not in html
 
     def test_format_html_no_findings_message(self, tmp_path: Path) -> None:
         html = _format_html([], tmp_path)
-        assert "No findings." in html
+        assert "Robot Framework Suite Health Report" in html
+        assert "Executive summary" in html
+        assert "Health status" in html
+        assert "Healthy" in html
+        assert "No findings were detected" in html
