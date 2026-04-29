@@ -18,8 +18,8 @@ pip install robot-framework-optimizer-core
 ### Install from Source
 
 ```bash
-git clone https://github.com/rf-optimizer/robot-framework-optimizer-core.git
-cd robot-framework-optimizer-core
+git clone https://github.com/kobolcs/robot_optimizer_core.git
+cd robot_optimizer_core
 pip install -e ".[dev]"
 ```
 

@@ -94,6 +94,6 @@ class VersionInfo:
         return (self.major, self.minor, self.patch)
 
 
-__version_info__ = VersionInfo(major=1, minor=0, patch=0, release="final", serial=0)
+__version_info__ = VersionInfo(major=1, minor=0, patch=0, release="b", serial=1)
 
 __version__ = str(__version_info__)
