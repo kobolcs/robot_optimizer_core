@@ -31,7 +31,7 @@ GitHub will keep the report private until a fix is released.
 Send a PGP-encrypted (preferred) or plain-text email to:
 
 ```
-robot-optimizer-security@users.noreply.github.com
+kobolcs@users.noreply.github.com
 ```
 
 Include the word **SECURITY** in the subject line.

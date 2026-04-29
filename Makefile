@@ -4,7 +4,7 @@ PYTEST        := uv run pytest
 MYPY          := uv run mypy
 RUFF          := uv run ruff
 
-.PHONY: help install test test-fast test-unit test-integration lint lint-full type format clean coverage docs docs-serve build check publish-test publish
+.PHONY: help install test test-fast test-unit test-integration lint lint-full type format clean coverage docs docs-serve build check publish-test publish-test-upload publish release-check release-check-testpypi
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -59,7 +59,11 @@ docs-serve: ## Serve documentation locally
 build: ## Build sdist and wheel
 	uv run python -m build
 
-publish-test: clean build ## Build and upload to TestPyPI (dry-run)
+publish-test: clean build ## Build and validate package metadata (true dry-run)
+	uv run python -m twine check dist/*
+	@echo "Dry-run OK. TestPyPI URL (post-upload): https://test.pypi.org/project/robot-framework-optimizer-core/"
+
+publish-test-upload: clean build ## Build and upload to TestPyPI
 	uv run twine upload --repository testpypi dist/*
 	@echo "TestPyPI URL: https://test.pypi.org/project/robot-framework-optimizer-core/"
 
@@ -73,3 +77,11 @@ publish: ## Build and upload to PyPI (requires confirmation)
 	  fi
 
 check: lint type test-fast ## Run lint + type + fast tests (pre-PR sanity check)
+
+
+release-check: ## Validate distribution metadata locally
+	uv run python -m build
+	uv run python -m twine check dist/*
+
+release-check-testpypi: release-check ## Show TestPyPI project URL after validation
+	@echo "TestPyPI URL: https://test.pypi.org/project/robot-framework-optimizer-core/"

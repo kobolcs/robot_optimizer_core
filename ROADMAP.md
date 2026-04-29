@@ -79,7 +79,7 @@ free Core package.
 | ⭐ **License compliance audit** — check library licences | Enterprise feature |
 
 **Interested in Pro?**
-→ <https://github.com/kobolcs/robot_optimizer_core>
+→ <https://github.com/kobolcs/robot_optimizer_core_pro>
 
 ---
 
