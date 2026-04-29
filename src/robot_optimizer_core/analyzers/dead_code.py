@@ -199,7 +199,11 @@ class DeadCodeAnalyzer(BaseAnalyzer):
     def _extract_keywords_and_calls(
         self, test_file: TestFile
     ) -> tuple[dict[str, list[int]], set[str]]:
-        """Extract keyword definitions and resolved keyword calls."""
+        """Extract keyword definitions and resolved keyword calls.
+
+        Task 7: Also captures doubly-indented lines inside FOR loops so that
+        keywords called inside ``FOR … END`` blocks are no longer missed.
+        """
         keywords: dict[str, list[int]] = defaultdict(list)
         self._keyword_display_names = {}
         candidate_calls: list[str] = []
@@ -230,6 +234,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                 self._keyword_display_names.setdefault(normalized, stripped)
                 continue
 
+            # Task 7: capture any indented line (including doubly-indented FOR bodies)
             if in_test_or_keyword and line.startswith((" ", "\t")):
                 candidate_calls.append(stripped)
 
@@ -395,7 +400,13 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         return findings
 
     def _find_unreachable_code(self, test_file: TestFile) -> list[Finding]:
-        """Find code after RETURN statements inside Keyword definitions."""
+        """Find code after RETURN statements inside Keyword definitions.
+
+        Task 8: A RETURN inside an IF/ELSE branch does not make the lines
+        *after* the END unreachable.  We track IF/ELSE/END nesting depth so
+        that ``found_return`` is only propagated when we exit a keyword body
+        without any intervening control-flow block.
+        """
         findings = []
         lines = test_file.content.splitlines()
 
@@ -403,6 +414,10 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         in_keyword = False
         found_return = False
         current_keyword = None
+        # Track IF/ELSE/TRY/EXCEPT/WHILE/FOR nesting (any control-flow block
+        # that can legitimately contain a RETURN without making the remaining
+        # keyword body unreachable).
+        control_depth = 0
 
         for line_num, line in enumerate(lines, 1):
             stripped = line.strip()
@@ -416,29 +431,51 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                 in_keywords_section = "keyword" in section
                 in_keyword = False
                 found_return = False
+                control_depth = 0
                 continue
 
             # Non-indented line: start of a new keyword (only inside Keywords section)
             if not line.startswith((" ", "\t")):
                 in_keyword = False
                 found_return = False
+                control_depth = 0
                 if in_keywords_section:
                     current_keyword = stripped
                     in_keyword = True
                 continue
 
-            # Check for RETURN inside a keyword body
-            if in_keyword and stripped.upper().startswith("RETURN"):
-                found_return = True
+            if not in_keyword:
                 continue
 
-            # Check for code after RETURN
-            if (
-                found_return
-                and in_keyword
-                and stripped
-                and not stripped.startswith("#")
-            ):
+            upper = stripped.upper()
+
+            # Track control-flow block depth
+            if upper in {"IF", "ELSE IF", "ELSE", "FOR", "WHILE", "TRY", "EXCEPT", "FINALLY"}:
+                # Entering a nested block — any RETURN inside it is scoped
+                control_depth += 1
+                # A RETURN found *before* this block is still valid context, but
+                # the block entry resets it so we don't false-positive lines after END.
+                if found_return:
+                    found_return = False
+                continue
+
+            if upper == "END":
+                if control_depth > 0:
+                    control_depth -= 1
+                # Exiting a control-flow block does not itself mean unreachable
+                found_return = False
+                continue
+
+            # Check for RETURN inside a keyword body
+            if upper.startswith("RETURN"):
+                if control_depth == 0:
+                    # Top-level RETURN in the keyword body
+                    found_return = True
+                # A RETURN inside a nested block does NOT set found_return
+                continue
+
+            # Check for code after a top-level RETURN
+            if found_return and stripped and not stripped.startswith("#"):
                 pattern = Pattern(
                     type=PatternType.UNREACHABLE_CODE,
                     name="Unreachable Code",

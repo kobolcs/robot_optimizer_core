@@ -71,6 +71,10 @@ class FlakinessAnalyzer(BaseAnalyzer):
     ) -> None:
         """Initialize the analyzer.
 
+        Task 11: When no repository is available the analyzer no longer raises
+        at construction time.  Instead, ``analyze()`` returns an empty list
+        and logs a warning so that ``analyze_file()`` continues normally.
+
         Args:
             test_result_repository: Repository for test results.
             config: Analyzer configuration.
@@ -82,13 +86,9 @@ class FlakinessAnalyzer(BaseAnalyzer):
             container = get_container()
             if container.has_service("test_result_repository"):
                 test_result_repository = container.resolve("test_result_repository")
-            else:
-                raise ConfigurationError(
-                    "TestResultRepository not provided and not found in DI container",
-                    config_key="test_result_repository",
-                )
+            # No longer raise here — defer to analyze() (Task 11)
 
-        self._repository = test_result_repository
+        self._repository: TestResultRepository | None = test_result_repository
 
         # Get settings
         settings = get_settings()
@@ -147,6 +147,9 @@ class FlakinessAnalyzer(BaseAnalyzer):
     def analyze(self, test_file: TestFile) -> list[Finding]:
         """Analyze test file for flaky tests.
 
+        Task 11: Returns an empty list (with a warning) when no repository
+        is configured instead of raising an error.
+
         Args:
             test_file: The test file to analyze.
 
@@ -154,6 +157,14 @@ class FlakinessAnalyzer(BaseAnalyzer):
             List of findings.
         """
         findings: list[Finding] = []
+
+        # Task 11: graceful no-repo handling
+        if self._repository is None:
+            self._logger.warning(
+                "FlakinessAnalyzer skipped: no TestResultRepository configured",
+                extra={"file": str(test_file.path)},
+            )
+            return findings
 
         # Get flakiness statistics from repository
         try:
@@ -238,6 +249,15 @@ class FlakinessAnalyzer(BaseAnalyzer):
         if stats.last_failure:
             message_parts.append(f"Last failed: {stats.last_failure.date()}")
 
+        # Task 12: include trend in message
+        if stats.trend != "unknown":
+            trend_symbol = {
+                "improving": "📈 improving",
+                "stable": "➡️ stable",
+                "worsening": "📉 worsening",
+            }[stats.trend]
+            message_parts.append(f"Trend: {trend_symbol}")
+
         # Estimate time wasted
         avg_investigation_hours = 0.25  # 15 minutes per failure
         time_wasted = stats.failures * avg_investigation_hours
@@ -260,6 +280,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
             last_failure=stats.last_failure.isoformat() if stats.last_failure else None,
             time_wasted_hours=time_wasted,
             flakiness_category=self._categorize_flakiness(stats, test_file),
+            trend=stats.trend,
         )
 
     def _determine_severity(self, failure_rate: float) -> Severity:

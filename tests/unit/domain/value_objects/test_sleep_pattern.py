@@ -101,9 +101,9 @@ class TestSleepPattern:
         with pytest.raises(ValidationError) as exc_info:
             SleepPattern(
                 duration=Decimal("1"),
-                unit="hours",
+                unit="lightyears",
                 line_number=1,
-                original_text="Sleep    1 hours",
+                original_text="Sleep    1 lightyears",
             )
         assert "Invalid time unit" in str(exc_info.value)
 

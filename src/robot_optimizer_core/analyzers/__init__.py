@@ -38,6 +38,11 @@ from .base import BaseAnalyzer
 # Built-in analyzers
 from .dead_code import DeadCodeAnalyzer
 from .flakiness import FlakinessAnalyzer
+from .hardcoded_value import HardcodedValueAnalyzer
+from .naming_convention import NamingConventionAnalyzer
+from .setup_teardown import SetupTeardownAnalyzer
+from .tag_consistency import TagConsistencyAnalyzer
+from .test_documentation import TestDocumentationAnalyzer
 
 # Registry
 from .registry import (
@@ -62,6 +67,11 @@ __all__ = [
     "get_analyzer_registry",
     # Built-in analyzers
     "DeadCodeAnalyzer",
-    "SleepDetector",
     "FlakinessAnalyzer",
+    "HardcodedValueAnalyzer",
+    "NamingConventionAnalyzer",
+    "SetupTeardownAnalyzer",
+    "SleepDetector",
+    "TagConsistencyAnalyzer",
+    "TestDocumentationAnalyzer",
 ]

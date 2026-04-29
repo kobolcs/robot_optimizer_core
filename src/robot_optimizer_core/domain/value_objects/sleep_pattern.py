@@ -69,6 +69,13 @@ class SleepPattern(ValueObject):
             "ms",
             "milliseconds",
             "millisecond",
+            # Extended units supported by Task 9
+            "h",
+            "hour",
+            "hours",
+            "d",
+            "day",
+            "days",
         }
         normalized = v.lower().strip()
         if normalized not in valid_units:
@@ -96,6 +103,10 @@ class SleepPattern(ValueObject):
             return float(self.duration * 60)
         if self.unit in {"ms", "milliseconds", "millisecond"}:
             return float(self.duration / 1000)
+        if self.unit in {"h", "hour", "hours"}:
+            return float(self.duration * 3600)
+        if self.unit in {"d", "day", "days"}:
+            return float(self.duration * 86400)
         return float(self.duration)
 
     @computed_field  # type: ignore[prop-decorator]
