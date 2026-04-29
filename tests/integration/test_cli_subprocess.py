@@ -8,6 +8,7 @@ exit codes, and output format — not just the internal ``_run_analyze`` helper.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -30,11 +31,20 @@ def _extract_json_array(output: str) -> list:
 def _run(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
     """Run robot-optimizer as a module so it works without install."""
     cmd = [sys.executable, "-m", "robot_optimizer_core", *args]
+    env = os.environ.copy()
+    src_dir = Path(__file__).resolve().parents[2] / "src"
+    existing_pythonpath = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = (
+        str(src_dir)
+        if not existing_pythonpath
+        else f"{src_dir}{os.pathsep}{existing_pythonpath}"
+    )
     return subprocess.run(
         cmd,
         capture_output=True,
         text=True,
         cwd=cwd,
+        env=env,
     )
 
 

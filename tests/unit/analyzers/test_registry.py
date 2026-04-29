@@ -4,8 +4,11 @@ from importlib.metadata import EntryPoint
 
 import pytest
 
-from robot_optimizer_core.analyzers import BaseAnalyzer
-from robot_optimizer_core.analyzers.registry import AnalyzerRegistry, _register_entry_point_analyzers
+from robot_optimizer_core.analyzers import BaseAnalyzer, SleepDetector
+from robot_optimizer_core.analyzers.registry import (
+    AnalyzerRegistry,
+    _register_entry_point_analyzers,
+)
 from robot_optimizer_core.domain.entities import TestFile
 from robot_optimizer_core.domain.value_objects import Finding
 
@@ -40,7 +43,7 @@ def test_register_entry_point_analyzers_loads_canonical_group(monkeypatch: pytes
 
     ep = EntryPoint(
         name="external_plugin",
-        value="tests.unit.analyzers.test_registry:ExternalAnalyzer",
+        value="robot_optimizer_core.analyzers:SleepDetector",
         group="robot_optimizer_core.analyzers",
     )
 
@@ -52,4 +55,4 @@ def test_register_entry_point_analyzers_loads_canonical_group(monkeypatch: pytes
     _register_entry_point_analyzers(registry)
 
     assert "external_plugin" in registry.list()
-    assert isinstance(registry.create("external_plugin"), ExternalAnalyzer)
+    assert isinstance(registry.create("external_plugin"), SleepDetector)
