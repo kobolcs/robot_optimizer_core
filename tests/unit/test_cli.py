@@ -248,3 +248,50 @@ class TestHtmlFormat:
         assert "Health status" in html
         assert "Healthy" in html
         assert "No findings were detected" in html
+
+    def test_format_html_auto_fixable_count_uses_flag_not_recommendation(self, tmp_path: Path) -> None:
+        auto_fixable_pattern = Pattern(
+            type=PatternType.SLEEP_IN_TEST,
+            name="Sleep in Test Case",
+            description="Sleep detected",
+            recommendation="Use explicit wait",
+            auto_fixable=True,
+        )
+        not_auto_fixable_pattern = Pattern(
+            type=PatternType.HARDCODED_VALUE,
+            name="Hardcoded URL",
+            description="URL detected",
+            recommendation="Move URL to variable",
+            auto_fixable=False,
+        )
+        findings = [
+            Finding.create(
+                pattern=auto_fixable_pattern,
+                severity=Severity.WARNING,
+                location=Location(file_path=tmp_path / "a.robot", line=1),
+                message="Sleep used",
+            ),
+            Finding.create(
+                pattern=not_auto_fixable_pattern,
+                severity=Severity.WARNING,
+                location=Location(file_path=tmp_path / "b.robot", line=2),
+                message="Hardcoded URL",
+            ),
+        ]
+
+        html = _format_html(findings, tmp_path)
+        assert "<strong>Auto-fixable findings</strong><div>1</div>" in html
+
+
+class TestUpgradeCommand:
+    def test_upgrade_message_includes_basic_html_as_core(self, capsys: pytest.CaptureFixture[str]) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main(["upgrade"])
+        assert exc.value.code == 0
+
+        output = capsys.readouterr().out
+        assert "Basic HTML report" in output
+        assert "Advanced branded HTML reports" in output
+        assert "PDF export" in output
+        assert "HTML / PDF reports" not in output
+

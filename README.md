@@ -2,7 +2,7 @@
 
 [![Python Version](https://img.shields.io/pypi/pyversions/robot-framework-optimizer-core.svg)](https://pypi.org/project/robot-framework-optimizer-core/)
 [![PyPI Version](https://img.shields.io/pypi/v/robot-framework-optimizer-core.svg)](https://pypi.org/project/robot-framework-optimizer-core/)
-[![License](https://img.shields.io/pypi/l/robot-framework-optimizer-core.svg)](https://github.com/kobolcs/robot_optimizer_core/blob/main/LICENSE)
+[![License](https://img.shields.io/pypi/l/robot-framework-optimizer-core.svg)](https://github.com/kobolcs/robot_optimizer_core/blob/master/LICENSE)
 [![Coverage](https://img.shields.io/codecov/c/github/kobolcs/robot_optimizer_core)](https://codecov.io/gh/kobolcs/robot_optimizer_core)
 [![Documentation](https://img.shields.io/badge/docs-mkdocs-blue)](https://kobolcs.github.io/robot_optimizer_core)
 [![CI](https://github.com/kobolcs/robot_optimizer_core/actions/workflows/ci.yml/badge.svg)](https://github.com/kobolcs/robot_optimizer_core/actions/workflows/ci.yml)
@@ -253,6 +253,16 @@ pytest -m integration # Integration tests
 pytest -m component   # End-to-end tests
 ```
 
+
+## Known Limitations
+
+- Findings are static-analysis hints, not proof of defects.
+- Dynamic Robot Framework keyword usage can require manual review.
+- Dead-code detection is more reliable at suite level than single-file level.
+- False positives are still possible in heavily dynamic suites.
+- The Core HTML report is static and local; it does not include historical trend views.
+- PDF export, dashboards, baseline diffing, and advanced branded reporting are not part of Core.
+
 ## 📚 Documentation
 
 Full documentation is available at [https://kobolcs.github.io/robot_optimizer_core](https://kobolcs.github.io/robot_optimizer_core)
@@ -310,7 +320,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🔗 Related Projects
 
 - [robot-framework-optimizer](https://github.com/kobolcs/robot_optimizer_core) - Free CLI tool
-- [robot-framework-optimizer-pro](https://github.com/kobolcs/robot_optimizer_core) - Professional edition with advanced features
+- robot-framework-optimizer-pro - Professional edition with advanced features (separate package; repository URL will be announced publicly at launch)
 
 ---
 

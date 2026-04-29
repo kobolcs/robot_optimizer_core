@@ -265,3 +265,14 @@ Built with modern Python best practices:
 ---
 
 **Made with care for the Robot Framework community**
+
+
+## Known Limitations
+
+- Findings are static-analysis hints, not proof of defects.
+- Dynamic Robot Framework keyword usage can require manual review.
+- Dead-code detection is more reliable at suite level than single-file level.
+- False positives are still possible in heavily dynamic suites.
+- The Core HTML report is static and local; it does not include historical trend views.
+- PDF export, dashboards, baseline diffing, and advanced branded reporting are not part of Core.
+
