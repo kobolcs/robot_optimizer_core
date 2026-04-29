@@ -132,7 +132,7 @@ def _run_analyze(args: argparse.Namespace) -> int:
                 error_handling="warn",
             )
             # Check if we had partial failures
-            partial_failure = hasattr(results, "_errors") and bool(results._errors)  # type: ignore[attr-defined]
+            partial_failure = bool(getattr(results, "errors", []))
             all_findings: list[Finding] = [f for fs in results.values() for f in fs]
         elif path.is_file():
             all_findings = analyze_file(
@@ -346,13 +346,3 @@ def main(argv: list[str] | None = None) -> NoReturn:
             code = _EXIT_ERROR
 
     sys.exit(code)
-
-"""Command-line interface for robot-optimizer.
-
-Usage::
-
-    robot-optimizer analyze path/to/suite/
-    robot-optimizer analyze tests/login.robot --format json
-    robot-optimizer analyze tests/ --analyzers dead_code,sleep_detector
-    robot-optimizer analyze tests/ --no-fail   # always exit 0
-"""

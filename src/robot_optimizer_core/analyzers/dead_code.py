@@ -32,6 +32,11 @@ _LIFECYCLE_KEYWORDS = frozenset(
     }
 )
 
+# Control-flow keywords that open a nested scope (Task 8)
+_CONTROL_FLOW_OPENERS = frozenset(
+    {"IF", "ELSE IF", "ELSE", "FOR", "WHILE", "TRY", "EXCEPT", "FINALLY"}
+)
+
 
 class DeadCodeAnalyzer(BaseAnalyzer):
     """Analyzer for detecting dead code in Robot Framework files.
@@ -450,7 +455,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
             upper = stripped.upper()
 
             # Track control-flow block depth
-            if upper in {"IF", "ELSE IF", "ELSE", "FOR", "WHILE", "TRY", "EXCEPT", "FINALLY"}:
+            if upper in _CONTROL_FLOW_OPENERS:
                 # Entering a nested block — any RETURN inside it is scoped
                 control_depth += 1
                 # A RETURN found *before* this block is still valid context, but

@@ -213,7 +213,11 @@ class Finding(ValueObject):
             Severity.WARNING: "warning",
             Severity.INFO: "note",
         }
-        rule_id = self.pattern.type.name if hasattr(self.pattern.type, "name") else str(self.pattern.type)  # type: ignore[attr-defined]
+        pattern_type = self.pattern.type
+        if hasattr(pattern_type, "name"):
+            rule_id: str = pattern_type.name  # type: ignore[union-attr]
+        else:
+            rule_id = str(pattern_type)
 
         physical_location: dict[str, Any] = {
             "artifactLocation": {

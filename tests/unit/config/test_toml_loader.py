@@ -10,6 +10,7 @@ import pytest
 
 from robot_optimizer_core.config import Settings, load_settings_from_toml
 from robot_optimizer_core.config.toml_loader import _find_toml_root, _read_optimizer_section
+from robot_optimizer_core.domain.value_objects import Severity
 
 
 @pytest.mark.unit
@@ -132,4 +133,3 @@ class TestSeverityFilter:
         assert "SLEEP_IN_TEST" in analyzer_names or findings == []
 
 
-from robot_optimizer_core.domain.value_objects import Severity  # noqa: E402

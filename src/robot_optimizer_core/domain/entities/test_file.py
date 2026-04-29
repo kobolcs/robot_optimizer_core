@@ -112,22 +112,25 @@ class TZAwareTestFile(Entity[UUID]):
 
         Task 28: Results are cached by ``(resolved_path, mtime)`` so that a
         single analysis run never reads the same unchanged file twice.
+        The cache is only populated when content is read from disk.
         """
         path = Path(file_path)
 
         if not path.exists():
             raise FileNotFoundError(f"File not found: {path}")
 
-        # Check cache first (Task 28)
+        # Track whether content was provided by the caller
+        content_provided = content is not None
         resolved = path.resolve()
-        if content is None:
+
+        # Check cache first — only valid when reading from disk (Task 28)
+        if not content_provided:
             stats = path.stat()
             cache_key = (resolved, stats.st_mtime)
             cached = _from_path_cache.get(cache_key)
             if cached is not None:
                 return cached
 
-        if content is None:
             raw = path.read_bytes()
 
             if b"\x00" in raw:
@@ -156,9 +159,11 @@ class TZAwareTestFile(Entity[UUID]):
             }
         )
 
-        # Populate cache only when we read from disk (content is None on entry)
-        cache_key = (resolved, stats.st_mtime)
-        _from_path_cache[cache_key] = result
+        # Populate cache only when content was read from disk (Task 28)
+        if not content_provided:
+            cache_key = (resolved, stats.st_mtime)
+            _from_path_cache[cache_key] = result
+
         return result
 
     @property

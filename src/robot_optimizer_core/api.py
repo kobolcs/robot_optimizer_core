@@ -55,6 +55,21 @@ if TYPE_CHECKING:
 ErrorHandling = Literal["raise", "skip", "warn"]
 
 
+class DirectoryResults(dict):  # type: ignore[type-arg]
+    """Mapping of file paths to findings returned by :func:`analyze_directory`.
+
+    Behaves exactly like a plain :class:`dict` but carries an ``errors`` field
+    (Task 15) that lists ``(path, exception)`` pairs for files that could not
+    be analysed.  This avoids dynamically patching a plain dict.
+    """
+
+    errors: list[tuple[Path, Exception]]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.errors = []
+
+
 class SuiteInfo(TypedDict):
     """Suite-level aggregate info returned inside :class:`SuiteAnalysisResult`."""
 
@@ -301,8 +316,8 @@ def analyze_directory(
     )
 
     # Analyze each file — Task 29: use ThreadPoolExecutor when max_workers != 1
-    results: dict[Path, list[Finding]] = {}
-    errors: list[tuple[Path, Exception]] = []
+    dir_results: DirectoryResults = DirectoryResults()
+    file_errors: list[tuple[Path, Exception]] = []
 
     _default_workers = min(4, (os.cpu_count() or 1))
     effective_workers = max_workers if max_workers is not None else _default_workers
@@ -322,11 +337,11 @@ def analyze_directory(
         for file_path in files:
             try:
                 _, file_findings = _analyze_one(file_path)
-                results[file_path] = file_findings
+                dir_results[file_path] = file_findings
             except Exception as e:
                 if fail_fast:
                     raise
-                errors.append((file_path, e))
+                file_errors.append((file_path, e))
                 logger.error(
                     f"Failed to analyze file: {file_path}",
                     extra={"file": str(file_path), "error": str(e)},
@@ -340,9 +355,9 @@ def analyze_directory(
                 fp = future_to_path[future]
                 try:
                     _, file_findings = future.result()
-                    results[fp] = file_findings
+                    dir_results[fp] = file_findings
                 except Exception as e:
-                    errors.append((fp, e))
+                    file_errors.append((fp, e))
                     logger.error(
                         f"Failed to analyze file: {fp}",
                         extra={"file": str(fp), "error": str(e)},
@@ -350,43 +365,43 @@ def analyze_directory(
                     )
 
     # Log summary
-    total_findings = sum(len(findings) for findings in results.values())
+    total_findings = sum(len(findings) for findings in dir_results.values())
     logger.info(
         "Directory analysis complete",
         extra={
             "directory": str(path),
-            "files_analyzed": len(results),
-            "files_failed": len(errors),
+            "files_analyzed": len(dir_results),
+            "files_failed": len(file_errors),
             "total_findings": total_findings,
         },
     )
 
     # Track metrics
     metrics = get_metrics()
-    metrics.gauge("batch.files_analyzed", len(results))
-    metrics.gauge("batch.files_failed", len(errors))
+    metrics.gauge("batch.files_analyzed", len(dir_results))
+    metrics.gauge("batch.files_failed", len(file_errors))
     metrics.gauge("batch.total_findings", total_findings)
 
     # Task 15: configurable error handling
-    if errors:
+    if file_errors:
         effective_handling = error_handling
         if fail_fast:
             effective_handling = "raise"
 
         if effective_handling == "raise":
             raise ExceptionGroup(
-                f"Analysis failed for {len(errors)} files", [e for _, e in errors]
+                f"Analysis failed for {len(file_errors)} files",
+                [e for _, e in file_errors],
             )
         elif effective_handling == "warn":
             logger.warning(
-                f"Analysis had partial failures: {len(errors)} file(s) could not be analyzed",
-                extra={"failed_files": [str(p) for p, _ in errors]},
+                f"Analysis had partial failures: {len(file_errors)} file(s) could not be analyzed",
+                extra={"failed_files": [str(p) for p, _ in file_errors]},
             )
-            # Store errors on results so caller can detect partial failure
-            results._errors = errors  # type: ignore[attr-defined]
+            dir_results.errors = file_errors
         # "skip": silently continue
 
-    return results
+    return dir_results
 
 
 def analyze_suite(
