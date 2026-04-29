@@ -51,7 +51,7 @@ are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 | `robot-optimizer init` config wizard | 1.2 | Interactive setup |
 | GitHub Actions composite action | 1.2 | Zero-config GHAS |
 | Severity override via inline comments | 1.3 | `# noqa: sleep_detector` style |
-| Python 3.14 support | 1.3 | Track CPython beta |
+| Python 3.14 support | ✅ 1.0b1 | CI tests on 3.14 with allow-prereleases |
 | VS Code extension (open-source) | 2.0 | Squiggly-line diagnostics |
 
 ---

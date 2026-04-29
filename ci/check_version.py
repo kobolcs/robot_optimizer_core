@@ -17,7 +17,15 @@ ver_text = (ROOT / "src" / "robot_optimizer_core" / "__version__.py").read_text(
 major = int(re.search(r"major=(\d+)", ver_text).group(1))
 minor = int(re.search(r"minor=(\d+)", ver_text).group(1))
 patch = int(re.search(r"patch=(\d+)", ver_text).group(1))
-py_version = f"{major}.{minor}.{patch}"
+release_match = re.search(r'release="([^"]*)"', ver_text)
+serial_match = re.search(r"serial=(\d+)", ver_text)
+release = release_match.group(1) if release_match else "final"
+serial = int(serial_match.group(1)) if serial_match else 0
+
+if release == "final" or release == "":
+    py_version = f"{major}.{minor}.{patch}"
+else:
+    py_version = f"{major}.{minor}.{patch}{release}{serial}"
 
 if toml_version != py_version:
     print(

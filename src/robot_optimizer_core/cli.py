@@ -95,12 +95,14 @@ def _format_sarif(findings: list[Finding], path: Path) -> str:
     for f in findings:
         rule_id = f.pattern.name.replace(" ", "_").lower()
         if rule_id not in seen_rules:
-            seen_rules[rule_id] = {
+            rule: dict[str, object] = {
                 "id": rule_id,
                 "name": f.pattern.name,
                 "shortDescription": {"text": f.pattern.name},
-                "helpUri": str(path),
             }
+            if f.pattern.documentation_url:
+                rule["helpUri"] = f.pattern.documentation_url
+            seen_rules[rule_id] = rule
 
     results = []
     for f in findings:
