@@ -83,47 +83,54 @@ def _format_json(findings: list[Finding]) -> str:
 
 
 def _format_sarif(findings: list[Finding], path: Path) -> str:
-    """Produce a SARIF 2.1.0 JSON string from a list of findings."""
-    _SEV_MAP = {
-        Severity.ERROR: "error",
-        Severity.WARNING: "warning",
-        Severity.INFO: "note",
-    }
+    """Produce a SARIF 2.1.0 JSON string from a list of findings.
 
-    # Build unique rules list
+    ``path`` is the analysed file or directory.  It is used to rewrite absolute
+    artifact URIs to relative ones so SARIF output is portable across machines.
+    """
+    # Build unique rules list and deterministic result ordering from Finding helpers.
     seen_rules: dict[str, dict[str, object]] = {}
-    for f in findings:
-        rule_id = f.pattern.name.replace(" ", "_").lower()
+    results: list[dict[str, object]] = []
+
+    # Use the directory itself as root; for a single-file analysis use the parent
+    # directory so that relative artifact URIs remain meaningful (e.g. "suite.robot"
+    # instead of ".").
+    root = path.resolve() if path.is_dir() else path.parent.resolve()
+
+    for finding in sorted(
+        findings,
+        key=lambda x: (
+            str(x.location.file_path),
+            x.location.line,
+            x.pattern.name,
+            x.message,
+        ),
+    ):
+        result = finding.to_sarif()
+        # Rewrite artifact URIs to paths relative to the analysed root so that
+        # SARIF output is portable across machines.
+        try:
+            physical = result["locations"][0]["physicalLocation"]  # type: ignore[index]
+            artifact = physical["artifactLocation"]  # type: ignore[index]
+            file_uri = artifact.get("uri", "")  # type: ignore[assignment]
+            candidate = Path(str(file_uri))
+            artifact["uri"] = str(candidate.resolve().relative_to(root)).replace("\\", "/")  # type: ignore[index]
+        except (KeyError, IndexError, ValueError, OSError, TypeError):
+            # Keep the generated SARIF location untouched when path conversion
+            # fails (e.g. the finding is outside the analysed root).
+            pass
+
+        rule_id = str(result.get("ruleId", ""))
+        results.append(result)
         if rule_id not in seen_rules:
             rule: dict[str, object] = {
                 "id": rule_id,
-                "name": f.pattern.name,
-                "shortDescription": {"text": f.pattern.name},
+                "name": finding.pattern.name,
+                "shortDescription": {"text": finding.pattern.name},
             }
-            if f.pattern.documentation_url:
-                rule["helpUri"] = f.pattern.documentation_url
+            if finding.pattern.documentation_url:
+                rule["helpUri"] = finding.pattern.documentation_url
             seen_rules[rule_id] = rule
-
-    results = []
-    for f in findings:
-        rule_id = f.pattern.name.replace(" ", "_").lower()
-        results.append(
-            {
-                "ruleId": rule_id,
-                "level": _SEV_MAP.get(f.severity, "note"),
-                "message": {"text": f.message},
-                "locations": [
-                    {
-                        "physicalLocation": {
-                            "artifactLocation": {
-                                "uri": str(f.location.file_path),
-                            },
-                            "region": {"startLine": f.location.line or 1},
-                        }
-                    }
-                ],
-            }
-        )
 
     sarif = {
         "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
@@ -133,7 +140,7 @@ def _format_sarif(findings: list[Finding], path: Path) -> str:
                 "tool": {
                     "driver": {
                         "name": "robot-optimizer",
-                        "rules": list(seen_rules.values()),
+                        "rules": [seen_rules[key] for key in sorted(seen_rules)],
                     }
                 },
                 "results": results,

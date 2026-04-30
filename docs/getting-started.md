@@ -291,5 +291,5 @@ for file_path, file_findings in by_file.items():
 
 ## Getting Help
 
-- **Documentation**: [https://rf-optimizer.github.io/robot-framework-optimizer-core](https://rf-optimizer.github.io/robot-framework-optimizer-core)
-- **Issues**: [https://github.com/rf-optimizer/robot-framework-optimizer-core/issues](https://github.com/rf-optimizer/robot-framework-optimizer-core/issues)
+- **Documentation**: [https://kobolcs.github.io/robot_optimizer_core](https://kobolcs.github.io/robot_optimizer_core)
+- **Issues**: [https://github.com/kobolcs/robot_optimizer_core/issues](https://github.com/kobolcs/robot_optimizer_core/issues)
