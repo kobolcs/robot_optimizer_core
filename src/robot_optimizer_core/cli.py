@@ -110,11 +110,11 @@ def _format_sarif(findings: list[Finding], path: Path) -> str:
         # Rewrite artifact URIs to paths relative to the analysed root so that
         # SARIF output is portable across machines.
         try:
-            physical = result["locations"][0]["physicalLocation"]  # type: ignore[index]
-            artifact = physical["artifactLocation"]  # type: ignore[index]
-            file_uri = artifact.get("uri", "")  # type: ignore[assignment]
+            physical = result["locations"][0]["physicalLocation"]
+            artifact = physical["artifactLocation"]
+            file_uri = artifact.get("uri", "")
             candidate = Path(str(file_uri))
-            artifact["uri"] = str(candidate.resolve().relative_to(root)).replace("\\", "/")  # type: ignore[index]
+            artifact["uri"] = str(candidate.resolve().relative_to(root)).replace("\\", "/")
         except (KeyError, IndexError, ValueError, OSError, TypeError):
             # Keep the generated SARIF location untouched when path conversion
             # fails (e.g. the finding is outside the analysed root).
