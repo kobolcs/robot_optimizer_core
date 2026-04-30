@@ -83,12 +83,19 @@ def _format_json(findings: list[Finding]) -> str:
 
 
 def _format_sarif(findings: list[Finding], path: Path) -> str:
-    """Produce a SARIF 2.1.0 JSON string from a list of findings."""
+    """Produce a SARIF 2.1.0 JSON string from a list of findings.
+
+    ``path`` is the analysed file or directory.  It is used to rewrite absolute
+    artifact URIs to relative ones so SARIF output is portable across machines.
+    """
     # Build unique rules list and deterministic result ordering from Finding helpers.
     seen_rules: dict[str, dict[str, object]] = {}
     results: list[dict[str, object]] = []
 
-    root = path.resolve()
+    # Use the directory itself as root; for a single-file analysis use the parent
+    # directory so that relative artifact URIs remain meaningful (e.g. "suite.robot"
+    # instead of ".").
+    root = path.resolve() if path.is_dir() else path.parent.resolve()
 
     for finding in sorted(
         findings,
@@ -100,15 +107,17 @@ def _format_sarif(findings: list[Finding], path: Path) -> str:
         ),
     ):
         result = finding.to_sarif()
-        # Prefer relative URIs when output path is inside the analysed root.
+        # Rewrite artifact URIs to paths relative to the analysed root so that
+        # SARIF output is portable across machines.
         try:
             physical = result["locations"][0]["physicalLocation"]  # type: ignore[index]
             artifact = physical["artifactLocation"]  # type: ignore[index]
             file_uri = artifact.get("uri", "")  # type: ignore[assignment]
             candidate = Path(str(file_uri))
             artifact["uri"] = str(candidate.resolve().relative_to(root)).replace("\\", "/")  # type: ignore[index]
-        except Exception:
-            # Keep generated SARIF location untouched on path conversion issues.
+        except (KeyError, IndexError, ValueError, OSError, TypeError):
+            # Keep the generated SARIF location untouched when path conversion
+            # fails (e.g. the finding is outside the analysed root).
             pass
 
         rule_id = str(result.get("ruleId", ""))
