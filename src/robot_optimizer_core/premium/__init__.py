@@ -58,7 +58,7 @@ __all__ = [
 # Constants
 # ---------------------------------------------------------------------------
 
-PREMIUM_PACKAGE_NAME = "robot-framework-optimizer-pro"
+PREMIUM_PACKAGE_NAME = "robot-optimizer-pro"
 UPGRADE_URL = "https://kobolcs.github.io/robot-optimizer-pro"
 
 # ---------------------------------------------------------------------------
