@@ -88,9 +88,8 @@ class PremiumFeatureError(RobotOptimizerError):
         self.upgrade_url = UPGRADE_URL
         message = (
             f"'{feature_name}' is a premium feature. "
-            f"Install '{PREMIUM_PACKAGE_NAME}' to enable it.\n"
-            f"  pip install {PREMIUM_PACKAGE_NAME}\n"
-            f"  More info: {UPGRADE_URL}"
+            f"Upgrade to '{PREMIUM_PACKAGE_NAME}' to enable it.\n"
+            f"  Join the waitlist / get access: {UPGRADE_URL}"
         )
         super().__init__(
             message,
