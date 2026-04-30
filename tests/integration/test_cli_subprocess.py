@@ -27,10 +27,12 @@ def _run(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str
         if not existing_pythonpath
         else f"{src_dir}{os.pathsep}{existing_pythonpath}"
     )
+    env["PYTHONUTF8"] = "1"
     return subprocess.run(
         cmd,
         capture_output=True,
         text=True,
+        encoding="utf-8",
         cwd=cwd,
         env=env,
     )
