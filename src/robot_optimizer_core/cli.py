@@ -541,27 +541,27 @@ def _run_upgrade(args: argparse.Namespace) -> int:  # noqa: ARG001
         ("Hardcoded value detection", True, True),
         ("Custom analyzer plugins", True, True),
         ("SARIF output format", True, True),
-        ("Auto-fix workflows", False, True),
         ("Basic HTML report", True, True),
-        ("Advanced branded HTML reports", False, True),
-        ("PDF export", False, True),
-        ("Baseline diffing", False, True),
-        ("Historical trend reports", False, True),
-        ("Dashboards", False, True),
-        ("Priority support", False, True),
+        ("Auto-fix workflows", False, "coming soon"),
+        ("Advanced branded HTML reports", False, "coming soon"),
+        ("PDF export", False, "coming soon"),
+        ("Baseline diffing", False, "coming soon"),
+        ("Historical trend reports", False, "coming soon"),
+        ("Dashboards", False, "coming soon"),
+        ("Priority support", False, "coming soon"),
     ]
     for name, free, pro in features:
         free_mark = "✓" if free else "—"
-        pro_mark = "✓" if pro else "—"
+        pro_mark = pro if isinstance(pro, str) else ("✓" if pro else "—")
         print(f"  {name:<36} {free_mark:<10} {pro_mark}")
     print()
 
     if is_premium_installed():
         print(f"✓ {PREMIUM_PACKAGE_NAME} is installed.")
     else:
-        print("Upgrade to Pro:")
-        print(f"  pip install {PREMIUM_PACKAGE_NAME}")
-        print(f"  More info: {UPGRADE_URL}")
+        print("Interested in Pro features?")
+        print(f"  Join the waitlist: {UPGRADE_URL}")
+        print("  (Pro launch planned Q3 2026)")
 
     return _EXIT_OK
 

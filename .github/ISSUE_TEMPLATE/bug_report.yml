@@ -1,0 +1,85 @@
+name: Bug Report
+description: Report a bug or unexpected behaviour in robot-optimizer
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the sections below so we can reproduce and fix the issue quickly.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of the bug.
+      placeholder: "When I run `robot-optimizer analyze tests/` it crashes with..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps to reproduce the behaviour.
+      placeholder: |
+        1. Create a `.robot` file with `...`
+        2. Run `robot-optimizer analyze ...`
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: What actually happened? Include full error output or tracebacks.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: robot-optimizer-core version
+      placeholder: "1.0.0b1  (run: robot-optimizer --version)"
+    validations:
+      required: true
+
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      placeholder: "3.12.3  (run: python --version)"
+    validations:
+      required: true
+
+  - type: input
+    id: rf_version
+    attributes:
+      label: Robot Framework version
+      placeholder: "7.1  (run: robot --version)"
+    validations:
+      required: false
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "Ubuntu 24.04 / macOS 14 / Windows 11"
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Any other context, sample `.robot` files, or screenshots.
+    validations:
+      required: false

@@ -155,7 +155,7 @@ class Settings(BaseSettings):
         default_factory=dict, description="Custom settings for extensions"
     )
 
-    # Task 20: per-analyzer configuration
+    # Per-analyzer configuration
     analyzer_config: dict[str, dict[str, Any]] = Field(
         default_factory=dict,
         description=(

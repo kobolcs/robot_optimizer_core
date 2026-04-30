@@ -19,7 +19,12 @@ keywords = [
     "analysis",
     "optimization",
     "quality",
-    "static-analysis"
+    "static-analysis",
+    "linting",
+    "quality-assurance",
+    "test-automation",
+    "robotframework-lint",
+    "dead-code"
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
