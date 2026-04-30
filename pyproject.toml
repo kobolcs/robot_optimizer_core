@@ -133,6 +133,10 @@ include = [
     "CHANGELOG.md",
     "LICENSE",
 ]
+exclude = [
+    "src/robot_optimizer_core/AGENTS.md",
+    "src/robot_optimizer_core/CLAUDE.md",
+]
 
 # Testing configuration
 [tool.pytest.ini_options]

@@ -10,10 +10,10 @@ import pytest
 from robot_optimizer_core.exceptions import (
     AnalysisError,
     ConfigurationError,
-    FileNotFoundError,
     ParsingError,
     PluginError,
     RepositoryError,
+    RobotFileNotFoundError,
     RobotOptimizerError,
     ValidationError,
     create_error,
@@ -172,16 +172,16 @@ class TestValidationError:
 @pytest.mark.unit
 class TestFileNotFoundError:
     def test_auto_message_includes_path(self) -> None:
-        err = FileNotFoundError(Path("missing.robot"))
+        err = RobotFileNotFoundError(Path("missing.robot"))
         assert "missing.robot" in str(err)
 
     def test_file_path_attribute(self) -> None:
-        assert FileNotFoundError(Path("missing.robot")).file_path == Path(
+        assert RobotFileNotFoundError(Path("missing.robot")).file_path == Path(
             "missing.robot"
         )
 
     def test_inherits_from_analysis_error(self) -> None:
-        assert isinstance(FileNotFoundError(Path("x.robot")), AnalysisError)
+        assert isinstance(RobotFileNotFoundError(Path("x.robot")), AnalysisError)
 
 
 @pytest.mark.unit

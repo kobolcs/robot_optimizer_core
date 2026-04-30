@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import os
 import time
+import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, TypedDict
@@ -42,7 +43,7 @@ from .config import get_settings
 from .di import get_container
 from .domain.entities import TestFile
 from .domain.value_objects import Finding, Severity
-from .exceptions import AnalysisError, FileNotFoundError
+from .exceptions import AnalysisError, RobotFileNotFoundError
 from .logging import get_logger, log_analysis_complete, log_analysis_start
 from .metrics import get_metrics
 
@@ -173,7 +174,7 @@ def analyze_file(
 
     # Validate file exists
     if not path.exists():
-        raise FileNotFoundError(path)
+        raise RobotFileNotFoundError(path)
 
     # Get settings
     if settings is None:
@@ -310,6 +311,15 @@ def analyze_directory(
     # Convert to Path
     path = Path(directory_path)
 
+    # Emit deprecation warning for fail_fast before any other processing
+    if fail_fast:
+        warnings.warn(
+            "The 'fail_fast' parameter is deprecated since 1.0.0b1 and will be "
+            "removed in a future release. Use error_handling='raise' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     # Premium feature guards
     if auto_fix and not is_premium_installed():
         fire_telemetry_event("premium_stub_triggered", feature="auto_fix")
@@ -323,7 +333,7 @@ def analyze_directory(
 
     # Validate directory exists
     if not path.exists():
-        raise FileNotFoundError(path)
+        raise RobotFileNotFoundError(path)
 
     if not path.is_dir():
         raise AnalysisError("Path is not a directory", file_path=path)

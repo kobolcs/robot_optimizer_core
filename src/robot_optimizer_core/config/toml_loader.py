@@ -26,8 +26,7 @@ from .settings import Settings
 
 __all__ = ["load_settings_from_toml"]
 
-# Section keys searched in robot.toml and pyproject.toml respectively
-_ROBOT_TOML_KEY = "tool.robot-optimizer"
+# Section key searched in robot.toml and pyproject.toml
 _PYPROJECT_KEY = "tool.robot-optimizer"
 
 # Candidate TOML filenames, in search order

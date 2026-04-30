@@ -171,7 +171,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
-        extra="allow",  # Allow extra fields for Pro extensions
+        extra="ignore",  # Silently ignore unknown fields; prevents silent misconfiguration
     )
 
     @field_validator("file_patterns", "exclude_patterns")

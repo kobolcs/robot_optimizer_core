@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..config import Settings
-from ..exceptions import FileNotFoundError as RFFileNotFoundError
+from ..exceptions import RobotFileNotFoundError as RFFileNotFoundError
 from ..logging import get_logger
 
 logger = get_logger(__name__)
