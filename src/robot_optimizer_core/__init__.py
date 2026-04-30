@@ -64,8 +64,8 @@ from .api import (
 # Configuration
 from .config import Settings, get_settings, reset_settings
 
-# Deprecation utilities
-from .deprecation import deprecated, deprecation_warning
+# Deprecation utilities (internal; not part of the public API)
+from ._deprecation import deprecated, deprecation_warning
 
 # Dependency injection
 from .di import ThreadSafeContainer, get_container
@@ -116,22 +116,14 @@ __all__ = [
     # Version
     "__version__",
     "__version_info__",
-    # Domain models
-    "ValueObject",
-    "Entity",
-    "AggregateRoot",
-    "DomainEvent",
-    "TestFile",
-    # Value objects
-    "Finding",
-    "Location",
-    "Pattern",
-    "PatternType",
-    "Severity",
-    "SleepPattern",
-    "TestResult",
-    "FlakinessStats",
-    # Analyzers
+    # High-level API functions
+    "analyze_file",
+    "analyze_directory",
+    "analyze_suite",
+    "SuiteAnalysisResult",
+    "SuiteInfo",
+    "SuiteStatistics",
+    # Analyzer classes and registry helpers
     "BaseAnalyzer",
     "AnalyzerRegistry",
     "DeadCodeAnalyzer",
@@ -146,9 +138,15 @@ __all__ = [
     "get_analyzer",
     "get_analyzer_registry",
     "list_analyzers",
-    # Services
-    "FileDiscoveryService",
-    "RobotASTParser",
+    # Domain model — user-facing types
+    "TestFile",
+    "Finding",
+    "Location",
+    "Pattern",
+    "PatternType",
+    "Severity",
+    "SleepPattern",
+    "FlakinessStats",
     # Configuration
     "Settings",
     "get_settings",
@@ -158,34 +156,12 @@ __all__ = [
     "AnalysisError",
     "ConfigurationError",
     "PluginError",
-    # Logging
-    "get_logger",
-    "configure_logging",
-    # Metrics
-    "MetricsCollector",
-    "get_metrics",
-    "configure_metrics",
-    # DI
-    "Container",
-    "get_container",
-    # Plugins
+    # Plugin system
     "Plugin",
     "PluginMetadata",
-    # Listener
-    "FlakinessListener",
-    # Premium
+    # Premium boundary
     "PremiumFeatureError",
     "is_premium_installed",
-    # Utilities
-    "deprecated",
-    "deprecation_warning",
-    # High-level API
-    "analyze_file",
-    "analyze_directory",
-    "analyze_suite",
-    "SuiteAnalysisResult",
-    "SuiteInfo",
-    "SuiteStatistics",
 ]
 
 

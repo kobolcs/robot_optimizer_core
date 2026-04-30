@@ -91,6 +91,11 @@ for finding in findings:
 results = analyze_directory("tests/", recursive=True)
 for file_path, findings in results.items():
     print(f"{file_path}: {len(findings)} issues found")
+
+# Note: the CLI calls analyze_directory with error_handling="warn" by default
+# (partial results on per-file errors, exit code 3).  The Python API defaults
+# to error_handling="raise" and will raise an ExceptionGroup on any file error.
+# Pass error_handling="warn" explicitly if you want the lenient CLI behaviour.
 ```
 
 ### Using Specific Analyzers

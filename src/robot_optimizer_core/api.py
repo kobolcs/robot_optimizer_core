@@ -121,9 +121,7 @@ def analyze_file(
     settings: Settings | None = None,
     severity_filter: Severity | None = None,
     pattern_filter: list[str] | None = None,
-    auto_fix: bool = False,
-    report_format: Literal["html", "pdf"] | None = None,
-    baseline: Path | None = None,
+    **_pro_kwargs: Any,
 ) -> list[Finding]:
     """Analyze a single Robot Framework file.
 
@@ -138,11 +136,9 @@ def analyze_file(
             this level are returned (e.g. ``Severity.WARNING`` drops INFO).
         pattern_filter: When given, only findings whose analyzer name
             matches one of these strings are returned.
-        auto_fix: Automatically apply suggested fixes (available in Pro).
-        report_format: Output report format, ``"html"`` or ``"pdf"``
-            (available in Pro).
-        baseline: Path to a baseline file for diffing
-            (available in Pro).
+        **_pro_kwargs: Reserved for Pro edition features (``auto_fix``,
+            ``report_format``, ``baseline``).  Passing any of these without
+            the Pro package installed raises :exc:`PremiumFeatureError`.
 
     Returns:
         List of findings from all analyzers.
@@ -160,6 +156,11 @@ def analyze_file(
     """
     # Convert to Path
     path = Path(file_path)
+
+    # Extract and guard pro-only kwargs
+    auto_fix = _pro_kwargs.get("auto_fix", False)
+    report_format = _pro_kwargs.get("report_format", None)
+    baseline = _pro_kwargs.get("baseline", None)
 
     # Premium feature guards
     if auto_fix and not is_premium_installed():
@@ -261,9 +262,7 @@ def analyze_directory(
     severity_filter: Severity | None = None,
     pattern_filter: list[str] | None = None,
     max_workers: int | None = None,
-    auto_fix: bool = False,
-    report_format: Literal["html", "pdf"] | None = None,
-    baseline: Path | None = None,
+    **_pro_kwargs: Any,
 ) -> dict[Path, list[Finding]]:
     """Analyze all Robot Framework files in a directory.
 
@@ -279,19 +278,25 @@ def analyze_directory(
         settings: Configuration settings.
         fail_fast: Stop on first error (deprecated; prefer ``error_handling``).
         error_handling: How to handle per-file analysis errors.
-            ``"raise"`` re-raises as ExceptionGroup (default legacy behaviour).
+            ``"raise"`` re-raises as ExceptionGroup (default for the Python API).
             ``"skip"`` silently discards failed files and returns partial results.
             ``"warn"`` logs a warning and returns partial results (exit-code 3
             on the CLI).
+
+            .. note::
+                The CLI always calls this function with ``error_handling="warn"``,
+                so CLI runs return partial results on per-file errors while the
+                Python API raises by default.  Pass ``error_handling="warn"``
+                explicitly if you want the same lenient behaviour in code.
+
         severity_filter: Only return findings at or more severe than this level.
         pattern_filter: Only run/return findings from analyzers with these names.
         max_workers: Maximum number of threads for parallel file analysis
             Defaults to ``min(4, cpu_count)``. Pass ``1`` to
             force sequential behaviour.
-        auto_fix: Automatically apply suggested fixes (available in Pro).
-        report_format: Output report format, ``"html"`` or ``"pdf"``
-            (available in Pro).
-        baseline: Path to a baseline file for diffing (available in Pro).
+        **_pro_kwargs: Reserved for Pro edition features (``auto_fix``,
+            ``report_format``, ``baseline``).  Passing any of these without
+            the Pro package installed raises :exc:`PremiumFeatureError`.
 
     Returns:
         Dictionary mapping file paths to findings.
@@ -310,6 +315,11 @@ def analyze_directory(
     """
     # Convert to Path
     path = Path(directory_path)
+
+    # Extract and guard pro-only kwargs
+    auto_fix = _pro_kwargs.get("auto_fix", False)
+    report_format = _pro_kwargs.get("report_format", None)
+    baseline = _pro_kwargs.get("baseline", None)
 
     # Emit deprecation warning for fail_fast before any other processing
     if fail_fast:
