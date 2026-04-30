@@ -59,7 +59,7 @@ __all__ = [
 # ---------------------------------------------------------------------------
 
 PREMIUM_PACKAGE_NAME = "robot-framework-optimizer-pro"
-UPGRADE_URL = "https://github.com/kobolcs/robot_optimizer_core"
+UPGRADE_URL = "https://kobolcs.github.io/robot-optimizer-pro"
 
 # ---------------------------------------------------------------------------
 # Exception
