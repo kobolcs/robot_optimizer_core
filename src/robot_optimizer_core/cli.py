@@ -84,46 +84,26 @@ def _format_json(findings: list[Finding]) -> str:
 
 def _format_sarif(findings: list[Finding], path: Path) -> str:
     """Produce a SARIF 2.1.0 JSON string from a list of findings."""
-    _SEV_MAP = {
-        Severity.ERROR: "error",
-        Severity.WARNING: "warning",
-        Severity.INFO: "note",
-    }
-
-    # Build unique rules list
+    _ = path  # kept for API compatibility in this private helper signature
+    # Build unique rules list and deterministic result ordering from Finding helpers.
     seen_rules: dict[str, dict[str, object]] = {}
-    for f in findings:
-        rule_id = f.pattern.name.replace(" ", "_").lower()
+    results: list[dict[str, object]] = []
+
+    for finding in sorted(
+        findings, key=lambda x: (str(x.location.file_path), x.location.line, x.id.int)
+    ):
+        result = finding.to_sarif()
+        rule_id = str(result.get("ruleId", ""))
+        results.append(result)
         if rule_id not in seen_rules:
             rule: dict[str, object] = {
                 "id": rule_id,
-                "name": f.pattern.name,
-                "shortDescription": {"text": f.pattern.name},
+                "name": finding.pattern.name,
+                "shortDescription": {"text": finding.pattern.name},
             }
-            if f.pattern.documentation_url:
-                rule["helpUri"] = f.pattern.documentation_url
+            if finding.pattern.documentation_url:
+                rule["helpUri"] = finding.pattern.documentation_url
             seen_rules[rule_id] = rule
-
-    results = []
-    for f in findings:
-        rule_id = f.pattern.name.replace(" ", "_").lower()
-        results.append(
-            {
-                "ruleId": rule_id,
-                "level": _SEV_MAP.get(f.severity, "note"),
-                "message": {"text": f.message},
-                "locations": [
-                    {
-                        "physicalLocation": {
-                            "artifactLocation": {
-                                "uri": str(f.location.file_path),
-                            },
-                            "region": {"startLine": f.location.line or 1},
-                        }
-                    }
-                ],
-            }
-        )
 
     sarif = {
         "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
@@ -133,7 +113,7 @@ def _format_sarif(findings: list[Finding], path: Path) -> str:
                 "tool": {
                     "driver": {
                         "name": "robot-optimizer",
-                        "rules": list(seen_rules.values()),
+                        "rules": [seen_rules[key] for key in sorted(seen_rules)],
                     }
                 },
                 "results": results,
