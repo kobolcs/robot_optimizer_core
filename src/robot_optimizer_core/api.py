@@ -185,7 +185,7 @@ def analyze_file(
 
     # Enforce max file size before reading content and load file
     try:
-        file_size = path.stat().st_size
+        file_size = len(path.read_bytes())
         if file_size > settings.max_file_size_bytes:
             raise AnalysisError(
                 f"File exceeds maximum size: {path} "

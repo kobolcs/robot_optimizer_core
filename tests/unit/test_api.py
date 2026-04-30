@@ -52,13 +52,15 @@ class TestAnalyzeFileMaxSizeEnforcement:
     ) -> None:
         # A file whose byte count equals the limit exactly must not be rejected
         # by the size guard (the check is strictly greater-than).
+        # write_bytes ensures the on-disk size is exactly `limit` on all platforms
+        # (write_text would expand \n to \r\n on Windows, adding extra bytes).
         settings = Settings(max_file_size_mb=0.1)
         limit = settings.max_file_size_bytes  # 104857
 
         robot_file = tmp_path / "edge.robot"
-        base_content = "*** Test Cases ***\nSample Test\n    Log    hello\n"
-        padding = "x" * (limit - len(base_content.encode("utf-8")))
-        robot_file.write_text(base_content + padding)
+        base_content = b"*** Test Cases ***\nSample Test\n    Log    hello\n"
+        padding = b"x" * (limit - len(base_content))
+        robot_file.write_bytes(base_content + padding)
 
         try:
             findings = analyze_file(robot_file, settings=settings)

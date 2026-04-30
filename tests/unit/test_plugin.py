@@ -6,6 +6,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import logging
+import os
 from pathlib import Path
 
 import pytest
@@ -16,8 +17,8 @@ from robot_optimizer_core.plugin import (
     PluginMetadata,
     PluginRegistry,
     PluginSecurityValidator,
-    ValidatedPluginManager,
     SecurityVisitor,
+    ValidatedPluginManager,
     get_plugin_registry,
 )
 
@@ -235,6 +236,7 @@ class TestPluginSecurityValidator:
         assert is_safe is False
         assert len(violations) > 0
 
+    @pytest.mark.skipif(os.name != "posix", reason="Permission bits are POSIX-only")
     def test_world_writable_file_rejected(self, tmp_path: Path) -> None:
         plugin_file = tmp_path / "writable.py"
         plugin_file.write_text("x = 1\n")

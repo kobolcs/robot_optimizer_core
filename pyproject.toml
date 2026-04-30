@@ -46,6 +46,7 @@ dependencies = [
     "pydantic>=2.9.0",  # Latest v2 in 2025
     "pydantic-settings>=2.0.0",  # Settings management with Pydantic
     "robotframework>=7.1.0",  # Latest RF in 2025
+    "tzdata; platform_system == 'Windows'",  # Windows lacks a system timezone database
     "typing-extensions>=4.0.0; python_version < '3.12'",  # For override decorator on Python < 3.12
 ]
 
