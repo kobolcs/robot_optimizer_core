@@ -35,7 +35,7 @@ from .__version__ import __version__, __version_info__
 
 # Analyzers
 from .analyzers import (
-    AnalyzerRegistry,
+    AnalyzerRegistry,  # noqa: F401
     BaseAnalyzer,
     DeadCodeAnalyzer,
     FlakinessAnalyzer,
@@ -46,7 +46,7 @@ from .analyzers import (
     TagConsistencyAnalyzer,
     TestDocumentationAnalyzer,
     get_analyzer,
-    get_analyzer_registry,
+    get_analyzer_registry,  # noqa: F401
     list_analyzers,
     register_analyzer,
 )
@@ -64,27 +64,28 @@ from .api import (
 # Configuration
 from .config import Settings, get_settings, reset_settings
 
-# Deprecation utilities
-from .deprecation import deprecated, deprecation_warning
+# Dependency injection — not part of the public API; importable for advanced use
+from .di import ThreadSafeContainer, get_container  # noqa: F401
 
-# Dependency injection
-from .di import ThreadSafeContainer, get_container
+# Alias preserved for consumers that relied on it before the narrowing of __all__
+Container = ThreadSafeContainer  # noqa: F401
 
-# Core services
-from .discovery import FileDiscoveryService
+# Core services — not part of the public API; importable for advanced use
+from .discovery import FileDiscoveryService  # noqa: F401
 
-# Core domain models
-from .domain.base import AggregateRoot, DomainEvent, Entity, ValueObject
+# Core domain models — public value objects in __all__; base types re-exported for
+# advanced consumers but intentionally excluded from __all__ to reduce surface area
+from .domain.base import AggregateRoot, DomainEvent, Entity, ValueObject  # noqa: F401
 from .domain.entities import TestFile
 from .domain.value_objects import (
     Finding,
-    FlakinessStats,
+    FlakinessStats,  # noqa: F401
     Location,
     Pattern,
     PatternType,
     Severity,
-    SleepPattern,
-    TestResult,
+    SleepPattern,  # noqa: F401
+    TestResult,  # noqa: F401
 )
 
 # Exceptions
@@ -95,45 +96,33 @@ from .exceptions import (
     RobotOptimizerError,
 )
 
-# Listener
-from .listener import FlakinessListener
+# Listener — not part of the public API; importable for advanced use
+from .listener import FlakinessListener  # noqa: F401
 
-# Logging
-from .logging import configure_logging, get_logger
+# Logging — not part of the public API; importable for advanced use
+from .logging import configure_logging, get_logger  # noqa: F401
 
-# Metrics
-from .metrics import MetricsCollector, configure_metrics, get_metrics
-from .parsers import RobotASTParser
+# Metrics — not part of the public API; importable for advanced use
+from .metrics import MetricsCollector, configure_metrics, get_metrics  # noqa: F401
+from .parsers import RobotASTParser  # noqa: F401
 
 # Plugin system
 from .plugin import Plugin, PluginMetadata
 from .premium import PremiumFeatureError, is_premium_installed
 
-# Alias for backward compatibility
-Container = ThreadSafeContainer
-
 __all__ = [
     # Version
     "__version__",
     "__version_info__",
-    # Domain models
-    "ValueObject",
-    "Entity",
-    "AggregateRoot",
-    "DomainEvent",
-    "TestFile",
-    # Value objects
-    "Finding",
-    "Location",
-    "Pattern",
-    "PatternType",
-    "Severity",
-    "SleepPattern",
-    "TestResult",
-    "FlakinessStats",
-    # Analyzers
+    # High-level API — primary entry points
+    "analyze_file",
+    "analyze_directory",
+    "analyze_suite",
+    "SuiteAnalysisResult",
+    "SuiteInfo",
+    "SuiteStatistics",
+    # Analyzer classes
     "BaseAnalyzer",
-    "AnalyzerRegistry",
     "DeadCodeAnalyzer",
     "SleepDetector",
     "FlakinessAnalyzer",
@@ -144,11 +133,14 @@ __all__ = [
     "TestDocumentationAnalyzer",
     "register_analyzer",
     "get_analyzer",
-    "get_analyzer_registry",
     "list_analyzers",
-    # Services
-    "FileDiscoveryService",
-    "RobotASTParser",
+    # Domain value objects used in findings
+    "Finding",
+    "Location",
+    "Pattern",
+    "PatternType",
+    "Severity",
+    "TestFile",
     # Configuration
     "Settings",
     "get_settings",
@@ -158,41 +150,15 @@ __all__ = [
     "AnalysisError",
     "ConfigurationError",
     "PluginError",
-    # Logging
-    "get_logger",
-    "configure_logging",
-    # Metrics
-    "MetricsCollector",
-    "get_metrics",
-    "configure_metrics",
-    # DI
-    "Container",
-    "get_container",
-    # Plugins
+    "PremiumFeatureError",
+    # Plugin system
     "Plugin",
     "PluginMetadata",
-    # Listener
-    "FlakinessListener",
-    # Premium
-    "PremiumFeatureError",
+    # Premium detection (useful for plugin authors)
     "is_premium_installed",
-    # Utilities
-    "deprecated",
-    "deprecation_warning",
-    # High-level API
-    "analyze_file",
-    "analyze_directory",
-    "analyze_suite",
-    "SuiteAnalysisResult",
-    "SuiteInfo",
-    "SuiteStatistics",
 ]
 
 
 def __dir__() -> list[str]:
-    """Return list of public attributes.
-
-    Returns:
-        List of attribute names exposed by this module.
-    """
+    """Return list of public attributes."""
     return __all__

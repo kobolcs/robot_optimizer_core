@@ -8,7 +8,7 @@
 [![CI](https://github.com/kobolcs/robot_optimizer_core/actions/workflows/ci.yml/badge.svg)](https://github.com/kobolcs/robot_optimizer_core/actions/workflows/ci.yml)
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/kobolcs/robot_optimizer_core/master.svg)](https://results.pre-commit.ci/latest/github/kobolcs/robot_optimizer_core/master)
 
-Core analysis engine for Robot Framework test suite optimization. This package provides the foundation for analyzing Robot Framework test suites and identifying optimization opportunities.
+Core analysis engine for Robot Framework test suite optimization. Find dead keywords, unsafe sleeps, and broken tag conventions across your entire Robot Framework suite — in seconds.
 
 ## 🚀 Features
 
@@ -330,8 +330,22 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🔗 Related Projects
 
-- [robot-framework-optimizer](https://github.com/kobolcs/robot_optimizer_core) - Free CLI tool
-- robot-framework-optimizer-pro - Professional edition with advanced features (separate package; repository URL will be announced publicly at launch)
+- [robot-framework-optimizer-pro](https://kobolcs.github.io/robot-optimizer-pro) - Professional edition with advanced features (separate package; join the waitlist)
+- [Robocop](https://github.com/MarketSquare/robotframework-robocop) - Style and lint enforcement for Robot Framework
+- [robotframework-lint](https://github.com/boakley/robotframework-lint) - Lint tool for Robot Framework
+
+### How does robot-optimizer compare to Robocop and robotframework-lint?
+
+| | robot-optimizer | Robocop | robotframework-lint |
+|---|---|---|---|
+| **Focus** | Structural quality — dead code, flakiness, cross-file suite analysis | Style and lint rule enforcement | General lint checks |
+| **Cross-file analysis** | ✓ suite-level dead-code detection | — | — |
+| **Flakiness detection** | ✓ | — | — |
+| **Sleep pattern analysis** | ✓ | partial | — |
+| **Custom plugins** | ✓ | ✓ | — |
+| **SARIF output** | ✓ | ✓ | — |
+
+**In short:** Robocop excels at style enforcement; robot-optimizer focuses on structural quality — dead code, flakiness, and cross-file suite-level analysis. They complement each other well.
 
 ---
 
