@@ -67,9 +67,6 @@ from .config import Settings, get_settings, reset_settings
 # Dependency injection — not part of the public API; importable for advanced use
 from .di import ThreadSafeContainer, get_container  # noqa: F401
 
-# Alias preserved for consumers that relied on it before the narrowing of __all__
-Container = ThreadSafeContainer  # noqa: F401
-
 # Core services — not part of the public API; importable for advanced use
 from .discovery import FileDiscoveryService  # noqa: F401
 
@@ -109,6 +106,9 @@ from .parsers import RobotASTParser  # noqa: F401
 # Plugin system
 from .plugin import Plugin, PluginMetadata
 from .premium import PremiumFeatureError, is_premium_installed
+
+# Alias preserved for consumers that relied on it before the narrowing of __all__
+Container = ThreadSafeContainer  # noqa: F401
 
 __all__ = [
     # Version
