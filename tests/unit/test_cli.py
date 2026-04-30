@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from robot_optimizer_core.cli import _format_html, main
+from robot_optimizer_core.cli import _format_html, _format_sarif, main
 from robot_optimizer_core.domain.value_objects import Finding, Severity
 from robot_optimizer_core.domain.value_objects.location import Location
 from robot_optimizer_core.domain.value_objects.pattern import Pattern, PatternType
@@ -294,4 +294,93 @@ class TestUpgradeCommand:
         assert "Advanced branded HTML reports" in output
         assert "PDF export" in output
         assert "HTML / PDF reports" not in output
+
+
+# ---------------------------------------------------------------------------
+# --format sarif
+# ---------------------------------------------------------------------------
+
+
+class TestSarifFormat:
+    def test_sarif_is_valid_json_with_required_structure(self, tmp_path: Path) -> None:
+        """SARIF output must be valid JSON with the required top-level fields."""
+        finding = _make_finding(file_path=tmp_path / "suite.robot")
+        output = _format_sarif([finding], tmp_path)
+        parsed = json.loads(output)
+        assert parsed["version"] == "2.1.0"
+        assert "$schema" in parsed
+        assert len(parsed["runs"]) == 1
+        run = parsed["runs"][0]
+        assert "tool" in run
+        assert "results" in run
+        assert "rules" in run["tool"]["driver"]
+
+    def test_sarif_results_and_rules_are_present(self, tmp_path: Path) -> None:
+        """Each finding must produce a result entry and a corresponding rule."""
+        finding = _make_finding(file_path=tmp_path / "suite.robot")
+        parsed = json.loads(_format_sarif([finding], tmp_path))
+        run = parsed["runs"][0]
+        assert len(run["results"]) == 1
+        assert len(run["tool"]["driver"]["rules"]) == 1
+        rule = run["tool"]["driver"]["rules"][0]
+        assert "id" in rule
+        assert "name" in rule
+        assert "shortDescription" in rule
+
+    def test_sarif_empty_findings(self, tmp_path: Path) -> None:
+        """No findings should produce an empty results list and rules list."""
+        parsed = json.loads(_format_sarif([], tmp_path))
+        run = parsed["runs"][0]
+        assert run["results"] == []
+        assert run["tool"]["driver"]["rules"] == []
+
+    def test_sarif_artifact_uri_directory_analysis(self, tmp_path: Path) -> None:
+        """For directory analysis, artifact URI must be relative to the directory root."""
+        robot_file = tmp_path / "suite.robot"
+        finding = _make_finding(file_path=robot_file)
+        parsed = json.loads(_format_sarif([finding], tmp_path))
+        uri = parsed["runs"][0]["results"][0]["locations"][0]["physicalLocation"][
+            "artifactLocation"
+        ]["uri"]
+        assert uri == "suite.robot"
+        assert str(tmp_path) not in uri
+
+    def test_sarif_artifact_uri_single_file_analysis(self, tmp_path: Path) -> None:
+        """For single-file analysis, artifact URI must be relative to the file's parent dir."""
+        robot_file = tmp_path / "suite.robot"
+        finding = _make_finding(file_path=robot_file)
+        # Pass the file itself as the analysed path (single-file mode)
+        parsed = json.loads(_format_sarif([finding], robot_file))
+        uri = parsed["runs"][0]["results"][0]["locations"][0]["physicalLocation"][
+            "artifactLocation"
+        ]["uri"]
+        assert uri == "suite.robot"
+        assert str(tmp_path) not in uri
+
+    def test_sarif_deterministic_ordering(self, tmp_path: Path) -> None:
+        """Results must be emitted in a stable, sorted order regardless of input order."""
+        f1 = _make_finding(file_path=tmp_path / "b.robot", line=5, message="msg B")
+        f2 = _make_finding(file_path=tmp_path / "a.robot", line=10, message="msg A")
+        f3 = _make_finding(file_path=tmp_path / "a.robot", line=3, message="msg A")
+
+        # Run twice with different orderings; results must be identical.
+        out1 = _format_sarif([f1, f2, f3], tmp_path)
+        out2 = _format_sarif([f3, f1, f2], tmp_path)
+        assert json.loads(out1) == json.loads(out2)
+
+        # The first result should be the finding on a.robot line 3.
+        parsed = json.loads(out1)
+        first_result = parsed["runs"][0]["results"][0]
+        assert first_result["locations"][0]["physicalLocation"]["region"]["startLine"] == 3
+
+    def test_sarif_rules_deduplicated_and_sorted(self, tmp_path: Path) -> None:
+        """Duplicate rule IDs must appear only once and rules must be sorted."""
+        f1 = _make_finding(file_path=tmp_path / "a.robot", line=1)
+        f2 = _make_finding(file_path=tmp_path / "a.robot", line=2)
+        # Both findings use the same pattern type → same rule ID.
+        parsed = json.loads(_format_sarif([f1, f2], tmp_path))
+        rules = parsed["runs"][0]["tool"]["driver"]["rules"]
+        rule_ids = [r["id"] for r in rules]
+        assert len(rule_ids) == len(set(rule_ids)), "Duplicate rule IDs found"
+        assert rule_ids == sorted(rule_ids), "Rules are not sorted"
 
