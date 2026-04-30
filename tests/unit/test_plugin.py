@@ -16,8 +16,8 @@ from robot_optimizer_core.plugin import (
     PluginMetadata,
     PluginRegistry,
     PluginSecurityValidator,
-    ValidatedPluginManager,
     SecurityVisitor,
+    ValidatedPluginManager,
     get_plugin_registry,
 )
 

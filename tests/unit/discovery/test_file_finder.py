@@ -12,7 +12,9 @@ from robot_optimizer_core.discovery.file_finder import (
     PathExclusionTrie,
     PatternMatcher,
 )
-from robot_optimizer_core.exceptions import RobotFileNotFoundError as RFFileNotFoundError
+from robot_optimizer_core.exceptions import (
+    RobotFileNotFoundError as RFFileNotFoundError,
+)
 
 
 @pytest.mark.unit
