@@ -176,8 +176,8 @@ htmlcov/
 README_CI_INTEGRATION.md
 run_test_coverage_check.py
 
-# MkDocs generated site
-site/
+# Generated HTML report artifacts
+*-report.html
 
 # mutmut cache
 .mutmut-cache

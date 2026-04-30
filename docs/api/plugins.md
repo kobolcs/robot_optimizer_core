@@ -59,15 +59,15 @@ metadata = PluginMetadata(
 
 ## Plugin Manager
 
-### SecurePluginManager
+### ValidatedPluginManager
 
 Manages plugin loading with security validation.
 
 ```python
-from robot_optimizer_core.plugin import SecurePluginManager
+from robot_optimizer_core.plugin import ValidatedPluginManager
 from pathlib import Path
 
-manager = SecurePluginManager()
+manager = ValidatedPluginManager()
 
 # Load plugin from file
 manager.load_plugin_from_file(Path("my_plugin.py"))

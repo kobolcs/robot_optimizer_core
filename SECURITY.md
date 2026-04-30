@@ -70,5 +70,7 @@ The following are **out of scope**:
 - Pin dependency versions in production environments.
 - Use `pip audit` or `safety check` as part of your CI pipeline.
 - Load third-party plugins only from trusted sources; the built-in
-  `SecurePluginManager` performs AST-level validation but is not a
-  sandbox replacement.
+  `ValidatedPluginManager` performs AST-level validation but **is not a
+  sandbox**.  The AST check reduces risk from accidentally unsafe code but
+  cannot prevent a determined adversary from executing arbitrary code —
+  `exec()` is still used internally to run the plugin after validation passes.

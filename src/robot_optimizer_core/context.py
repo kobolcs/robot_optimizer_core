@@ -16,7 +16,7 @@ from .discovery import FileDiscoveryService
 from .logging import LoggerAdapter, configure_logging
 from .metrics import MetricsCollector
 from .parsers.robot_ast_parser import RobotASTParser
-from .plugin import SecurePluginManager
+from .plugin import ValidatedPluginManager
 
 
 @runtime_checkable
@@ -76,7 +76,7 @@ class ApplicationContext:
         # Core services (not global!)
         self._container: ThreadSafeContainer | None = None
         self._metrics: MetricsCollector | None = None
-        self._plugin_manager: SecurePluginManager | None = None
+        self._plugin_manager: ValidatedPluginManager | None = None
         self._analyzer_registry: AnalyzerRegistry | None = None
         self._loggers: dict[str, LoggerAdapter] = {}
 
@@ -122,7 +122,7 @@ class ApplicationContext:
 
             # Initialize plugin manager
             if self.config.enable_plugins:
-                self._plugin_manager = SecurePluginManager()
+                self._plugin_manager = ValidatedPluginManager()
                 self._container.register_instance(
                     "plugin_manager", self._plugin_manager
                 )
