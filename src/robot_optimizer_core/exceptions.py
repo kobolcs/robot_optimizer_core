@@ -33,10 +33,10 @@ E = TypeVar("E", bound="RobotOptimizerError")
 __all__ = [
     "AnalysisError",
     "ConfigurationError",
-    "FileNotFoundError",
     "ParsingError",
     "PluginError",
     "RepositoryError",
+    "RobotFileNotFoundError",
     "RobotOptimizerError",
     "ValidationError",
 ]
@@ -250,7 +250,7 @@ class ValidationError(RobotOptimizerError):
         self.validation_rule = validation_rule
 
 
-class FileNotFoundError(AnalysisError):
+class RobotFileNotFoundError(AnalysisError):
     """Raised when a required file cannot be found.
 
     This is a specific type of AnalysisError for missing files.

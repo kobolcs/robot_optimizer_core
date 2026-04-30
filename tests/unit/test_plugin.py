@@ -16,7 +16,7 @@ from robot_optimizer_core.plugin import (
     PluginMetadata,
     PluginRegistry,
     PluginSecurityValidator,
-    SecurePluginManager,
+    ValidatedPluginManager,
     SecurityVisitor,
     get_plugin_registry,
 )
@@ -248,9 +248,9 @@ class TestPluginSecurityValidator:
 
 
 @pytest.mark.unit
-class TestSecurePluginManager:
+class TestValidatedPluginManager:
     def test_nonexistent_file_raises_plugin_error(self) -> None:
-        manager = SecurePluginManager()
+        manager = ValidatedPluginManager()
         with pytest.raises(PluginError, match="Plugin file not found"):
             manager.load_plugin_from_file(Path("/nonexistent/plugin.py"))
 
@@ -259,7 +259,7 @@ class TestSecurePluginManager:
         plugin_file.write_text("import os\n")
         plugin_file.chmod(0o644)
 
-        manager = SecurePluginManager()
+        manager = ValidatedPluginManager()
         with pytest.raises(PluginError, match="[Ss]ecurity validation"):
             manager.load_plugin_from_file(plugin_file)
 
@@ -281,7 +281,7 @@ class TestSecurePluginManager:
         )
         plugin_file.chmod(0o644)
 
-        manager = SecurePluginManager()
+        manager = ValidatedPluginManager()
         manager.load_plugin_from_file(plugin_file)
 
         assert "valid_plugin" in manager.plugins
@@ -293,7 +293,7 @@ class TestSecurePluginManager:
         plugin_file.write_text("x = 1\n")
         plugin_file.chmod(0o644)
 
-        manager = SecurePluginManager()
+        manager = ValidatedPluginManager()
         with pytest.raises(PluginError):
             manager.load_plugin_from_file(plugin_file)
 
@@ -304,7 +304,7 @@ class TestSecurePluginManager:
         plugin_file.write_text("import os\n")  # would be rejected by validator
         plugin_file.chmod(0o644)
 
-        manager = SecurePluginManager()
+        manager = ValidatedPluginManager()
         with caplog.at_level(logging.WARNING, logger="robot_optimizer_core.plugin"):
             with pytest.raises(PluginError):
                 manager.load_plugin_from_file(plugin_file, force=True)
@@ -324,7 +324,7 @@ class TestSecurePluginManager:
         plugin_file.write_text("import os\n")
         plugin_file.chmod(0o644)
 
-        manager = SecurePluginManager()
+        manager = ValidatedPluginManager()
         with caplog.at_level(logging.WARNING, logger="robot_optimizer_core.plugin"):
             with pytest.raises(PluginError):
                 manager.load_plugin_from_file(plugin_file, force=True)
@@ -340,7 +340,7 @@ class TestSecurePluginManager:
         plugin_file.chmod(0o644)
 
         file_hash = hashlib.sha256(plugin_file.read_bytes()).hexdigest()
-        manager = SecurePluginManager()
+        manager = ValidatedPluginManager()
         manager.add_trusted_plugin_hash(file_hash)
 
         # Security validation is skipped; exec still fails with no Plugin subclass.
@@ -351,7 +351,7 @@ class TestSecurePluginManager:
         assert "security validation" not in str(exc_info.value).lower()
 
     def test_add_trusted_hash_stored(self) -> None:
-        manager = SecurePluginManager()
+        manager = ValidatedPluginManager()
         manager.add_trusted_plugin_hash("deadbeef")
         assert "deadbeef" in manager.trusted_hashes
 
@@ -374,7 +374,7 @@ class TestSecurePluginManager:
         )
         plugin_file.chmod(0o644)
 
-        manager = SecurePluginManager()
+        manager = ValidatedPluginManager()
         file_hash = hashlib.sha256(plugin_file.read_bytes()).hexdigest()
         manager.add_trusted_plugin_hash(file_hash)
 

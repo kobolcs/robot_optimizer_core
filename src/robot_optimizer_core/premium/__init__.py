@@ -58,8 +58,8 @@ __all__ = [
 # Constants
 # ---------------------------------------------------------------------------
 
-PREMIUM_PACKAGE_NAME = "robot-framework-optimizer-pro"
-UPGRADE_URL = "https://github.com/kobolcs/robot_optimizer_core"
+PREMIUM_PACKAGE_NAME = "robot-optimizer-pro"
+UPGRADE_URL = "https://kobolcs.github.io/robot-optimizer-pro"
 
 # ---------------------------------------------------------------------------
 # Exception
@@ -88,9 +88,8 @@ class PremiumFeatureError(RobotOptimizerError):
         self.upgrade_url = UPGRADE_URL
         message = (
             f"'{feature_name}' is a premium feature. "
-            f"Install '{PREMIUM_PACKAGE_NAME}' to enable it.\n"
-            f"  pip install {PREMIUM_PACKAGE_NAME}\n"
-            f"  More info: {UPGRADE_URL}"
+            f"Upgrade to '{PREMIUM_PACKAGE_NAME}' to enable it.\n"
+            f"  Join the waitlist / get access: {UPGRADE_URL}"
         )
         super().__init__(
             message,

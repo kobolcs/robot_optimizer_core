@@ -285,16 +285,20 @@ class UnitOfWork:
 
     def register_new(self, entity: Any) -> None:
         """Register a new entity."""
-        assert entity not in self._dirty, "Entity already marked as dirty"
-        assert entity not in self._removed, "Entity already marked for removal"
-        assert entity not in self._new, "Entity already registered as new"
+        if entity in self._dirty:
+            raise ValueError("Entity already marked as dirty")
+        if entity in self._removed:
+            raise ValueError("Entity already marked for removal")
+        if entity in self._new:
+            raise ValueError("Entity already registered as new")
 
         self._new.append(entity)
         self._add_to_identity_map(entity)
 
     def register_dirty(self, entity: Any) -> None:
         """Register a modified entity."""
-        assert entity not in self._removed, "Entity already marked for removal"
+        if entity in self._removed:
+            raise ValueError("Entity already marked for removal")
 
         if entity not in self._dirty and entity not in self._new:
             self._dirty.append(entity)
@@ -323,7 +327,8 @@ class UnitOfWork:
     @contextmanager
     def transaction(self) -> Iterator[UnitOfWork]:
         """Start a transaction context."""
-        assert self._transaction is None, "Transaction already in progress"
+        if self._transaction is not None:
+            raise ValueError("Transaction already in progress")
 
         self._transaction = TransactionContext()
 

@@ -6,25 +6,38 @@ on:
   pull_request:
     branches: [ master, main ]
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - python-version: "3.11"
             tox-env: "py311"
+            os: ubuntu-latest
           - python-version: "3.12"
             tox-env: "py312"
+            os: ubuntu-latest
           - python-version: "3.13"
             tox-env: "py313"
+            os: ubuntu-latest
           - python-version: "3.14"
             tox-env: "py314"
+            os: ubuntu-latest
+          - python-version: "3.12"
+            tox-env: "py312"
+            os: windows-latest
+          - python-version: "3.12"
+            tox-env: "py312"
+            os: macos-latest
 
     steps:
       - name: Checkout

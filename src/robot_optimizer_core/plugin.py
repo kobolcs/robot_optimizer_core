@@ -19,7 +19,7 @@ __all__ = [
     "PluginMetadata",
     "PluginRegistry",
     "PluginSecurityValidator",
-    "SecurePluginManager",
+    "ValidatedPluginManager",
     "SecurityVisitor",
     "get_plugin_registry",
 ]
@@ -271,8 +271,15 @@ class SecurityVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
 
-class SecurePluginManager:
-    """Secure plugin manager that validates plugins before loading."""
+class ValidatedPluginManager:
+    """Plugin manager that validates plugins via AST analysis before loading.
+
+    .. warning::
+        The AST-level validation performed by this class is **not a sandbox**.
+        It reduces risk from accidentally unsafe plugins but cannot prevent a
+        determined adversary from executing arbitrary code.  Only load plugins
+        from sources you trust.
+    """
 
     def __init__(self, registry: PluginRegistry | None = None) -> None:
         self.registry = registry or PluginRegistry()
