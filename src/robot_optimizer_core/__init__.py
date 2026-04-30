@@ -64,7 +64,9 @@ from .api import (
 # Configuration
 from .config import Settings, get_settings, reset_settings
 
-# Deprecation utilities (internal; not part of the public API)
+# Deprecation utilities — imported for internal use only; not listed in __all__
+# and therefore not part of the stable public API.  Available for backward
+# compatibility via `robot_optimizer_core.deprecation` (shim module).
 from ._deprecation import deprecated, deprecation_warning
 
 # Dependency injection
