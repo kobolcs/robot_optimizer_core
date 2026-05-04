@@ -117,7 +117,7 @@ class TagConsistencyAnalyzer(BaseAnalyzer):
 
             if current_name and stripped.lower().startswith("[tags]"):
                 # Extract tag values from this line
-                rest = stripped[len("[tags]"):].strip()
+                rest = stripped[len("[tags]") :].strip()
                 if rest:
                     # Tags are separated by two or more spaces OR tabs
                     tag_parts = re.split(r"  +|\t+", rest)
@@ -138,13 +138,12 @@ class TagConsistencyAnalyzer(BaseAnalyzer):
                 continue  # no point checking further if no tags
 
             for tag in tags:
-                if self._check_reserved:
-                    if tag.lower() in _RESERVED_NORMALIZED and tag not in _RESERVED_TAGS:
-                        findings.append(
-                            self._reserved_tag_finding(
-                                tag, test_name, test_line, test_file
-                            )
-                        )
+                if self._check_reserved and (
+                    tag.lower() in _RESERVED_NORMALIZED and tag not in _RESERVED_TAGS
+                ):
+                    findings.append(
+                        self._reserved_tag_finding(tag, test_name, test_line, test_file)
+                    )
 
                 if (
                     self._check_singletons
@@ -190,9 +189,7 @@ class TagConsistencyAnalyzer(BaseAnalyzer):
         pattern = Pattern(
             type=PatternType.NO_TAGS,
             name="Singleton Tag",
-            description=(
-                f"Tag '{tag}' is only used in '{test_name}' — possible typo"
-            ),
+            description=(f"Tag '{tag}' is only used in '{test_name}' — possible typo"),
             recommendation=(
                 f"Verify the tag '{tag}' is intentional; "
                 "if it is a category tag, apply it to all related tests"
@@ -204,9 +201,7 @@ class TagConsistencyAnalyzer(BaseAnalyzer):
             pattern=pattern,
             severity=Severity.INFO,
             location=Location(file_path=test_file.path, line=line_num),
-            message=(
-                f"Tag '{tag}' appears only once in this file — check for typo"
-            ),
+            message=(f"Tag '{tag}' appears only once in this file — check for typo"),
             tag=tag,
             test_name=test_name,
         )

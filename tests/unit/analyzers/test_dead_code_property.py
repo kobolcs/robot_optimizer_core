@@ -29,9 +29,9 @@ _IDENTIFIER_CHARS = st.text(
     min_size=3,
     max_size=30,
 )
-_KW_NAME = st.text(
-    alphabet="abcdefghijklmnopqrstuvwxyz ", min_size=3, max_size=20
-).map(str.title)
+_KW_NAME = st.text(alphabet="abcdefghijklmnopqrstuvwxyz ", min_size=3, max_size=20).map(
+    str.title
+)
 
 
 def _make_robot_content(
@@ -146,9 +146,7 @@ class TestDeadCodeAnalyzerProperties:
                 finding.location.line,
                 str(finding.pattern.type),
             )
-            assert key not in seen, (
-                f"Duplicate finding at {key}: {finding.message}"
-            )
+            assert key not in seen, f"Duplicate finding at {key}: {finding.message}"
             seen.add(key)
 
     @given(
@@ -174,8 +172,7 @@ class TestDeadCodeAnalyzerProperties:
         unused_names = {
             f.context.get("keyword_name", "").lower()
             for f in findings
-            if f.pattern.type == PatternType.UNUSED_KEYWORD
-            and f.context
+            if f.pattern.type == PatternType.UNUSED_KEYWORD and f.context
         }
         for kw in kw_names:
             # If the keyword is called, it must not appear in unused findings

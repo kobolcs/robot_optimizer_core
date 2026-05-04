@@ -38,12 +38,8 @@ class TestDocumentationAnalyzer(BaseAnalyzer):
         self._check_keywords = bool(self.get_config_value("check_keywords", True))
         self._min_len = int(str(self.get_config_value("min_doc_length", 10)))
 
-        sev_tests_raw = str(
-            self.get_config_value("severity_tests", "WARNING")
-        ).upper()
-        sev_kw_raw = str(
-            self.get_config_value("severity_keywords", "INFO")
-        ).upper()
+        sev_tests_raw = str(self.get_config_value("severity_tests", "WARNING")).upper()
+        sev_kw_raw = str(self.get_config_value("severity_keywords", "INFO")).upper()
         from ..domain.value_objects import Severity as Sev
 
         self._sev_tests = Sev[sev_tests_raw]
@@ -111,12 +107,8 @@ class TestDocumentationAnalyzer(BaseAnalyzer):
                     Finding.create(
                         pattern=pattern,
                         severity=severity,
-                        location=Location(
-                            file_path=test_file.path, line=current_line
-                        ),
-                        message=(
-                            f"{entity.title()} '{current_name}' has {reason}"
-                        ),
+                        location=Location(file_path=test_file.path, line=current_line),
+                        message=(f"{entity.title()} '{current_name}' has {reason}"),
                         entity_type=entity,
                         entity_name=current_name,
                     )

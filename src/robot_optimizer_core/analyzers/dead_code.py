@@ -108,11 +108,15 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         findings = []
 
         # Parse the file structure in a single pass (optimization)
-        keywords, keyword_calls, keyword_display_names = self._extract_keywords_and_calls(test_file)
+        keywords, keyword_calls, keyword_display_names = (
+            self._extract_keywords_and_calls(test_file)
+        )
 
         if self._check_unused:
             findings.extend(
-                self._find_unused_keywords(keywords, keyword_calls, keyword_display_names, test_file)
+                self._find_unused_keywords(
+                    keywords, keyword_calls, keyword_display_names, test_file
+                )
             )
 
         if self._check_duplicates:
@@ -152,7 +156,9 @@ class DeadCodeAnalyzer(BaseAnalyzer):
             for kw_name, line_numbers in keywords.items():
                 for line_num in line_numbers:
                     all_definitions[kw_name].append((test_file, line_num))
-                per_file_display.setdefault(kw_name, display_names.get(kw_name, kw_name))
+                per_file_display.setdefault(
+                    kw_name, display_names.get(kw_name, kw_name)
+                )
             raw_candidates.extend(self._extract_candidate_calls(test_file))
 
         # Resolve raw candidates against the full suite-wide keyword set
@@ -302,13 +308,17 @@ class DeadCodeAnalyzer(BaseAnalyzer):
             if not stripped or stripped.startswith("#"):
                 continue
             if stripped.startswith("***"):
-                in_test_or_keyword = "test case" in stripped.lower() or "keyword" in stripped.lower()
+                in_test_or_keyword = (
+                    "test case" in stripped.lower() or "keyword" in stripped.lower()
+                )
                 continue
             if in_test_or_keyword and line.startswith((" ", "\t")):
                 candidates.append(stripped)
         return candidates
 
-    def _resolve_calls(self, candidates: list[str], keyword_names: set[str]) -> set[str]:
+    def _resolve_calls(
+        self, candidates: list[str], keyword_names: set[str]
+    ) -> set[str]:
         """Match raw candidate strings against a keyword set, returning matched names."""
         calls: set[str] = set()
         for call in candidates:
@@ -319,7 +329,13 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                 if lowered == keyword or lowered.startswith(keyword + " "):
                     calls.add(keyword)
 
-            if lowered_parts and lowered_parts[0] in {"given", "when", "then", "and", "but"}:
+            if lowered_parts and lowered_parts[0] in {
+                "given",
+                "when",
+                "then",
+                "and",
+                "but",
+            }:
                 bdd_call = " ".join(lowered_parts[1:])
                 for keyword in keyword_names:
                     if bdd_call == keyword or bdd_call.startswith(keyword + " "):
@@ -328,14 +344,20 @@ class DeadCodeAnalyzer(BaseAnalyzer):
             if lowered.startswith("run keyword "):
                 dynamic_call = lowered.removeprefix("run keyword ").strip()
                 for keyword in keyword_names:
-                    if dynamic_call == keyword or dynamic_call.startswith(keyword + " "):
+                    if dynamic_call == keyword or dynamic_call.startswith(
+                        keyword + " "
+                    ):
                         calls.add(keyword)
 
             if lowered.startswith("run keywords "):
-                for part in re.split(r"\s+AND\s+", call[len("Run Keywords "):], flags=re.IGNORECASE):
+                for part in re.split(
+                    r"\s+AND\s+", call[len("Run Keywords ") :], flags=re.IGNORECASE
+                ):
                     dynamic_call = part.strip().lower()
                     for keyword in keyword_names:
-                        if dynamic_call == keyword or dynamic_call.startswith(keyword + " "):
+                        if dynamic_call == keyword or dynamic_call.startswith(
+                            keyword + " "
+                        ):
                             calls.add(keyword)
         return calls
 

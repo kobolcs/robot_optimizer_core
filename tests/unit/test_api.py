@@ -85,9 +85,10 @@ class TestAnalyzeFileMaxSizeEnforcement:
         assert exc_info.value.file_path == robot_file
 
 
-
 @pytest.mark.unit
-def test_analyze_file_uses_safe_analyze(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_analyze_file_uses_safe_analyze(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     robot_file = tmp_path / "sample.robot"
     robot_file.write_text("*** Test Cases ***\nCase\n    Log    ok\n")
 
@@ -120,10 +121,12 @@ def test_analyze_directory_parallel_is_deterministic(tmp_path: Path) -> None:
     second = analyze_directory(tmp_path, analyzers=["dead_code"], max_workers=4)
 
     first_messages = {
-        str(path): sorted(f.message for f in findings) for path, findings in first.items()
+        str(path): sorted(f.message for f in findings)
+        for path, findings in first.items()
     }
     second_messages = {
-        str(path): sorted(f.message for f in findings) for path, findings in second.items()
+        str(path): sorted(f.message for f in findings)
+        for path, findings in second.items()
     }
 
     assert first_messages == second_messages

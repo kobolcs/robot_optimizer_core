@@ -89,4 +89,3 @@ class FlakinessStats(ValueObject):
         if delta > 0.05:
             return "worsening"
         return "stable"
-

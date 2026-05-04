@@ -151,9 +151,7 @@ def requires_premium(feature_name: str) -> Callable[[F], F]:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             if not is_premium_installed():
-                fire_telemetry_event(
-                    "premium_stub_triggered", feature=feature_name
-                )
+                fire_telemetry_event("premium_stub_triggered", feature=feature_name)
                 raise PremiumFeatureError(feature_name)
             return func(*args, **kwargs)
 

@@ -480,7 +480,10 @@ def analyze_suite(
             tf = TestFile.from_path(file_path)
             test_files.append(tf)
         except Exception as e:
-            logger.warning(f"Failed to load file for suite analysis: {file_path}", extra={"error": str(e)})
+            logger.warning(
+                f"Failed to load file for suite analysis: {file_path}",
+                extra={"error": str(e)},
+            )
 
     # Gather suite structure info
     for tf in test_files:
@@ -604,4 +607,3 @@ def _get_analyzer_instances(
                 instances.append(analyzer)
 
     return instances
-

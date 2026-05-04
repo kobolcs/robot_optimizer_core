@@ -169,7 +169,6 @@ class AnalyzerRegistry:
 
         return instance
 
-
     def create(self, name: str) -> BaseAnalyzer:
         """Create a fresh analyzer instance without using the cache."""
         if name not in self.analyzers:
@@ -314,9 +313,11 @@ def _register_entry_point_analyzers(registry: AnalyzerRegistry) -> None:
         except Exception as exc:  # pragma: no cover - defensive logging path
             logger.warning(
                 "Failed to load analyzer entry point",
-                extra={"entry_point": getattr(ep, "name", "<unknown>"), "error": str(exc)},
+                extra={
+                    "entry_point": getattr(ep, "name", "<unknown>"),
+                    "error": str(exc),
+                },
             )
-
 
 
 # Public API functions

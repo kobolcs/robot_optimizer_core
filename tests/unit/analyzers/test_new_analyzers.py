@@ -120,9 +120,7 @@ class TestHardcodedValueAnalyzer:
         assert len(findings) == 1
 
     def test_localhost_flagged(self, analyzer: HardcodedValueAnalyzer) -> None:
-        content = (
-            "*** Test Cases ***\nMy Test\n    Connect    localhost\n"
-        )
+        content = "*** Test Cases ***\nMy Test\n    Connect    localhost\n"
         findings = analyzer.analyze(_make_file(content))
         assert findings  # should flag localhost
 
@@ -134,16 +132,12 @@ class TestHardcodedValueAnalyzer:
     def test_credential_flagged_as_error(
         self, analyzer: HardcodedValueAnalyzer
     ) -> None:
-        content = (
-            "*** Test Cases ***\nMy Test\n    Login    password=s3cr3t123\n"
-        )
+        content = "*** Test Cases ***\nMy Test\n    Login    password=s3cr3t123\n"
         findings = analyzer.analyze(_make_file(content))
         cred_findings = [f for f in findings if f.severity == Severity.ERROR]
         assert cred_findings
 
-    def test_variable_url_not_flagged(
-        self, analyzer: HardcodedValueAnalyzer
-    ) -> None:
+    def test_variable_url_not_flagged(self, analyzer: HardcodedValueAnalyzer) -> None:
         content = "*** Test Cases ***\nMy Test\n    Go To    ${BASE_URL}\n"
         findings = analyzer.analyze(_make_file(content))
         url_findings = [f for f in findings if "url" in f.message.lower()]
@@ -160,9 +154,7 @@ class TestHardcodedValueAnalyzer:
     ) -> None:
         content = "*** Test Cases ***\nMy Test\n    Connect    8080\n"
         findings = analyzer.analyze(_make_file(content))
-        port_findings = [
-            f for f in findings if "port" in f.message.lower()
-        ]
+        port_findings = [f for f in findings if "port" in f.message.lower()]
         assert port_findings == []
 
     def test_check_ports_enabled(self) -> None:
@@ -187,9 +179,7 @@ class DocAnalyzerTests:
         assert analyzer.name == "test_documentation"
         assert "documentation" in analyzer.tags
 
-    def test_undocumented_test_flagged(
-        self, analyzer: DocAnalyzer
-    ) -> None:
+    def test_undocumented_test_flagged(self, analyzer: DocAnalyzer) -> None:
         content = "*** Test Cases ***\nMy Test\n    Log    hi\n"
         findings = analyzer.analyze(_make_file(content))
         assert any("My Test" in f.message for f in findings)
@@ -205,16 +195,12 @@ class DocAnalyzerTests:
 
     def test_short_doc_flagged(self, analyzer: DocAnalyzer) -> None:
         content = (
-            "*** Test Cases ***\nMy Test\n"
-            "    [Documentation]    Hi\n"
-            "    Log    hi\n"
+            "*** Test Cases ***\nMy Test\n    [Documentation]    Hi\n    Log    hi\n"
         )
         findings = analyzer.analyze(_make_file(content))
         assert findings  # "Hi" is too short
 
-    def test_undocumented_keyword_flagged(
-        self, analyzer: DocAnalyzer
-    ) -> None:
+    def test_undocumented_keyword_flagged(self, analyzer: DocAnalyzer) -> None:
         content = "*** Keywords ***\nMy Keyword\n    Log    hi\n"
         findings = analyzer.analyze(_make_file(content))
         assert findings
@@ -312,9 +298,7 @@ class TestSetupTeardownAnalyzer:
         assert analyzer.name == "setup_teardown"
         assert "structure" in analyzer.tags
 
-    def test_repeated_setup_step_flagged(
-        self, analyzer: SetupTeardownAnalyzer
-    ) -> None:
+    def test_repeated_setup_step_flagged(self, analyzer: SetupTeardownAnalyzer) -> None:
         content = (
             "*** Test Cases ***\nTest A\n"
             "    Open Browser    ${URL}\n"
