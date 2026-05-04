@@ -138,16 +138,12 @@ class TagConsistencyAnalyzer(BaseAnalyzer):
                 continue  # no point checking further if no tags
 
             for tag in tags:
-                if self._check_reserved:
-                    if (
-                        tag.lower() in _RESERVED_NORMALIZED
-                        and tag not in _RESERVED_TAGS
-                    ):
-                        findings.append(
-                            self._reserved_tag_finding(
-                                tag, test_name, test_line, test_file
-                            )
-                        )
+                if self._check_reserved and (
+                    tag.lower() in _RESERVED_NORMALIZED and tag not in _RESERVED_TAGS
+                ):
+                    findings.append(
+                        self._reserved_tag_finding(tag, test_name, test_line, test_file)
+                    )
 
                 if (
                     self._check_singletons

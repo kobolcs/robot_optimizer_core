@@ -88,7 +88,21 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
 
     def __init__(self, config: dict[str, ConfigValue] | None = None) -> None:
         super().__init__(config)
-        self._threshold = int(str(self.get_config_value("duplication_threshold", 2)))
+        raw_threshold = self.get_config_value("duplication_threshold", 2)
+        if isinstance(raw_threshold, bool):
+            msg = "duplication_threshold must be an integer, not a boolean"
+            raise ValueError(msg)
+        if isinstance(raw_threshold, (int, float)):
+            self._threshold = int(raw_threshold)
+        elif isinstance(raw_threshold, str):
+            try:
+                self._threshold = int(raw_threshold.strip())
+            except ValueError as e:
+                msg = f"duplication_threshold must be an integer, got: {raw_threshold}"
+                raise ValueError(msg) from e
+        else:
+            msg = f"duplication_threshold must be an integer, got {type(raw_threshold).__name__}"
+            raise TypeError(msg)
         self._check_setup = bool(self.get_config_value("check_setup", True))
         self._check_teardown = bool(self.get_config_value("check_teardown", True))
 
