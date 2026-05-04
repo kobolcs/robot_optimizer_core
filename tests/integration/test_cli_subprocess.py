@@ -72,9 +72,7 @@ class TestAnalyzeExitCodesSubprocess:
     def test_no_fail_exits_zero(self, tmp_path: Path) -> None:
         """--no-fail must produce exit 0 even when findings exist."""
         f = tmp_path / "t.robot"
-        f.write_text(
-            "*** Test Cases ***\nMy Test\n    Sleep    10\n"
-        )
+        f.write_text("*** Test Cases ***\nMy Test\n    Sleep    10\n")
         result = _run("analyze", str(f), "--no-fail")
         assert result.returncode == 0
 
@@ -88,18 +86,14 @@ class TestAnalyzeExitCodesSubprocess:
 class TestAnalyzeFormatSubprocess:
     def test_json_output_is_valid_json(self, tmp_path: Path) -> None:
         f = tmp_path / "t.robot"
-        f.write_text(
-            "*** Test Cases ***\nMy Test\n    Sleep    10\n"
-        )
+        f.write_text("*** Test Cases ***\nMy Test\n    Sleep    10\n")
         result = _run("analyze", str(f), "--format", "json")
         parsed = json.loads(result.stdout)
         assert isinstance(parsed, list)
 
     def test_text_output_contains_finding_info(self, tmp_path: Path) -> None:
         f = tmp_path / "t.robot"
-        f.write_text(
-            "*** Test Cases ***\nMy Test\n    Sleep    10\n"
-        )
+        f.write_text("*** Test Cases ***\nMy Test\n    Sleep    10\n")
         result = _run("analyze", str(f), "--format", "text")
         # Either findings or a clean message
         assert result.stdout
@@ -115,9 +109,7 @@ class TestMinSeveritySubprocess:
     def test_min_severity_error_filters_warnings(self, tmp_path: Path) -> None:
         """With --min-severity ERROR, WARNING findings must not appear."""
         f = tmp_path / "t.robot"
-        f.write_text(
-            "*** Test Cases ***\nMy Test\n    Sleep    2\n"
-        )
+        f.write_text("*** Test Cases ***\nMy Test\n    Sleep    2\n")
         result = _run("analyze", str(f), "--format", "json", "--min-severity", "ERROR")
         findings = json.loads(result.stdout)
         severities = {finding["severity"] for finding in findings}
@@ -168,7 +160,6 @@ class TestListAnalyzersSubprocess:
             "test_documentation",
         }
         assert expected.issubset(names)
-
 
     def test_list_analyzers_stdout_has_no_structured_logs(self) -> None:
         result = _run("list-analyzers")

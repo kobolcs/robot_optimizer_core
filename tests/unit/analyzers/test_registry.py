@@ -38,7 +38,9 @@ def test_registry_create_returns_fresh_instances() -> None:
 
 
 @pytest.mark.unit
-def test_register_entry_point_analyzers_loads_canonical_group(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_register_entry_point_analyzers_loads_canonical_group(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     registry = AnalyzerRegistry()
 
     ep = EntryPoint(

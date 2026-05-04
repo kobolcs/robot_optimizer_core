@@ -50,7 +50,9 @@ class TestSleepDetectorSuggestions:
         assert "Login Test" in self._find_message(content)
 
     def test_suggestion_includes_keyword_name(self) -> None:
-        content = "*** Keywords ***\nWait For Page Load\n    Sleep    2\n    Log    done\n"
+        content = (
+            "*** Keywords ***\nWait For Page Load\n    Sleep    2\n    Log    done\n"
+        )
         assert "Wait For Page Load" in self._find_message(content)
 
     def test_sub_second_sleep_mentions_sub_second(self) -> None:
@@ -78,7 +80,10 @@ class TestSleepDetectorHelpers:
         assert self._d()._detect_library(lines) == "browser"
 
     def test_detect_library_none(self) -> None:
-        assert self._d()._detect_library(["*** Test Cases ***", "T", "    Sleep    1"]) is None
+        assert (
+            self._d()._detect_library(["*** Test Cases ***", "T", "    Sleep    1"])
+            is None
+        )
 
     def test_classify_context_ui(self) -> None:
         assert self._d()._classify_context(["Click Element    id:btn"]) == "ui"
@@ -87,7 +92,10 @@ class TestSleepDetectorHelpers:
         assert self._d()._classify_context(["Navigate To    https://x"]) == "page"
 
     def test_classify_context_verify(self) -> None:
-        assert self._d()._classify_context(["Element Should Contain    id:x    text"]) == "verify"
+        assert (
+            self._d()._classify_context(["Element Should Contain    id:x    text"])
+            == "verify"
+        )
 
     def test_classify_context_generic(self) -> None:
         assert self._d()._classify_context(["Log    message"]) == "generic"

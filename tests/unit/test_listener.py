@@ -23,7 +23,9 @@ class _FakeRepo(TestResultRepository):
     def save_result(self, result: TestResult) -> None:
         self.saved.append(result)
 
-    def get_results_for_file(self, file_path: Path, days_back: int = 30) -> list[TestResult]:
+    def get_results_for_file(
+        self, file_path: Path, days_back: int = 30
+    ) -> list[TestResult]:
         return []
 
     def get_flakiness_stats(self, file_path: Path, days_back: int = 30):  # type: ignore[override]
@@ -33,7 +35,9 @@ class _FakeRepo(TestResultRepository):
         return len(self.saved)
 
 
-def _fake_test_data(name: str = "My Test", source: str = "tests/login.robot") -> MagicMock:
+def _fake_test_data(
+    name: str = "My Test", source: str = "tests/login.robot"
+) -> MagicMock:
     data = MagicMock()
     data.name = name
     data.source = source
@@ -42,7 +46,9 @@ def _fake_test_data(name: str = "My Test", source: str = "tests/login.robot") ->
     return data
 
 
-def _fake_result(status: str = "PASS", elapsed_seconds: float = 1.5, message: str = "") -> MagicMock:
+def _fake_result(
+    status: str = "PASS", elapsed_seconds: float = 1.5, message: str = ""
+) -> MagicMock:
     result = MagicMock()
     result.status = status
     result.elapsed_time = timedelta(seconds=elapsed_seconds)
@@ -68,7 +74,9 @@ class TestFlakinessListenerEndTest:
     def test_failing_test_saved(self) -> None:
         repo = _FakeRepo()
         listener = FlakinessListener(repository=repo)
-        listener.end_test(_fake_test_data(), _fake_result("FAIL", message="Assertion failed"))
+        listener.end_test(
+            _fake_test_data(), _fake_result("FAIL", message="Assertion failed")
+        )
         assert repo.saved[0].status == "FAIL"
         assert repo.saved[0].error_message == "Assertion failed"
 

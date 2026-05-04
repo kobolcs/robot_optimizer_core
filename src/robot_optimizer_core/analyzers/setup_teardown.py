@@ -88,24 +88,29 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
 
     def __init__(self, config: dict[str, ConfigValue] | None = None) -> None:
         super().__init__(config)
-        value = self.get_config_value("duplication_threshold", 2)
-        if isinstance(value, bool):
-            raise ValueError(
-                "duplication_threshold must be an integer, got bool"
-            )
-        elif isinstance(value, (int, float)):
-            self._threshold = int(value)
-        elif isinstance(value, str):
+        raw_threshold = self.get_config_value("duplication_threshold", 2)
+        if isinstance(raw_threshold, bool):
+            msg = "duplication_threshold must be an integer, not a boolean"
+            raise TypeError(msg)
+        if isinstance(raw_threshold, int):
+            self._threshold = raw_threshold
+        elif isinstance(raw_threshold, float):
+            if not raw_threshold.is_integer():
+                msg = f"duplication_threshold must be a whole number, got: {raw_threshold}"
+                raise ValueError(msg)
+            self._threshold = int(raw_threshold)
+        elif isinstance(raw_threshold, str):
             try:
-                self._threshold = int(value.strip())
-            except ValueError:
-                raise ValueError(
-                    f"duplication_threshold must be an integer, got string {value!r}"
-                ) from None
+                self._threshold = int(raw_threshold.strip())
+            except ValueError as e:
+                msg = f"duplication_threshold must be an integer, got: {raw_threshold}"
+                raise ValueError(msg) from e
         else:
-            raise TypeError(
-                f"duplication_threshold must be an integer, got {type(value).__name__}"
-            )
+            msg = f"duplication_threshold must be an integer, got {type(raw_threshold).__name__}"
+            raise TypeError(msg)
+        if self._threshold < 1:
+            msg = "duplication_threshold must be >= 1"
+            raise ValueError(msg)
         self._check_setup = bool(self.get_config_value("check_setup", True))
         self._check_teardown = bool(self.get_config_value("check_teardown", True))
 
@@ -210,7 +215,9 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
 
         def flush() -> None:
             if current_name:
-                result.append((current_name, current_line, list(current_steps), has_hook))
+                result.append(
+                    (current_name, current_line, list(current_steps), has_hook)
+                )
 
         for line_num, line in enumerate(lines, 1):
             stripped = line.strip()
