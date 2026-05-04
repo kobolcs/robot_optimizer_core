@@ -430,30 +430,22 @@ def analyze_suite(
     analyzers: list[str | BaseAnalyzer] | None = None,
     settings: Settings | None = None,
 ) -> SuiteAnalysisResult:
-    """Analyze a Robot Framework test suite with AST parsing.
-
-    When the ``dead_code`` analyzer is active, this function uses
-    :meth:`~robot_optimizer_core.analyzers.DeadCodeAnalyzer.analyze_suite`
-    for cross-file unused keyword detection.  Per-file findings from all other
-    analyzers are preserved; dead-code findings are replaced with the
-    suite-level ones to avoid false positives caused by keywords that are
-    called from *other* files in the suite.
-
-    Args:
-        suite_path: Path to suite file or directory.
-        analyzers: List of analyzer names or instances.
-        settings: Configuration settings.
-
+    """
+    Analyze a Robot Framework test suite and return aggregated findings and suite metadata.
+    
+    When the `dead_code` analyzer is present, dead-code analysis is executed at the suite level to detect unused keywords across files; its findings are attributed back to the originating files and replace per-file dead-code results to avoid cross-file false positives.
+    
+    Parameters:
+        suite_path (str | Path): Path to a suite file or a directory containing suite files.
+        analyzers (list[str | BaseAnalyzer] | None): Analyzer names or pre-instantiated analyzer objects to run. If `None`, the default analyzer set is used.
+        settings (Settings | None): Optional configuration; if omitted, global settings are loaded.
+    
     Returns:
-        Dictionary with analysis results including:
-        - findings: List of all findings
-        - suite_info: Parsed suite information
-        - statistics: Analysis statistics
-
-    Example:
-        >>> results = analyze_suite("tests/")
-        >>> print(f"Total findings: {len(results['findings'])}")
-        >>> print(f"Keywords: {results['suite_info']['keyword_count']}")
+        SuiteAnalysisResult: A mapping containing:
+            - findings: list[Finding] — all findings produced for the suite.
+            - file_findings: dict[Path, list[Finding]] — findings grouped by file path.
+            - suite_info: SuiteInfo — aggregated suite information (files, keywords, test cases, imports).
+            - statistics: SuiteStatistics — counts and breakdowns of findings and suite element counts.
     """
     path = Path(suite_path)
     container = get_container()
@@ -574,14 +566,17 @@ def _create_analyzer_instance(name: str) -> BaseAnalyzer:
 def _get_analyzer_instances(
     analyzers: list[str | BaseAnalyzer] | None, settings: Settings
 ) -> list[BaseAnalyzer]:
-    """Get analyzer instances from names or objects.
-
-    Args:
-        analyzers: List of analyzer names or instances.
-        settings: Configuration settings.
-
+    """
+    Resolve analyzer identifiers into instantiated analyzer objects.
+    
+    If `analyzers` is None, instantiate all registered analyzers that do not require an external repository. Otherwise, convert string names to instances and pass through any analyzer objects.
+    
+    Parameters:
+        analyzers (list[str | BaseAnalyzer] | None): Analyzer names or prepared analyzer instances. If None, the registry's applicable analyzers are instantiated.
+        settings (Settings): Configuration settings used when creating analyzer instances.
+    
     Returns:
-        List of analyzer instances.
+        list[BaseAnalyzer]: A list of analyzer instances ready for use.
     """
     if analyzers is None:
         # Check requires_external_repo at the class level before instantiation;

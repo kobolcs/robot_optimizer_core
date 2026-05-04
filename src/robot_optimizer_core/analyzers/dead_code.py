@@ -104,7 +104,18 @@ class DeadCodeAnalyzer(BaseAnalyzer):
 
     @override
     def analyze(self, test_file: TestFile) -> list[Finding]:
-        """Analyze test file for dead code."""
+        """
+        Run dead-code checks on a single test file and return any findings.
+        
+        Performs configured checks (unused keywords, duplicate definitions, unreachable code)
+        for the provided test file and aggregates all resulting findings.
+        
+        Parameters:
+            test_file (TestFile): The test file to analyze.
+        
+        Returns:
+            list[Finding]: A list of findings detected in the file (possibly empty).
+        """
         findings = []
 
         # Parse the file structure in a single pass (optimization)
@@ -299,7 +310,19 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         return dict(keywords), calls, keyword_display_names
 
     def _extract_candidate_calls(self, test_file: TestFile) -> list[str]:
-        """Return all indented (call-site) stripped lines from test/keyword sections."""
+        """
+        Collect candidate call lines from the test-case and keyword sections of a test file.
+        
+        Scans the file content and returns stripped lines that are indented (start with space or tab)
+        inside either the `*** Test Cases ***` or `*** Keywords ***` sections, excluding blank lines
+        and comments.
+        
+        Parameters:
+            test_file (TestFile): Test file object whose `.content` (string) will be scanned.
+        
+        Returns:
+            list[str]: Stripped indented lines that are potential call sites.
+        """
         candidates: list[str] = []
         lines = test_file.content.splitlines()
         in_test_or_keyword = False
@@ -319,7 +342,16 @@ class DeadCodeAnalyzer(BaseAnalyzer):
     def _resolve_calls(
         self, candidates: list[str], keyword_names: set[str]
     ) -> set[str]:
-        """Match raw candidate strings against a keyword set, returning matched names."""
+        """
+        Match raw candidate call strings against known keyword names and return the set of matched keyword identifiers.
+        
+        Parameters:
+            candidates (list[str]): Raw caller lines (stripped instruction lines) to evaluate.
+            keyword_names (set[str]): Normalized (lowercased) keyword names to match against.
+        
+        Returns:
+            matched (set[str]): Set of keyword names from `keyword_names` that were matched by any candidate.
+        """
         calls: set[str] = set()
         for call in candidates:
             lowered = call.lower()

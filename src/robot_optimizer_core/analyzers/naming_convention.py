@@ -73,6 +73,19 @@ class NamingConventionAnalyzer(BaseAnalyzer):
     """
 
     def __init__(self, config: dict[str, ConfigValue] | None = None) -> None:
+        """
+        Initialize the NamingConventionAnalyzer with configuration-controlled checks and compiled ignore patterns.
+        
+        Reads the following keys from `config` (defaults shown) and stores corresponding internal flags:
+        - `check_test_names` (True): enable checking test case names.
+        - `check_keyword_names` (True): enable checking keyword names.
+        - `check_variable_names` (True): enable checking variable names.
+        
+        Also reads `ignore_patterns` (default empty list), compiles each entry into a case-insensitive regular expression, and stores them for skipping matching names.
+        
+        Parameters:
+            config (dict[str, ConfigValue] | None): Configuration mapping that may contain the keys above; if `None`, defaults are used.
+        """
         super().__init__(config)
         self._check_tests: bool = bool(self.get_config_value("check_test_names", True))
         self._check_keywords: bool = bool(
@@ -103,6 +116,17 @@ class NamingConventionAnalyzer(BaseAnalyzer):
 
     @override
     def analyze(self, test_file: TestFile) -> list[Finding]:
+        """
+        Analyze a Robot Framework test file and return naming-convention findings for test cases, keywords, and variables.
+        
+        Scans the file content line-by-line, detects section headers to identify test case and keyword definitions, inspects non-indented definition lines for CamelCase-style names, and inspects indented lines for `${...}` variable usages that appear to use CamelCase. Honors analyzer configuration flags to enable/disable checks and skips names matching configured ignore patterns.
+        
+        Parameters:
+            test_file (TestFile): The parsed test file whose `content` will be scanned.
+        
+        Returns:
+            findings (list[Finding]): A list of findings describing naming convention violations found in the file.
+        """
         findings: list[Finding] = []
         lines = test_file.content.splitlines()
 

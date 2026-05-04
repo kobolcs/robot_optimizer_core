@@ -83,10 +83,15 @@ def _format_json(findings: list[Finding]) -> str:
 
 
 def _format_sarif(findings: list[Finding], path: Path) -> str:
-    """Produce a SARIF 2.1.0 JSON string from a list of findings.
-
-    ``path`` is the analysed file or directory.  It is used to rewrite absolute
-    artifact URIs to relative ones so SARIF output is portable across machines.
+    """
+    Convert a list of findings into a SARIF 2.1.0 JSON string.
+    
+    Parameters:
+    	findings (list[Finding]): Sequence of findings to include in the SARIF results.
+    	path (Path): The analysed file or directory; used as the analysis root when converting artifact URIs to paths relative to the analysed location.
+    
+    Returns:
+    	sarif_json (str): A JSON-formatted SARIF 2.1.0 document containing the tool driver rules and results.
     """
     # Build unique rules list and deterministic result ordering from Finding helpers.
     seen_rules: dict[str, dict[str, object]] = {}
@@ -153,6 +158,18 @@ def _format_sarif(findings: list[Finding], path: Path) -> str:
 
 
 def _format_html(findings: list[Finding], path: Path) -> str:
+    """
+    Render a complete HTML health report for the given findings and analysis path.
+    
+    The generated document contains an executive summary, health status badge, key metrics (counts by severity, affected files, auto-fixable count), categorized risk cards with suggested actions, a list of recommended actions derived from present findings, grouped finding cards by category, and an appendix table of detailed findings. File paths shown in the report are made relative to the provided path when possible.
+    
+    Parameters:
+        findings (list[Finding]): Collected analysis findings to include in the report.
+        path (Path): Path used as the analysis root for display and relative path resolution.
+    
+    Returns:
+        str: A complete HTML document as a UTF-8 text string.
+    """
     class _CategoryInfo(TypedDict):
         count: int
         impact: str
@@ -425,6 +442,32 @@ def _format_html(findings: list[Finding], path: Path) -> str:
 
 
 def _run_analyze(args: argparse.Namespace) -> int:
+    """
+    Run the analyze subcommand: perform analysis of a file or directory, format results, and exit with an appropriate code.
+    
+    This function:
+    - Resolves args.path and runs analysis on that file or directory (directory analysis may produce partial results).
+    - Optionally restricts analyzers via args.analyzers, applies a minimum severity from args.min_severity, and loads configuration from args.config when provided.
+    - Formats findings according to args.format ("text", "json", "sarif", or "html") and writes the output to args.output_file if set, otherwise prints to stdout.
+    - Emits a concise findings summary to stderr.
+    
+    Parameters:
+        args (argparse.Namespace): Parsed command-line namespace. Expected attributes used:
+            - path: path to file or directory to analyze.
+            - analyzers: optional comma-separated analyzer names.
+            - min_severity: optional minimum severity string.
+            - config: optional path to a TOML config file.
+            - format: output format ("text", "json", "sarif", "html").
+            - output_file: optional path to write formatted output.
+            - no_fail: when true, suppresses failure exit code even if findings are present.
+    
+    Returns:
+        int: Process exit code:
+            - 0: success with no findings or --no-fail.
+            - 1: findings present and not suppressed by --no-fail.
+            - 2: unrecoverable error (invalid options, config load failure, analysis error, write error).
+            - 3: partial directory analysis results due to errors in some files.
+    """
     path = Path(args.path)
     from .analyzers import (
         BaseAnalyzer,  # local import avoids circular import at module level
@@ -631,6 +674,22 @@ def _run_list_analyzers(args: argparse.Namespace) -> int:
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    """
+    Builds and returns the command-line argument parser for the `robot-optimizer` CLI.
+    
+    The returned parser is configured with global flags:
+    - --version (shows tool version),
+    - --verbose (enable INFO logs),
+    - --debug (enable DEBUG logs);
+    
+    and three required subcommands:
+    - analyze: analyze a .robot file or directory and supports flags for selecting analyzers, output format (text|json|sarif|html), output file, --no-fail, --min-severity, and --config;
+    - list-analyzers: list available analyzers with text or json output;
+    - upgrade: show feature comparison and upgrade information.
+    
+    Returns:
+        argparse.ArgumentParser: A configured ArgumentParser for the `robot-optimizer` command-line interface.
+    """
     parser = argparse.ArgumentParser(
         prog="robot-optimizer",
         description="Robot Framework test-suite analyser",

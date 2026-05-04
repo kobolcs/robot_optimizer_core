@@ -127,27 +127,29 @@ def is_premium_installed() -> bool:
 
 
 def requires_premium(feature_name: str) -> Callable[[F], F]:
-    """Decorator that guards a function behind a Pro installation check.
-
-    When the decorated callable is invoked without Pro installed,
-    :class:`PremiumFeatureError` is raised **before** the function body
-    executes.
-
-    Args:
-        feature_name: Human-readable name of the premium feature, used in
-            the error message and telemetry event.
-
+    """
+    Prevent a callable from running unless the Pro package is installed.
+    
+    Parameters:
+        feature_name (str): Human-readable name of the premium feature used in the error message and telemetry event.
+    
     Returns:
-        Decorator that wraps the target callable.
-
-    Example::
-
-        @requires_premium("html_reports")
-        def generate_html_report(findings: list[Finding]) -> bytes:
-            ...  # Pro-only implementation
+        Callable[[F], F]: A decorator that wraps a function so that the decorated callable raises `PremiumFeatureError` when Pro is not installed; otherwise it invokes and returns the wrapped function's result.
     """
 
     def decorator(func: F) -> F:
+        """
+        Create a decorator that enforces a premium feature check for the decorated callable.
+        
+        Parameters:
+            func (F): The function to wrap.
+        
+        Returns:
+            F: A wrapper that calls the original function when the Pro package is installed; if not installed, the wrapper fires a "premium_stub_triggered" telemetry event and raises `PremiumFeatureError`.
+        
+        Raises:
+            PremiumFeatureError: If the Pro package is not installed when the wrapper is invoked.
+        """
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             if not is_premium_installed():

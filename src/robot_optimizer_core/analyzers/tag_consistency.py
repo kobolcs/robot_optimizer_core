@@ -81,6 +81,17 @@ class TagConsistencyAnalyzer(BaseAnalyzer):
 
     @override
     def analyze(self, test_file: TestFile) -> list[Finding]:
+        """
+        Analyze a Robot Framework test file for tag-related issues.
+        
+        Scans the given test file's test cases and produces findings for tests that are missing a `[Tags]` line, tags that occur fewer times than the configured singleton threshold, and tags that match reserved Robot Framework tags only by case (capitalization mismatches).
+        
+        Parameters:
+            test_file (TestFile): Test file object containing `path` and `content` to analyze.
+        
+        Returns:
+            list[Finding]: A list of Findings describing detected tag issues (missing tags, singleton tags, reserved-tag capitalization conflicts).
+        """
         findings: list[Finding] = []
         lines = test_file.content.splitlines()
 
@@ -190,6 +201,18 @@ class TagConsistencyAnalyzer(BaseAnalyzer):
     def _singleton_tag_finding(
         self, tag: str, test_name: str, line_num: int, test_file: TestFile
     ) -> Finding:
+        """
+        Create a Finding for a tag that is used only in a single test within the file.
+        
+        Parameters:
+            tag (str): The tag name that appears only once.
+            test_name (str): Name of the test containing the tag.
+            line_num (int): Line number where the test (or tag) is defined.
+            test_file (TestFile): The file being analyzed.
+        
+        Returns:
+            finding (Finding): A Finding with severity INFO describing the singleton tag occurrence and recommending verification.
+        """
         pattern = Pattern(
             type=PatternType.NO_TAGS,
             name="Singleton Tag",

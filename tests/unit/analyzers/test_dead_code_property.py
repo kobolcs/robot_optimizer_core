@@ -39,7 +39,17 @@ def _make_robot_content(
     called: list[str],
     test_names: list[str],
 ) -> str:
-    """Build a minimal Robot Framework file from components."""
+    """
+    Construct a minimal Robot Framework file containing a Test Cases section and a Keywords section.
+    
+    Parameters:
+        kw_names (list[str]): Keyword names to include under the `*** Keywords ***` section; names containing `*` or surrounding whitespace will be stripped and omitted if empty.
+        called (list[str]): Keyword names to insert as indented calls under each test in the `*** Test Cases ***` section; entries that are empty after trimming are skipped.
+        test_names (list[str]): Test case names to include; names containing `*` or surrounding whitespace will be stripped and replaced with "My Test" if empty.
+    
+    Returns:
+        robot_content (str): The assembled Robot Framework file as a single string with newline separators.
+    """
     lines = ["*** Test Cases ***"]
     for test in test_names:
         safe = test.replace("*", "").strip() or "My Test"
@@ -132,7 +142,13 @@ class TestDeadCodeAnalyzerProperties:
         kw_names: list[str],
         test_names: list[str],
     ) -> None:
-        """No two findings should share the exact same (file, line, pattern_type)."""
+        """
+        Assert that the analyzer does not produce two findings with the same file path, line number, and pattern type.
+        
+        Parameters:
+            kw_names (list[str]): Keyword names to include in the generated Robot file.
+            test_names (list[str]): Test case names to include in the generated Robot file.
+        """
         content = _make_robot_content(kw_names, [], test_names)
         test_file = _make_file(content)
 

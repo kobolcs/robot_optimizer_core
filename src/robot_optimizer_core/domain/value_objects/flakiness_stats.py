@@ -70,11 +70,13 @@ class FlakinessStats(ValueObject):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def trend(self) -> FlakinessTrend:
-        """Determine whether flakiness is improving, stable, or worsening.
-
-        Compares the failure rate in the recent half of the run window against
-        the older half.  Requires at least 2 runs in each window to be
-        meaningful; otherwise reports 'unknown'.
+        """
+        Classifies the flakiness trend by comparing failure rates between the recent and older run windows.
+        
+        If either window has fewer than 2 runs the trend is `'unknown'`. Otherwise the method computes the difference between recent and older failure rates and applies an absolute threshold of 0.05: a decrease of at least 0.05 is `'improving'`, an increase of at least 0.05 is `'worsening'`, and any change within ±0.05 is `'stable'`.
+        
+        Returns:
+        	FlakinessTrend: `'improving'` if recent failure rate is at least 0.05 lower than older rate, `'worsening'` if recent failure rate is at least 0.05 higher than older rate, `'stable'` if the rates differ by less than 0.05, `'unknown'` if either window has fewer than 2 runs.
         """
         if self.recent_runs < 2 or self.older_runs < 2:
             return "unknown"

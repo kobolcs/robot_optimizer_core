@@ -112,6 +112,11 @@ def test_analyze_file_uses_safe_analyze(
 
 @pytest.mark.unit
 def test_analyze_directory_parallel_is_deterministic(tmp_path: Path) -> None:
+    """
+    Verifies that analyze_directory produces deterministic findings when run in parallel.
+    
+    Runs analyze_directory twice on the same directory with multiple workers and asserts that, for each file, the sorted lists of finding messages are identical between runs.
+    """
     one = tmp_path / "one.robot"
     two = tmp_path / "two.robot"
     one.write_text("*** Keywords ***\nAlpha\n    No Operation\n")

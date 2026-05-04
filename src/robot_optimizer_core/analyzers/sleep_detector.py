@@ -477,7 +477,15 @@ class SleepDetector(BaseAnalyzer):
     }
 
     def _detect_library(self, lines: list[str]) -> str | None:
-        """Return the canonical library name from *** Settings *** Library imports."""
+        """
+        Detects which known testing library is imported in the file's *** Settings *** Library entries.
+        
+        Parameters:
+            lines (list[str]): Lines of the Robot Framework test file.
+        
+        Returns:
+            str | None: The canonical library key found in a `Library` import (e.g., 'seleniumlibrary'), or `None` if no matching library is imported.
+        """
         in_settings = False
         for line in lines:
             stripped = line.strip()
@@ -510,10 +518,14 @@ class SleepDetector(BaseAnalyzer):
     def _build_file_index(
         self, lines: list[str]
     ) -> tuple[dict[int, str | None], dict[int, str]]:
-        """Build block-name index in O(n); category dict is empty (lazy per-finding).
-
+        """
+        Map each 1-based line number to the enclosing non-indented block or header name.
+        
+        Parameters:
+            lines (list[str]): File lines in original order.
+        
         Returns:
-            (block_names, {}) — categories are computed on-demand in _suggest_alternative.
+            tuple[dict[int, str | None], dict[int, str]]: A pair where the first element maps 1-based line numbers to the nearest preceding non-indented, non-empty line (the block/header name) or `None` if none applies; the second element is an empty dict reserved as a per-finding category cache.
         """
         block_names: dict[int, str | None] = {}
         current_block: str | None = None
@@ -570,7 +582,20 @@ class SleepDetector(BaseAnalyzer):
         line_num: int,
         ctx: _AnalyzeCtx | None = None,
     ) -> str | None:
-        """Suggest a context- and library-aware alternative to sleep."""
+        """
+        Suggest a context- and library-aware replacement suggestion for a detected sleep.
+        
+        Generates a short, user-facing recommendation based on the sleep duration, nearby test lines, the enclosing block (if any), and any detected test library. The message suggests an appropriate wait keyword for the classified context and includes a brief rationale tailored to sub-second, short (<5s), and long sleeps.
+        
+        Parameters:
+            sleep_pattern (SleepPattern): Parsed sleep information; its duration_in_seconds is used to choose the suggestion.
+            test_file (TestFile): Source test file used to access content when no analysis context is provided.
+            line_num (int): 1-based line number where the sleep occurs; used to extract surrounding context and locate the enclosing block name.
+            ctx (_AnalyzeCtx | None): Optional precomputed analysis context (lines, detected library, block_names); when provided, it is used instead of re-parsing the test file.
+        
+        Returns:
+            str | None: A suggestion string tailored to the context and library, or None if no suggestion can be produced.
+        """
         if ctx is not None:
             lines = ctx.lines
             library = ctx.library

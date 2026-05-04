@@ -21,23 +21,65 @@ class _FakeRepo(TestResultRepository):
         self.saved: list[TestResult] = []
 
     def save_result(self, result: TestResult) -> None:
+        """
+        Store a TestResult in this fake repository's in-memory list.
+        
+        Parameters:
+            result (TestResult): The test result to save; appended to the repository's internal `saved` list.
+        """
         self.saved.append(result)
 
     def get_results_for_file(
         self, file_path: Path, days_back: int = 30
     ) -> list[TestResult]:
+        """
+        Retrieve saved test results for the specified file within a lookback window.
+        
+        Parameters:
+            file_path (Path): Path to the test file whose results should be returned.
+            days_back (int): Number of days to include when selecting results, counting backward from now.
+        
+        Returns:
+            list[TestResult]: TestResult objects for the given file from the past `days_back` days (may be empty).
+        """
         return []
 
     def get_flakiness_stats(self, file_path: Path, days_back: int = 30):  # type: ignore[override]
+        """
+        Return flakiness statistics for tests in a file over the given lookback period.
+        
+        Parameters:
+            file_path (Path): Path to the test file to query.
+            days_back (int): Number of days to include in the statistics.
+        
+        Returns:
+            list: An empty list (test stub) representing flakiness statistics.
+        """
         return []
 
     def get_total_results_count(self) -> int:
+        """
+        Return the number of test results stored in the repository.
+        
+        Returns:
+            total (int): The number of saved TestResult objects.
+        """
         return len(self.saved)
 
 
 def _fake_test_data(
     name: str = "My Test", source: str = "tests/login.robot"
 ) -> MagicMock:
+    """
+    Create a MagicMock that mimics Robot Framework test data with `name` and `source` set.
+    
+    Parameters:
+        name (str): Test case name to set on the mock.
+        source (str): File path (or source) to set on the mock and its parent.
+    
+    Returns:
+        MagicMock: A mock object with `name`, `source`, and `parent.source` configured.
+    """
     data = MagicMock()
     data.name = name
     data.source = source
@@ -49,6 +91,17 @@ def _fake_test_data(
 def _fake_result(
     status: str = "PASS", elapsed_seconds: float = 1.5, message: str = ""
 ) -> MagicMock:
+    """
+    Create a MagicMock simulating a Robot Framework test result.
+    
+    Parameters:
+    	status (str): Test status string (e.g., "PASS", "FAIL", "SKIP").
+    	elapsed_seconds (float): Execution time in seconds; converted to a datetime.timedelta and assigned to `elapsed_time`.
+    	message (str): Result message or error text.
+    
+    Returns:
+    	MagicMock: A mock object with attributes `status`, `elapsed_time` (timedelta), and `message` set accordingly.
+    """
     result = MagicMock()
     result.status = status
     result.elapsed_time = timedelta(seconds=elapsed_seconds)

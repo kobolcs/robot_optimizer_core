@@ -107,7 +107,9 @@ class TestAnalyzeFormatSubprocess:
 @pytest.mark.integration
 class TestMinSeveritySubprocess:
     def test_min_severity_error_filters_warnings(self, tmp_path: Path) -> None:
-        """With --min-severity ERROR, WARNING findings must not appear."""
+        """
+        Ensure analyzer output excludes findings with severity WARNING or INFO when `--min-severity` is set to `ERROR`.
+        """
         f = tmp_path / "t.robot"
         f.write_text("*** Test Cases ***\nMy Test\n    Sleep    2\n")
         result = _run("analyze", str(f), "--format", "json", "--min-severity", "ERROR")

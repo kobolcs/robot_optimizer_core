@@ -135,19 +135,16 @@ class AnalyzerRegistry:
         )
 
     def get(self, name: str) -> BaseAnalyzer:
-        """Get an analyzer instance.
-
-        This method returns a cached instance if available,
-        otherwise creates a new instance.
-
-        Args:
-            name: Analyzer name.
-
+        """
+        Retrieve a named analyzer instance from the registry.
+        
+        Returns a cached instance when available; otherwise creates, caches, and returns a new instance.
+        
         Returns:
-            Analyzer instance.
-
+            The analyzer instance corresponding to the provided name.
+        
         Raises:
-            PluginError: If analyzer not found.
+            PluginError: If the analyzer name is not registered (see `details` for available analyzers).
         """
         # Return cached instance
         if name in self.instances:
@@ -170,7 +167,17 @@ class AnalyzerRegistry:
         return instance
 
     def create(self, name: str) -> BaseAnalyzer:
-        """Create a fresh analyzer instance without using the cache."""
+        """
+        Create a new instance of the registered analyzer, preferring a container-provided service if available.
+        
+        If a dependency-injection container has a service named "analyzer.{name}", that service instance is returned; otherwise a new instance of the registered analyzer class is constructed.
+        
+        Returns:
+            BaseAnalyzer: An analyzer instance corresponding to `name`.
+        
+        Raises:
+            PluginError: If no analyzer is registered under `name`. 
+        """
         if name not in self.analyzers:
             raise PluginError(
                 f"Analyzer not found: {name}",
@@ -305,7 +312,14 @@ def _register_built_in_analyzers(registry: AnalyzerRegistry) -> None:
 
 
 def _register_entry_point_analyzers(registry: AnalyzerRegistry) -> None:
-    """Register third-party analyzers from Python entry points."""
+    """
+    Register third-party analyzers discovered via Python entry points into the given registry.
+    
+    Iterates entry points in the `robot_optimizer_core.analyzers` group, loads each analyzer class, and registers it under the entry point name with `override=True`. Entry points that raise exceptions during loading are logged and skipped.
+    
+    Parameters:
+        registry (AnalyzerRegistry): Registry used to register discovered analyzer classes.
+    """
     for ep in _iter_analyzer_entry_points():
         try:
             analyzer_class = ep.load()
@@ -324,15 +338,13 @@ def _register_entry_point_analyzers(registry: AnalyzerRegistry) -> None:
 def register_analyzer(
     name: str, analyzer_class: AnalyzerClass, override: bool = False
 ) -> None:
-    """Register an analyzer in the global registry.
-
-    Args:
-        name: Unique name for the analyzer.
-        analyzer_class: The analyzer class.
-        override: Whether to override existing analyzer.
-
-    Example:
-        >>> register_analyzer("custom", CustomAnalyzer)
+    """
+    Register an analyzer class under the given name in the global AnalyzerRegistry.
+    
+    Parameters:
+        name (str): Unique identifier to register the analyzer under.
+        analyzer_class (AnalyzerClass): Analyzer class to register; must be a subclass of BaseAnalyzer.
+        override (bool): If True, replace any existing registration with the same name.
     """
     registry = get_analyzer_registry()
     registry.register(name, analyzer_class, override)

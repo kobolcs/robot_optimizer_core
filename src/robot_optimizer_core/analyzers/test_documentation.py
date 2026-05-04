@@ -33,6 +33,22 @@ class TestDocumentationAnalyzer(BaseAnalyzer):
     """
 
     def __init__(self, config: dict[str, ConfigValue] | None = None) -> None:
+        """
+        Initialize the analyzer and load configuration options from the provided config mapping.
+        
+        Parameters:
+            config (dict[str, ConfigValue] | None): Optional configuration mapping. Recognized keys:
+                - "check_test_cases": whether to check test cases (default True)
+                - "check_keywords": whether to check keywords (default True)
+                - "min_doc_length": minimum allowed documentation length (default 10)
+                - "severity_tests": severity name for test-case findings (default "WARNING")
+                - "severity_keywords": severity name for keyword findings (default "INFO")
+        
+        Detailed behavior:
+            - Stores boolean flags _check_tests and _check_keywords.
+            - Stores integer _min_len parsed from "min_doc_length".
+            - Maps severity names to the Severity enum and stores them as _sev_tests and _sev_keywords.
+        """
         super().__init__(config)
         self._check_tests = bool(self.get_config_value("check_test_cases", True))
         self._check_keywords = bool(self.get_config_value("check_keywords", True))
@@ -62,6 +78,17 @@ class TestDocumentationAnalyzer(BaseAnalyzer):
 
     @override
     def analyze(self, test_file: TestFile) -> list[Finding]:
+        """
+        Finds test cases and keywords that either lack a [Documentation] entry or have documentation shorter than the configured minimum length.
+        
+        Inspects the provided Robot Framework test file content, checking definitions in the "Test Cases" and "Keywords" sections. For each definition, a Finding is produced when no `[Documentation]` tag is present or when the documentation text (after the tag) has fewer characters than the configured minimum. Each Finding includes a pattern describing the issue, severity according to configuration, and a location pointing to the definition's line.
+        
+        Parameters:
+            test_file (TestFile): Test file object whose `content` (string) will be parsed and whose `path` is used for Finding locations.
+        
+        Returns:
+            list[Finding]: A list of Findings for definitions with missing or too-short documentation.
+        """
         findings: list[Finding] = []
         lines = test_file.content.splitlines()
 
@@ -75,6 +102,11 @@ class TestDocumentationAnalyzer(BaseAnalyzer):
         doc_text = ""
 
         def flush() -> None:
+            """
+            Finalize the current test case or keyword definition and record a finding if its documentation is missing or shorter than the configured minimum.
+            
+            If there is no active definition or checks for the current entity type are disabled, this function does nothing. When invoked for a tracked entity, it creates and appends a Finding describing either missing documentation or documentation shorter than self._min_len, using the current entity name and line, then resets the documentation tracking state (`has_doc` and `doc_text`).
+            """
             nonlocal has_doc, doc_text
             if current_name is None:
                 return

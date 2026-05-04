@@ -87,6 +87,17 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
     """
 
     def __init__(self, config: dict[str, ConfigValue] | None = None) -> None:
+        """
+        Initialize the analyzer and load configuration-derived settings.
+        
+        Reads the configuration keys "duplication_threshold", "check_setup", and "check_teardown" and stores them as attributes:
+        - self._threshold: integer threshold for how many tests must share a first/last step before reporting (default 2).
+        - self._check_setup: whether to detect repeated inline setup-like steps (default True).
+        - self._check_teardown: whether to detect repeated inline teardown-like steps (default True).
+        
+        Parameters:
+            config (dict[str, ConfigValue] | None): Optional configuration mapping; when omitted or missing keys, defaults are used.
+        """
         super().__init__(config)
         self._threshold = int(str(self.get_config_value("duplication_threshold", 2)))
         self._check_setup = bool(self.get_config_value("check_setup", True))
@@ -182,7 +193,19 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
     def _parse_test_steps(
         self, test_file: TestFile
     ) -> list[tuple[str, int, list[str], bool]]:
-        """Parse test cases returning (name, line, steps, has_setup_or_teardown)."""
+        """
+        Parse Robot Framework test cases from the file content into a list of test records.
+        
+        Parameters:
+            test_file (TestFile): File object whose `content` contains Robot Framework suite text.
+        
+        Returns:
+            list[tuple[str, int, list[str], bool]]: A list of tuples for each parsed test case:
+                - test name (str)
+                - header line number (int)
+                - ordered list of keyword call lines present in the test body (list[str])
+                - boolean indicating whether the test declares a `[Setup]` or `[Teardown]` hook (bool)
+        """
         result: list[tuple[str, int, list[str], bool]] = []
         lines = test_file.content.splitlines()
         in_test_cases = False
@@ -192,6 +215,13 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
         has_hook = False
 
         def flush() -> None:
+            """
+            Append the currently collected test case record to the result list if a test header is active.
+            
+            When `current_name` is set, adds a tuple (test_name, header_line_number, steps_list, has_setup_or_teardown)
+            to `result`. The `steps_list` is a shallow copy of `current_steps` and `has_setup_or_teardown` reflects whether
+            the test contained an explicit `[Setup]` or `[Teardown]` hook.
+            """
             if current_name:
                 result.append(
                     (current_name, current_line, list(current_steps), has_hook)

@@ -152,6 +152,11 @@ class TestHardcodedValueAnalyzer:
     def test_check_ports_disabled_by_default(
         self, analyzer: HardcodedValueAnalyzer
     ) -> None:
+        """
+        Verifies that numeric port-like literals are ignored by default by the HardcodedValueAnalyzer.
+        
+        Uses a test step containing "8080" and asserts that no findings mention "port".
+        """
         content = "*** Test Cases ***\nMy Test\n    Connect    8080\n"
         findings = analyzer.analyze(_make_file(content))
         port_findings = [f for f in findings if "port" in f.message.lower()]

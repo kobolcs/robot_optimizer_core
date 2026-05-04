@@ -106,11 +106,13 @@ class PathExclusionTrie:
     _component_patterns: list[re.Pattern[str]] = field(default_factory=list, init=False)
 
     def add_exclusion(self, pattern: str) -> None:
-        """Add exclusion pattern to trie.
-
-        Patterns containing ``**`` are decomposed into their non-wildcard
-        segments and stored as per-component match patterns.  All other
-        patterns are inserted into the prefix trie as before.
+        """
+        Add an exclusion pattern to the trie or component-pattern list.
+        
+        If the pattern contains '**', each non-empty, non-'**' path component is compiled (case-insensitive) as an fnmatch-derived regex and stored as a per-component matcher; the pattern is not inserted into the trie. Otherwise the pattern is split on '/' and inserted into the trie as literal segments; if a segment contains '*' or '?', that node is marked as a pattern node and the segment is compiled as a regex (case-insensitive) and stored on the node, and insertion stops. The final node reached is marked as excluded.
+        
+        Parameters:
+            pattern (str): A filesystem-style glob pattern describing paths to exclude.
         """
         if "**" in pattern:
             # Extract the meaningful (non-**) components and compile each one
@@ -317,7 +319,14 @@ class OptimizedFileDiscoveryService:
         return control_chars <= max(1, len(text) // 20)
 
     def _get_cached_listing(self, path: Path) -> list[Path]:
-        """Get directory listing with caching."""
+        """
+        Return the directory entries for `path`, using an internal cache to avoid repeated filesystem scans.
+        
+        The cached listing is returned when available (this also increments the service's `cache_hits` counter). On first successful read the directory contents are stored in the cache. If the directory cannot be listed due to `PermissionError` or other `OSError`, an empty list is returned.
+        
+        Returns:
+            list[Path]: The directory entries for `path`, or an empty list if the directory cannot be read.
+        """
         if path in self._dir_cache:
             self._stats["cache_hits"] += 1
             return self._dir_cache[path]
