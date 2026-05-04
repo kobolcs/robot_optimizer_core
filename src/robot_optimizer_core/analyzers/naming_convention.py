@@ -74,9 +74,7 @@ class NamingConventionAnalyzer(BaseAnalyzer):
 
     def __init__(self, config: dict[str, ConfigValue] | None = None) -> None:
         super().__init__(config)
-        self._check_tests: bool = bool(
-            self.get_config_value("check_test_names", True)
-        )
+        self._check_tests: bool = bool(self.get_config_value("check_test_names", True))
         self._check_keywords: bool = bool(
             self.get_config_value("check_keyword_names", True)
         )
@@ -152,9 +150,7 @@ class NamingConventionAnalyzer(BaseAnalyzer):
                     if _variable_is_camel(inner):
                         if not self._is_ignored(inner):
                             findings.append(
-                                self._make_variable_finding(
-                                    inner, line_num, test_file
-                                )
+                                self._make_variable_finding(inner, line_num, test_file)
                             )
 
         return findings

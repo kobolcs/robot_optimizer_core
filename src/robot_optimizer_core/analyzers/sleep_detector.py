@@ -494,10 +494,18 @@ class SleepDetector(BaseAnalyzer):
         return None
 
     # Precompiled regexes for fast context classification (used in the index pass).
-    _VERIFY_RE: re.Pattern[str] = re.compile(r"should|verify|check|assert|expect|contain|equal|match")
-    _PAGE_RE: re.Pattern[str] = re.compile(r"page|navigate|url|title|reload|refresh|location|tab|window")
-    _UI_RE: re.Pattern[str] = re.compile(r"click|element|button|input|checkbox|radio|select|focus|hover|drag|drop|type|fill|press")
-    _NETWORK_RE: re.Pattern[str] = re.compile(r"request|response|api|http|fetch|xhr|ajax|websocket")
+    _VERIFY_RE: re.Pattern[str] = re.compile(
+        r"should|verify|check|assert|expect|contain|equal|match"
+    )
+    _PAGE_RE: re.Pattern[str] = re.compile(
+        r"page|navigate|url|title|reload|refresh|location|tab|window"
+    )
+    _UI_RE: re.Pattern[str] = re.compile(
+        r"click|element|button|input|checkbox|radio|select|focus|hover|drag|drop|type|fill|press"
+    )
+    _NETWORK_RE: re.Pattern[str] = re.compile(
+        r"request|response|api|http|fetch|xhr|ajax|websocket"
+    )
 
     def _build_file_index(
         self, lines: list[str]
@@ -576,7 +584,11 @@ class SleepDetector(BaseAnalyzer):
         context_lines = [lines[i].strip() for i in range(lo, hi) if lines[i].strip()]
         category = self._classify_context(context_lines)
 
-        waits = self._LIBRARY_WAITS.get(library, self._GENERIC_WAITS) if library else self._GENERIC_WAITS
+        waits = (
+            self._LIBRARY_WAITS.get(library, self._GENERIC_WAITS)
+            if library
+            else self._GENERIC_WAITS
+        )
         wait_keyword = waits.get(category, waits["generic"])
 
         block = self._enclosing_block_name(lines, line_num, block_names)

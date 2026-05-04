@@ -88,9 +88,7 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
 
     def __init__(self, config: dict[str, ConfigValue] | None = None) -> None:
         super().__init__(config)
-        self._threshold = int(
-            str(self.get_config_value("duplication_threshold", 2))
-        )
+        self._threshold = int(str(self.get_config_value("duplication_threshold", 2)))
         self._check_setup = bool(self.get_config_value("check_setup", True))
         self._check_teardown = bool(self.get_config_value("check_teardown", True))
 
@@ -195,7 +193,9 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
 
         def flush() -> None:
             if current_name:
-                result.append((current_name, current_line, list(current_steps), has_hook))
+                result.append(
+                    (current_name, current_line, list(current_steps), has_hook)
+                )
 
         for line_num, line in enumerate(lines, 1):
             stripped = line.strip()

@@ -67,9 +67,13 @@ class TestAnalyzePath:
         rf_file.write_text("*** Test Cases ***\n")
         from robot_optimizer_core.exceptions import AnalysisError
 
-        with patch(
-            "robot_optimizer_core.cli.analyze_file", side_effect=AnalysisError("boom")
-        ), pytest.raises(SystemExit) as exc:
+        with (
+            patch(
+                "robot_optimizer_core.cli.analyze_file",
+                side_effect=AnalysisError("boom"),
+            ),
+            pytest.raises(SystemExit) as exc,
+        ):
             main(["analyze", str(rf_file)])
         assert exc.value.code == 2
 
@@ -249,7 +253,9 @@ class TestHtmlFormat:
         assert "Healthy" in html
         assert "No findings were detected" in html
 
-    def test_format_html_auto_fixable_count_uses_flag_not_recommendation(self, tmp_path: Path) -> None:
+    def test_format_html_auto_fixable_count_uses_flag_not_recommendation(
+        self, tmp_path: Path
+    ) -> None:
         auto_fixable_pattern = Pattern(
             type=PatternType.SLEEP_IN_TEST,
             name="Sleep in Test Case",
@@ -284,7 +290,9 @@ class TestHtmlFormat:
 
 
 class TestUpgradeCommand:
-    def test_upgrade_message_includes_basic_html_as_core(self, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_upgrade_message_includes_basic_html_as_core(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         with pytest.raises(SystemExit) as exc:
             main(["upgrade"])
         assert exc.value.code == 0
@@ -371,7 +379,9 @@ class TestSarifFormat:
         # The first result should be the finding on a.robot line 3.
         parsed = json.loads(out1)
         first_result = parsed["runs"][0]["results"][0]
-        assert first_result["locations"][0]["physicalLocation"]["region"]["startLine"] == 3
+        assert (
+            first_result["locations"][0]["physicalLocation"]["region"]["startLine"] == 3
+        )
 
     def test_sarif_rules_deduplicated_and_sorted(self, tmp_path: Path) -> None:
         """Duplicate rule IDs must appear only once and rules must be sorted."""
@@ -383,4 +393,3 @@ class TestSarifFormat:
         rule_ids = [r["id"] for r in rules]
         assert len(rule_ids) == len(set(rule_ids)), "Duplicate rule IDs found"
         assert rule_ids == sorted(rule_ids), "Rules are not sorted"
-

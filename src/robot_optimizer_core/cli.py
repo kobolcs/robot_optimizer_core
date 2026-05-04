@@ -110,11 +110,13 @@ def _format_sarif(findings: list[Finding], path: Path) -> str:
         # Rewrite artifact URIs to paths relative to the analysed root so that
         # SARIF output is portable across machines.
         try:
-            physical = result["locations"][0]["physicalLocation"]  # type: ignore[index]
-            artifact = physical["artifactLocation"]  # type: ignore[index]
-            file_uri = artifact.get("uri", "")  # type: ignore[assignment]
+            physical = result["locations"][0]["physicalLocation"]
+            artifact = physical["artifactLocation"]
+            file_uri = artifact.get("uri", "")
             candidate = Path(str(file_uri))
-            artifact["uri"] = str(candidate.resolve().relative_to(root)).replace("\\", "/")  # type: ignore[index]
+            artifact["uri"] = str(candidate.resolve().relative_to(root)).replace(
+                "\\", "/"
+            )
         except (KeyError, IndexError, ValueError, OSError, TypeError):
             # Keep the generated SARIF location untouched when path conversion
             # fails (e.g. the finding is outside the analysed root).
@@ -235,7 +237,9 @@ def _format_html(findings: list[Finding], path: Path) -> str:
                 "impact": impact,
                 "action": action,
             }
-        category_summary[category]["count"] = int(category_summary[category]["count"]) + 1
+        category_summary[category]["count"] = (
+            int(category_summary[category]["count"]) + 1
+        )
 
     if sev_counts["ERROR"] > 0 or sev_counts["WARNING"] >= 10:
         health_status = "High Risk"
@@ -251,7 +255,9 @@ def _format_html(findings: list[Finding], path: Path) -> str:
     severity_phrase = (
         "no significant"
         if not findings
-        else "high" if health_status == "High Risk" else "moderate"
+        else "high"
+        if health_status == "High Risk"
+        else "moderate"
     )
     top_categories = sorted(
         category_summary.items(), key=lambda item: int(item[1]["count"]), reverse=True
@@ -268,7 +274,9 @@ def _format_html(findings: list[Finding], path: Path) -> str:
     )
 
     rows = []
-    for finding in sorted(findings, key=lambda x: (str(x.location.file_path), x.location.line)):
+    for finding in sorted(
+        findings, key=lambda x: (str(x.location.file_path), x.location.line)
+    ):
         rows.append(
             "<tr>"
             f"<td>{escape(finding.severity.name.upper())}</td>"
@@ -280,7 +288,11 @@ def _format_html(findings: list[Finding], path: Path) -> str:
             "</tr>"
         )
 
-    no_findings = "<p class='no-findings'>No findings were detected for the selected analyzers.</p>" if not findings else ""
+    no_findings = (
+        "<p class='no-findings'>No findings were detected for the selected analyzers.</p>"
+        if not findings
+        else ""
+    )
     auto_fixable_count = sum(1 for finding in findings if finding.pattern.auto_fixable)
     table = ""
     if findings:
@@ -336,7 +348,9 @@ def _format_html(findings: list[Finding], path: Path) -> str:
             "</article>"
             for item in sorted_items
         )
-        grouped_sections.append(f"<section><h3>{escape(category_name)}</h3>{item_cards}</section>")
+        grouped_sections.append(
+            f"<section><h3>{escape(category_name)}</h3>{item_cards}</section>"
+        )
     grouped_findings = "".join(grouped_sections)
 
     return f"""<!doctype html>
@@ -374,7 +388,7 @@ def _format_html(findings: list[Finding], path: Path) -> str:
   </section>
   <section class="panel">
     <h2>Executive summary</h2>
-    <p>Total findings: {len(findings)} · Warnings/Errors: {sev_counts['WARNING'] + sev_counts['ERROR']} · Main risk categories: {escape(top_category_names or 'None')}</p>
+    <p>Total findings: {len(findings)} · Warnings/Errors: {sev_counts["WARNING"] + sev_counts["ERROR"]} · Main risk categories: {escape(top_category_names or "None")}</p>
     <p>{escape(summary_paragraph)}</p>
   </section>
   <section class="panel">
@@ -384,16 +398,16 @@ def _format_html(findings: list[Finding], path: Path) -> str:
   <section class="panel">
     <h2>Key metrics</h2>
     <div class="cards">
-    <div class="card"><strong>ERROR</strong><div>{sev_counts['ERROR']}</div></div>
-    <div class="card"><strong>WARNING</strong><div>{sev_counts['WARNING']}</div></div>
-    <div class="card"><strong>INFO</strong><div>{sev_counts['INFO']}</div></div>
+    <div class="card"><strong>ERROR</strong><div>{sev_counts["ERROR"]}</div></div>
+    <div class="card"><strong>WARNING</strong><div>{sev_counts["WARNING"]}</div></div>
+    <div class="card"><strong>INFO</strong><div>{sev_counts["INFO"]}</div></div>
     <div class="card"><strong>Total findings</strong><div>{len(findings)}</div></div>
     <div class="card"><strong>Affected files</strong><div>{len(affected_files)}</div></div>
     <div class="card"><strong>Auto-fixable findings</strong><div>{auto_fixable_count}</div></div>
   </div>
   </section>
-  <section class="panel"><h2>Risk categories</h2>{category_cards or '<p>No risk categories detected.</p>'}</section>
-  <section class="panel"><h2>Recommended actions</h2><ol>{''.join(action_items) or '<li>Maintain current standards and monitor new findings.</li>'}</ol></section>
+  <section class="panel"><h2>Risk categories</h2>{category_cards or "<p>No risk categories detected.</p>"}</section>
+  <section class="panel"><h2>Recommended actions</h2><ol>{"".join(action_items) or "<li>Maintain current standards and monitor new findings.</li>"}</ol></section>
   <section class="panel"><h2>Findings by category</h2>{no_findings}{grouped_findings}</section>
   <section class="panel"><h2>Appendix — Detailed Findings</h2>
   {no_findings}
@@ -439,7 +453,9 @@ def _run_analyze(args: argparse.Namespace) -> int:
 
             settings = load_settings_from_toml(Path(args.config).parent)
         except Exception as exc:
-            print(f"error: failed to load config '{args.config}': {exc}", file=sys.stderr)
+            print(
+                f"error: failed to load config '{args.config}': {exc}", file=sys.stderr
+            )
             return _EXIT_ERROR
 
     partial_failure = False
@@ -622,8 +638,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--version", action="version", version=f"%(prog)s {_get_version()}"
     )
-    parser.add_argument("--verbose", action="store_true", help="Enable INFO logs to stderr")
-    parser.add_argument("--debug", action="store_true", help="Enable DEBUG logs to stderr")
+    parser.add_argument(
+        "--verbose", action="store_true", help="Enable INFO logs to stderr"
+    )
+    parser.add_argument(
+        "--debug", action="store_true", help="Enable DEBUG logs to stderr"
+    )
 
     sub = parser.add_subparsers(dest="command", required=True)
 

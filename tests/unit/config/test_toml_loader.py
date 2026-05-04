@@ -114,13 +114,11 @@ class TestSeverityFilter:
         from robot_optimizer_core import analyze_file
 
         f = tmp_path / "t.robot"
-        f.write_text(
-            "*** Test Cases ***\nMy Test\n    Sleep    10\n"
-        )
+        f.write_text("*** Test Cases ***\nMy Test\n    Sleep    10\n")
         findings = analyze_file(str(f), pattern_filter=["sleep_detector"])
         analyzer_names = {
-            f.pattern.type.name for f in findings  # type: ignore[attr-defined]
+            f.pattern.type.name
+            for f in findings  # type: ignore[attr-defined]
         }
         # Only sleep-related findings should be present
         assert "SLEEP_IN_TEST" in analyzer_names or findings == []
-

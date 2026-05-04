@@ -63,7 +63,6 @@ class TestPatternType:
 class TestPattern:
     """Test the Pattern value object."""
 
-
     def test_pattern_type_classvar_uses_builtin_type(self) -> None:
         """Regression test: class-level PatternType alias remains usable."""
         assert Pattern.PatternType is PatternType

@@ -103,9 +103,7 @@ class PathExclusionTrie:
     root: TrieNode = field(default_factory=TrieNode)
     # Per-component patterns compiled from ** glob patterns (init=False keeps
     # them out of the dataclass constructor signature).
-    _component_patterns: list[re.Pattern[str]] = field(
-        default_factory=list, init=False
-    )
+    _component_patterns: list[re.Pattern[str]] = field(default_factory=list, init=False)
 
     def add_exclusion(self, pattern: str) -> None:
         """Add exclusion pattern to trie.
@@ -330,5 +328,3 @@ class OptimizedFileDiscoveryService:
             return entries
         except (PermissionError, OSError):
             return []
-
-
