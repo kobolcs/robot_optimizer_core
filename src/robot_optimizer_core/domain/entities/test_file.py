@@ -137,6 +137,8 @@ class TZAwareTestFile(Entity[UUID]):
                 raise ValueError(f"File appears to be binary or invalid text: {path}")
 
             content = raw.decode("utf-8")
+            # Normalize Windows CRLF and bare CR to LF so all callers see \n
+            content = content.replace("\r\n", "\n").replace("\r", "\n")
 
             control_chars = sum(
                 1 for ch in content if ord(ch) < 32 and ch not in "\n\r\t"

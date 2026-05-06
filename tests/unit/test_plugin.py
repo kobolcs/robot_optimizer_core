@@ -6,6 +6,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import logging
+import sys
 from pathlib import Path
 
 import pytest
@@ -235,6 +236,10 @@ class TestPluginSecurityValidator:
         assert is_safe is False
         assert len(violations) > 0
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Windows does not support Unix group/other write permission bits",
+    )
     def test_world_writable_file_rejected(self, tmp_path: Path) -> None:
         plugin_file = tmp_path / "writable.py"
         plugin_file.write_text("x = 1\n")
