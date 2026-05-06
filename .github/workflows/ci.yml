@@ -76,6 +76,8 @@ jobs:
         with:
           path: .tox
           key: tox-${{ matrix.os }}-${{ matrix.python-version }}-${{ hashFiles('tox.ini', 'pyproject.toml') }}
+          restore-keys: |
+            tox-${{ matrix.os }}-${{ matrix.python-version }}-
 
       - name: Install tox
         run: python -m pip install --upgrade pip tox
@@ -108,6 +110,8 @@ jobs:
         with:
           path: .tox
           key: tox-quality-${{ hashFiles('tox.ini', 'pyproject.toml') }}
+          restore-keys: |
+            tox-quality-
 
       - name: Install tox
         run: python -m pip install --upgrade pip tox
@@ -118,4 +122,5 @@ jobs:
       - name: Audit dependencies
         run: |
           pip install pip-audit
+          pip install -e .
           pip-audit
