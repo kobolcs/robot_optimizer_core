@@ -163,6 +163,40 @@ class TestFactoryFunctions:
         assert ctx.config.settings.max_file_size_mb == 1.0
 
 
+class TestBuiltinAnalyzerRegistration:
+    """Verify ApplicationContext registers all built-in analyzers."""
+
+    EXPECTED_BUILTINS = {
+        "dead_code",
+        "sleep_detector",
+        "flakiness",
+        "hardcoded_value",
+        "naming_convention",
+        "setup_teardown",
+        "tag_consistency",
+        "test_documentation",
+    }
+
+    def test_all_builtin_analyzers_registered(self) -> None:
+        ctx = create_test_application()
+        ctx.initialize()
+        registered = set(ctx.analyzer_registry.list())
+        missing = self.EXPECTED_BUILTINS - registered
+        assert not missing, f"ApplicationContext missing analyzers: {missing}"
+        ctx.shutdown()
+
+    def test_no_builtin_analyzer_is_missing_after_reinit(self) -> None:
+        ctx = create_test_application()
+        ctx.initialize()
+        ctx.shutdown()
+        ctx2 = create_test_application()
+        ctx2.initialize()
+        registered = set(ctx2.analyzer_registry.list())
+        missing = self.EXPECTED_BUILTINS - registered
+        assert not missing, f"Missing after re-init: {missing}"
+        ctx2.shutdown()
+
+
 class TestShutdownCleanup:
     def test_shutdown_clears_analyzer_registry(self) -> None:
         ctx = create_test_application()

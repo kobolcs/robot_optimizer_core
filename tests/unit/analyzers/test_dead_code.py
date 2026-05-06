@@ -457,6 +457,141 @@ Static Unused
 
 
 @pytest.mark.unit
+class TestDeadCodeAnalyzerASTExtraction:
+    """Tests covering the AST-based keyword/call extraction paths."""
+
+    @pytest.fixture
+    def analyzer(self) -> DeadCodeAnalyzer:
+        return DeadCodeAnalyzer()
+
+    def _make(self, content: str) -> TestFile:
+        return TestFile(
+            path=Path("test.robot"),
+            content=content,
+            size_bytes=len(content),
+            last_modified_utc=datetime.now(),
+        )
+
+    def test_test_case_setup_keyword_not_flagged(
+        self, analyzer: DeadCodeAnalyzer
+    ) -> None:
+        """A keyword used only in [Setup] must not appear in unused findings."""
+        content = (
+            "*** Test Cases ***\n"
+            "My Test\n"
+            "    [Setup]    My Setup Keyword\n"
+            "    Log    body\n"
+            "\n"
+            "*** Keywords ***\n"
+            "My Setup Keyword\n"
+            "    Log    setup done\n"
+        )
+        findings = analyzer.analyze(self._make(content))
+        unused = [f for f in findings if f.pattern.type == PatternType.UNUSED_KEYWORD]
+        names = [f.context["keyword_name"] for f in unused]
+        assert "My Setup Keyword" not in names
+
+    def test_test_case_teardown_keyword_not_flagged(
+        self, analyzer: DeadCodeAnalyzer
+    ) -> None:
+        """A keyword used only in [Teardown] must not appear in unused findings."""
+        content = (
+            "*** Test Cases ***\n"
+            "My Test\n"
+            "    Log    body\n"
+            "    [Teardown]    My Teardown Keyword\n"
+            "\n"
+            "*** Keywords ***\n"
+            "My Teardown Keyword\n"
+            "    Log    teardown done\n"
+        )
+        findings = analyzer.analyze(self._make(content))
+        unused = [f for f in findings if f.pattern.type == PatternType.UNUSED_KEYWORD]
+        names = [f.context["keyword_name"] for f in unused]
+        assert "My Teardown Keyword" not in names
+
+    def test_if_block_call_not_flagged(self, analyzer: DeadCodeAnalyzer) -> None:
+        """A keyword called only inside an IF block must not be flagged."""
+        content = (
+            "*** Test Cases ***\n"
+            "My Test\n"
+            "    IF    ${condition}\n"
+            "        My Conditional Keyword\n"
+            "    END\n"
+            "\n"
+            "*** Keywords ***\n"
+            "My Conditional Keyword\n"
+            "    Log    conditional\n"
+        )
+        findings = analyzer.analyze(self._make(content))
+        unused = [f for f in findings if f.pattern.type == PatternType.UNUSED_KEYWORD]
+        assert len(unused) == 0
+
+    def test_for_loop_call_not_flagged(self, analyzer: DeadCodeAnalyzer) -> None:
+        """A keyword called only inside a FOR loop must not be flagged."""
+        content = (
+            "*** Test Cases ***\n"
+            "My Test\n"
+            "    FOR    ${i}    IN RANGE    3\n"
+            "        My Loop Keyword\n"
+            "    END\n"
+            "\n"
+            "*** Keywords ***\n"
+            "My Loop Keyword\n"
+            "    Log    iteration\n"
+        )
+        findings = analyzer.analyze(self._make(content))
+        unused = [f for f in findings if f.pattern.type == PatternType.UNUSED_KEYWORD]
+        assert len(unused) == 0
+
+    def test_else_branch_call_not_flagged(self, analyzer: DeadCodeAnalyzer) -> None:
+        """A keyword called only in an ELSE branch must not be flagged."""
+        content = (
+            "*** Test Cases ***\n"
+            "My Test\n"
+            "    IF    ${flag}\n"
+            "        Log    true branch\n"
+            "    ELSE\n"
+            "        My Else Keyword\n"
+            "    END\n"
+            "\n"
+            "*** Keywords ***\n"
+            "My Else Keyword\n"
+            "    Log    else path\n"
+        )
+        findings = analyzer.analyze(self._make(content))
+        unused = [f for f in findings if f.pattern.type == PatternType.UNUSED_KEYWORD]
+        assert len(unused) == 0
+
+    def test_ast_extraction_still_catches_truly_unused_keywords(
+        self, analyzer: DeadCodeAnalyzer
+    ) -> None:
+        """AST path must still flag keywords that are genuinely not called."""
+        content = (
+            "*** Test Cases ***\n"
+            "My Test\n"
+            "    [Setup]    Used In Setup\n"
+            "    IF    ${x}\n"
+            "        Used In If\n"
+            "    END\n"
+            "\n"
+            "*** Keywords ***\n"
+            "Used In Setup\n"
+            "    Log    a\n"
+            "\n"
+            "Used In If\n"
+            "    Log    b\n"
+            "\n"
+            "Truly Unused\n"
+            "    Log    nobody calls me\n"
+        )
+        findings = analyzer.analyze(self._make(content))
+        unused = [f for f in findings if f.pattern.type == PatternType.UNUSED_KEYWORD]
+        assert len(unused) == 1
+        assert unused[0].context["keyword_name"] == "Truly Unused"
+
+
+@pytest.mark.unit
 class TestDeadCodeAnalyzerSuite:
     """Cross-file (suite-level) analysis via analyze_suite."""
 

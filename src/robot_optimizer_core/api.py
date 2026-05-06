@@ -353,8 +353,8 @@ def analyze_directory(
         )
         return file_path, findings
 
-    if effective_workers == 1 or len(files) <= 1:
-        # Sequential path (also used when fail_fast=True for predictable ordering)
+    if effective_workers == 1 or len(files) <= 1 or fail_fast:
+        # Sequential path; fail_fast requires sequential ordering to stop on first error
         for file_path in files:
             try:
                 _, file_findings = _analyze_one(file_path)

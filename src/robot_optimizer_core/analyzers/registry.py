@@ -21,7 +21,6 @@ Example:
 
 from __future__ import annotations
 
-from functools import cache
 from importlib.metadata import EntryPoint, entry_points
 from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
@@ -40,6 +39,7 @@ __all__ = [
     "get_analyzer_registry",
     "list_analyzers",
     "register_analyzer",
+    "reset_registry",
 ]
 
 logger = get_logger(__name__)
@@ -261,7 +261,6 @@ class AnalyzerRegistry:
 _analyzer_registry: AnalyzerRegistry | None = None
 
 
-@cache
 def get_analyzer_registry() -> AnalyzerRegistry:
     """Get the global analyzer registry.
 
@@ -274,6 +273,15 @@ def get_analyzer_registry() -> AnalyzerRegistry:
         _register_built_in_analyzers(_analyzer_registry)
         _register_entry_point_analyzers(_analyzer_registry)
     return _analyzer_registry
+
+
+def reset_registry() -> None:
+    """Reset the global analyzer registry to an uninitialized state.
+
+    Primarily useful for tests and plugin reload scenarios.
+    """
+    global _analyzer_registry
+    _analyzer_registry = None
 
 
 def _register_built_in_analyzers(registry: AnalyzerRegistry) -> None:

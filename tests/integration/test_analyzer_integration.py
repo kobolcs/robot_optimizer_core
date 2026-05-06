@@ -355,6 +355,119 @@ unused keyword
 
 
 @pytest.mark.integration
+class TestRegistryResetIntegration:
+    """Integration tests for reset_registry across the full stack."""
+
+    def test_reset_then_analyze_file_works(self, tmp_path: Path) -> None:
+        """After reset_registry the analysis pipeline must fully reconstruct."""
+        from robot_optimizer_core.analyzers.registry import reset_registry
+
+        f = tmp_path / "sample.robot"
+        f.write_bytes("*** Test Cases ***\nT\n    Log    ok\n".encode("utf-8"))
+
+        reset_registry()
+        findings = analyze_file(f, analyzers=["dead_code"])
+        assert isinstance(findings, list)
+
+    def test_reset_restores_all_builtins_at_integration_level(self) -> None:
+        from robot_optimizer_core.analyzers.registry import (
+            get_analyzer_registry,
+            reset_registry,
+        )
+
+        reset_registry()
+        registry = get_analyzer_registry()
+        expected = {
+            "dead_code",
+            "sleep_detector",
+            "hardcoded_value",
+            "naming_convention",
+            "setup_teardown",
+            "tag_consistency",
+            "test_documentation",
+        }
+        missing = expected - set(registry.list())
+        assert not missing, f"Missing after reset: {missing}"
+
+
+@pytest.mark.integration
+class TestDeadCodeASTIntegration:
+    """Integration tests for AST-based dead-code detection on real files."""
+
+    def test_setup_teardown_no_false_positives(self, temp_dir: Path) -> None:
+        content = (
+            "*** Test Cases ***\n"
+            "Suite Test\n"
+            "    [Setup]    Suite Prepare\n"
+            "    Log    body\n"
+            "    [Teardown]    Suite Cleanup\n"
+            "\n"
+            "*** Keywords ***\n"
+            "Suite Prepare\n"
+            "    Log    prepare\n"
+            "\n"
+            "Suite Cleanup\n"
+            "    Log    cleanup\n"
+        )
+        f = temp_dir / "ast_test.robot"
+        f.write_bytes(content.encode("utf-8"))
+
+        findings = analyze_file(f, analyzers=["dead_code"])
+        unused_names = [
+            finding.context["keyword_name"]
+            for finding in findings
+            if finding.pattern.type.name == "UNUSED_KEYWORD"
+        ]
+        assert "Suite Prepare" not in unused_names
+        assert "Suite Cleanup" not in unused_names
+
+    def test_nested_if_keyword_no_false_positive(self, temp_dir: Path) -> None:
+        content = (
+            "*** Test Cases ***\n"
+            "Branch Test\n"
+            "    IF    ${env} == 'prod'\n"
+            "        Production Step\n"
+            "    ELSE\n"
+            "        Development Step\n"
+            "    END\n"
+            "\n"
+            "*** Keywords ***\n"
+            "Production Step\n"
+            "    Log    prod\n"
+            "\n"
+            "Development Step\n"
+            "    Log    dev\n"
+        )
+        f = temp_dir / "if_test.robot"
+        f.write_bytes(content.encode("utf-8"))
+
+        findings = analyze_file(f, analyzers=["dead_code"])
+        unused_names = [
+            finding.context["keyword_name"]
+            for finding in findings
+            if finding.pattern.type.name == "UNUSED_KEYWORD"
+        ]
+        assert "Production Step" not in unused_names
+        assert "Development Step" not in unused_names
+
+
+@pytest.mark.integration
+class TestFailFastIntegration:
+    """Integration tests verifying fail_fast behaviour with real files."""
+
+    def test_fail_fast_with_unreadable_content(self, temp_dir: Path) -> None:
+        """fail_fast=True should surface the first error and stop."""
+        # Create a valid file and a binary file that will fail parsing
+        valid = temp_dir / "a_valid.robot"
+        valid.write_bytes("*** Test Cases ***\nT\n    Log    hi\n".encode("utf-8"))
+        bad = temp_dir / "b_bad.robot"
+        bad.write_bytes(b"\x00\x01\x02\x03\xff")  # binary → parse error
+
+        with pytest.raises(Exception):
+            analyze_directory(temp_dir, analyzers=["dead_code"], fail_fast=True)
+
+
+@pytest.mark.integration
 @pytest.mark.slow
 class TestAnalyzerPerformance:
     """Test analyzer performance with larger files."""

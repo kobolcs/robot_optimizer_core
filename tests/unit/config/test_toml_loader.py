@@ -110,6 +110,23 @@ class TestSeverityFilter:
         for finding in findings:
             assert finding.severity <= Severity.ERROR
 
+    def test_unknown_setting_key_raises(self) -> None:
+        """Settings with extra='forbid' must raise on unknown keys."""
+        from pydantic import ValidationError
+
+        with pytest.raises((ValidationError, TypeError)):
+            Settings(completely_unknown_key_xyz="should_fail")
+
+    def test_known_setting_keys_accepted(self) -> None:
+        """All documented Settings fields must be accepted without error."""
+        s = Settings(
+            max_file_size_mb=5.0,
+            log_level="DEBUG",
+            enable_metrics=False,
+            plugins_enabled=False,
+        )
+        assert s.max_file_size_mb == 5.0
+
     def test_pattern_filter_limits_analyzers(self, tmp_path: Path) -> None:
         from robot_optimizer_core import analyze_file
 
