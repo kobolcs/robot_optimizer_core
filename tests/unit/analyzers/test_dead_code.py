@@ -7,7 +7,7 @@ duplicates, and edge cases.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -56,7 +56,7 @@ Another Unused
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified_utc=datetime.now(),
+            last_modified_utc=datetime.now(UTC),
         )
 
         findings = analyzer.analyze(test_file)
@@ -94,7 +94,7 @@ My Keyword
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified_utc=datetime.now(),
+            last_modified_utc=datetime.now(UTC),
         )
 
         keywords, calls, display_names = analyzer._extract_keywords_and_calls(test_file)
@@ -116,7 +116,7 @@ MiXeD Case Keyword
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified_utc=datetime.now(),
+            last_modified_utc=datetime.now(UTC),
         )
 
         findings = analyzer.analyze(test_file)
@@ -149,7 +149,7 @@ Do Something
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified_utc=datetime.now(),
+            last_modified_utc=datetime.now(UTC),
         )
 
         findings = analyzer.analyze(test_file)
@@ -181,7 +181,7 @@ Normal Keyword
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified_utc=datetime.now(),
+            last_modified_utc=datetime.now(UTC),
         )
 
         findings = analyzer.analyze(test_file)
@@ -210,7 +210,7 @@ My Keyword
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified_utc=datetime.now(),
+            last_modified_utc=datetime.now(UTC),
         )
 
         findings = analyzer.analyze(test_file)
@@ -237,7 +237,7 @@ Local Keyword
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified_utc=datetime.now(),
+            last_modified_utc=datetime.now(UTC),
         )
 
         findings = analyzer.analyze(test_file)
@@ -277,7 +277,7 @@ exception should not occur
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified_utc=datetime.now(),
+            last_modified_utc=datetime.now(UTC),
         )
 
         findings = analyzer.analyze(test_file)
@@ -306,7 +306,7 @@ Duplicate
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified_utc=datetime.now(),
+            last_modified_utc=datetime.now(UTC),
         )
 
         findings = analyzer.analyze(test_file)
@@ -342,7 +342,7 @@ Normal Unused Keyword
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified_utc=datetime.now(),
+            last_modified_utc=datetime.now(UTC),
         )
 
         findings = analyzer.analyze(test_file)
@@ -358,7 +358,7 @@ Normal Unused Keyword
             path=Path("empty.robot"),
             content="",
             size_bytes=0,
-            last_modified_utc=datetime.now(),
+            last_modified_utc=datetime.now(UTC),
         )
         findings = analyzer.analyze(empty_file)
         assert len(findings) == 0
@@ -368,7 +368,7 @@ Normal Unused Keyword
             path=Path("no_keywords.robot"),
             content="*** Test Cases ***\nTest\n    Log    Hi",
             size_bytes=100,
-            last_modified_utc=datetime.now(),
+            last_modified_utc=datetime.now(UTC),
         )
         findings = analyzer.analyze(no_keywords)
         assert len(findings) == 0
@@ -387,7 +387,7 @@ Valid Keyword Name
     Log    This is fine but unused
 """,
             size_bytes=200,
-            last_modified_utc=datetime.now(),
+            last_modified_utc=datetime.now(UTC),
         )
         findings = analyzer.analyze(malformed)
 
@@ -411,7 +411,7 @@ My Keyword
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified_utc=datetime.now(),
+            last_modified_utc=datetime.now(UTC),
         )
 
         findings = analyzer.analyze(test_file)
@@ -445,7 +445,7 @@ Static Unused
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified_utc=datetime.now(),
+            last_modified_utc=datetime.now(UTC),
         )
 
         findings = analyzer.analyze(test_file)
@@ -469,7 +469,7 @@ class TestDeadCodeAnalyzerASTExtraction:
             path=Path("test.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified_utc=datetime.now(),
+            last_modified_utc=datetime.now(UTC),
         )
 
     def test_test_case_setup_keyword_not_flagged(
@@ -600,7 +600,7 @@ class TestDeadCodeAnalyzerSuite:
             path=Path(path),
             content=content,
             size_bytes=len(content),
-            last_modified_utc=datetime.now(),
+            last_modified_utc=datetime.now(UTC),
         )
 
     def test_empty_suite_returns_no_findings(self) -> None:

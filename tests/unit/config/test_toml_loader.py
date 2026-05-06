@@ -110,6 +110,24 @@ class TestSeverityFilter:
         for finding in findings:
             assert finding.severity <= Severity.ERROR
 
+    def test_pattern_filter_limits_analyzers(self, tmp_path: Path) -> None:
+        from robot_optimizer_core import analyze_file
+
+        f = tmp_path / "t.robot"
+        f.write_bytes("*** Test Cases ***\nMy Test\n    Sleep    10\n".encode("utf-8"))
+        findings = analyze_file(str(f), pattern_filter=["sleep_detector"])
+        analyzer_names = {
+            f.pattern.type.name
+            for f in findings  # type: ignore[attr-defined]
+        }
+        # Only sleep-related findings should be present
+        assert "SLEEP_IN_TEST" in analyzer_names or findings == []
+
+
+@pytest.mark.unit
+class TestSettingsValidation:
+    """Tests for Settings field validation, including extra='forbid'."""
+
     def test_unknown_setting_key_raises(self) -> None:
         """Settings with extra='forbid' must raise on unknown keys."""
         from pydantic import ValidationError
@@ -126,16 +144,3 @@ class TestSeverityFilter:
             plugins_enabled=False,
         )
         assert s.max_file_size_mb == 5.0
-
-    def test_pattern_filter_limits_analyzers(self, tmp_path: Path) -> None:
-        from robot_optimizer_core import analyze_file
-
-        f = tmp_path / "t.robot"
-        f.write_bytes("*** Test Cases ***\nMy Test\n    Sleep    10\n".encode("utf-8"))
-        findings = analyze_file(str(f), pattern_filter=["sleep_detector"])
-        analyzer_names = {
-            f.pattern.type.name
-            for f in findings  # type: ignore[attr-defined]
-        }
-        # Only sleep-related findings should be present
-        assert "SLEEP_IN_TEST" in analyzer_names or findings == []

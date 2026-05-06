@@ -166,7 +166,7 @@ class TestFactoryFunctions:
 class TestBuiltinAnalyzerRegistration:
     """Verify ApplicationContext registers all built-in analyzers."""
 
-    EXPECTED_BUILTINS = {
+    EXPECTED_BUILTINS: frozenset[str] = frozenset({
         "dead_code",
         "sleep_detector",
         "flakiness",
@@ -175,7 +175,7 @@ class TestBuiltinAnalyzerRegistration:
         "setup_teardown",
         "tag_consistency",
         "test_documentation",
-    }
+    })
 
     def test_all_builtin_analyzers_registered(self) -> None:
         ctx = create_test_application()

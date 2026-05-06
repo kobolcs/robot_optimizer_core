@@ -249,6 +249,8 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         calls: list[str] = []
 
         def _walk(items: object) -> None:
+            if not hasattr(items, "__iter__"):
+                return
             for item in items:  # type: ignore[union-attr]
                 item_type = getattr(item, "type", None)
                 if item_type == "KEYWORD":

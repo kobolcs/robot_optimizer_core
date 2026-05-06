@@ -240,7 +240,7 @@ def analyze_directory(
     severity_filter: Severity | None = None,
     pattern_filter: list[str] | None = None,
     max_workers: int | None = None,
-) -> dict[Path, list[Finding]]:
+) -> DirectoryResults:
     """Analyze all Robot Framework files in a directory.
 
     This function discovers and analyzes all matching files in a directory,

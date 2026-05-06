@@ -217,7 +217,7 @@ Unused Keyword {i}
         assert invalid_file not in files
 
         # Direct analysis should fail gracefully
-        with pytest.raises(Exception):  # noqa: B017  # various exception types possible
+        with pytest.raises(Exception, match=r".+"):  # noqa: B017  # various exception types possible
             TestFile.from_path(invalid_file)
 
         # Create file with invalid encoding
@@ -463,7 +463,7 @@ class TestFailFastIntegration:
         bad = temp_dir / "b_bad.robot"
         bad.write_bytes(b"\x00\x01\x02\x03\xff")  # binary → parse error
 
-        with pytest.raises(Exception):
+        with pytest.raises(Exception, match=r".+"):
             analyze_directory(temp_dir, analyzers=["dead_code"], fail_fast=True)
 
 

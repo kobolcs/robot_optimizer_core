@@ -3,7 +3,7 @@
 
 These tests exercise several components together (analyzer, api, registry,
 settings) without relying on external services.  They validate that the
-cross-cutting changes (fix 1–5) behave correctly end-to-end at the
+cross-cutting changes (fix 1-5) behave correctly end-to-end at the
 component boundary.
 """
 
