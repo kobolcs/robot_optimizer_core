@@ -105,7 +105,7 @@ class TestSeverityFilter:
         from robot_optimizer_core import analyze_file
 
         f = tmp_path / "t.robot"
-        f.write_text("*** Test Cases ***\nMy Test\n    Sleep    2\n")
+        f.write_bytes("*** Test Cases ***\nMy Test\n    Sleep    2\n".encode("utf-8"))
         findings = analyze_file(str(f), severity_filter=Severity.ERROR)
         for finding in findings:
             assert finding.severity <= Severity.ERROR
@@ -114,7 +114,7 @@ class TestSeverityFilter:
         from robot_optimizer_core import analyze_file
 
         f = tmp_path / "t.robot"
-        f.write_text("*** Test Cases ***\nMy Test\n    Sleep    10\n")
+        f.write_bytes("*** Test Cases ***\nMy Test\n    Sleep    10\n".encode("utf-8"))
         findings = analyze_file(str(f), pattern_filter=["sleep_detector"])
         analyzer_names = {
             f.pattern.type.name

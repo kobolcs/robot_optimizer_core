@@ -12,6 +12,8 @@ from pathlib import Path
 
 import pytest
 
+from ..conftest import write_robot_file
+
 from robot_optimizer_core import (
     Container,
     DeadCodeAnalyzer,
@@ -74,7 +76,7 @@ Test Case {i}
 Unused Keyword {i}
     Log    Never called
 """
-            file_path.write_text(content)
+            write_robot_file(file_path, content)
             files.append(file_path)
 
         # Discover files

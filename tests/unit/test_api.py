@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from ..conftest import write_robot_file
+
 from robot_optimizer_core.api import analyze_directory, analyze_file
 from robot_optimizer_core.config import Settings
 from robot_optimizer_core.domain.value_objects import Finding
@@ -40,7 +42,7 @@ class TestAnalyzeFileMaxSizeEnforcement:
         self, tmp_path: Path
     ) -> None:
         robot_file = tmp_path / "normal.robot"
-        robot_file.write_text("*** Test Cases ***\nSample Test\n    Log    hello\n")
+        write_robot_file(robot_file, "*** Test Cases ***\nSample Test\n    Log    hello\n")
 
         settings = Settings(max_file_size_mb=10.0)
         findings = analyze_file(robot_file, settings=settings)
@@ -92,7 +94,7 @@ def test_analyze_file_uses_safe_analyze(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     robot_file = tmp_path / "sample.robot"
-    robot_file.write_text("*** Test Cases ***\nCase\n    Log    ok\n")
+    write_robot_file(robot_file, "*** Test Cases ***\nCase\n    Log    ok\n")
 
     calls: list[str] = []
 
@@ -116,8 +118,8 @@ def test_analyze_file_uses_safe_analyze(
 def test_analyze_directory_parallel_is_deterministic(tmp_path: Path) -> None:
     one = tmp_path / "one.robot"
     two = tmp_path / "two.robot"
-    one.write_text("*** Keywords ***\nAlpha\n    No Operation\n")
-    two.write_text("*** Test Cases ***\nUse\n    Alpha\n")
+    write_robot_file(one, "*** Keywords ***\nAlpha\n    No Operation\n")
+    write_robot_file(two, "*** Test Cases ***\nUse\n    Alpha\n")
 
     first = analyze_directory(tmp_path, analyzers=["dead_code"], max_workers=4)
     second = analyze_directory(tmp_path, analyzers=["dead_code"], max_workers=4)
@@ -137,7 +139,7 @@ def test_analyze_directory_parallel_is_deterministic(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_analyze_file_with_dead_code_analyzer_does_not_crash(tmp_path: Path) -> None:
     robot_file = tmp_path / "sample.robot"
-    robot_file.write_text("*** Test Cases ***\nCase\n    Log    ok\n")
+    write_robot_file(robot_file, "*** Test Cases ***\nCase\n    Log    ok\n")
 
     findings = analyze_file(robot_file, analyzers=["dead_code"])
 
