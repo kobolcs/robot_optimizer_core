@@ -58,7 +58,9 @@ class TestAnalyzeFileMaxSizeEnforcement:
         robot_file = tmp_path / "edge.robot"
         base_content = "*** Test Cases ***\nSample Test\n    Log    hello\n"
         padding = "x" * (limit - len(base_content.encode("utf-8")))
-        robot_file.write_text(base_content + padding)
+        # Use write_bytes so the on-disk size is exactly `limit` bytes on every
+        # platform (write_text in text mode adds \r on Windows, overshooting).
+        robot_file.write_bytes((base_content + padding).encode("utf-8"))
 
         try:
             findings = analyze_file(robot_file, settings=settings)
