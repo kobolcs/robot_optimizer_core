@@ -9,8 +9,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ..conftest import write_robot_file
-
 from robot_optimizer_core.cli import _format_html, _format_sarif, main
 from robot_optimizer_core.domain.value_objects import Finding, Severity
 from robot_optimizer_core.domain.value_objects.location import Location
@@ -66,7 +64,7 @@ class TestAnalyzePath:
 
     def test_analysis_error_exits_error(self, tmp_path: Path) -> None:
         rf_file = tmp_path / "t.robot"
-        write_robot_file(rf_file, "*** Test Cases ***\n")
+        rf_file.write_bytes("*** Test Cases ***\n".encode("utf-8"))
         from robot_optimizer_core.exceptions import AnalysisError
 
         with (
@@ -88,7 +86,7 @@ class TestAnalyzePath:
 class TestAnalyzeClean:
     def test_no_findings_exits_zero(self, tmp_path: Path) -> None:
         rf_file = tmp_path / "t.robot"
-        write_robot_file(rf_file, "*** Test Cases ***\n")
+        rf_file.write_bytes("*** Test Cases ***\n".encode("utf-8"))
         with patch("robot_optimizer_core.cli.analyze_file", return_value=[]):
             with pytest.raises(SystemExit) as exc:
                 main(["analyze", str(rf_file)])
@@ -96,7 +94,7 @@ class TestAnalyzeClean:
 
     def test_no_fail_flag_exits_zero_despite_findings(self, tmp_path: Path) -> None:
         rf_file = tmp_path / "t.robot"
-        write_robot_file(rf_file, "*** Test Cases ***\n")
+        rf_file.write_bytes("*** Test Cases ***\n".encode("utf-8"))
         findings = [_make_finding(rf_file)]
         with patch("robot_optimizer_core.cli.analyze_file", return_value=findings):
             with pytest.raises(SystemExit) as exc:
@@ -112,7 +110,7 @@ class TestAnalyzeClean:
 class TestAnalyzeFindings:
     def test_findings_exits_one(self, tmp_path: Path) -> None:
         rf_file = tmp_path / "t.robot"
-        write_robot_file(rf_file, "*** Test Cases ***\n")
+        rf_file.write_bytes("*** Test Cases ***\n".encode("utf-8"))
         findings = [_make_finding(rf_file)]
         with patch("robot_optimizer_core.cli.analyze_file", return_value=findings):
             with pytest.raises(SystemExit) as exc:
@@ -129,8 +127,8 @@ class TestAnalyzeDirectory:
     def test_directory_aggregates_findings(self, tmp_path: Path) -> None:
         f1 = tmp_path / "a.robot"
         f2 = tmp_path / "b.robot"
-        write_robot_file(f1, "*** Test Cases ***\n")
-        write_robot_file(f2, "*** Test Cases ***\n")
+        f1.write_bytes("*** Test Cases ***\n".encode("utf-8"))
+        f2.write_bytes("*** Test Cases ***\n".encode("utf-8"))
         findings = {f1: [_make_finding(f1)], f2: []}
         with patch("robot_optimizer_core.cli.analyze_directory", return_value=findings):
             with pytest.raises(SystemExit) as exc:
@@ -154,7 +152,7 @@ class TestJsonFormat:
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
         rf_file = tmp_path / "t.robot"
-        write_robot_file(rf_file, "*** Test Cases ***\n")
+        rf_file.write_bytes("*** Test Cases ***\n".encode("utf-8"))
         findings = [_make_finding(rf_file)]
         with patch("robot_optimizer_core.cli.analyze_file", return_value=findings):
             with pytest.raises(SystemExit):
@@ -170,7 +168,7 @@ class TestJsonFormat:
     ) -> None:
         """Severity in JSON output must be a plain string, not 'Severity.WARNING'."""
         rf_file = tmp_path / "t.robot"
-        write_robot_file(rf_file, "*** Test Cases ***\n")
+        rf_file.write_bytes("*** Test Cases ***\n".encode("utf-8"))
         findings = [_make_finding(rf_file, severity=Severity.WARNING)]
         with patch("robot_optimizer_core.cli.analyze_file", return_value=findings):
             with pytest.raises(SystemExit):
@@ -183,7 +181,7 @@ class TestJsonFormat:
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
         rf_file = tmp_path / "t.robot"
-        write_robot_file(rf_file, "*** Test Cases ***\n")
+        rf_file.write_bytes("*** Test Cases ***\n".encode("utf-8"))
         with patch("robot_optimizer_core.cli.analyze_file", return_value=[]):
             with pytest.raises(SystemExit):
                 main(["analyze", str(rf_file), "--format", "json"])
@@ -199,7 +197,7 @@ class TestJsonFormat:
 class TestOutputFile:
     def test_writes_to_file(self, tmp_path: Path) -> None:
         rf_file = tmp_path / "t.robot"
-        write_robot_file(rf_file, "*** Test Cases ***\n")
+        rf_file.write_bytes("*** Test Cases ***\n".encode("utf-8"))
         out_file = tmp_path / "out.txt"
         findings = [_make_finding(rf_file)]
         with patch("robot_optimizer_core.cli.analyze_file", return_value=findings):
@@ -217,7 +215,7 @@ class TestOutputFile:
 class TestAnalyzerSelection:
     def test_passes_analyzer_names_to_api(self, tmp_path: Path) -> None:
         rf_file = tmp_path / "t.robot"
-        write_robot_file(rf_file, "*** Test Cases ***\n")
+        rf_file.write_bytes("*** Test Cases ***\n".encode("utf-8"))
         mock = MagicMock(return_value=[])
         with patch("robot_optimizer_core.cli.analyze_file", mock):
             with pytest.raises(SystemExit):
