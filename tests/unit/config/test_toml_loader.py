@@ -47,28 +47,28 @@ class TestTomlLoader:
         assert isinstance(settings, Settings)
 
     def test_reads_robot_toml(self, tmp_path: Path) -> None:
-        (tmp_path / "robot.toml").write_text(
-            "[tool.robot-optimizer]\nmax_acceptable_sleep_seconds = 0.5\n"
+        (tmp_path / "robot.toml").write_bytes(
+            "[tool.robot-optimizer]\nmax_acceptable_sleep_seconds = 0.5\n".encode("utf-8")
         )
         settings = load_settings_from_toml(tmp_path)
         assert settings.max_acceptable_sleep_seconds == 0.5
 
     def test_reads_pyproject_toml(self, tmp_path: Path) -> None:
-        (tmp_path / "pyproject.toml").write_text(
-            "[tool.robot-optimizer]\nmax_acceptable_sleep_seconds = 2.0\n"
+        (tmp_path / "pyproject.toml").write_bytes(
+            "[tool.robot-optimizer]\nmax_acceptable_sleep_seconds = 2.0\n".encode("utf-8")
         )
         settings = load_settings_from_toml(tmp_path)
         assert settings.max_acceptable_sleep_seconds == 2.0
 
     def test_overrides_take_precedence_over_toml(self, tmp_path: Path) -> None:
-        (tmp_path / "robot.toml").write_text(
-            "[tool.robot-optimizer]\nmax_acceptable_sleep_seconds = 0.5\n"
+        (tmp_path / "robot.toml").write_bytes(
+            "[tool.robot-optimizer]\nmax_acceptable_sleep_seconds = 0.5\n".encode("utf-8")
         )
         settings = load_settings_from_toml(tmp_path, max_acceptable_sleep_seconds=5.0)
         assert settings.max_acceptable_sleep_seconds == 5.0
 
     def test_missing_section_gives_defaults(self, tmp_path: Path) -> None:
-        (tmp_path / "robot.toml").write_text("[project]\nname = 'foo'\n")
+        (tmp_path / "robot.toml").write_bytes("[project]\nname = 'foo'\n".encode("utf-8"))
         settings = load_settings_from_toml(tmp_path)
         # Should fall back to defaults without error
         assert isinstance(settings, Settings)
@@ -86,12 +86,12 @@ class TestTomlLoader:
         self, tmp_path: Path
     ) -> None:
         toml_path = tmp_path / "robot.toml"
-        toml_path.write_text("")
+        toml_path.write_bytes("".encode("utf-8"))
         assert _read_optimizer_section(toml_path) is None
 
     def test_read_optimizer_section_invalid_toml(self, tmp_path: Path) -> None:
         toml_path = tmp_path / "robot.toml"
-        toml_path.write_text("this is not valid toml }{{{")
+        toml_path.write_bytes("this is not valid toml }{{{".encode("utf-8"))
         # Should return None without raising
         result = _read_optimizer_section(toml_path)
         assert result is None
