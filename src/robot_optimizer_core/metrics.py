@@ -54,9 +54,9 @@ class TimingStats:
         self.samples.append((value, datetime.now(UTC)))
 
     def cleanup_old_samples(self, max_age: timedelta) -> None:
-        """Remove samples older than max_age."""
+        """Remove samples at least max_age old."""
         cutoff = datetime.now(UTC) - max_age
-        while self.samples and self.samples[0][1] < cutoff:
+        while self.samples and self.samples[0][1] <= cutoff:
             self.samples.popleft()
 
 
