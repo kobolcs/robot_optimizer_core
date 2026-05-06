@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
@@ -148,10 +149,13 @@ class PluginSecurityValidator:
 
             self.violations.extend(validator.violations)
 
-            # Check file permissions (should not be writable by others)
-            stat = file_path.stat()
-            if stat.st_mode & 0o022:  # Check if writable by group/others
-                self.violations.append("Plugin file is writable by group/others")
+            # Check file permissions on POSIX only.
+            # Windows does not track group/other write bits (st_mode & 0o022
+            # is always 0 there), so this check is meaningless on Windows.
+            if sys.platform != "win32":
+                stat = file_path.stat()
+                if stat.st_mode & 0o022:
+                    self.violations.append("Plugin file is writable by group/others")
 
             return len(self.violations) == 0, self.violations
 

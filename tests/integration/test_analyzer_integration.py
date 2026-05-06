@@ -74,7 +74,7 @@ Test Case {i}
 Unused Keyword {i}
     Log    Never called
 """
-            file_path.write_text(content)
+            file_path.write_bytes(content.encode("utf-8"))
             files.append(file_path)
 
         # Discover files
@@ -337,8 +337,8 @@ unused keyword
 
         from tempfile import NamedTemporaryFile
 
-        with NamedTemporaryFile(mode="w", suffix=".robot", delete=False) as f:
-            f.write(content)
+        with NamedTemporaryFile(mode="wb", suffix=".robot", delete=False) as f:
+            f.write(content.encode("utf-8"))
             temp_path = Path(f.name)
 
         try:

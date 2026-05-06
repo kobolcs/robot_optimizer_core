@@ -6,6 +6,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import logging
+import sys
 from pathlib import Path
 
 import pytest
@@ -197,7 +198,7 @@ class MyClass:
 class TestPluginSecurityValidator:
     def test_clean_file_passes(self, tmp_path: Path) -> None:
         plugin_file = tmp_path / "clean.py"
-        plugin_file.write_text("x = 1\n")
+        plugin_file.write_bytes("x = 1\n".encode("utf-8"))
         plugin_file.chmod(0o644)
 
         validator = PluginSecurityValidator()
@@ -208,7 +209,7 @@ class TestPluginSecurityValidator:
 
     def test_forbidden_import_rejected(self, tmp_path: Path) -> None:
         plugin_file = tmp_path / "bad.py"
-        plugin_file.write_text("import os\n")
+        plugin_file.write_bytes("import os\n".encode("utf-8"))
         plugin_file.chmod(0o644)
 
         validator = PluginSecurityValidator()
@@ -219,7 +220,7 @@ class TestPluginSecurityValidator:
 
     def test_eval_call_rejected(self, tmp_path: Path) -> None:
         plugin_file = tmp_path / "eval_plugin.py"
-        plugin_file.write_text("result = eval('1+1')\n")
+        plugin_file.write_bytes("result = eval('1+1')\n".encode("utf-8"))
         plugin_file.chmod(0o644)
 
         validator = PluginSecurityValidator()
@@ -235,9 +236,13 @@ class TestPluginSecurityValidator:
         assert is_safe is False
         assert len(violations) > 0
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Windows does not support Unix group/other write permission bits",
+    )
     def test_world_writable_file_rejected(self, tmp_path: Path) -> None:
         plugin_file = tmp_path / "writable.py"
-        plugin_file.write_text("x = 1\n")
+        plugin_file.write_bytes("x = 1\n".encode("utf-8"))
         plugin_file.chmod(0o666)  # world-writable
 
         validator = PluginSecurityValidator()
@@ -256,7 +261,7 @@ class TestValidatedPluginManager:
 
     def test_security_violation_raises_plugin_error(self, tmp_path: Path) -> None:
         plugin_file = tmp_path / "bad.py"
-        plugin_file.write_text("import os\n")
+        plugin_file.write_bytes("import os\n".encode("utf-8"))
         plugin_file.chmod(0o644)
 
         manager = ValidatedPluginManager()
@@ -265,19 +270,21 @@ class TestValidatedPluginManager:
 
     def test_load_valid_plugin_registers_and_activates(self, tmp_path: Path) -> None:
         plugin_file = tmp_path / "valid_plugin.py"
-        plugin_file.write_text(
-            "from robot_optimizer_core.plugin import Plugin, PluginMetadata\n"
-            "\n"
-            "class ValidPlugin(Plugin):\n"
-            "    @property\n"
-            "    def metadata(self) -> PluginMetadata:\n"
-            '        return PluginMetadata("valid_plugin", "1.0.0", "Valid test plugin", "Test")\n'
-            "\n"
-            "    def activate(self) -> None:\n"
-            "        self.is_active = True\n"
-            "\n"
-            "    def deactivate(self) -> None:\n"
-            "        self.is_active = False\n"
+        plugin_file.write_bytes(
+            (
+                "from robot_optimizer_core.plugin import Plugin, PluginMetadata\n"
+                "\n"
+                "class ValidPlugin(Plugin):\n"
+                "    @property\n"
+                "    def metadata(self) -> PluginMetadata:\n"
+                '        return PluginMetadata("valid_plugin", "1.0.0", "Valid test plugin", "Test")\n'
+                "\n"
+                "    def activate(self) -> None:\n"
+                "        self.is_active = True\n"
+                "\n"
+                "    def deactivate(self) -> None:\n"
+                "        self.is_active = False\n"
+            ).encode("utf-8")
         )
         plugin_file.chmod(0o644)
 
@@ -290,7 +297,7 @@ class TestValidatedPluginManager:
 
     def test_no_plugin_subclass_raises_plugin_error(self, tmp_path: Path) -> None:
         plugin_file = tmp_path / "no_subclass.py"
-        plugin_file.write_text("x = 1\n")
+        plugin_file.write_bytes("x = 1\n".encode("utf-8"))
         plugin_file.chmod(0o644)
 
         manager = ValidatedPluginManager()
@@ -301,7 +308,7 @@ class TestValidatedPluginManager:
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture
     ) -> None:
         plugin_file = tmp_path / "forced.py"
-        plugin_file.write_text("import os\n")  # would be rejected by validator
+        plugin_file.write_bytes("import os\n".encode("utf-8"))  # would be rejected by validator
         plugin_file.chmod(0o644)
 
         manager = ValidatedPluginManager()
@@ -321,7 +328,7 @@ class TestValidatedPluginManager:
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture
     ) -> None:
         plugin_file = tmp_path / "forced.py"
-        plugin_file.write_text("import os\n")
+        plugin_file.write_bytes("import os\n".encode("utf-8"))
         plugin_file.chmod(0o644)
 
         manager = ValidatedPluginManager()
@@ -336,7 +343,7 @@ class TestValidatedPluginManager:
 
     def test_trusted_hash_skips_security_validation(self, tmp_path: Path) -> None:
         plugin_file = tmp_path / "trusted.py"
-        plugin_file.write_text("import os\n")  # would normally be rejected
+        plugin_file.write_bytes("import os\n".encode("utf-8"))  # would normally be rejected
         plugin_file.chmod(0o644)
 
         file_hash = hashlib.sha256(plugin_file.read_bytes()).hexdigest()
@@ -358,19 +365,21 @@ class TestValidatedPluginManager:
     def test_invalid_plugin_name_raises(self, tmp_path: Path) -> None:
         # Plugin with traversal attempt in metadata name.
         plugin_file = tmp_path / "traversal.py"
-        plugin_file.write_text(
-            "from robot_optimizer_core.plugin import Plugin, PluginMetadata\n"
-            "\n"
-            "class TraversalPlugin(Plugin):\n"
-            "    @property\n"
-            "    def metadata(self) -> PluginMetadata:\n"
-            "        return PluginMetadata('../evil', '1.0.0', 'Bad name', 'Test')\n"
-            "\n"
-            "    def activate(self) -> None:\n"
-            "        self.is_active = True\n"
-            "\n"
-            "    def deactivate(self) -> None:\n"
-            "        self.is_active = False\n"
+        plugin_file.write_bytes(
+            (
+                "from robot_optimizer_core.plugin import Plugin, PluginMetadata\n"
+                "\n"
+                "class TraversalPlugin(Plugin):\n"
+                "    @property\n"
+                "    def metadata(self) -> PluginMetadata:\n"
+                "        return PluginMetadata('../evil', '1.0.0', 'Bad name', 'Test')\n"
+                "\n"
+                "    def activate(self) -> None:\n"
+                "        self.is_active = True\n"
+                "\n"
+                "    def deactivate(self) -> None:\n"
+                "        self.is_active = False\n"
+            ).encode("utf-8")
         )
         plugin_file.chmod(0o644)
 

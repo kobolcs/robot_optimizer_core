@@ -736,8 +736,29 @@ def _get_version() -> str:
 # ---------------------------------------------------------------------------
 
 
+def _ensure_utf8_streams() -> None:
+    """Reconfigure stdout/stderr to UTF-8 so non-ASCII output works on Windows.
+
+    The CLI emits Unicode characters such as em-dashes and arrows. On Windows
+    the default console encoding is cp1252, which raises ``UnicodeEncodeError``
+    when these are written. Python 3.7+ exposes ``reconfigure`` on TextIOWrapper
+    streams; use it defensively (the streams may have been replaced by a test
+    runner with an object that does not support reconfigure).
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):
+                # Stream is already detached or doesn't support encoding changes;
+                # fall back silently rather than crash before argument parsing.
+                pass
+
+
 def main(argv: list[str] | None = None) -> NoReturn:
     """Entry point registered as ``robot-optimizer`` in pyproject.toml."""
+    _ensure_utf8_streams()
     parser = _build_parser()
     args = parser.parse_args(argv)
 

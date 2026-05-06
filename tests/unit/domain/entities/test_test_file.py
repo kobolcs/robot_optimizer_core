@@ -147,9 +147,9 @@ class TestTestFile:
 
     def test_from_path_factory(self) -> None:
         """Test creating TestFile from an actual file."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".robot", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="wb", suffix=".robot", delete=False) as f:
             content = "*** Test Cases ***\nSample Test\n    Log    Hello World"
-            f.write(content)
+            f.write(content.encode("utf-8"))
             temp_path = Path(f.name)
 
         try:
@@ -166,8 +166,8 @@ class TestTestFile:
 
     def test_from_path_with_content_override(self) -> None:
         """Test from_path with content parameter."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".robot", delete=False) as f:
-            f.write("Original content")
+        with tempfile.NamedTemporaryFile(mode="wb", suffix=".robot", delete=False) as f:
+            f.write(b"Original content")
             temp_path = Path(f.name)
 
         try:

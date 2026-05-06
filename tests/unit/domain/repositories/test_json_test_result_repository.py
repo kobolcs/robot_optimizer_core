@@ -144,7 +144,7 @@ class TestGetResultsForFile:
             "error_message": None,
             "timestamp": naive_ts,
         }
-        path.write_text(json.dumps(record) + "\n")
+        path.write_bytes((json.dumps(record) + "\n").encode("utf-8"))
         repo = JsonTestResultRepository(path)
         results = repo.get_results_for_file(Path("suite.robot"), days_back=1)
         assert len(results) == 1

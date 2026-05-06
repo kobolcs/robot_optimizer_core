@@ -148,8 +148,7 @@ def temp_dir() -> Generator[Path, None, None]:
 def sample_robot_file(temp_dir: Path) -> Path:
     """Create a sample robot file for testing."""
     file_path = temp_dir / "test_suite.robot"
-    file_path.write_text(SAMPLE_ROBOT_CONTENT)
-    return file_path
+    return write_robot_file(file_path, SAMPLE_ROBOT_CONTENT)
 
 
 @pytest.fixture
@@ -162,8 +161,7 @@ def test_file(sample_robot_file: Path) -> TestFile:
 def empty_robot_file(temp_dir: Path) -> Path:
     """Create an empty robot file."""
     file_path = temp_dir / "empty.robot"
-    file_path.write_text("")
-    return file_path
+    return write_robot_file(file_path, "")
 
 
 @pytest.fixture
@@ -179,8 +177,7 @@ Test Case {i}
 """
 
     file_path = temp_dir / "large_suite.robot"
-    file_path.write_text(content)
-    return file_path
+    return write_robot_file(file_path, content)
 
 
 @pytest.fixture
@@ -309,7 +306,7 @@ class TestData:
     @staticmethod
     def create_test_file(path: Path, content: str, encoding: str = "utf-8") -> TestFile:
         """Create a test file with given content."""
-        path.write_text(content, encoding=encoding)
+        write_robot_file(path, content)
         return TestFile.from_path(path)
 
 
@@ -367,3 +364,24 @@ class MockFactory:
             setattr(finding, key, value)
 
         return finding
+
+
+# Utilities for cross-platform file handling
+def write_robot_file(path: Path, content: str) -> Path:
+    """Write Robot Framework content to file with consistent line endings (LF only).
+
+    This helper ensures files always have LF line endings regardless of platform,
+    preventing CRLF issues on Windows that can cause size mismatches and content
+    assertion failures.
+
+    Args:
+        path: File path to write to.
+        content: String content to write.
+
+    Returns:
+        The path that was written.
+    """
+    # Normalize to LF only before writing
+    normalized = content.replace("\r\n", "\n").replace("\r", "\n")
+    path.write_bytes(normalized.encode("utf-8"))
+    return path

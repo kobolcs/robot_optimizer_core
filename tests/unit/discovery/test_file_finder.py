@@ -110,18 +110,18 @@ class TestOptimizedFileDiscoveryService:
     @pytest.fixture
     def robot_tree(self, tmp_path: Path) -> Path:
         """Create a tree of robot files for discovery tests."""
-        (tmp_path / "suite_a.robot").write_text("*** Test Cases ***")
-        (tmp_path / "suite_b.robot").write_text("*** Test Cases ***")
-        (tmp_path / "keywords.resource").write_text("*** Keywords ***")
-        (tmp_path / "helpers.py").write_text("# python helper")
+        (tmp_path / "suite_a.robot").write_bytes("*** Test Cases ***".encode("utf-8"))
+        (tmp_path / "suite_b.robot").write_bytes("*** Test Cases ***".encode("utf-8"))
+        (tmp_path / "keywords.resource").write_bytes("*** Keywords ***".encode("utf-8"))
+        (tmp_path / "helpers.py").write_bytes("# python helper".encode("utf-8"))
 
         sub = tmp_path / "sub"
         sub.mkdir()
-        (sub / "nested.robot").write_text("*** Test Cases ***")
+        (sub / "nested.robot").write_bytes("*** Test Cases ***".encode("utf-8"))
 
         excluded = tmp_path / "build"
         excluded.mkdir()
-        (excluded / "artifact.robot").write_text("*** Test Cases ***")
+        (excluded / "artifact.robot").write_bytes("*** Test Cases ***".encode("utf-8"))
 
         return tmp_path
 
@@ -185,8 +185,8 @@ class TestOptimizedFileDiscoveryService:
     ) -> None:
         deep = tmp_path / "a" / "b" / "c"
         deep.mkdir(parents=True)
-        (deep / "deep.robot").write_text("*** Test Cases ***")
-        (tmp_path / "shallow.robot").write_text("*** Test Cases ***")
+        (deep / "deep.robot").write_bytes("*** Test Cases ***".encode("utf-8"))
+        (tmp_path / "shallow.robot").write_bytes("*** Test Cases ***".encode("utf-8"))
 
         files = service.find_files(tmp_path, patterns=["*.robot"], max_depth=1)
         names = [f.name for f in files]
