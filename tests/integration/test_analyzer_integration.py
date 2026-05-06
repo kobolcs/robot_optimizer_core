@@ -337,8 +337,8 @@ unused keyword
 
         from tempfile import NamedTemporaryFile
 
-        with NamedTemporaryFile(mode="w", suffix=".robot", delete=False) as f:
-            f.write(content)
+        with NamedTemporaryFile(mode="wb", suffix=".robot", delete=False) as f:
+            f.write(content.encode("utf-8"))
             temp_path = Path(f.name)
 
         try:
