@@ -1,10 +1,9 @@
 name: CI
-
 on:
   push:
     branches: [ master, main ]
   pull_request:
-    branches: [ master, main ]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -16,6 +15,7 @@ concurrency:
 jobs:
   test:
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.experimental == true }}
     strategy:
       fail-fast: false
       matrix:
@@ -32,12 +32,33 @@ jobs:
           - python-version: "3.14"
             tox-env: "py314"
             os: ubuntu-latest
-          - python-version: "3.12"
-            tox-env: "py312"
+            experimental: true
+          - python-version: "3.11"
+            tox-env: "py311"
             os: windows-latest
           - python-version: "3.12"
             tox-env: "py312"
+            os: windows-latest
+          - python-version: "3.13"
+            tox-env: "py313"
+            os: windows-latest
+          - python-version: "3.14"
+            tox-env: "py314"
+            os: windows-latest
+            experimental: true
+          - python-version: "3.11"
+            tox-env: "py311"
             os: macos-latest
+          - python-version: "3.12"
+            tox-env: "py312"
+            os: macos-latest
+          - python-version: "3.13"
+            tox-env: "py313"
+            os: macos-latest
+          - python-version: "3.14"
+            tox-env: "py314"
+            os: macos-latest
+            experimental: true
 
     steps:
       - name: Checkout
@@ -48,6 +69,13 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: ${{ matrix.python-version == '3.14' }}
+          cache: 'pip'
+
+      - name: Cache tox environments
+        uses: actions/cache@v4
+        with:
+          path: .tox
+          key: tox-${{ matrix.os }}-${{ matrix.python-version }}-${{ hashFiles('tox.ini', 'pyproject.toml') }}
 
       - name: Install tox
         run: python -m pip install --upgrade pip tox
@@ -56,15 +84,15 @@ jobs:
         run: tox -e ${{ matrix.tox-env }}
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.xml
-          flags: py${{ matrix.python-version }}
+          flags: ${{ matrix.os }}-py${{ matrix.python-version }}
           fail_ci_if_error: false
 
   quality:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -73,9 +101,21 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: 'pip'
+
+      - name: Cache tox environments
+        uses: actions/cache@v4
+        with:
+          path: .tox
+          key: tox-quality-${{ hashFiles('tox.ini', 'pyproject.toml') }}
 
       - name: Install tox
         run: python -m pip install --upgrade pip tox
 
       - name: Run lint / type / packaging checks
         run: tox -e lint,type,build
+
+      - name: Audit dependencies
+        run: |
+          pip install pip-audit
+          pip-audit
