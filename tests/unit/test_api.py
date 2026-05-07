@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+import robot_optimizer_core.api as _api_module
 from robot_optimizer_core.api import analyze_directory, analyze_file
 from robot_optimizer_core.config import Settings
 from robot_optimizer_core.domain.value_objects import Finding
@@ -40,7 +41,7 @@ class TestAnalyzeFileMaxSizeEnforcement:
         self, tmp_path: Path
     ) -> None:
         robot_file = tmp_path / "normal.robot"
-        robot_file.write_bytes("*** Test Cases ***\nSample Test\n    Log    hello\n".encode("utf-8"))
+        robot_file.write_bytes(b"*** Test Cases ***\nSample Test\n    Log    hello\n")
 
         settings = Settings(max_file_size_mb=10.0)
         findings = analyze_file(robot_file, settings=settings)
@@ -92,7 +93,7 @@ def test_analyze_file_uses_safe_analyze(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     robot_file = tmp_path / "sample.robot"
-    robot_file.write_bytes("*** Test Cases ***\nCase\n    Log    ok\n".encode("utf-8"))
+    robot_file.write_bytes(b"*** Test Cases ***\nCase\n    Log    ok\n")
 
     calls: list[str] = []
 
@@ -116,8 +117,8 @@ def test_analyze_file_uses_safe_analyze(
 def test_analyze_directory_parallel_is_deterministic(tmp_path: Path) -> None:
     one = tmp_path / "one.robot"
     two = tmp_path / "two.robot"
-    one.write_bytes("*** Keywords ***\nAlpha\n    No Operation\n".encode("utf-8"))
-    two.write_bytes("*** Test Cases ***\nUse\n    Alpha\n".encode("utf-8"))
+    one.write_bytes(b"*** Keywords ***\nAlpha\n    No Operation\n")
+    two.write_bytes(b"*** Test Cases ***\nUse\n    Alpha\n")
 
     first = analyze_directory(tmp_path, analyzers=["dead_code"], max_workers=4)
     second = analyze_directory(tmp_path, analyzers=["dead_code"], max_workers=4)
@@ -137,8 +138,63 @@ def test_analyze_directory_parallel_is_deterministic(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_analyze_file_with_dead_code_analyzer_does_not_crash(tmp_path: Path) -> None:
     robot_file = tmp_path / "sample.robot"
-    robot_file.write_bytes("*** Test Cases ***\nCase\n    Log    ok\n".encode("utf-8"))
+    robot_file.write_bytes(b"*** Test Cases ***\nCase\n    Log    ok\n")
 
     findings = analyze_file(robot_file, analyzers=["dead_code"])
 
     assert isinstance(findings, list)
+
+
+@pytest.mark.unit
+def test_fail_fast_stops_on_first_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """fail_fast=True must stop after the first failing file, not process all files."""
+    import warnings
+
+    for i in range(3):
+        (tmp_path / f"test_{i}.robot").write_bytes(
+            b"*** Test Cases ***\nT\n    Log    ok\n"
+        )
+
+    call_count = 0
+
+    def always_fail(path: Path, *args: object, **kwargs: object) -> list[Finding]:
+        nonlocal call_count
+        call_count += 1
+        raise AnalysisError("forced failure", file_path=path)
+
+    monkeypatch.setattr(_api_module, "analyze_file", always_fail)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        with pytest.raises(AnalysisError):
+            analyze_directory(tmp_path, max_workers=4, fail_fast=True)
+
+    assert call_count == 1, (
+        f"fail_fast=True processed {call_count} files before stopping; expected 1"
+    )
+
+
+@pytest.mark.unit
+def test_fail_fast_false_processes_all_files_and_collects_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """error_handling='warn' continues through all files and surfaces errors on the result."""
+    for i in range(3):
+        (tmp_path / f"test_{i}.robot").write_bytes(
+            b"*** Test Cases ***\nT\n    Log    ok\n"
+        )
+
+    call_count = 0
+
+    def always_fail(path: Path, *args: object, **kwargs: object) -> list[Finding]:
+        nonlocal call_count
+        call_count += 1
+        raise AnalysisError("forced failure", file_path=path)
+
+    monkeypatch.setattr(_api_module, "analyze_file", always_fail)
+
+    result = analyze_directory(tmp_path, max_workers=1, error_handling="warn")
+    assert call_count == 3
+    assert len(result.errors) == 3  # type: ignore[attr-defined]

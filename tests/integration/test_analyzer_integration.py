@@ -21,6 +21,7 @@ from robot_optimizer_core import (
     Settings,
     SleepDetector,
     TestFile,
+    analyze_directory,
     analyze_file,
     get_analyzer_registry,
     register_analyzer,
@@ -217,7 +218,7 @@ Unused Keyword {i}
         assert invalid_file not in files
 
         # Direct analysis should fail gracefully
-        with pytest.raises(Exception):  # noqa: B017  # various exception types possible
+        with pytest.raises(Exception, match=r".+"):  # noqa: B017  # various exception types possible
             TestFile.from_path(invalid_file)
 
         # Create file with invalid encoding
@@ -355,6 +356,119 @@ unused keyword
 
 
 @pytest.mark.integration
+class TestRegistryResetIntegration:
+    """Integration tests for reset_registry across the full stack."""
+
+    def test_reset_then_analyze_file_works(self, tmp_path: Path) -> None:
+        """After reset_registry the analysis pipeline must fully reconstruct."""
+        from robot_optimizer_core.analyzers.registry import reset_registry
+
+        f = tmp_path / "sample.robot"
+        f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+
+        reset_registry()
+        findings = analyze_file(f, analyzers=["dead_code"])
+        assert isinstance(findings, list)
+
+    def test_reset_restores_all_builtins_at_integration_level(self) -> None:
+        from robot_optimizer_core.analyzers.registry import (
+            get_analyzer_registry,
+            reset_registry,
+        )
+
+        reset_registry()
+        registry = get_analyzer_registry()
+        expected = {
+            "dead_code",
+            "sleep_detector",
+            "hardcoded_value",
+            "naming_convention",
+            "setup_teardown",
+            "tag_consistency",
+            "test_documentation",
+        }
+        missing = expected - set(registry.list())
+        assert not missing, f"Missing after reset: {missing}"
+
+
+@pytest.mark.integration
+class TestDeadCodeASTIntegration:
+    """Integration tests for AST-based dead-code detection on real files."""
+
+    def test_setup_teardown_no_false_positives(self, temp_dir: Path) -> None:
+        content = (
+            "*** Test Cases ***\n"
+            "Suite Test\n"
+            "    [Setup]    Suite Prepare\n"
+            "    Log    body\n"
+            "    [Teardown]    Suite Cleanup\n"
+            "\n"
+            "*** Keywords ***\n"
+            "Suite Prepare\n"
+            "    Log    prepare\n"
+            "\n"
+            "Suite Cleanup\n"
+            "    Log    cleanup\n"
+        )
+        f = temp_dir / "ast_test.robot"
+        f.write_bytes(content.encode("utf-8"))
+
+        findings = analyze_file(f, analyzers=["dead_code"])
+        unused_names = [
+            finding.context["keyword_name"]
+            for finding in findings
+            if finding.pattern.type.name == "UNUSED_KEYWORD"
+        ]
+        assert "Suite Prepare" not in unused_names
+        assert "Suite Cleanup" not in unused_names
+
+    def test_nested_if_keyword_no_false_positive(self, temp_dir: Path) -> None:
+        content = (
+            "*** Test Cases ***\n"
+            "Branch Test\n"
+            "    IF    ${env} == 'prod'\n"
+            "        Production Step\n"
+            "    ELSE\n"
+            "        Development Step\n"
+            "    END\n"
+            "\n"
+            "*** Keywords ***\n"
+            "Production Step\n"
+            "    Log    prod\n"
+            "\n"
+            "Development Step\n"
+            "    Log    dev\n"
+        )
+        f = temp_dir / "if_test.robot"
+        f.write_bytes(content.encode("utf-8"))
+
+        findings = analyze_file(f, analyzers=["dead_code"])
+        unused_names = [
+            finding.context["keyword_name"]
+            for finding in findings
+            if finding.pattern.type.name == "UNUSED_KEYWORD"
+        ]
+        assert "Production Step" not in unused_names
+        assert "Development Step" not in unused_names
+
+
+@pytest.mark.integration
+class TestFailFastIntegration:
+    """Integration tests verifying fail_fast behaviour with real files."""
+
+    def test_fail_fast_with_unreadable_content(self, temp_dir: Path) -> None:
+        """fail_fast=True should surface the first error and stop."""
+        # Create a valid file and a binary file that will fail parsing
+        valid = temp_dir / "a_valid.robot"
+        valid.write_bytes(b"*** Test Cases ***\nT\n    Log    hi\n")
+        bad = temp_dir / "b_bad.robot"
+        bad.write_bytes(b"\x00\x01\x02\x03\xff")  # binary → parse error
+
+        with pytest.raises(Exception, match=r".+"):
+            analyze_directory(temp_dir, analyzers=["dead_code"], fail_fast=True)
+
+
+@pytest.mark.integration
 @pytest.mark.slow
 class TestAnalyzerPerformance:
     """Test analyzer performance with larger files."""
@@ -391,3 +505,62 @@ class TestAnalyzerPerformance:
 
         # Each finding should be reasonably sized
         assert avg_size_per_finding < 10_000  # Less than 10KB per finding
+
+
+# ---------------------------------------------------------------------------
+# reset_container integration
+# ---------------------------------------------------------------------------
+
+@pytest.mark.integration
+class TestResetContainerIntegration:
+    def test_get_container_after_reset_returns_new_instance(self) -> None:
+        from robot_optimizer_core.di import get_container, reset_container
+
+        c1 = get_container()
+        reset_container()
+        c2 = get_container()
+        assert c1 is not c2
+
+    def test_reset_container_idempotent(self) -> None:
+        from robot_optimizer_core.di import reset_container
+        reset_container()
+        reset_container()
+
+    def test_get_container_after_double_reset_is_usable(self) -> None:
+        from robot_optimizer_core.di import get_container, reset_container
+        reset_container()
+        reset_container()
+        c = get_container()
+        assert c is not None
+
+
+# ---------------------------------------------------------------------------
+# SleepDetectorAnalyzer rename integration
+# ---------------------------------------------------------------------------
+
+@pytest.mark.integration
+class TestSleepDetectorAnalyzerIntegration:
+    def test_alias_and_canonical_produce_same_findings(self, sample_robot_file: Path) -> None:
+        from robot_optimizer_core.analyzers.sleep_detector import (
+            SleepDetector,
+            SleepDetectorAnalyzer,
+        )
+
+        tf = TestFile.from_path(sample_robot_file)
+        f1 = SleepDetector().safe_analyze(tf)
+        f2 = SleepDetectorAnalyzer().safe_analyze(tf)
+        assert len(f1) == len(f2)
+        for a, b in zip(f1, f2, strict=True):
+            assert a.pattern == b.pattern
+            assert a.location == b.location
+            assert a.severity == b.severity
+
+    def test_explicit_config_skips_settings_call(self) -> None:
+        from unittest.mock import patch
+
+        from robot_optimizer_core.analyzers.sleep_detector import SleepDetectorAnalyzer
+
+        cfg = {'severity_thresholds': {'info': 0.5, 'warning': 2.0, 'error': float('inf')}}
+        with patch('robot_optimizer_core.analyzers.sleep_detector.get_settings') as mock:
+            SleepDetectorAnalyzer(config=cfg)
+            mock.assert_not_called()

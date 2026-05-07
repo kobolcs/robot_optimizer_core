@@ -231,12 +231,12 @@ class TZAwareTestFile(Entity[UUID]):
     def last_modified_local(self) -> datetime:
         """Get last modified time in display timezone."""
         if self.display_timezone == "UTC":
-            return self.last_modified_utc.astimezone(timezone.utc)
+            return self.last_modified_utc.astimezone(UTC)
         try:
             tz = ZoneInfo(self.display_timezone)
             return self.last_modified_utc.astimezone(tz)
         except Exception:
-            return self.last_modified_utc.astimezone(timezone.utc)
+            return self.last_modified_utc.astimezone(UTC)
 
     @computed_field  # type: ignore[prop-decorator]
     @property

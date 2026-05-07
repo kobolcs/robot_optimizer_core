@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 import sys
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Generator, Sequence
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -209,15 +209,115 @@ class DeadCodeAnalyzer(BaseAnalyzer):
     def _extract_keywords_and_calls(
         self, test_file: TestFile
     ) -> tuple[dict[str, list[int]], set[str], dict[str, str]]:
-        """Extract keyword definitions and resolved keyword calls.
+        """Extract keyword definitions and resolved keyword calls via the RF AST."""
+        keywords: dict[str, list[int]] = defaultdict(list)
+        keyword_display_names: dict[str, str] = {}
 
-        Also captures doubly-indented lines inside FOR loops so that
-        keywords called inside ``FOR … END`` blocks are no longer missed.
-        """
+        try:
+            from robot.parsing import get_model
+            from robot.parsing.model import KeywordSection
+
+            model = get_model(test_file.content)
+        except Exception as e:
+            self._logger.debug(
+                "AST parse failed, falling back to text extraction",
+                extra={"file": str(test_file.path), "error": str(e)},
+            )
+            return self._extract_keywords_and_calls_text(test_file)
+
+        # --- Keyword definitions (KeywordSection only) ---
+        for section in model.sections:
+            if not isinstance(section, KeywordSection):
+                continue
+            for kw in section.body:
+                name: str | None = getattr(kw, "name", None)
+                if not name or not isinstance(name, str):
+                    continue
+                if name[0].isdigit():
+                    continue
+                normalized = name.lower()
+                lineno: int = getattr(kw, "lineno", 0) or 0
+                keywords[normalized].append(lineno)
+                keyword_display_names.setdefault(normalized, name)
+
+        # --- Keyword calls (all sections, recursively) ---
+        candidate_calls = self._collect_ast_calls(model)
+        keyword_names = set(keywords)
+        calls = self._resolve_calls(candidate_calls, keyword_names)
+
+        return dict(keywords), calls, keyword_display_names
+
+    def _collect_ast_calls(self, model: object) -> list[str]:
+        """Recursively collect all keyword call names from a robot model."""
+        calls: list[str] = []
+        for section in model.sections:  # type: ignore[attr-defined]
+            section_body = getattr(section, "body", None)
+            if section_body:
+                self._walk_body(section_body, calls)
+        return calls
+
+    def _walk_body(self, items: object, calls: list[str]) -> None:
+        """Walk an iterable body, collecting keyword call names into *calls*."""
+        if not hasattr(items, "__iter__"):
+            return
+        from collections.abc import Iterable
+        for item in items if isinstance(items, Iterable) else []:
+            self._collect_item_calls(item, calls)
+
+    def _collect_item_calls(self, item: object, calls: list[str]) -> None:
+        """Collect call names from a single AST node and recurse into its bodies."""
+        item_type = getattr(item, "type", None)
+        if item_type == "KEYWORD":
+            name = self._resolve_keyword_call_name(item)
+            if name:
+                calls.append(name)
+        elif item_type in ("SETUP", "TEARDOWN"):
+            for token in getattr(item, "data_tokens", []):
+                if token.type == "NAME":
+                    calls.append(str(token.value))
+                    break
+        for body in self._iter_nested_bodies(item):
+            self._walk_body(body, calls)
+
+    def _resolve_keyword_call_name(self, item: object) -> str | None:
+        """Return the effective call name for a KEYWORD node, handling Run Keyword dispatch."""
+        name = getattr(item, "keyword", None)
+        if not name:
+            return None
+        name_str = str(name)
+        args = list(getattr(item, "args", ()))
+        name_lower = name_str.lower()
+        if name_lower == "run keyword" and args:
+            return f"Run Keyword {args[0]}"
+        if name_lower == "run keywords" and args:
+            return f"Run Keywords {' '.join(str(a) for a in args)}"
+        return name_str
+
+    def _iter_nested_bodies(self, item: object) -> Generator[object, None, None]:
+        """Yield each body list reachable from *item* via body, orelse, or Try.next chain."""
+        body = getattr(item, "body", None)
+        if body:
+            yield body
+        orelse = getattr(item, "orelse", None)
+        if orelse is not None:
+            orelse_body = getattr(orelse, "body", None)
+            if orelse_body:
+                yield orelse_body
+        # RF 7.1+ Try/EXCEPT/ELSE/FINALLY branches are linked via .next (not .handlers/.finally_item)
+        next_branch = getattr(item, "next", None)
+        while next_branch is not None:
+            branch_body = getattr(next_branch, "body", None)
+            if branch_body:
+                yield branch_body
+            next_branch = getattr(next_branch, "next", None)
+
+    def _extract_keywords_and_calls_text(
+        self, test_file: TestFile
+    ) -> tuple[dict[str, list[int]], set[str], dict[str, str]]:
+        """Text-based fallback for _extract_keywords_and_calls."""
         keywords: dict[str, list[int]] = defaultdict(list)
         keyword_display_names: dict[str, str] = {}
         candidate_calls: list[str] = []
-        calls: set[str] = set()
 
         lines = test_file.content.splitlines()
         in_keywords_section = False
@@ -236,7 +336,6 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                 continue
 
             if in_keywords_section and not line.startswith((" ", "\t")):
-                # Ignore malformed definitions such as names beginning with a digit.
                 if stripped[0].isdigit():
                     continue
                 normalized = stripped.lower()
@@ -244,77 +343,41 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                 keyword_display_names.setdefault(normalized, stripped)
                 continue
 
-            # Capture any indented line, including nested FOR bodies.
             if in_test_or_keyword and line.startswith((" ", "\t")):
                 candidate_calls.append(stripped)
 
         keyword_names = set(keywords)
-
-        for call in candidate_calls:
-            lowered = call.lower()
-            parts = call.split()
-            lowered_parts = [part.lower() for part in parts]
-
-            # Direct full-line/prefix matches against known local keyword definitions.
-            for keyword in keyword_names:
-                if lowered == keyword or lowered.startswith(keyword + " "):
-                    calls.add(keyword)
-
-            # BDD prefixes: Given/When/Then/And/But <keyword>
-            if lowered_parts and lowered_parts[0] in {
-                "given",
-                "when",
-                "then",
-                "and",
-                "but",
-            }:
-                bdd_call = " ".join(lowered_parts[1:])
-                for keyword in keyword_names:
-                    if bdd_call == keyword or bdd_call.startswith(keyword + " "):
-                        calls.add(keyword)
-
-            # Dynamic Robot calls: Run Keyword <keyword>, Run Keywords <kw> AND <kw>
-            if lowered.startswith("run keyword "):
-                dynamic_call = lowered.removeprefix("run keyword ").strip()
-                for keyword in keyword_names:
-                    if dynamic_call == keyword or dynamic_call.startswith(
-                        keyword + " "
-                    ):
-                        calls.add(keyword)
-
-            if lowered.startswith("run keywords "):
-                dynamic_parts = [
-                    part.strip().lower()
-                    for part in re.split(
-                        r"\s+AND\s+", call[len("Run Keywords ") :], flags=re.IGNORECASE
-                    )
-                ]
-                for dynamic_call in dynamic_parts:
-                    for keyword in keyword_names:
-                        if dynamic_call == keyword or dynamic_call.startswith(
-                            keyword + " "
-                        ):
-                            calls.add(keyword)
-
+        calls = self._resolve_calls(candidate_calls, keyword_names)
         return dict(keywords), calls, keyword_display_names
 
     def _extract_candidate_calls(self, test_file: TestFile) -> list[str]:
-        """Return all indented (call-site) stripped lines from test/keyword sections."""
-        candidates: list[str] = []
-        lines = test_file.content.splitlines()
-        in_test_or_keyword = False
-        for line in lines:
-            stripped = line.strip()
-            if not stripped or stripped.startswith("#"):
-                continue
-            if stripped.startswith("***"):
-                in_test_or_keyword = (
-                    "test case" in stripped.lower() or "keyword" in stripped.lower()
-                )
-                continue
-            if in_test_or_keyword and line.startswith((" ", "\t")):
-                candidates.append(stripped)
-        return candidates
+        """Return all keyword call names from test/keyword sections via the RF AST."""
+        try:
+            from robot.parsing import get_model
+
+            model = get_model(test_file.content)
+            return self._collect_ast_calls(model)
+        except Exception as e:
+            self._logger.debug(
+                "AST parse failed, falling back to text extraction",
+                extra={"file": str(test_file.path), "error": str(e)},
+            )
+            # Fallback: indented lines from text
+            candidates: list[str] = []
+            lines = test_file.content.splitlines()
+            in_test_or_keyword = False
+            for line in lines:
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#"):
+                    continue
+                if stripped.startswith("***"):
+                    in_test_or_keyword = (
+                        "test case" in stripped.lower() or "keyword" in stripped.lower()
+                    )
+                    continue
+                if in_test_or_keyword and line.startswith((" ", "\t")):
+                    candidates.append(stripped)
+            return candidates
 
     def _resolve_calls(
         self, candidates: list[str], keyword_names: set[str]

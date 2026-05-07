@@ -71,7 +71,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
     ) -> None:
         """Initialize the analyzer.
 
-        Task 11: When no repository is available the analyzer no longer raises
+        When no repository is available the analyzer no longer raises
         at construction time.  Instead, ``analyze()`` returns an empty list
         and logs a warning so that ``analyze_file()`` continues normally.
 
@@ -86,19 +86,21 @@ class FlakinessAnalyzer(BaseAnalyzer):
             container = get_container()
             if container.has_service("test_result_repository"):
                 test_result_repository = container.resolve("test_result_repository")
-            # No longer raise here — defer to analyze() (Task 11)
+            # No longer raise here — defer to analyze()
 
         self._repository: TestResultRepository | None = test_result_repository
 
-        # Get settings
-        settings = get_settings()
-
-        # Configuration
         self._days_back = self.get_config_value("days_back", 30)
-        self._failure_threshold = self.get_config_value(
-            "failure_threshold", settings.flakiness_threshold
-        )
-        self._min_runs = self.get_config_value("min_runs", settings.flakiness_min_runs)
+        _need_settings = "failure_threshold" not in self.config or "min_runs" not in self.config
+        if _need_settings:
+            _s = get_settings()
+            _default_failure = _s.flakiness_threshold
+            _default_runs = _s.flakiness_min_runs
+        else:
+            _default_failure = 0.05
+            _default_runs = 4
+        self._failure_threshold = self.get_config_value("failure_threshold", _default_failure)
+        self._min_runs = self.get_config_value("min_runs", _default_runs)
 
         # Severity thresholds
         self._severity_thresholds = self.get_config_value(
@@ -147,7 +149,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
     def analyze(self, test_file: TestFile) -> list[Finding]:
         """Analyze test file for flaky tests.
 
-        Task 11: Returns an empty list (with a warning) when no repository
+        Returns an empty list (with a warning) when no repository
         is configured instead of raising an error.
 
         Args:
@@ -158,7 +160,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
         """
         findings: list[Finding] = []
 
-        # Task 11: graceful no-repo handling
+        # graceful no-repo handling
         if self._repository is None:
             self._logger.warning(
                 "FlakinessAnalyzer skipped: no TestResultRepository configured",
@@ -249,7 +251,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
         if stats.last_failure:
             message_parts.append(f"Last failed: {stats.last_failure.date()}")
 
-        # Task 12: include trend in message
+        # include trend in message
         if stats.trend != "unknown":
             trend_symbol = {
                 "improving": "📈 improving",

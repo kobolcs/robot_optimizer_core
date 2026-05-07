@@ -21,7 +21,6 @@ Example:
 
 from __future__ import annotations
 
-from functools import cache
 from importlib.metadata import EntryPoint, entry_points
 from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
@@ -40,6 +39,7 @@ __all__ = [
     "get_analyzer_registry",
     "list_analyzers",
     "register_analyzer",
+    "reset_registry",
 ]
 
 logger = get_logger(__name__)
@@ -261,7 +261,6 @@ class AnalyzerRegistry:
 _analyzer_registry: AnalyzerRegistry | None = None
 
 
-@cache
 def get_analyzer_registry() -> AnalyzerRegistry:
     """Get the global analyzer registry.
 
@@ -276,6 +275,15 @@ def get_analyzer_registry() -> AnalyzerRegistry:
     return _analyzer_registry
 
 
+def reset_registry() -> None:
+    """Reset the global analyzer registry to an uninitialized state.
+
+    Primarily useful for tests and plugin reload scenarios.
+    """
+    global _analyzer_registry
+    _analyzer_registry = None
+
+
 def _register_built_in_analyzers(registry: AnalyzerRegistry) -> None:
     """Register built-in analyzers.
 
@@ -288,12 +296,12 @@ def _register_built_in_analyzers(registry: AnalyzerRegistry) -> None:
     from .hardcoded_value import HardcodedValueAnalyzer
     from .naming_convention import NamingConventionAnalyzer
     from .setup_teardown import SetupTeardownAnalyzer
-    from .sleep_detector import SleepDetector
+    from .sleep_detector import SleepDetectorAnalyzer
     from .tag_consistency import TagConsistencyAnalyzer
     from .test_documentation import TestDocumentationAnalyzer
 
     registry.register("dead_code", DeadCodeAnalyzer)
-    registry.register("sleep_detector", SleepDetector)
+    registry.register("sleep_detector", SleepDetectorAnalyzer)
     registry.register("flakiness", FlakinessAnalyzer)
     registry.register("hardcoded_value", HardcodedValueAnalyzer)
     registry.register("naming_convention", NamingConventionAnalyzer)

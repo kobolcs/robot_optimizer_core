@@ -51,7 +51,7 @@ from .registry import (
     register_analyzer,
 )
 from .setup_teardown import SetupTeardownAnalyzer
-from .sleep_detector import SleepDetector
+from .sleep_detector import SleepDetector, SleepDetectorAnalyzer
 from .tag_consistency import TagConsistencyAnalyzer
 from .test_documentation import TestDocumentationAnalyzer
 
@@ -72,6 +72,7 @@ __all__ = [
     "NamingConventionAnalyzer",
     "SetupTeardownAnalyzer",
     "SleepDetector",
+    "SleepDetectorAnalyzer",
     "TagConsistencyAnalyzer",
     "TestDocumentationAnalyzer",
 ]

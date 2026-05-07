@@ -8,6 +8,8 @@ from robot_optimizer_core.analyzers import BaseAnalyzer, SleepDetector
 from robot_optimizer_core.analyzers.registry import (
     AnalyzerRegistry,
     _register_entry_point_analyzers,
+    get_analyzer_registry,
+    reset_registry,
 )
 from robot_optimizer_core.domain.entities import TestFile
 from robot_optimizer_core.domain.value_objects import Finding
@@ -26,6 +28,13 @@ class ExternalAnalyzer(BaseAnalyzer):
         return []
 
 
+@pytest.fixture(autouse=True)
+def _isolate_registry_state() -> None:
+    reset_registry()
+    yield  # type: ignore[misc]
+    reset_registry()
+
+
 @pytest.mark.unit
 def test_registry_create_returns_fresh_instances() -> None:
     registry = AnalyzerRegistry()
@@ -35,6 +44,50 @@ def test_registry_create_returns_fresh_instances() -> None:
     second = registry.create("external")
 
     assert first is not second
+
+
+_ALL_BUILTINS = {
+    "dead_code",
+    "sleep_detector",
+    "flakiness",
+    "hardcoded_value",
+    "naming_convention",
+    "setup_teardown",
+    "tag_consistency",
+    "test_documentation",
+}
+
+
+@pytest.mark.unit
+def test_reset_registry_creates_fresh_instance() -> None:
+    r1 = get_analyzer_registry()
+    reset_registry()
+    r2 = get_analyzer_registry()
+    assert r1 is not r2
+
+
+@pytest.mark.unit
+def test_get_analyzer_registry_stable_without_reset() -> None:
+    r1 = get_analyzer_registry()
+    r2 = get_analyzer_registry()
+    assert r1 is r2
+
+
+@pytest.mark.unit
+def test_reset_registry_rebuilds_all_builtins() -> None:
+    reset_registry()
+    registry = get_analyzer_registry()
+    missing = _ALL_BUILTINS - set(registry.list())
+    assert not missing, f"Missing after reset: {missing}"
+
+
+@pytest.mark.unit
+def test_reset_registry_removes_custom_analyzer() -> None:
+    registry = get_analyzer_registry()
+    registry.register("_temp_probe", ExternalAnalyzer, override=True)
+    assert "_temp_probe" in registry.list()
+    reset_registry()
+    assert "_temp_probe" not in get_analyzer_registry().list()
 
 
 @pytest.mark.unit

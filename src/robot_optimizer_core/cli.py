@@ -152,75 +152,90 @@ def _format_sarif(findings: list[Finding], path: Path) -> str:
     return json.dumps(sarif, indent=2, default=str)
 
 
-def _format_html(findings: list[Finding], path: Path) -> str:
-    class _CategoryInfo(TypedDict):
-        count: int
-        impact: str
-        action: str
+class _CategoryInfo(TypedDict):
+    count: int
+    impact: str
+    action: str
+
+
+def _html_category_metadata(pattern_name: str) -> tuple[str, str, str]:
+    """Return (category, impact, action) for an HTML report finding group."""
+    normalized = pattern_name.lower()
+    mappings = [
+        (
+            ("sleep",),
+            "Stability / flakiness risk",
+            "Fixed sleeps increase execution variance and flaky outcomes.",
+            "Replace fixed sleeps with condition-based explicit waits.",
+        ),
+        (
+            ("unused keyword",),
+            "Maintainability / legacy debt",
+            "Unused legacy keywords create noise and increase maintenance cost.",
+            "Remove or confirm legacy keywords and archive obsolete helpers.",
+        ),
+        (
+            ("documentation",),
+            "Knowledge transfer / onboarding risk",
+            "Missing documentation slows onboarding and raises review effort.",
+            "Add concise business-focused documentation to critical tests and keywords.",
+        ),
+        (
+            ("hardcoded",),
+            "Environment/configuration risk",
+            "Hardcoded values reduce portability between environments.",
+            "Move environment-specific data into variables or configuration.",
+        ),
+        (
+            ("tag",),
+            "Governance / test selection risk",
+            "Tag inconsistency weakens filtering, reporting, and release gates.",
+            "Normalize tag taxonomy and enforce conventions in review checks.",
+        ),
+        (
+            ("naming", "camelcase", "camel_case"),
+            "Readability / consistency risk",
+            "Naming inconsistency reduces readability and increases review friction.",
+            "Adopt naming standards and align keywords/tests incrementally.",
+        ),
+        (
+            ("setup", "teardown"),
+            "Structure / duplication risk",
+            "Setup/teardown issues can duplicate logic and hide dependencies.",
+            "Refactor shared setup/teardown behavior into reusable keywords.",
+        ),
+    ]
+    for keywords, category, impact, action in mappings:
+        if any(keyword in normalized for keyword in keywords):
+            return (category, impact, action)
+    return (
+        "General quality risk",
+        "General quality issues can accumulate into delivery and maintenance cost.",
+        "Review and remediate recurring findings as part of sprint quality work.",
+    )
+
+
+def _html_compute_stats(
+    findings: list[Finding],
+    path: Path,
+) -> tuple[
+    str,
+    dict[str, int],
+    set[str],
+    dict[str, _CategoryInfo],
+    dict[str, list[Finding]],
+]:
+    """Compute summary statistics used by the HTML report."""
 
     def _display_path(file_path: Path) -> str:
         try:
-            return str(file_path.resolve().relative_to(path.resolve()))
+            root = path.resolve() if path.is_dir() else path.parent.resolve()
+            return str(file_path.resolve().relative_to(root))
         except ValueError:
             return str(file_path)
 
-    def _category_metadata(pattern_name: str) -> tuple[str, str, str]:
-        normalized = pattern_name.lower()
-        mappings = [
-            (
-                ("sleep",),
-                "Stability / flakiness risk",
-                "Fixed sleeps increase execution variance and flaky outcomes.",
-                "Replace fixed sleeps with condition-based explicit waits.",
-            ),
-            (
-                ("unused keyword",),
-                "Maintainability / legacy debt",
-                "Unused legacy keywords create noise and increase maintenance cost.",
-                "Remove or confirm legacy keywords and archive obsolete helpers.",
-            ),
-            (
-                ("documentation",),
-                "Knowledge transfer / onboarding risk",
-                "Missing documentation slows onboarding and raises review effort.",
-                "Add concise business-focused documentation to critical tests and keywords.",
-            ),
-            (
-                ("hardcoded",),
-                "Environment/configuration risk",
-                "Hardcoded values reduce portability between environments.",
-                "Move environment-specific data into variables or configuration.",
-            ),
-            (
-                ("tag",),
-                "Governance / test selection risk",
-                "Tag inconsistency weakens filtering, reporting, and release gates.",
-                "Normalize tag taxonomy and enforce conventions in review checks.",
-            ),
-            (
-                ("naming",),
-                "Readability / consistency risk",
-                "Naming inconsistency reduces readability and increases review friction.",
-                "Adopt naming standards and align keywords/tests incrementally.",
-            ),
-            (
-                ("setup", "teardown"),
-                "Structure / duplication risk",
-                "Setup/teardown issues can duplicate logic and hide dependencies.",
-                "Refactor shared setup/teardown behavior into reusable keywords.",
-            ),
-        ]
-        for keywords, category, impact, action in mappings:
-            if any(keyword in normalized for keyword in keywords):
-                return (category, impact, action)
-        return (
-            "General quality risk",
-            "General quality issues can accumulate into delivery and maintenance cost.",
-            "Review and remediate recurring findings as part of sprint quality work.",
-        )
-
     timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
-    sev_counts = {"ERROR": 0, "WARNING": 0, "INFO": 0}
+    sev_counts: dict[str, int] = {"ERROR": 0, "WARNING": 0, "INFO": 0}
     affected_files: set[str] = set()
     category_summary: dict[str, _CategoryInfo] = {}
     category_groups: dict[str, list[Finding]] = {}
@@ -229,17 +244,26 @@ def _format_html(findings: list[Finding], path: Path) -> str:
         sev_counts[finding.severity.name.upper()] += 1
         display_path = _display_path(finding.location.file_path)
         affected_files.add(display_path)
-        category, impact, action = _category_metadata(finding.pattern.name)
+        category, impact, action = _html_category_metadata(finding.pattern.name)
         category_groups.setdefault(category, []).append(finding)
         if category not in category_summary:
-            category_summary[category] = {
-                "count": 0,
-                "impact": impact,
-                "action": action,
-            }
-        category_summary[category]["count"] = (
-            int(category_summary[category]["count"]) + 1
-        )
+            category_summary[category] = {"count": 0, "impact": impact, "action": action}
+        category_summary[category]["count"] = int(category_summary[category]["count"]) + 1
+
+    return timestamp, sev_counts, affected_files, category_summary, category_groups
+
+
+def _format_html(findings: list[Finding], path: Path) -> str:
+    def _display_path(file_path: Path) -> str:
+        try:
+            root = path.resolve() if path.is_dir() else path.parent.resolve()
+            return str(file_path.resolve().relative_to(root))
+        except ValueError:
+            return str(file_path)
+
+    timestamp, sev_counts, affected_files, category_summary, category_groups = (
+        _html_compute_stats(findings, path)
+    )
 
     if sev_counts["ERROR"] > 0 or sev_counts["WARNING"] >= 10:
         health_status = "High Risk"
@@ -314,7 +338,7 @@ def _format_html(findings: list[Finding], path: Path) -> str:
     for label, matcher in recommended_actions:
         if matcher == "tag|naming":
             is_relevant = any(
-                any(part in f.pattern.name.lower() for part in ("tag", "naming"))
+                any(part in f.pattern.name.lower() for part in ("tag", "naming", "camel_case"))
                 for f in findings
             )
         else:

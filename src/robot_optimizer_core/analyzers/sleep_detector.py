@@ -46,10 +46,10 @@ from ..domain.value_objects import (
 from ..exceptions import ConfigurationError
 from .base import BaseAnalyzer, ConfigValue
 
-__all__ = ["SleepDetector"]
+__all__ = ["SleepDetectorAnalyzer", "SleepDetector"]
 
 # ---------------------------------------------------------------------------
-# Unit normalisation helper (Task 9)
+# Unit normalisation helper
 # ---------------------------------------------------------------------------
 
 _UNIT_MAP: dict[str, str] = {
@@ -109,7 +109,7 @@ class _AnalyzeCtx:
     block_names: dict[int, str | None]
 
 
-class SleepDetector(BaseAnalyzer):
+class SleepDetectorAnalyzer(BaseAnalyzer):
     """Detects sleep usage in Robot Framework tests.
 
     This analyzer finds Sleep keyword usage and categorizes findings
@@ -131,19 +131,15 @@ class SleepDetector(BaseAnalyzer):
         """
         super().__init__(config)
 
-        # Get severity thresholds from settings
-        settings = get_settings()
-        max_acceptable = settings.max_acceptable_sleep_seconds
-
-        # Default thresholds
-        self._severity_thresholds = self.get_config_value(
-            "severity_thresholds",
-            {
-                "info": max_acceptable,  # <= 1s by default
-                "warning": max_acceptable * 5,  # <= 5s
-                "error": float("inf"),  # > 5s
-            },
-        )
+        if "severity_thresholds" not in self.config:
+            max_acceptable = get_settings().max_acceptable_sleep_seconds
+            self._severity_thresholds: dict[str, float] = {
+                "info": max_acceptable,
+                "warning": max_acceptable * 5,
+                "error": float("inf"),
+            }
+        else:
+            self._severity_thresholds = self.config["severity_thresholds"]  # type: ignore[assignment]
 
         # Configuration
         self._suggest_alternatives = self.get_config_value("suggest_alternatives", True)
@@ -222,7 +218,7 @@ class SleepDetector(BaseAnalyzer):
     def _compile_sleep_patterns(self) -> list[tuple[re.Pattern[str], str]]:
         """Compile regex patterns for sleep detection.
 
-        Task 9: Supports ``Sleep  2 minutes``, ``Sleep  500ms``, ``Sleep  1.5s``
+        Supports ``Sleep  2 minutes``, ``Sleep  500ms``, ``Sleep  1.5s``
         and all Robot Framework time-string formats with a space between number
         and unit.
 
@@ -276,7 +272,7 @@ class SleepDetector(BaseAnalyzer):
 
         return patterns
 
-    # Task 10: regex for detecting time.sleep() inside Evaluate calls
+    # Regex for detecting time.sleep() inside Evaluate calls
     _EVALUATE_SLEEP_RE: re.Pattern[str] = re.compile(
         r"^\s*(?:Evaluate|Run Keyword)\s+.*time\.sleep\s*\(\s*(\d+(?:\.\d+)?)\s*\)",
         re.IGNORECASE,
@@ -285,10 +281,9 @@ class SleepDetector(BaseAnalyzer):
     def _detect_sleep(self, line: str) -> dict[str, str | Decimal | None] | None:
         """Detect sleep pattern in a line.
 
-        Task 9: Normalises duration using Robot Framework's own
-        ``timestring_to_secs`` utility when available, falling back to the
-        built-in unit multipliers.
-        Task 10: Also detects ``Evaluate  time.sleep(N)`` calls.
+        Normalises duration using Robot Framework's own ``timestring_to_secs``
+        utility when available, falling back to built-in unit multipliers.
+        Also detects ``Evaluate  time.sleep(N)`` calls.
 
         Args:
             line: Line to check.
@@ -296,7 +291,7 @@ class SleepDetector(BaseAnalyzer):
         Returns:
             Sleep information dict or None.
         """
-        # Task 10: check for time.sleep() inside Evaluate first
+        # check for time.sleep() inside Evaluate first
         if self._check_builtin:
             if m := self._EVALUATE_SLEEP_RE.match(line):
                 duration_str = m.group(1)
@@ -640,3 +635,6 @@ class SleepDetector(BaseAnalyzer):
                     config_key=f"severity_thresholds.{key}",
                     provided_value=value,
                 )
+
+# Backward-compatible alias
+SleepDetector = SleepDetectorAnalyzer

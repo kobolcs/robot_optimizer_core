@@ -171,7 +171,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
-        extra="ignore",  # Silently ignore unknown fields; prevents silent misconfiguration
+        extra="forbid",  # Raise on unknown fields to surface typos and misconfigured keys
     )
 
     @field_validator("file_patterns", "exclude_patterns")
