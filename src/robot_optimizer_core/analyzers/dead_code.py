@@ -323,6 +323,9 @@ class DeadCodeAnalyzer(BaseAnalyzer):
             branch_body = getattr(next_branch, "body", None)
             if branch_body:
                 yield branch_body
+            finalbody = getattr(next_branch, "finalbody", None)
+            if finalbody:
+                yield finalbody
             next_branch = getattr(next_branch, "next", None)
 
     def _extract_keywords_and_calls_text(
