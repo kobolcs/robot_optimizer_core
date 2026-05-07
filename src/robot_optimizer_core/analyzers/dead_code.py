@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 import sys
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Generator, Sequence
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -250,7 +250,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
     def _collect_ast_calls(self, model: object) -> list[str]:
         """Recursively collect all keyword call names from a robot model."""
         calls: list[str] = []
-        for section in model.sections:  # type: ignore[union-attr]
+        for section in model.sections:  # type: ignore[attr-defined]
             section_body = getattr(section, "body", None)
             if section_body:
                 self._walk_body(section_body, calls)
@@ -260,7 +260,8 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         """Walk an iterable body, collecting keyword call names into *calls*."""
         if not hasattr(items, "__iter__"):
             return
-        for item in items:  # type: ignore[union-attr]
+        from collections.abc import Iterable
+        for item in items if isinstance(items, Iterable) else []:
             self._collect_item_calls(item, calls)
 
     def _collect_item_calls(self, item: object, calls: list[str]) -> None:
@@ -292,7 +293,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
             return f"Run Keywords {' '.join(str(a) for a in args)}"
         return name_str
 
-    def _iter_nested_bodies(self, item: object):  # type: ignore[return]
+    def _iter_nested_bodies(self, item: object) -> Generator[object, None, None]:
         """Yield each body list reachable from *item* via body, orelse, or Try.next chain."""
         body = getattr(item, "body", None)
         if body:
