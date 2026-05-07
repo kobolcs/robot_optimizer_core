@@ -11,11 +11,10 @@ from typing import Any, Protocol, runtime_checkable
 
 from .analyzers.registry import AnalyzerRegistry
 from .config.settings import Settings
-from .di import ThreadSafeContainer
+from .di import ThreadSafeContainer, get_container, reset_container
 from .discovery import FileDiscoveryService
 from .logging import LoggerAdapter, configure_logging
 from .metrics import MetricsCollector
-from .parsers.robot_ast_parser import RobotASTParser
 from .plugin import ValidatedPluginManager
 
 
@@ -91,7 +90,15 @@ class ApplicationContext:
         self._lock = threading.RLock()
 
     def initialize(self) -> None:
-        """Initialize the application context."""
+        """Initialize the application context.
+
+        .. warning::
+            This method resets the global DI container (via ``reset_container``) and
+            replaces it with a new one configured for this context.  Only one
+            ``ApplicationContext`` instance may be active at a time; creating and
+            initialising a second instance will silently discard the first context's
+            container registrations.
+        """
         with self._lock:
             if self._initialized:
                 return
@@ -99,28 +106,38 @@ class ApplicationContext:
             if self._shutdown:
                 raise RuntimeError("Cannot initialize after shutdown")
 
-            # Initialize logging
             if self.config.enable_logging:
                 configure_logging(
                     level=self.config.log_level,
                     format_json=self.config.log_format_json,
-                    enable_metrics=False,  # We have our own metrics
+                    enable_metrics=False,
                 )
 
-            # Initialize container
-            self._container = ThreadSafeContainer()
-            self._setup_container()
+            # Reset and configure the global DI container so that api.py's
+            # get_container() calls see the settings and services this context
+            # was constructed with — both paths converge on the same container.
+            reset_container()
+            self._container = get_container()
 
-            # Initialize metrics
+            self._container.register_instance(
+                "settings", self.config.settings, override=True
+            )
+            settings = self.config.settings
+            self._container.register_singleton(
+                "file_discovery",
+                lambda: FileDiscoveryService(settings),
+                override=True,
+            )
+            self._container.register_instance("context", self)
+
             if self.config.enable_metrics:
                 self._metrics = MetricsCollector(enabled=True)
-                self._container.register_instance("metrics", self._metrics)
+                self._container.register_instance("metrics", self._metrics, override=True)
 
-            # Initialize analyzer registry
-            self._analyzer_registry = AnalyzerRegistry()
-            self._register_builtin_analyzers()
+            # The global registry is already populated by _register_defaults
+            # (via get_analyzer_registry / entry-point discovery).
+            self._analyzer_registry = self._container.resolve("analyzer_registry")
 
-            # Initialize plugin manager
             if self.config.enable_plugins:
                 self._plugin_manager = ValidatedPluginManager()
                 self._container.register_instance(
@@ -135,7 +152,6 @@ class ApplicationContext:
             if self._shutdown:
                 return
 
-            # Shutdown services in reverse order
             if self._plugin_manager:
                 for plugin_name in list(self._plugin_manager.plugins.keys()):
                     self._plugin_manager.unload_plugin(plugin_name)
@@ -143,25 +159,20 @@ class ApplicationContext:
             if self._metrics:
                 self._metrics.reset()
 
-            if self._container:
-                self._container.clear()
-
             self._loggers.clear()
             self._analyzer_registry = None
+
+            reset_container()
 
             self._shutdown = True
             self._initialized = False
 
     @property
     def container(self) -> ThreadSafeContainer:
-        """Get the DI container."""
+        """Get the DI container (the global container configured by this context)."""
         if not self._initialized:
             self.initialize()
-
-        if not self._container:
-            raise RuntimeError("Container not available")
-
-        return self._container
+        return get_container()
 
     @property
     def metrics(self) -> MetricsCollector:
@@ -216,43 +227,6 @@ class ApplicationContext:
             self._loggers[name] = adapter
 
         return self._loggers[name]
-
-    def _setup_container(self) -> None:
-        """Set up the DI container with services."""
-        assert self._container is not None
-        # Register settings
-        self._container.register_instance("settings", self.config.settings)
-
-        # Register core services
-        self._container.register_singleton(
-            "file_discovery", lambda: FileDiscoveryService(self.config.settings)
-        )
-
-        self._container.register("parser", RobotASTParser)
-
-        # Register context itself for services that need it
-        self._container.register_instance("context", self)
-
-    def _register_builtin_analyzers(self) -> None:
-        """Register built-in analyzers."""
-        assert self._analyzer_registry is not None
-        from .analyzers.dead_code import DeadCodeAnalyzer
-        from .analyzers.flakiness import FlakinessAnalyzer
-        from .analyzers.hardcoded_value import HardcodedValueAnalyzer
-        from .analyzers.naming_convention import NamingConventionAnalyzer
-        from .analyzers.setup_teardown import SetupTeardownAnalyzer
-        from .analyzers.sleep_detector import SleepDetectorAnalyzer
-        from .analyzers.tag_consistency import TagConsistencyAnalyzer
-        from .analyzers.test_documentation import TestDocumentationAnalyzer
-
-        self._analyzer_registry.register("dead_code", DeadCodeAnalyzer)
-        self._analyzer_registry.register("sleep_detector", SleepDetectorAnalyzer)
-        self._analyzer_registry.register("flakiness", FlakinessAnalyzer)
-        self._analyzer_registry.register("hardcoded_value", HardcodedValueAnalyzer)
-        self._analyzer_registry.register("naming_convention", NamingConventionAnalyzer)
-        self._analyzer_registry.register("setup_teardown", SetupTeardownAnalyzer)
-        self._analyzer_registry.register("tag_consistency", TagConsistencyAnalyzer)
-        self._analyzer_registry.register("test_documentation", TestDocumentationAnalyzer)
 
     @contextmanager
     def request_scope(self, **context: Any) -> Iterator[ThreadSafeContainer]:

@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
-
 import pytest
 
 from robot_optimizer_core.analyzers.sleep_detector import (
@@ -27,18 +25,27 @@ class TestSleepDetectorNaming:
 
 @pytest.mark.unit
 class TestSleepDetectorSettingsCoupling:
-    def test_explicit_thresholds_skip_get_settings(self) -> None:
+    def test_explicit_thresholds_used_directly(self) -> None:
         explicit = {"severity_thresholds": {"info": 0.5, "warning": 2.0, "error": float("inf")}}
-        with patch("robot_optimizer_core.analyzers.sleep_detector.get_settings") as mock:
-            SleepDetectorAnalyzer(config=explicit)
-            mock.assert_not_called()
+        analyzer = SleepDetectorAnalyzer(config=explicit)
+        assert analyzer._severity_thresholds["info"] == 0.5
+        assert analyzer._severity_thresholds["warning"] == 2.0
 
-    def test_no_config_calls_get_settings(self) -> None:
-        with patch("robot_optimizer_core.analyzers.sleep_detector.get_settings") as mock:
-            from robot_optimizer_core.config import Settings
-            mock.return_value = Settings()
-            SleepDetectorAnalyzer()
-            mock.assert_called_once()
+    def test_no_config_reads_thresholds_from_container_settings(self) -> None:
+        from robot_optimizer_core.config import Settings
+        from robot_optimizer_core.di import get_container, reset_container
+
+        reset_container()
+        container = get_container()
+        container.register_instance(
+            "settings", Settings(max_acceptable_sleep_seconds=3.0), override=True
+        )
+        try:
+            analyzer = SleepDetectorAnalyzer()
+            assert analyzer._severity_thresholds["info"] == 3.0
+            assert analyzer._severity_thresholds["warning"] == 15.0  # 3.0 * 5
+        finally:
+            reset_container()
 
     def test_explicit_thresholds_respected(self) -> None:
         explicit = {"severity_thresholds": {"info": 99.0, "warning": 199.0, "error": float("inf")}}

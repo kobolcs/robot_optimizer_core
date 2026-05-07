@@ -32,7 +32,6 @@ if sys.version_info >= (3, 12):
 else:
     from typing_extensions import override
 
-from ..config import get_settings
 from ..di import get_container
 from ..domain.entities import TestFile
 from ..domain.repositories import TestResultRepository
@@ -93,7 +92,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
         self._days_back = self.get_config_value("days_back", 30)
         _need_settings = "failure_threshold" not in self.config or "min_runs" not in self.config
         if _need_settings:
-            _s = get_settings()
+            _s = get_container().resolve("settings")
             _default_failure = _s.flakiness_threshold
             _default_runs = _s.flakiness_min_runs
         else:

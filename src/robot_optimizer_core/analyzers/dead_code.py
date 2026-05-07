@@ -37,6 +37,20 @@ _CONTROL_FLOW_OPENERS = frozenset(
     {"IF", "ELSE IF", "ELSE", "FOR", "WHILE", "TRY", "EXCEPT", "FINALLY"}
 )
 
+_BDD_PREFIXES = frozenset({"given", "when", "then", "and", "but"})
+
+
+def _match_prefixes(call: str, keyword_names: set[str], calls: set[str]) -> None:
+    """Add every keyword that is a word-boundary prefix of *call* into *calls*.
+
+    Replaces the O(keywords) inner loop with O(words-in-call) set lookups.
+    """
+    parts = call.split()
+    for n in range(len(parts), 0, -1):
+        candidate = " ".join(parts[:n])
+        if candidate in keyword_names:
+            calls.add(candidate)
+
 
 class DeadCodeAnalyzer(BaseAnalyzer):
     """Analyzer for detecting dead code in Robot Framework files.
@@ -389,42 +403,21 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         calls: set[str] = set()
         for call in candidates:
             lowered = call.lower()
-            lowered_parts = lowered.split()
+            _match_prefixes(lowered, keyword_names, calls)
 
-            for keyword in keyword_names:
-                if lowered == keyword or lowered.startswith(keyword + " "):
-                    calls.add(keyword)
-
-            if lowered_parts and lowered_parts[0] in {
-                "given",
-                "when",
-                "then",
-                "and",
-                "but",
-            }:
-                bdd_call = " ".join(lowered_parts[1:])
-                for keyword in keyword_names:
-                    if bdd_call == keyword or bdd_call.startswith(keyword + " "):
-                        calls.add(keyword)
+            parts = lowered.split()
+            if parts and parts[0] in _BDD_PREFIXES:
+                _match_prefixes(" ".join(parts[1:]), keyword_names, calls)
 
             if lowered.startswith("run keyword "):
-                dynamic_call = lowered.removeprefix("run keyword ").strip()
-                for keyword in keyword_names:
-                    if dynamic_call == keyword or dynamic_call.startswith(
-                        keyword + " "
-                    ):
-                        calls.add(keyword)
+                _match_prefixes(lowered.removeprefix("run keyword ").strip(), keyword_names, calls)
 
             if lowered.startswith("run keywords "):
                 for part in re.split(
-                    r"\s+AND\s+", call[len("Run Keywords ") :], flags=re.IGNORECASE
+                    r"\s+AND\s+", lowered.removeprefix("run keywords "), flags=re.IGNORECASE
                 ):
-                    dynamic_call = part.strip().lower()
-                    for keyword in keyword_names:
-                        if dynamic_call == keyword or dynamic_call.startswith(
-                            keyword + " "
-                        ):
-                            calls.add(keyword)
+                    _match_prefixes(part.strip(), keyword_names, calls)
+
         return calls
 
     def _find_unused_keywords(

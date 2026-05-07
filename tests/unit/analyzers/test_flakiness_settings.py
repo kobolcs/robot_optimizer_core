@@ -1,9 +1,7 @@
 # tests/unit/analyzers/test_flakiness_settings.py
-"""Tests that FlakinessAnalyzer only calls get_settings when needed."""
+"""Tests that FlakinessAnalyzer resolves settings through the container."""
 
 from __future__ import annotations
-
-from unittest.mock import patch
 
 import pytest
 
@@ -12,19 +10,25 @@ from robot_optimizer_core.analyzers.flakiness import FlakinessAnalyzer
 
 @pytest.mark.unit
 class TestFlakinessSettingsCoupling:
-    def test_both_keys_present_skips_get_settings(self) -> None:
+    def test_both_keys_present_uses_config_values(self) -> None:
         cfg = {"failure_threshold": 0.1, "min_runs": 5}
-        with patch("robot_optimizer_core.analyzers.flakiness.get_settings") as mock:
-            FlakinessAnalyzer(config=cfg)
-            mock.assert_not_called()
+        analyzer = FlakinessAnalyzer(config=cfg)
+        assert analyzer._failure_threshold == 0.1
+        assert analyzer._min_runs == 5
 
-    def test_missing_threshold_calls_get_settings(self) -> None:
-        cfg = {"min_runs": 5}
-        with patch("robot_optimizer_core.analyzers.flakiness.get_settings") as mock:
-            from robot_optimizer_core.config import Settings
-            mock.return_value = Settings()
-            FlakinessAnalyzer(config=cfg)
-            mock.assert_called_once()
+    def test_missing_threshold_reads_from_container_settings(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from robot_optimizer_core.config import Settings
+        from robot_optimizer_core.di import ThreadSafeContainer
+        import robot_optimizer_core.analyzers.flakiness as flakiness_mod
+
+        private_container = ThreadSafeContainer()
+        private_container.register_instance(
+            "settings",
+            Settings(flakiness_threshold=0.15, flakiness_min_runs=7),
+        )
+        monkeypatch.setattr(flakiness_mod, "get_container", lambda: private_container)
+        analyzer = FlakinessAnalyzer(config={"min_runs": 5})
+        assert analyzer._failure_threshold == 0.15
 
     def test_explicit_values_used(self) -> None:
         cfg = {"failure_threshold": 0.25, "min_runs": 10}
