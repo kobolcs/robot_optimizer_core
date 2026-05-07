@@ -172,7 +172,7 @@ class NamingConventionAnalyzer(BaseAnalyzer):
             return None
 
         pattern = Pattern(
-            type=PatternType.MISSING_DOCUMENTATION,  # closest structural type
+            type=PatternType.CAMEL_CASE_NAME,
             name="CamelCase Name",
             description=(
                 f"{entity_type.title()} '{name}' uses CamelCase instead of "

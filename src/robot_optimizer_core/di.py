@@ -21,6 +21,7 @@ __all__ = [
     "ThreadSafeContainer",
     "get_container",
     "get_thread_safe_container",
+    "reset_container",
 ]
 
 ServiceFactory: TypeAlias = type[Any] | Callable[..., Any]
@@ -321,6 +322,18 @@ def get_thread_safe_container() -> ThreadSafeContainer:
 
 # Alias for backward compatibility
 get_container = get_thread_safe_container
+
+
+def reset_container() -> None:
+    """Reset the global DI container to an uninitialised state.
+
+    Primarily useful for tests and plugin reload scenarios.
+    """
+    global _global_container
+    with _global_container_lock:
+        if _global_container is not None:
+            _global_container.clear()
+        _global_container = None
 
 
 def _register_defaults(container: ThreadSafeContainer) -> None:

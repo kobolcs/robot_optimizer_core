@@ -34,7 +34,7 @@ from ..domain.entities import TestFile
 from ..domain.value_objects import Finding, Severity
 from ..exceptions import AnalysisError
 from ..logging import get_logger
-from ..metrics import get_metrics
+from ..metrics import MetricsCollector, get_metrics
 
 # Type alias for analyzer configuration values
 __all__ = ["BaseAnalyzer", "ConfigValue"]
@@ -74,7 +74,7 @@ class BaseAnalyzer(ABC):
         """
         self.config = config or {}
         self.metrics_enabled = metrics_enabled
-        self._metrics = get_metrics() if metrics_enabled else None
+        self._metrics: MetricsCollector | None = None  # resolved lazily on first safe_analyze call
         self._logger = get_logger(
             f"{__name__}.{self.__class__.__name__}", {"analyzer": self.name}
         )
@@ -216,6 +216,9 @@ class BaseAnalyzer(ABC):
         self._logger.debug("Starting analysis", extra={"file": str(test_file.path)})
 
         try:
+            if self.metrics_enabled and self._metrics is None:
+                self._metrics = get_metrics()
+
             # Pre-analysis hook
             self.pre_analyze(test_file)
 

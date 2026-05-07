@@ -276,6 +276,7 @@ class TestPattern:
             # All should have proper categories, not "Other"
             assert pattern.category in [
                 "Keywords",
+                "Naming",
                 "Waits",
                 "Locators",
                 "Structure",

@@ -246,3 +246,71 @@ class TestFailFastBehaviour:
         result = analyze_directory(tmp_path, max_workers=1, error_handling="warn")
         assert call_count == 3
         assert len(result.errors) == 3  # type: ignore[attr-defined]
+
+
+# ---------------------------------------------------------------------------
+# Pattern type integrity across the full analyzer workflow
+# ---------------------------------------------------------------------------
+
+@pytest.mark.component
+class TestPatternTypeIntegrity:
+    def test_naming_convention_emits_camel_case_type(self, tmp_path: Path) -> None:
+        from robot_optimizer_core.analyzers.naming_convention import NamingConventionAnalyzer
+        from datetime import UTC, datetime
+        from robot_optimizer_core.domain.entities import TestFile
+
+        content = '*** Test Cases ***\nLoginPage\n    Log    hi\n'
+        f = tmp_path / 't.robot'
+        f.write_bytes(content.encode())
+        tf = TestFile(path=f, content=content, size_bytes=len(content), last_modified_utc=datetime.now(UTC))
+        findings = NamingConventionAnalyzer().analyze(tf)
+        assert any(fi.pattern.type == PatternType.CAMEL_CASE_NAME for fi in findings)
+
+    def test_tag_consistency_emits_semantic_types(self, tmp_path: Path) -> None:
+        from robot_optimizer_core.analyzers.tag_consistency import TagConsistencyAnalyzer
+        from datetime import UTC, datetime
+        from robot_optimizer_core.domain.entities import TestFile
+
+        def _tf(name: str, content: str) -> TestFile:
+            f = tmp_path / name
+            f.write_bytes(content.encode())
+            return TestFile(path=f, content=content, size_bytes=len(content), last_modified_utc=datetime.now(UTC))
+
+        findings = TagConsistencyAnalyzer(config={'singleton_threshold': 2}).analyze(
+            _tf('a.robot', '*** Test Cases ***\nMy Test\n    [Tags]    unique_xyz\n'))
+        assert any(fi.pattern.type == PatternType.SINGLETON_TAG for fi in findings)
+
+        findings2 = TagConsistencyAnalyzer().analyze(
+            _tf('b.robot', '*** Test Cases ***\nMy Test\n    [Tags]    Robot:Skip\n'))
+        assert any(fi.pattern.type == PatternType.RESERVED_TAG for fi in findings2)
+
+        findings3 = TagConsistencyAnalyzer().analyze(
+            _tf('c.robot', '*** Test Cases ***\nMy Test\n    Log    hi\n'))
+        assert any(fi.pattern.type == PatternType.NO_TAGS for fi in findings3)
+
+
+# ---------------------------------------------------------------------------
+# Global state isolation
+# ---------------------------------------------------------------------------
+
+@pytest.mark.component
+class TestGlobalStateIsolation:
+    def test_reset_registry_produces_fresh_registry(self) -> None:
+        r1 = get_analyzer_registry()
+        reset_registry()
+        r2 = get_analyzer_registry()
+        assert r1 is not r2
+        assert len(r2.list()) > 0
+
+    def test_reset_container_produces_fresh_container(self) -> None:
+        from robot_optimizer_core.di import get_container, reset_container
+
+        c1 = get_container()
+        reset_container()
+        c2 = get_container()
+        assert c1 is not c2
+
+    def test_sleep_detector_alias_identity(self) -> None:
+        from robot_optimizer_core.analyzers.sleep_detector import SleepDetector, SleepDetectorAnalyzer
+        assert SleepDetector is SleepDetectorAnalyzer
+        assert SleepDetector().name == 'sleep_detector'

@@ -504,3 +504,58 @@ class TestAnalyzerPerformance:
 
         # Each finding should be reasonably sized
         assert avg_size_per_finding < 10_000  # Less than 10KB per finding
+
+
+# ---------------------------------------------------------------------------
+# reset_container integration
+# ---------------------------------------------------------------------------
+
+@pytest.mark.integration
+class TestResetContainerIntegration:
+    def test_get_container_after_reset_returns_new_instance(self) -> None:
+        from robot_optimizer_core.di import get_container, reset_container
+
+        c1 = get_container()
+        reset_container()
+        c2 = get_container()
+        assert c1 is not c2
+
+    def test_reset_container_idempotent(self) -> None:
+        from robot_optimizer_core.di import reset_container
+        reset_container()
+        reset_container()
+
+    def test_get_container_after_double_reset_is_usable(self) -> None:
+        from robot_optimizer_core.di import get_container, reset_container
+        reset_container()
+        reset_container()
+        c = get_container()
+        assert c is not None
+
+
+# ---------------------------------------------------------------------------
+# SleepDetectorAnalyzer rename integration
+# ---------------------------------------------------------------------------
+
+@pytest.mark.integration
+class TestSleepDetectorAnalyzerIntegration:
+    def test_alias_and_canonical_produce_same_findings(self, sample_robot_file: Path) -> None:
+        from robot_optimizer_core.analyzers.sleep_detector import SleepDetector, SleepDetectorAnalyzer
+
+        tf = TestFile.from_path(sample_robot_file)
+        f1 = SleepDetector().safe_analyze(tf)
+        f2 = SleepDetectorAnalyzer().safe_analyze(tf)
+        assert len(f1) == len(f2)
+        for a, b in zip(f1, f2):
+            assert a.pattern == b.pattern
+            assert a.location == b.location
+            assert a.severity == b.severity
+
+    def test_explicit_config_skips_settings_call(self) -> None:
+        from unittest.mock import patch
+        from robot_optimizer_core.analyzers.sleep_detector import SleepDetectorAnalyzer
+
+        cfg = {'severity_thresholds': {'info': 0.5, 'warning': 2.0, 'error': float('inf')}}
+        with patch('robot_optimizer_core.analyzers.sleep_detector.get_settings') as mock:
+            SleepDetectorAnalyzer(config=cfg)
+            mock.assert_not_called()

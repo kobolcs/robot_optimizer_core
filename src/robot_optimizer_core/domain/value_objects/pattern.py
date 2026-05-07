@@ -18,6 +18,7 @@ class PatternType(Enum):
     UNUSED_KEYWORD = auto()
     COMPLEX_KEYWORD = auto()
     MISSING_DOCUMENTATION = auto()
+    CAMEL_CASE_NAME = auto()
 
     # Wait patterns
     SLEEP_IN_TEST = auto()
@@ -33,6 +34,8 @@ class PatternType(Enum):
     # Structure patterns
     LONG_TEST_CASE = auto()
     NO_TAGS = auto()
+    SINGLETON_TAG = auto()
+    RESERVED_TAG = auto()
     DUPLICATE_TEST = auto()
     MISSING_SETUP_TEARDOWN = auto()
     UNREACHABLE_CODE = auto()
@@ -145,6 +148,7 @@ class Pattern(ValueObject):
             PatternType.UNUSED_KEYWORD: "Keywords",
             PatternType.COMPLEX_KEYWORD: "Keywords",
             PatternType.MISSING_DOCUMENTATION: "Keywords",
+            PatternType.CAMEL_CASE_NAME: "Naming",
             PatternType.SLEEP_IN_TEST: "Waits",
             PatternType.HARD_CODED_WAIT: "Waits",
             PatternType.INEFFICIENT_WAIT: "Waits",
@@ -154,6 +158,8 @@ class Pattern(ValueObject):
             PatternType.ID_OVER_XPATH: "Locators",
             PatternType.LONG_TEST_CASE: "Structure",
             PatternType.NO_TAGS: "Structure",
+            PatternType.SINGLETON_TAG: "Structure",
+            PatternType.RESERVED_TAG: "Structure",
             PatternType.DUPLICATE_TEST: "Structure",
             PatternType.MISSING_SETUP_TEARDOWN: "Structure",
             PatternType.UNREACHABLE_CODE: "Structure",

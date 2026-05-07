@@ -247,55 +247,64 @@ class DeadCodeAnalyzer(BaseAnalyzer):
     def _collect_ast_calls(self, model: object) -> list[str]:
         """Recursively collect all keyword call names from a robot model."""
         calls: list[str] = []
-
-        def _walk(items: object) -> None:
-            if not hasattr(items, "__iter__"):
-                return
-            for item in items:  # type: ignore[union-attr]
-                item_type = getattr(item, "type", None)
-                if item_type == "KEYWORD":
-                    name = getattr(item, "keyword", None)
-                    if name:
-                        name_str = str(name)
-                        args = list(getattr(item, "args", ()))
-                        name_lower = name_str.lower()
-                        # Reconstruct "Run Keyword <name>" / "Run Keywords <name> AND …"
-                        # so that _resolve_calls can match the dynamically-called targets.
-                        if name_lower == "run keyword" and args:
-                            calls.append(f"Run Keyword {args[0]}")
-                        elif name_lower == "run keywords" and args:
-                            calls.append(f"Run Keywords {' '.join(str(a) for a in args)}")
-                        else:
-                            calls.append(name_str)
-                elif item_type in ("SETUP", "TEARDOWN"):
-                    for token in getattr(item, "data_tokens", []):
-                        if token.type == "NAME":
-                            calls.append(str(token.value))
-                            break
-                # Recurse into body (IF, FOR, WHILE, TRY, keyword/test bodies)
-                body = getattr(item, "body", None)
-                if body:
-                    _walk(body)
-                # IF else-branch
-                orelse = getattr(item, "orelse", None)
-                if orelse is not None:
-                    orelse_body = getattr(orelse, "body", None)
-                    if orelse_body:
-                        _walk(orelse_body)
-                # TRY handlers and finally
-                for attr in ("handlers", "finally_item"):
-                    nested = getattr(item, attr, None)
-                    if nested is not None:
-                        nested_body = getattr(nested, "body", None)
-                        if nested_body:
-                            _walk(nested_body)
-
         for section in model.sections:  # type: ignore[union-attr]
             section_body = getattr(section, "body", None)
             if section_body:
-                _walk(section_body)
-
+                self._walk_body(section_body, calls)
         return calls
+
+    def _walk_body(self, items: object, calls: list[str]) -> None:
+        """Walk an iterable body, collecting keyword call names into *calls*."""
+        if not hasattr(items, "__iter__"):
+            return
+        for item in items:  # type: ignore[union-attr]
+            self._collect_item_calls(item, calls)
+
+    def _collect_item_calls(self, item: object, calls: list[str]) -> None:
+        """Collect call names from a single AST node and recurse into its bodies."""
+        item_type = getattr(item, "type", None)
+        if item_type == "KEYWORD":
+            name = self._resolve_keyword_call_name(item)
+            if name:
+                calls.append(name)
+        elif item_type in ("SETUP", "TEARDOWN"):
+            for token in getattr(item, "data_tokens", []):
+                if token.type == "NAME":
+                    calls.append(str(token.value))
+                    break
+        for body in self._iter_nested_bodies(item):
+            self._walk_body(body, calls)
+
+    def _resolve_keyword_call_name(self, item: object) -> str | None:
+        """Return the effective call name for a KEYWORD node, handling Run Keyword dispatch."""
+        name = getattr(item, "keyword", None)
+        if not name:
+            return None
+        name_str = str(name)
+        args = list(getattr(item, "args", ()))
+        name_lower = name_str.lower()
+        if name_lower == "run keyword" and args:
+            return f"Run Keyword {args[0]}"
+        if name_lower == "run keywords" and args:
+            return f"Run Keywords {' '.join(str(a) for a in args)}"
+        return name_str
+
+    def _iter_nested_bodies(self, item: object):  # type: ignore[return]
+        """Yield each body list reachable from *item* via body/orelse/handlers/finally."""
+        body = getattr(item, "body", None)
+        if body:
+            yield body
+        orelse = getattr(item, "orelse", None)
+        if orelse is not None:
+            orelse_body = getattr(orelse, "body", None)
+            if orelse_body:
+                yield orelse_body
+        for attr in ("handlers", "finally_item"):
+            nested = getattr(item, attr, None)
+            if nested is not None:
+                nested_body = getattr(nested, "body", None)
+                if nested_body:
+                    yield nested_body
 
     def _extract_keywords_and_calls_text(
         self, test_file: TestFile

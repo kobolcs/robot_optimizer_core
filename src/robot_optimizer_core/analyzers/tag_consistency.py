@@ -80,12 +80,9 @@ class TagConsistencyAnalyzer(BaseAnalyzer):
         return ["tags", "structure", "style"]
 
     @override
-    def analyze(self, test_file: TestFile) -> list[Finding]:
-        findings: list[Finding] = []
-        lines = test_file.content.splitlines()
-
-        # First pass: collect per-test tag info
-        test_tag_info: list[tuple[str, int, list[str]]] = []  # (name, line, tags)
+    def _collect_tag_info(self, lines: list[str]) -> list[tuple[str, int, list[str]]]:
+        """First pass: return (test_name, first_line_number, tags) for every test case."""
+        tag_info: list[tuple[str, int, list[str]]] = []
         in_test_cases = False
         current_name: str | None = None
         current_line = 1
@@ -97,7 +94,7 @@ class TagConsistencyAnalyzer(BaseAnalyzer):
                 continue
             if stripped.startswith("***"):
                 if current_name is not None:
-                    test_tag_info.append((current_name, current_line, current_tags))
+                    tag_info.append((current_name, current_line, current_tags))
                     current_name = None
                     current_tags = []
                 in_test_cases = "test case" in stripped.lower()
@@ -105,7 +102,7 @@ class TagConsistencyAnalyzer(BaseAnalyzer):
 
             if in_test_cases and not line.startswith((" ", "\t")):
                 if current_name is not None:
-                    test_tag_info.append((current_name, current_line, current_tags))
+                    tag_info.append((current_name, current_line, current_tags))
                 if stripped.startswith("#"):
                     current_name = None
                     current_tags = []
@@ -116,15 +113,20 @@ class TagConsistencyAnalyzer(BaseAnalyzer):
                 continue
 
             if current_name and stripped.lower().startswith("[tags]"):
-                # Extract tag values from this line
                 rest = stripped[len("[tags]") :].strip()
                 if rest:
-                    # Tags are separated by two or more spaces OR tabs
                     tag_parts = re.split(r"  +|\t+", rest)
                     current_tags = [t.strip() for t in tag_parts if t.strip()]
 
         if current_name is not None:
-            test_tag_info.append((current_name, current_line, current_tags))
+            tag_info.append((current_name, current_line, current_tags))
+
+        return tag_info
+
+    def analyze(self, test_file: TestFile) -> list[Finding]:
+        findings: list[Finding] = []
+        lines = test_file.content.splitlines()
+        test_tag_info = self._collect_tag_info(lines)
 
         # Build suite-wide tag counter for singleton detection
         all_tags: list[str] = [t for _, _, tags in test_tag_info for t in tags]
@@ -187,7 +189,7 @@ class TagConsistencyAnalyzer(BaseAnalyzer):
         self, tag: str, test_name: str, line_num: int, test_file: TestFile
     ) -> Finding:
         pattern = Pattern(
-            type=PatternType.NO_TAGS,
+            type=PatternType.SINGLETON_TAG,
             name="Singleton Tag",
             description=(f"Tag '{tag}' is only used in '{test_name}' — possible typo"),
             recommendation=(
@@ -210,7 +212,7 @@ class TagConsistencyAnalyzer(BaseAnalyzer):
         self, tag: str, test_name: str, line_num: int, test_file: TestFile
     ) -> Finding:
         pattern = Pattern(
-            type=PatternType.NO_TAGS,
+            type=PatternType.RESERVED_TAG,
             name="Reserved Tag Conflict",
             description=(
                 f"Tag '{tag}' looks like a Robot Framework reserved tag "

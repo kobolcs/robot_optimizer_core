@@ -241,12 +241,12 @@ class ApplicationContext:
         from .analyzers.hardcoded_value import HardcodedValueAnalyzer
         from .analyzers.naming_convention import NamingConventionAnalyzer
         from .analyzers.setup_teardown import SetupTeardownAnalyzer
-        from .analyzers.sleep_detector import SleepDetector
+        from .analyzers.sleep_detector import SleepDetectorAnalyzer
         from .analyzers.tag_consistency import TagConsistencyAnalyzer
         from .analyzers.test_documentation import TestDocumentationAnalyzer
 
         self._analyzer_registry.register("dead_code", DeadCodeAnalyzer)
-        self._analyzer_registry.register("sleep_detector", SleepDetector)
+        self._analyzer_registry.register("sleep_detector", SleepDetectorAnalyzer)
         self._analyzer_registry.register("flakiness", FlakinessAnalyzer)
         self._analyzer_registry.register("hardcoded_value", HardcodedValueAnalyzer)
         self._analyzer_registry.register("naming_convention", NamingConventionAnalyzer)

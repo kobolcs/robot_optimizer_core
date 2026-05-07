@@ -296,12 +296,12 @@ def _register_built_in_analyzers(registry: AnalyzerRegistry) -> None:
     from .hardcoded_value import HardcodedValueAnalyzer
     from .naming_convention import NamingConventionAnalyzer
     from .setup_teardown import SetupTeardownAnalyzer
-    from .sleep_detector import SleepDetector
+    from .sleep_detector import SleepDetectorAnalyzer
     from .tag_consistency import TagConsistencyAnalyzer
     from .test_documentation import TestDocumentationAnalyzer
 
     registry.register("dead_code", DeadCodeAnalyzer)
-    registry.register("sleep_detector", SleepDetector)
+    registry.register("sleep_detector", SleepDetectorAnalyzer)
     registry.register("flakiness", FlakinessAnalyzer)
     registry.register("hardcoded_value", HardcodedValueAnalyzer)
     registry.register("naming_convention", NamingConventionAnalyzer)
