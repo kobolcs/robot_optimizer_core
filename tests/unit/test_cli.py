@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from robot_optimizer_core.cli import _format_html, _format_sarif, main
+from robot_optimizer_core.cli import _format_html, _format_sarif, _html_display_path, main
 from robot_optimizer_core.domain.value_objects import Finding, Severity
 from robot_optimizer_core.domain.value_objects.location import Location
 from robot_optimizer_core.domain.value_objects.pattern import Pattern, PatternType
@@ -49,6 +49,29 @@ class TestVersion:
         with pytest.raises(SystemExit) as exc:
             main(["--version"])
         assert exc.value.code == 0
+
+
+# ---------------------------------------------------------------------------
+# _html_display_path
+# ---------------------------------------------------------------------------
+
+
+class TestHtmlDisplayPath:
+    def test_returns_relative_path_when_inside_root(self, tmp_path: Path) -> None:
+        root = tmp_path
+        file_path = tmp_path / "sub" / "suite.robot"
+        file_path.parent.mkdir()
+        file_path.touch()
+        result = _html_display_path(file_path, root)
+        assert result == str(Path("sub") / "suite.robot")
+
+    def test_falls_back_to_str_when_outside_root(self, tmp_path: Path) -> None:
+        root = tmp_path / "sub"
+        root.mkdir()
+        outside = tmp_path / "other.robot"
+        outside.touch()
+        result = _html_display_path(outside, root)
+        assert result == str(outside)
 
 
 # ---------------------------------------------------------------------------

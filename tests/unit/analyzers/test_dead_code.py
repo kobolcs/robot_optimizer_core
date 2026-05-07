@@ -681,3 +681,66 @@ My Keyword
         # Only one finding: the keyword body, not the test case body
         assert len(unreachable) == 1
         assert "My Keyword" in unreachable[0].message
+
+
+@pytest.mark.unit
+class TestMatchPrefixes:
+    """Unit tests for the _match_prefixes module-level helper."""
+
+    def setup_method(self) -> None:
+        from robot_optimizer_core.analyzers.dead_code import _match_prefixes
+        self._fn = _match_prefixes
+
+    def _run(self, call: str, keywords: set[str]) -> set[str]:
+        calls: set[str] = set()
+        self._fn(call, keywords, calls)
+        return calls
+
+    def test_exact_match(self) -> None:
+        assert self._run("login", {"login", "logout"}) == {"login"}
+
+    def test_prefix_match_multiple(self) -> None:
+        result = self._run("login as admin", {"login", "login as"})
+        assert "login" in result
+        assert "login as" in result
+
+    def test_no_partial_word_match(self) -> None:
+        assert "login" not in self._run("login_with_sso", {"login"})
+
+    def test_empty_call_matches_nothing(self) -> None:
+        assert self._run("", {"login"}) == set()
+
+    def test_multiword_keyword_exact(self) -> None:
+        assert self._run("open browser", {"open browser"}) == {"open browser"}
+
+
+@pytest.mark.unit
+class TestResolveCallsRefactor:
+    """Verify _resolve_calls behaviour is preserved after the O(n*m) fix."""
+
+    def _resolve(self, candidates: list[str], keywords: set[str]) -> set[str]:
+        return DeadCodeAnalyzer()._resolve_calls(candidates, keywords)
+
+    def test_bdd_prefix_stripped(self) -> None:
+        result = self._resolve(["Given Login Page Is Open"], {"login page is open"})
+        assert "login page is open" in result
+
+    def test_run_keyword_dispatch(self) -> None:
+        result = self._resolve(["Run Keyword    My Helper"], {"my helper"})
+        assert "my helper" in result
+
+    def test_run_keywords_with_and(self) -> None:
+        result = self._resolve(
+            ["Run Keywords    Open Browser    AND    Login"],
+            {"open browser", "login"},
+        )
+        assert "open browser" in result
+        assert "login" in result
+
+    def test_prefix_and_full_match_both_added(self) -> None:
+        result = self._resolve(
+            ["Click Element    id:btn"],
+            {"click element", "click"},
+        )
+        assert "click element" in result
+        assert "click" in result

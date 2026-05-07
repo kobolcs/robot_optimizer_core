@@ -158,6 +158,14 @@ class _CategoryInfo(TypedDict):
     action: str
 
 
+def _html_display_path(file_path: Path, root: Path) -> str:
+    """Return file_path relative to root, or its string form if that fails."""
+    try:
+        return str(file_path.resolve().relative_to(root))
+    except ValueError:
+        return str(file_path)
+
+
 def _html_category_metadata(pattern_name: str) -> tuple[str, str, str]:
     """Return (category, impact, action) for an HTML report finding group."""
     normalized = pattern_name.lower()
@@ -226,14 +234,7 @@ def _html_compute_stats(
     dict[str, list[Finding]],
 ]:
     """Compute summary statistics used by the HTML report."""
-
-    def _display_path(file_path: Path) -> str:
-        try:
-            root = path.resolve() if path.is_dir() else path.parent.resolve()
-            return str(file_path.resolve().relative_to(root))
-        except ValueError:
-            return str(file_path)
-
+    root = path.resolve() if path.is_dir() else path.parent.resolve()
     timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
     sev_counts: dict[str, int] = {"ERROR": 0, "WARNING": 0, "INFO": 0}
     affected_files: set[str] = set()
@@ -242,7 +243,7 @@ def _html_compute_stats(
 
     for finding in findings:
         sev_counts[finding.severity.name.upper()] += 1
-        display_path = _display_path(finding.location.file_path)
+        display_path = _html_display_path(finding.location.file_path, root)
         affected_files.add(display_path)
         category, impact, action = _html_category_metadata(finding.pattern.name)
         category_groups.setdefault(category, []).append(finding)
@@ -254,13 +255,7 @@ def _html_compute_stats(
 
 
 def _format_html(findings: list[Finding], path: Path) -> str:
-    def _display_path(file_path: Path) -> str:
-        try:
-            root = path.resolve() if path.is_dir() else path.parent.resolve()
-            return str(file_path.resolve().relative_to(root))
-        except ValueError:
-            return str(file_path)
-
+    root = path.resolve() if path.is_dir() else path.parent.resolve()
     timestamp, sev_counts, affected_files, category_summary, category_groups = (
         _html_compute_stats(findings, path)
     )
@@ -304,7 +299,7 @@ def _format_html(findings: list[Finding], path: Path) -> str:
         rows.append(
             "<tr>"
             f"<td>{escape(finding.severity.name.upper())}</td>"
-            f"<td>{escape(_display_path(finding.location.file_path))}</td>"
+            f"<td>{escape(_html_display_path(finding.location.file_path, root))}</td>"
             f"<td>{escape(str(finding.location.line))}</td>"
             f"<td>{escape(finding.pattern.name)}</td>"
             f"<td>{escape(finding.message)}</td>"
@@ -366,7 +361,7 @@ def _format_html(findings: list[Finding], path: Path) -> str:
         item_cards = "".join(
             "<article class='finding-card'>"
             f"<span class='sev sev-{escape(item.severity.name.lower())}'>{escape(item.severity.name.upper())}</span> "
-            f"<span>{escape(_display_path(item.location.file_path))}:{escape(str(item.location.line))}</span>"
+            f"<span>{escape(_html_display_path(item.location.file_path, root))}:{escape(str(item.location.line))}</span>"
             f"<p>{escape(item.message)}</p>"
             f"<p><strong>Recommendation:</strong> {escape(item.pattern.recommendation)}</p>"
             "</article>"
