@@ -321,7 +321,7 @@ class TestHtmlFormat:
 
         html = _format_html(findings, tmp_path)
         assert "Auto-fixable findings" in html
-        assert ">1<" in html
+        assert '<div class="metric-value">1</div>' in html
 
 
 class TestUpgradeCommand:

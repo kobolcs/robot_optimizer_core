@@ -414,9 +414,9 @@ class DeadCodeAnalyzer(BaseAnalyzer):
 
             if lowered.startswith("run keywords "):
                 for part in re.split(
-                    r"\s+AND\s+", call[len("Run Keywords "):], flags=re.IGNORECASE
+                    r"\s+AND\s+", lowered.removeprefix("run keywords "), flags=re.IGNORECASE
                 ):
-                    _match_prefixes(part.strip().lower(), keyword_names, calls)
+                    _match_prefixes(part.strip(), keyword_names, calls)
 
         return calls
 

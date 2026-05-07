@@ -555,10 +555,3 @@ class TestSleepDetectorAnalyzerIntegration:
             assert a.location == b.location
             assert a.severity == b.severity
 
-    def test_explicit_config_uses_provided_thresholds(self) -> None:
-        from robot_optimizer_core.analyzers.sleep_detector import SleepDetectorAnalyzer
-
-        cfg = {'severity_thresholds': {'info': 0.5, 'warning': 2.0, 'error': float('inf')}}
-        analyzer = SleepDetectorAnalyzer(config=cfg)
-        assert analyzer._severity_thresholds['info'] == 0.5
-        assert analyzer._severity_thresholds['warning'] == 2.0

@@ -409,6 +409,7 @@ def _format_html(findings: list[Finding], path: Path) -> str:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Robot Framework Suite Health Report</title>
+  <!-- Google Fonts — optional; omitting these in offline environments degrades to the system font stack below -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -426,7 +427,7 @@ def _format_html(findings: list[Finding], path: Path) -> str:
     }}
     *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
     body {{
-      font-family: 'DM Sans', system-ui, sans-serif;
+      font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       background: var(--paper);
       color: var(--ink);
       line-height: 1.6;
@@ -451,7 +452,7 @@ def _format_html(findings: list[Finding], path: Path) -> str:
       pointer-events: none;
     }}
     .cover-eyebrow {{
-      font-family: 'Space Mono', monospace;
+      font-family: 'Space Mono', ui-monospace, 'Cascadia Code', 'Fira Mono', monospace;
       font-size: .7rem;
       letter-spacing: .12em;
       text-transform: uppercase;
@@ -471,7 +472,7 @@ def _format_html(findings: list[Finding], path: Path) -> str:
       margin-bottom: 1rem;
     }}
     .cover-meta {{
-      font-family: 'Space Mono', monospace;
+      font-family: 'Space Mono', ui-monospace, 'Cascadia Code', 'Fira Mono', monospace;
       font-size: .72rem;
       color: rgba(255,255,255,.45);
       line-height: 1.8;
@@ -505,7 +506,7 @@ def _format_html(findings: list[Finding], path: Path) -> str:
       gap: .5rem;
       padding: .45rem 1rem;
       border-radius: 999px;
-      font-family: 'Space Mono', monospace;
+      font-family: 'Space Mono', ui-monospace, 'Cascadia Code', 'Fira Mono', monospace;
       font-size: .85rem;
       font-weight: 700;
       background: {health_color}1a;
@@ -535,7 +536,7 @@ def _format_html(findings: list[Finding], path: Path) -> str:
     }}
     .metric-card:hover {{ border-color: var(--accent); }}
     .metric-card .metric-label {{
-      font-family: 'Space Mono', monospace;
+      font-family: 'Space Mono', ui-monospace, 'Cascadia Code', 'Fira Mono', monospace;
       font-size: .68rem;
       letter-spacing: .06em;
       text-transform: uppercase;
@@ -616,7 +617,7 @@ def _format_html(findings: list[Finding], path: Path) -> str:
     .finding-card:hover {{ border-color: var(--accent); }}
     .finding-card p {{ font-size: .85rem; color: var(--muted); margin-top: .35rem; }}
     .finding-card .finding-loc {{
-      font-family: 'Space Mono', monospace;
+      font-family: 'Space Mono', ui-monospace, 'Cascadia Code', 'Fira Mono', monospace;
       font-size: .75rem;
       color: var(--muted);
     }}
@@ -626,7 +627,7 @@ def _format_html(findings: list[Finding], path: Path) -> str:
       display: inline-block;
       padding: .15rem .5rem;
       border-radius: 6px;
-      font-family: 'Space Mono', monospace;
+      font-family: 'Space Mono', ui-monospace, 'Cascadia Code', 'Fira Mono', monospace;
       font-size: .68rem;
       font-weight: 700;
       letter-spacing: .04em;
@@ -641,7 +642,7 @@ def _format_html(findings: list[Finding], path: Path) -> str:
     th, td {{ border: 1px solid var(--border); padding: .55rem .75rem; text-align: left; vertical-align: top; }}
     th {{
       background: var(--warm);
-      font-family: 'Space Mono', monospace;
+      font-family: 'Space Mono', ui-monospace, 'Cascadia Code', 'Fira Mono', monospace;
       font-size: .68rem;
       text-transform: uppercase;
       letter-spacing: .06em;

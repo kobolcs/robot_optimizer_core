@@ -37,7 +37,7 @@ import time
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, TypedDict
+from typing import TYPE_CHECKING, Any, Callable, Literal, TypedDict
 
 from .di import get_container
 from .domain.entities import TestFile
@@ -547,7 +547,7 @@ def _analyze_one_file(
 
 def _execute_directory_analysis(
     files: list[Path],
-    analyze_fn: Any,
+    analyze_fn: Callable[[Path], tuple[Path, list[Finding]]],
     effective_workers: int,
     fail_fast: bool,
 ) -> tuple[DirectoryResults, list[tuple[Path, Exception]]]:
@@ -564,10 +564,9 @@ def _execute_directory_analysis(
                 if fail_fast:
                     raise
                 file_errors.append((file_path, e))
-                logger.error(
-                    f"Failed to analyze file: {file_path}",
+                logger.exception(
+                    "Failed to analyze file",
                     extra={"file": str(file_path), "error": str(e)},
-                    exc_info=True,
                 )
     else:
         with ThreadPoolExecutor(max_workers=effective_workers) as pool:
@@ -579,10 +578,9 @@ def _execute_directory_analysis(
                     dir_results[fp] = file_findings
                 except Exception as e:
                     file_errors.append((fp, e))
-                    logger.error(
-                        f"Failed to analyze file: {fp}",
+                    logger.exception(
+                        "Failed to analyze file",
                         extra={"file": str(fp), "error": str(e)},
-                        exc_info=True,
                     )
 
     return dir_results, file_errors

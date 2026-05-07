@@ -90,7 +90,15 @@ class ApplicationContext:
         self._lock = threading.RLock()
 
     def initialize(self) -> None:
-        """Initialize the application context."""
+        """Initialize the application context.
+
+        .. warning::
+            This method resets the global DI container (via ``reset_container``) and
+            replaces it with a new one configured for this context.  Only one
+            ``ApplicationContext`` instance may be active at a time; creating and
+            initialising a second instance will silently discard the first context's
+            container registrations.
+        """
         with self._lock:
             if self._initialized:
                 return

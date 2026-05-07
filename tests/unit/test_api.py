@@ -28,7 +28,7 @@ class TestAnalyzeFileMaxSizeEnforcement:
 
         settings = Settings(max_file_size_mb=0.1)
 
-        with pytest.raises(AnalysisError, match="[Ee]xceeds maximum size"):
+        with pytest.raises(AnalysisError, match=r"[Ee]xceeds maximum size"):
             analyze_file(robot_file, settings=settings)
 
     def test_file_error_includes_file_path(self, tmp_path: Path) -> None:
@@ -109,7 +109,7 @@ def test_analyze_file_uses_container_settings_when_none_passed(
     robot_file.write_bytes(b"x" * 150_000)  # 150 000 bytes > limit
 
     try:
-        with pytest.raises(AnalysisError, match="[Ee]xceeds maximum size"):
+        with pytest.raises(AnalysisError, match=r"[Ee]xceeds maximum size"):
             analyze_file(robot_file)  # no settings= passed — must use container
     finally:
         reset_container()
@@ -237,7 +237,6 @@ class TestAnalyzeOneFile:
     def test_returns_path_and_findings(self, tmp_path: Path) -> None:
         rf = tmp_path / "t.robot"
         rf.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
-        from robot_optimizer_core.config import Settings
         path, findings = _analyze_one_file(rf, ["dead_code"], Settings(), None, None)
         assert path == rf
         assert isinstance(findings, list)
@@ -248,7 +247,6 @@ class TestAnalyzeOneFile:
         monkeypatch.setattr(
             _api_module, "analyze_file", lambda *a, **kw: (_ for _ in ()).throw(AnalysisError("boom"))
         )
-        from robot_optimizer_core.config import Settings
         with pytest.raises(AnalysisError):
             _analyze_one_file(rf, None, Settings(), None, None)
 
@@ -268,19 +266,19 @@ class TestExecuteDirectoryAnalysis:
 
     def test_sequential_returns_all_results(self, tmp_path: Path) -> None:
         files = [tmp_path / f"f{i}.robot" for i in range(3)]
-        results, errors = _execute_directory_analysis(files, self._ok_fn, 1, False)
+        results, errors = _execute_directory_analysis(files, self._ok_fn, 1, fail_fast=False)
         assert len(results) == 3
         assert errors == []
 
     def test_parallel_returns_all_results(self, tmp_path: Path) -> None:
         files = [tmp_path / f"f{i}.robot" for i in range(4)]
-        results, errors = _execute_directory_analysis(files, self._ok_fn, 4, False)
+        results, errors = _execute_directory_analysis(files, self._ok_fn, 4, fail_fast=False)
         assert len(results) == 4
         assert errors == []
 
     def test_sequential_error_collected_not_raised(self, tmp_path: Path) -> None:
         files = [tmp_path / "f.robot"]
-        results, errors = _execute_directory_analysis(files, self._fail_fn, 1, False)
+        results, errors = _execute_directory_analysis(files, self._fail_fn, 1, fail_fast=False)
         assert len(errors) == 1
         assert len(results) == 0
 
@@ -294,11 +292,11 @@ class TestExecuteDirectoryAnalysis:
             raise AnalysisError("forced", file_path=p)
 
         with pytest.raises(AnalysisError):
-            _execute_directory_analysis(files, counting_fail, 1, True)
+            _execute_directory_analysis(files, counting_fail, 1, fail_fast=True)
         assert call_count == 1
 
     def test_parallel_error_collected_not_raised(self, tmp_path: Path) -> None:
         files = [tmp_path / f"f{i}.robot" for i in range(3)]
-        results, errors = _execute_directory_analysis(files, self._fail_fn, 4, False)
+        results, errors = _execute_directory_analysis(files, self._fail_fn, 4, fail_fast=False)
         assert len(errors) == 3
         assert len(results) == 0
