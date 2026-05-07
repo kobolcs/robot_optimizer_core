@@ -35,7 +35,9 @@ from .__version__ import __version__, __version_info__
 
 # Analyzers
 from .analyzers import (
-    AnalyzerRegistry,
+    AnalyzerRegistry as AnalyzerRegistry,
+)
+from .analyzers import (
     BaseAnalyzer,
     DeadCodeAnalyzer,
     FlakinessAnalyzer,
@@ -46,9 +48,11 @@ from .analyzers import (
     TagConsistencyAnalyzer,
     TestDocumentationAnalyzer,
     get_analyzer,
-    get_analyzer_registry,
     list_analyzers,
     register_analyzer,
+)
+from .analyzers import (
+    get_analyzer_registry as get_analyzer_registry,
 )
 
 # High-level API functions
@@ -65,24 +69,43 @@ from .api import (
 from .config import Settings, get_settings, reset_settings
 
 # Dependency injection — not part of the public API; importable for advanced use
-from .di import ThreadSafeContainer, get_container
+from .di import ThreadSafeContainer
+from .di import get_container as get_container
 
 # Core services — not part of the public API; importable for advanced use
-from .discovery import FileDiscoveryService
+from .discovery import FileDiscoveryService as FileDiscoveryService
 
-# Core domain models — public value objects in __all__; base types re-exported for
-# advanced consumers but intentionally excluded from __all__ to reduce surface area
-from .domain.base import AggregateRoot, DomainEvent, Entity, ValueObject
+# Core domain models — primary value objects (Finding, Location, Pattern, etc.) in __all__;
+# additional types (FlakinessStats, SleepPattern, TestResult) and base types re-exported
+# for advanced consumers but intentionally excluded from __all__ to reduce surface area
+from .domain.base import (
+    AggregateRoot as AggregateRoot,
+)
+from .domain.base import (
+    DomainEvent as DomainEvent,
+)
+from .domain.base import (
+    Entity as Entity,
+)
+from .domain.base import (
+    ValueObject as ValueObject,
+)
 from .domain.entities import TestFile
 from .domain.value_objects import (
     Finding,
-    FlakinessStats,
     Location,
     Pattern,
     PatternType,
     Severity,
-    SleepPattern,
-    TestResult,
+)
+from .domain.value_objects import (
+    FlakinessStats as FlakinessStats,
+)
+from .domain.value_objects import (
+    SleepPattern as SleepPattern,
+)
+from .domain.value_objects import (
+    TestResult as TestResult,
 )
 
 # Exceptions
@@ -94,20 +117,29 @@ from .exceptions import (
 )
 
 # Listener — not part of the public API; importable for advanced use
-from .listener import FlakinessListener
+from .listener import FlakinessListener as FlakinessListener
 
 # Logging — not part of the public API; importable for advanced use
-from .logging import configure_logging, get_logger
+from .logging import configure_logging as configure_logging
+from .logging import get_logger as get_logger
 
 # Metrics — not part of the public API; importable for advanced use
-from .metrics import MetricsCollector, configure_metrics, get_metrics
-from .parsers import RobotASTParser
+from .metrics import (
+    MetricsCollector as MetricsCollector,
+)
+from .metrics import (
+    configure_metrics as configure_metrics,
+)
+from .metrics import (
+    get_metrics as get_metrics,
+)
+from .parsers import RobotASTParser as RobotASTParser
 
 # Plugin system
 from .plugin import Plugin, PluginMetadata
 from .premium import PremiumFeatureError, is_premium_installed
 
-# Alias preserved for consumers that relied on it before the narrowing of __all__
+# Deprecated alias — use ThreadSafeContainer directly; will be removed in a future release
 Container = ThreadSafeContainer
 
 __all__ = [
@@ -115,6 +147,7 @@ __all__ = [
     # Analyzer classes
     "BaseAnalyzer",
     "ConfigurationError",
+    "Container",  # deprecated alias for ThreadSafeContainer
     "DeadCodeAnalyzer",
     # Domain value objects used in findings
     "Finding",
