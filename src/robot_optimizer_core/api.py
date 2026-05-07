@@ -38,14 +38,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
-from .analyzers import get_analyzer_registry, list_analyzers
-from .config import get_settings
 from .di import get_container
 from .domain.entities import TestFile
 from .domain.value_objects import Finding, Severity
 from .exceptions import AnalysisError, RobotFileNotFoundError
 from .logging import get_logger, log_analysis_complete, log_analysis_start
-from .metrics import get_metrics
 
 if TYPE_CHECKING:
     from .analyzers import BaseAnalyzer
@@ -155,12 +152,12 @@ def analyze_file(
     if not path.exists():
         raise RobotFileNotFoundError(path)
 
-    # Get settings
+    # Resolve services through the DI container
+    container = get_container()
     if settings is None:
-        settings = get_settings()
+        settings = container.resolve("settings")
 
-    # Get metrics collector
-    metrics = get_metrics()
+    metrics = container.resolve("metrics")
 
     # Enforce max file size before reading content and load file
     try:
@@ -305,12 +302,10 @@ def analyze_directory(
     if not path.is_dir():
         raise AnalysisError("Path is not a directory", file_path=path)
 
-    # Get settings
-    if settings is None:
-        settings = get_settings()
-
-    # Get file discovery service
+    # Resolve services through the DI container
     container = get_container()
+    if settings is None:
+        settings = container.resolve("settings")
     discovery: Any = container.resolve("file_discovery")
 
     # Discover files
@@ -398,7 +393,7 @@ def analyze_directory(
     )
 
     # Track metrics
-    metrics = get_metrics()
+    metrics = container.resolve("metrics")
     metrics.gauge("batch.files_analyzed", len(dir_results))
     metrics.gauge("batch.files_failed", len(file_errors))
     metrics.gauge("batch.total_findings", total_findings)
@@ -499,7 +494,7 @@ def analyze_suite(
 
     # Determine effective analyzer list
     if settings is None:
-        settings = get_settings()
+        settings = container.resolve("settings")
     analyzer_instances = _get_analyzer_instances(analyzers, settings)
 
     # Separate dead_code for suite-level cross-file analysis.
@@ -568,7 +563,7 @@ def analyze_suite(
 
 def _create_analyzer_instance(name: str) -> BaseAnalyzer:
     """Create a fresh analyzer instance for each analysis execution."""
-    return get_analyzer_registry().create(name)
+    return get_container().resolve("analyzer_registry").create(name)
 
 
 def _get_analyzer_instances(
@@ -586,10 +581,10 @@ def _get_analyzer_instances(
     if analyzers is None:
         # Check requires_external_repo at the class level before instantiation;
         # analyzers that need an external repo raise on construction without one.
-        registry = get_analyzer_registry()
+        registry = get_container().resolve("analyzer_registry")
         names = [
             name
-            for name in list_analyzers()
+            for name in registry.list()
             if not getattr(
                 registry.analyzers.get(name), "requires_external_repo", False
             )

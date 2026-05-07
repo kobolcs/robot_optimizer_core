@@ -89,6 +89,28 @@ class TestAnalyzeFileMaxSizeEnforcement:
 
 
 @pytest.mark.unit
+def test_analyze_file_uses_container_settings_when_none_passed(
+    tmp_path: Path,
+) -> None:
+    """analyze_file must resolve settings from the DI container, not a separate global."""
+    from robot_optimizer_core.di import get_container, reset_container
+
+    reset_container()
+    container = get_container()
+    restrictive = Settings(max_file_size_mb=0.1)  # 104 857 byte limit
+    container.register_instance("settings", restrictive, override=True)
+
+    robot_file = tmp_path / "toobig.robot"
+    robot_file.write_bytes(b"x" * 150_000)  # 150 000 bytes > limit
+
+    try:
+        with pytest.raises(AnalysisError, match="[Ee]xceeds maximum size"):
+            analyze_file(robot_file)  # no settings= passed — must use container
+    finally:
+        reset_container()
+
+
+@pytest.mark.unit
 def test_analyze_file_uses_safe_analyze(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

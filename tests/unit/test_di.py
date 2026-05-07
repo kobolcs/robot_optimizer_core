@@ -38,6 +38,8 @@ class TestResetContainer:
         assert container.has_service("settings")
         assert container.has_service("file_discovery")
         assert container.has_service("parser")
+        assert container.has_service("analyzer_registry")
+        assert container.has_service("metrics")
 
     def test_get_container_alias_works_after_reset(self) -> None:
         reset_container()
