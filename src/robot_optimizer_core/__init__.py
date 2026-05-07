@@ -69,7 +69,7 @@ from .api import (
 from .config import Settings, get_settings, reset_settings
 
 # Dependency injection — not part of the public API; importable for advanced use
-from .di import ThreadSafeContainer
+from .di import ThreadSafeContainer as ThreadSafeContainer
 from .di import get_container as get_container
 
 # Core services — not part of the public API; importable for advanced use
@@ -175,6 +175,7 @@ __all__ = [
     "TagConsistencyAnalyzer",
     "TestDocumentationAnalyzer",
     "TestFile",
+    "ThreadSafeContainer",
     # Version
     "__version__",
     "__version_info__",
