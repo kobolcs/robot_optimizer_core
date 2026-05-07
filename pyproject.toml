@@ -233,7 +233,6 @@ select = [
 ]
 ignore = [
     "E501",   # line too long (formatter handles)
-    "PLR0913", # too many arguments
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -242,6 +241,12 @@ ignore = [
     "ARG",    # unused arguments
     "PLR2004", # magic values
 ]
+"src/robot_optimizer_core/api.py" = [
+    "PLR0913",  # public API surface intentionally accepts many optional kwargs
+]
+
+[tool.ruff.lint.pylint]
+max-args = 8
 
 [tool.ruff.lint.isort]
 known-first-party = ["robot_optimizer_core"]
@@ -252,6 +257,7 @@ indent-style = "space"
 
 # Mypy configuration
 [tool.mypy]
+plugins = ["pydantic.mypy"]
 python_version = "3.11"
 strict = true
 warn_return_any = true

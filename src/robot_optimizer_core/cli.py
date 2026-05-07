@@ -764,7 +764,7 @@ def _print_summary(findings: list[Finding]) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _run_upgrade(args: argparse.Namespace) -> int:  # noqa: ARG001
+def _run_upgrade(_args: argparse.Namespace) -> int:
     from .premium import PREMIUM_PACKAGE_NAME, UPGRADE_URL, is_premium_installed
 
     version = _get_version()

@@ -56,15 +56,10 @@ from .tag_consistency import TagConsistencyAnalyzer
 from .test_documentation import TestDocumentationAnalyzer
 
 __all__ = [
-    # Base
-    "BaseAnalyzer",
     # Registry
     "AnalyzerRegistry",
-    "register_analyzer",
-    "get_analyzer",
-    "list_analyzers",
-    "get_analyzer_info",
-    "get_analyzer_registry",
+    # Base
+    "BaseAnalyzer",
     # Built-in analyzers
     "DeadCodeAnalyzer",
     "FlakinessAnalyzer",
@@ -75,4 +70,9 @@ __all__ = [
     "SleepDetectorAnalyzer",
     "TagConsistencyAnalyzer",
     "TestDocumentationAnalyzer",
+    "get_analyzer",
+    "get_analyzer_info",
+    "get_analyzer_registry",
+    "list_analyzers",
+    "register_analyzer",
 ]

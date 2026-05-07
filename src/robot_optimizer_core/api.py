@@ -592,13 +592,13 @@ def _create_analyzer_instance(name: str) -> BaseAnalyzer:
 
 
 def _get_analyzer_instances(
-    analyzers: list[str | BaseAnalyzer] | None, settings: Settings
+    analyzers: list[str | BaseAnalyzer] | None, _settings: Settings
 ) -> list[BaseAnalyzer]:
     """Get analyzer instances from names or objects.
 
     Args:
         analyzers: List of analyzer names or instances.
-        settings: Configuration settings.
+        _settings: Configuration settings (reserved for future use).
 
     Returns:
         List of analyzer instances.

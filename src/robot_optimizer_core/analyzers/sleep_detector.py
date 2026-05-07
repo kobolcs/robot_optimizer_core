@@ -26,7 +26,7 @@ import dataclasses
 import re
 import sys
 from decimal import Decimal, InvalidOperation
-from typing import cast
+from typing import ClassVar, cast
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -46,7 +46,7 @@ from ..domain.value_objects import (
 from ..exceptions import ConfigurationError
 from .base import BaseAnalyzer, ConfigValue
 
-__all__ = ["SleepDetectorAnalyzer", "SleepDetector"]
+__all__ = ["SleepDetector", "SleepDetectorAnalyzer"]
 
 # ---------------------------------------------------------------------------
 # Unit normalisation helper
@@ -440,7 +440,7 @@ class SleepDetectorAnalyzer(BaseAnalyzer):
         )
 
     # Library-specific wait keywords keyed by context category
-    _LIBRARY_WAITS: dict[str, dict[str, str]] = {
+    _LIBRARY_WAITS: ClassVar[dict[str, dict[str, str]]] = {
         "seleniumlibrary": {
             "ui": "Wait Until Element Is Visible",
             "page": "Wait Until Page Contains",
@@ -463,7 +463,7 @@ class SleepDetectorAnalyzer(BaseAnalyzer):
             "generic": "Wait Until Element Is Visible",
         },
     }
-    _GENERIC_WAITS: dict[str, str] = {
+    _GENERIC_WAITS: ClassVar[dict[str, str]] = {
         "ui": "Wait Until Element Is Visible",
         "page": "Wait Until Page Contains",
         "verify": "Wait Until Keyword Succeeds",

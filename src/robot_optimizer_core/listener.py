@@ -72,7 +72,7 @@ class FlakinessListener:
     # Listener V3 protocol
     # ------------------------------------------------------------------
 
-    def start_suite(self, data: Any, result: Any) -> None:
+    def start_suite(self, data: Any, _result: Any) -> None:
         """Record the suite source so end_test knows which file a test belongs to."""
         source = getattr(data, "source", None)
         if source is not None:

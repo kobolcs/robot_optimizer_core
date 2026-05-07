@@ -158,7 +158,7 @@ class BaseAnalyzer(ABC):
             AnalysisError: If analysis fails.
         """
 
-    def pre_analyze(self, test_file: TestFile) -> None:  # noqa: B027
+    def pre_analyze(self, _test_file: TestFile) -> None:  # noqa: B027
         """Hook called before analysis.
 
         Subclasses can override this to perform setup tasks.
@@ -166,11 +166,11 @@ class BaseAnalyzer(ABC):
         error handling.
 
         Args:
-            test_file: The test file to be analyzed.
+            _test_file: The test file to be analyzed.
         """
 
     def post_analyze(
-        self, test_file: TestFile, findings: list[Finding]
+        self, _test_file: TestFile, findings: list[Finding]
     ) -> list[Finding]:
         """Hook called after analysis.
 

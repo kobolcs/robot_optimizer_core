@@ -20,8 +20,8 @@ __all__ = [
     "PluginMetadata",
     "PluginRegistry",
     "PluginSecurityValidator",
-    "ValidatedPluginManager",
     "SecurityVisitor",
+    "ValidatedPluginManager",
     "get_plugin_registry",
 ]
 

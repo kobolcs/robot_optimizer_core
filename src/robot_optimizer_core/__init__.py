@@ -35,7 +35,7 @@ from .__version__ import __version__, __version_info__
 
 # Analyzers
 from .analyzers import (
-    AnalyzerRegistry,  # noqa: F401
+    AnalyzerRegistry,
     BaseAnalyzer,
     DeadCodeAnalyzer,
     FlakinessAnalyzer,
@@ -46,7 +46,7 @@ from .analyzers import (
     TagConsistencyAnalyzer,
     TestDocumentationAnalyzer,
     get_analyzer,
-    get_analyzer_registry,  # noqa: F401
+    get_analyzer_registry,
     list_analyzers,
     register_analyzer,
 )
@@ -65,24 +65,24 @@ from .api import (
 from .config import Settings, get_settings, reset_settings
 
 # Dependency injection — not part of the public API; importable for advanced use
-from .di import ThreadSafeContainer, get_container  # noqa: F401
+from .di import ThreadSafeContainer, get_container
 
 # Core services — not part of the public API; importable for advanced use
-from .discovery import FileDiscoveryService  # noqa: F401
+from .discovery import FileDiscoveryService
 
 # Core domain models — public value objects in __all__; base types re-exported for
 # advanced consumers but intentionally excluded from __all__ to reduce surface area
-from .domain.base import AggregateRoot, DomainEvent, Entity, ValueObject  # noqa: F401
+from .domain.base import AggregateRoot, DomainEvent, Entity, ValueObject
 from .domain.entities import TestFile
 from .domain.value_objects import (
     Finding,
-    FlakinessStats,  # noqa: F401
+    FlakinessStats,
     Location,
     Pattern,
     PatternType,
     Severity,
-    SleepPattern,  # noqa: F401
-    TestResult,  # noqa: F401
+    SleepPattern,
+    TestResult,
 )
 
 # Exceptions
@@ -94,68 +94,68 @@ from .exceptions import (
 )
 
 # Listener — not part of the public API; importable for advanced use
-from .listener import FlakinessListener  # noqa: F401
+from .listener import FlakinessListener
 
 # Logging — not part of the public API; importable for advanced use
-from .logging import configure_logging, get_logger  # noqa: F401
+from .logging import configure_logging, get_logger
 
 # Metrics — not part of the public API; importable for advanced use
-from .metrics import MetricsCollector, configure_metrics, get_metrics  # noqa: F401
-from .parsers import RobotASTParser  # noqa: F401
+from .metrics import MetricsCollector, configure_metrics, get_metrics
+from .parsers import RobotASTParser
 
 # Plugin system
 from .plugin import Plugin, PluginMetadata
 from .premium import PremiumFeatureError, is_premium_installed
 
 # Alias preserved for consumers that relied on it before the narrowing of __all__
-Container = ThreadSafeContainer  # noqa: F401
+Container = ThreadSafeContainer
 
 __all__ = [
-    # Version
-    "__version__",
-    "__version_info__",
-    # High-level API — primary entry points
-    "analyze_file",
-    "analyze_directory",
-    "analyze_suite",
+    "AnalysisError",
+    # Analyzer classes
+    "BaseAnalyzer",
+    "ConfigurationError",
+    "DeadCodeAnalyzer",
+    # Domain value objects used in findings
+    "Finding",
+    "FlakinessAnalyzer",
+    "HardcodedValueAnalyzer",
+    "Location",
+    "NamingConventionAnalyzer",
+    "Pattern",
+    "PatternType",
+    # Plugin system
+    "Plugin",
+    "PluginError",
+    "PluginMetadata",
+    "PremiumFeatureError",
+    # Exceptions
+    "RobotOptimizerError",
+    # Configuration
+    "Settings",
+    "SetupTeardownAnalyzer",
+    "Severity",
+    "SleepDetector",
     "SuiteAnalysisResult",
     "SuiteInfo",
     "SuiteStatistics",
-    # Analyzer classes
-    "BaseAnalyzer",
-    "DeadCodeAnalyzer",
-    "SleepDetector",
-    "FlakinessAnalyzer",
-    "HardcodedValueAnalyzer",
-    "NamingConventionAnalyzer",
-    "SetupTeardownAnalyzer",
     "TagConsistencyAnalyzer",
     "TestDocumentationAnalyzer",
-    "register_analyzer",
-    "get_analyzer",
-    "list_analyzers",
-    # Domain value objects used in findings
-    "Finding",
-    "Location",
-    "Pattern",
-    "PatternType",
-    "Severity",
     "TestFile",
-    # Configuration
-    "Settings",
+    # Version
+    "__version__",
+    "__version_info__",
+    "analyze_directory",
+    # High-level API — primary entry points
+    "analyze_file",
+    "analyze_suite",
+    "get_analyzer",
     "get_settings",
-    "reset_settings",
-    # Exceptions
-    "RobotOptimizerError",
-    "AnalysisError",
-    "ConfigurationError",
-    "PluginError",
-    "PremiumFeatureError",
-    # Plugin system
-    "Plugin",
-    "PluginMetadata",
     # Premium detection (useful for plugin authors)
     "is_premium_installed",
+    "list_analyzers",
+    "register_analyzer",
+    "reset_settings",
 ]
 
 
