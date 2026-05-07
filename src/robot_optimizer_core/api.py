@@ -31,6 +31,7 @@ Example:
 
 from __future__ import annotations
 
+import functools
 import os
 import time
 import warnings
@@ -331,54 +332,19 @@ def analyze_directory(
         },
     )
 
-    # Analyze files sequentially or with a thread pool based on worker settings.
-    dir_results: DirectoryResults = DirectoryResults()
-    file_errors: list[tuple[Path, Exception]] = []
-
     _default_workers = min(4, (os.cpu_count() or 1))
     effective_workers = max_workers if max_workers is not None else _default_workers
 
-    def _analyze_one(file_path: Path) -> tuple[Path, list[Finding]]:
-        findings = analyze_file(
-            file_path,
-            analyzers,
-            settings,
-            severity_filter=severity_filter,
-            pattern_filter=pattern_filter,
-        )
-        return file_path, findings
-
-    if effective_workers == 1 or len(files) <= 1 or fail_fast:
-        # Sequential path; fail_fast requires sequential ordering to stop on first error
-        for file_path in files:
-            try:
-                _, file_findings = _analyze_one(file_path)
-                dir_results[file_path] = file_findings
-            except Exception as e:
-                if fail_fast:
-                    raise
-                file_errors.append((file_path, e))
-                logger.error(
-                    f"Failed to analyze file: {file_path}",
-                    extra={"file": str(file_path), "error": str(e)},
-                    exc_info=True,
-                )
-    else:
-        # Parallel path
-        with ThreadPoolExecutor(max_workers=effective_workers) as pool:
-            future_to_path = {pool.submit(_analyze_one, fp): fp for fp in files}
-            for future in as_completed(future_to_path):
-                fp = future_to_path[future]
-                try:
-                    _, file_findings = future.result()
-                    dir_results[fp] = file_findings
-                except Exception as e:
-                    file_errors.append((fp, e))
-                    logger.error(
-                        f"Failed to analyze file: {fp}",
-                        extra={"file": str(fp), "error": str(e)},
-                        exc_info=True,
-                    )
+    analyze_fn = functools.partial(
+        _analyze_one_file,
+        analyzers=analyzers,
+        settings=settings,
+        severity_filter=severity_filter,
+        pattern_filter=pattern_filter,
+    )
+    dir_results, file_errors = _execute_directory_analysis(
+        files, analyze_fn, effective_workers, fail_fast
+    )
 
     # Log summary
     total_findings = sum(len(findings) for findings in dir_results.values())
@@ -559,6 +525,67 @@ def analyze_suite(
         suite_info=suite_info,
         statistics=statistics,
     )
+
+
+def _analyze_one_file(
+    file_path: Path,
+    analyzers: list[str | BaseAnalyzer] | None,
+    settings: Settings,
+    severity_filter: Severity | None,
+    pattern_filter: list[str] | None,
+) -> tuple[Path, list[Finding]]:
+    """Analyze a single file and return (path, findings). Used by analyze_directory."""
+    findings = analyze_file(
+        file_path,
+        analyzers,
+        settings,
+        severity_filter=severity_filter,
+        pattern_filter=pattern_filter,
+    )
+    return file_path, findings
+
+
+def _execute_directory_analysis(
+    files: list[Path],
+    analyze_fn: Any,
+    effective_workers: int,
+    fail_fast: bool,
+) -> tuple[DirectoryResults, list[tuple[Path, Exception]]]:
+    """Run per-file analysis sequentially or in parallel; return results and errors."""
+    dir_results: DirectoryResults = DirectoryResults()
+    file_errors: list[tuple[Path, Exception]] = []
+
+    if effective_workers == 1 or len(files) <= 1 or fail_fast:
+        for file_path in files:
+            try:
+                _, file_findings = analyze_fn(file_path)
+                dir_results[file_path] = file_findings
+            except Exception as e:
+                if fail_fast:
+                    raise
+                file_errors.append((file_path, e))
+                logger.error(
+                    f"Failed to analyze file: {file_path}",
+                    extra={"file": str(file_path), "error": str(e)},
+                    exc_info=True,
+                )
+    else:
+        with ThreadPoolExecutor(max_workers=effective_workers) as pool:
+            future_to_path = {pool.submit(analyze_fn, fp): fp for fp in files}
+            for future in as_completed(future_to_path):
+                fp = future_to_path[future]
+                try:
+                    _, file_findings = future.result()
+                    dir_results[fp] = file_findings
+                except Exception as e:
+                    file_errors.append((fp, e))
+                    logger.error(
+                        f"Failed to analyze file: {fp}",
+                        extra={"file": str(fp), "error": str(e)},
+                        exc_info=True,
+                    )
+
+    return dir_results, file_errors
 
 
 def _create_analyzer_instance(name: str) -> BaseAnalyzer:
