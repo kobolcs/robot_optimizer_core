@@ -16,17 +16,12 @@ class TestFlakinessSettingsCoupling:
         assert analyzer._failure_threshold == 0.1
         assert analyzer._min_runs == 5
 
-    def test_missing_threshold_reads_from_container_settings(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_missing_threshold_reads_from_settings(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from robot_optimizer_core.config import Settings
-        from robot_optimizer_core.di import ThreadSafeContainer
         import robot_optimizer_core.analyzers.flakiness as flakiness_mod
 
-        private_container = ThreadSafeContainer()
-        private_container.register_instance(
-            "settings",
-            Settings(flakiness_threshold=0.15, flakiness_min_runs=7),
-        )
-        monkeypatch.setattr(flakiness_mod, "get_container", lambda: private_container)
+        custom_settings = Settings(flakiness_threshold=0.15, flakiness_min_runs=7)
+        monkeypatch.setattr(flakiness_mod, "get_settings", lambda: custom_settings)
         analyzer = FlakinessAnalyzer(config={"min_runs": 5})
         assert analyzer._failure_threshold == 0.15
 

@@ -166,61 +166,65 @@ def _html_display_path(file_path: Path, root: Path) -> str:
         return str(file_path)
 
 
+# (pattern-name substrings, category, impact, action)
+_PATTERN_CATEGORY_MAP: list[tuple[tuple[str, ...], str, str, str]] = [
+    (
+        ("sleep",),
+        "Stability / flakiness risk",
+        "Fixed sleeps increase execution variance and flaky outcomes.",
+        "Replace fixed sleeps with condition-based explicit waits.",
+    ),
+    (
+        ("unused keyword",),
+        "Maintainability / legacy debt",
+        "Unused legacy keywords create noise and increase maintenance cost.",
+        "Remove or confirm legacy keywords and archive obsolete helpers.",
+    ),
+    (
+        ("documentation",),
+        "Knowledge transfer / onboarding risk",
+        "Missing documentation slows onboarding and raises review effort.",
+        "Add concise business-focused documentation to critical tests and keywords.",
+    ),
+    (
+        ("hardcoded",),
+        "Environment/configuration risk",
+        "Hardcoded values reduce portability between environments.",
+        "Move environment-specific data into variables or configuration.",
+    ),
+    (
+        ("tag",),
+        "Governance / test selection risk",
+        "Tag inconsistency weakens filtering, reporting, and release gates.",
+        "Normalize tag taxonomy and enforce conventions in review checks.",
+    ),
+    (
+        ("naming", "camelcase", "camel_case"),
+        "Readability / consistency risk",
+        "Naming inconsistency reduces readability and increases review friction.",
+        "Adopt naming standards and align keywords/tests incrementally.",
+    ),
+    (
+        ("setup", "teardown"),
+        "Structure / duplication risk",
+        "Setup/teardown issues can duplicate logic and hide dependencies.",
+        "Refactor shared setup/teardown behavior into reusable keywords.",
+    ),
+]
+_PATTERN_CATEGORY_DEFAULT = (
+    "General quality risk",
+    "General quality issues can accumulate into delivery and maintenance cost.",
+    "Review and remediate recurring findings as part of sprint quality work.",
+)
+
+
 def _html_category_metadata(pattern_name: str) -> tuple[str, str, str]:
     """Return (category, impact, action) for an HTML report finding group."""
     normalized = pattern_name.lower()
-    mappings = [
-        (
-            ("sleep",),
-            "Stability / flakiness risk",
-            "Fixed sleeps increase execution variance and flaky outcomes.",
-            "Replace fixed sleeps with condition-based explicit waits.",
-        ),
-        (
-            ("unused keyword",),
-            "Maintainability / legacy debt",
-            "Unused legacy keywords create noise and increase maintenance cost.",
-            "Remove or confirm legacy keywords and archive obsolete helpers.",
-        ),
-        (
-            ("documentation",),
-            "Knowledge transfer / onboarding risk",
-            "Missing documentation slows onboarding and raises review effort.",
-            "Add concise business-focused documentation to critical tests and keywords.",
-        ),
-        (
-            ("hardcoded",),
-            "Environment/configuration risk",
-            "Hardcoded values reduce portability between environments.",
-            "Move environment-specific data into variables or configuration.",
-        ),
-        (
-            ("tag",),
-            "Governance / test selection risk",
-            "Tag inconsistency weakens filtering, reporting, and release gates.",
-            "Normalize tag taxonomy and enforce conventions in review checks.",
-        ),
-        (
-            ("naming", "camelcase", "camel_case"),
-            "Readability / consistency risk",
-            "Naming inconsistency reduces readability and increases review friction.",
-            "Adopt naming standards and align keywords/tests incrementally.",
-        ),
-        (
-            ("setup", "teardown"),
-            "Structure / duplication risk",
-            "Setup/teardown issues can duplicate logic and hide dependencies.",
-            "Refactor shared setup/teardown behavior into reusable keywords.",
-        ),
-    ]
-    for keywords, category, impact, action in mappings:
-        if any(keyword in normalized for keyword in keywords):
+    for keywords, category, impact, action in _PATTERN_CATEGORY_MAP:
+        if any(kw in normalized for kw in keywords):
             return (category, impact, action)
-    return (
-        "General quality risk",
-        "General quality issues can accumulate into delivery and maintenance cost.",
-        "Review and remediate recurring findings as part of sprint quality work.",
-    )
+    return _PATTERN_CATEGORY_DEFAULT
 
 
 def _html_compute_stats(
@@ -355,6 +359,163 @@ def _html_render_findings_table(findings: list[Finding], root: Path) -> str:
     )
 
 
+_HTML_STYLES = """\
+    :root {
+      --accent:      #0d9488;
+      --accent-dark: #0a7a70;
+      --accent-glow: #e6f7f5;
+      --ink:         #1c1f26;
+      --paper:       #f4f5f7;
+      --dark-card:   #22262f;
+      --muted:       #6b7280;
+      --border:      #d1d5db;
+      --warm:        #eaecef;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    main { max-width: 1100px; margin: 0 auto; padding: 2.5rem 1.5rem; }
+    .cover {
+      background: var(--dark-card);
+      border-radius: 20px;
+      padding: 2.5rem 2rem;
+      margin-bottom: 1.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .cover::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 60% 80% at 100% 0%, rgba(13,148,136,.35) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .cover-eyebrow {
+      font-family: 'Space Mono', ui-monospace, 'Cascadia Code', 'Fira Mono', monospace;
+      font-size: .7rem; letter-spacing: .12em; text-transform: uppercase;
+      color: var(--accent); margin-bottom: .5rem;
+    }
+    .cover h1 { font-size: 1.75rem; font-weight: 700; color: #fff; margin-bottom: .25rem; }
+    .cover h2 { font-size: 1rem; font-weight: 400; color: rgba(255,255,255,.65); margin-bottom: 1rem; }
+    .cover-meta {
+      font-family: 'Space Mono', ui-monospace, 'Cascadia Code', 'Fira Mono', monospace;
+      font-size: .72rem; color: rgba(255,255,255,.45); line-height: 1.8;
+    }
+    .panel {
+      background: #fff; border: 1px solid var(--border); border-radius: 16px;
+      padding: 1.5rem 1.75rem; margin-bottom: 1.25rem;
+    }
+    .panel h2 {
+      font-size: 1rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+      color: var(--muted); margin-bottom: 1rem; padding-bottom: .5rem;
+      border-bottom: 1px solid var(--warm);
+    }
+    .panel p { color: var(--ink); margin-bottom: .6rem; }
+    .panel p:last-child { margin-bottom: 0; }
+    .health-badge {
+      display: inline-flex; align-items: center; gap: .5rem;
+      padding: .45rem 1rem; border-radius: 999px;
+      font-family: 'Space Mono', ui-monospace, 'Cascadia Code', 'Fira Mono', monospace;
+      font-size: .85rem; font-weight: 700;
+      background: var(--health-color-bg);
+      color: var(--health-color);
+      border: 1.5px solid var(--health-color-border);
+    }
+    .health-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--health-color);
+      box-shadow: 0 0 0 3px var(--health-color-glow);
+    }
+    .bento {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: .75rem; margin-top: .5rem;
+    }
+    .metric-card {
+      background: var(--paper); border: 1px solid var(--border);
+      border-radius: 12px; padding: 1rem; transition: border-color .15s;
+    }
+    .metric-card:hover { border-color: var(--accent); }
+    .metric-card .metric-label {
+      font-family: 'Space Mono', ui-monospace, 'Cascadia Code', 'Fira Mono', monospace;
+      font-size: .68rem; letter-spacing: .06em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: .35rem;
+    }
+    .metric-card .metric-value { font-size: 1.75rem; font-weight: 700; color: var(--ink); line-height: 1; }
+    .metric-card.accent { border-color: var(--accent); background: var(--accent-glow); }
+    .metric-card.accent .metric-value { color: var(--accent-dark); }
+    .category-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: .75rem; margin-top: .5rem;
+    }
+    .category-card {
+      background: var(--paper); border: 1px solid var(--border);
+      border-radius: 12px; padding: 1rem 1.25rem;
+      transition: box-shadow .15s, border-color .15s;
+    }
+    .category-card:hover { border-color: var(--accent); box-shadow: 0 4px 16px rgba(13,148,136,.1); }
+    .category-card h3 { font-size: .9rem; font-weight: 700; color: var(--ink); margin-bottom: .5rem; }
+    .category-card p { font-size: .82rem; color: var(--muted); margin-bottom: .35rem; line-height: 1.5; }
+    .category-card strong { color: var(--ink); }
+    ol { padding-left: 1.25rem; }
+    ol li { padding: .4rem 0; font-size: .9rem; color: var(--ink); border-bottom: 1px solid var(--warm); }
+    ol li:last-child { border-bottom: none; }
+    section.finding-section { margin-bottom: 1rem; }
+    section.finding-section h3 {
+      font-size: .85rem; font-weight: 700; color: var(--accent-dark);
+      margin-bottom: .5rem; padding: .25rem .6rem; background: var(--accent-glow);
+      border-radius: 6px; display: inline-block;
+    }
+    .finding-card {
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: .75rem 1rem; margin-bottom: .5rem; background: #fff; transition: border-color .15s;
+    }
+    .finding-card:hover { border-color: var(--accent); }
+    .finding-card p { font-size: .85rem; color: var(--muted); margin-top: .35rem; }
+    .finding-card .finding-loc {
+      font-family: 'Space Mono', ui-monospace, 'Cascadia Code', 'Fira Mono', monospace;
+      font-size: .75rem; color: var(--muted);
+    }
+    .sev {
+      display: inline-block; padding: .15rem .5rem; border-radius: 6px;
+      font-family: 'Space Mono', ui-monospace, 'Cascadia Code', 'Fira Mono', monospace;
+      font-size: .68rem; font-weight: 700; letter-spacing: .04em;
+    }
+    .sev-error   { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+    .sev-warning { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+    .sev-info    { background: var(--accent-glow); color: var(--accent-dark); border: 1px solid #99d9d4; }
+    .table-wrap { overflow-x: auto; margin-top: .75rem; }
+    table { border-collapse: collapse; width: 100%; font-size: .82rem; }
+    th, td { border: 1px solid var(--border); padding: .55rem .75rem; text-align: left; vertical-align: top; }
+    th {
+      background: var(--warm);
+      font-family: 'Space Mono', ui-monospace, 'Cascadia Code', 'Fira Mono', monospace;
+      font-size: .68rem; text-transform: uppercase; letter-spacing: .06em;
+      color: var(--muted); font-weight: 700;
+    }
+    tr:hover td { background: var(--accent-glow); }
+    .no-findings {
+      display: flex; align-items: center; gap: .75rem;
+      padding: 1rem 1.25rem; background: var(--accent-glow);
+      border: 1px solid #99d9d4; border-radius: 10px;
+      color: var(--accent-dark); font-weight: 600;
+    }
+    .no-findings::before { content: "✓"; font-size: 1.1rem; }"""
+
+
+_HEALTH_COLORS: dict[str, tuple[str, str, str, str]] = {
+    # status: (base, bg-alpha, border-alpha, glow-alpha) as hex colours
+    "High Risk":     ("#ef4444", "#ef44441a", "#ef444455", "#ef444433"),
+    "Moderate Risk": ("#f59e0b", "#f59e0b1a", "#f59e0b55", "#f59e0b33"),
+    "Healthy":       ("#0d9488", "#0d94881a", "#0d948855", "#0d948833"),
+}
+_HEALTH_COLOR_DEFAULT = ("#6b7280", "#6b72801a", "#6b728055", "#6b728033")
+
+
 def _format_html(findings: list[Finding], path: Path) -> str:
     root = path.resolve() if path.is_dir() else path.parent.resolve()
     timestamp, sev_counts, affected_files, category_summary, category_groups = (
@@ -362,6 +523,7 @@ def _format_html(findings: list[Finding], path: Path) -> str:
     )
 
     health_status = _html_health_status(sev_counts, findings)
+    hc, hc_bg, hc_border, hc_glow = _HEALTH_COLORS.get(health_status, _HEALTH_COLOR_DEFAULT)
 
     top_categories = sorted(
         category_summary.items(), key=lambda item: int(item[1]["count"]), reverse=True
@@ -396,274 +558,23 @@ def _format_html(findings: list[Finding], path: Path) -> str:
     grouped_findings = _html_render_grouped_findings(sorted_category_names, category_groups, root)
     table = _html_render_findings_table(findings, root)
 
-    health_color = (
-        "#ef4444" if health_status == "High Risk"
-        else "#f59e0b" if health_status == "Moderate Risk"
-        else "#0d9488" if health_status == "Healthy"
-        else "#6b7280"
-    )
-
     return f"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Robot Framework Suite Health Report</title>
-  <!-- Google Fonts — optional; omitting these in offline environments degrades to the system font stack below -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
     :root {{
-      --accent:      #0d9488;
-      --accent-dark: #0a7a70;
-      --accent-glow: #e6f7f5;
-      --ink:         #1c1f26;
-      --paper:       #f4f5f7;
-      --dark-card:   #22262f;
-      --muted:       #6b7280;
-      --border:      #d1d5db;
-      --warm:        #eaecef;
+      --health-color: {hc};
+      --health-color-bg: {hc_bg};
+      --health-color-border: {hc_border};
+      --health-color-glow: {hc_glow};
     }}
-    *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
-    body {{
-      font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: var(--paper);
-      color: var(--ink);
-      line-height: 1.6;
-      -webkit-font-smoothing: antialiased;
-    }}
-    main {{ max-width: 1100px; margin: 0 auto; padding: 2.5rem 1.5rem; }}
-
-    /* ── Cover ─────────────────────────────────────────────── */
-    .cover {{
-      background: var(--dark-card);
-      border-radius: 20px;
-      padding: 2.5rem 2rem;
-      margin-bottom: 1.5rem;
-      position: relative;
-      overflow: hidden;
-    }}
-    .cover::before {{
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(ellipse 60% 80% at 100% 0%, rgba(13,148,136,.35) 0%, transparent 70%);
-      pointer-events: none;
-    }}
-    .cover-eyebrow {{
-      font-family: 'Space Mono', ui-monospace, 'Cascadia Code', 'Fira Mono', monospace;
-      font-size: .7rem;
-      letter-spacing: .12em;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: .5rem;
-    }}
-    .cover h1 {{
-      font-size: 1.75rem;
-      font-weight: 700;
-      color: #fff;
-      margin-bottom: .25rem;
-    }}
-    .cover h2 {{
-      font-size: 1rem;
-      font-weight: 400;
-      color: rgba(255,255,255,.65);
-      margin-bottom: 1rem;
-    }}
-    .cover-meta {{
-      font-family: 'Space Mono', ui-monospace, 'Cascadia Code', 'Fira Mono', monospace;
-      font-size: .72rem;
-      color: rgba(255,255,255,.45);
-      line-height: 1.8;
-    }}
-
-    /* ── Panel ─────────────────────────────────────────────── */
-    .panel {{
-      background: #fff;
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 1.5rem 1.75rem;
-      margin-bottom: 1.25rem;
-    }}
-    .panel h2 {{
-      font-size: 1rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .06em;
-      color: var(--muted);
-      margin-bottom: 1rem;
-      padding-bottom: .5rem;
-      border-bottom: 1px solid var(--warm);
-    }}
-    .panel p {{ color: var(--ink); margin-bottom: .6rem; }}
-    .panel p:last-child {{ margin-bottom: 0; }}
-
-    /* ── Health badge ──────────────────────────────────────── */
-    .health-badge {{
-      display: inline-flex;
-      align-items: center;
-      gap: .5rem;
-      padding: .45rem 1rem;
-      border-radius: 999px;
-      font-family: 'Space Mono', ui-monospace, 'Cascadia Code', 'Fira Mono', monospace;
-      font-size: .85rem;
-      font-weight: 700;
-      background: {health_color}1a;
-      color: {health_color};
-      border: 1.5px solid {health_color}55;
-    }}
-    .health-dot {{
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: {health_color};
-      box-shadow: 0 0 0 3px {health_color}33;
-    }}
-
-    /* ── Metric cards bento grid ───────────────────────────── */
-    .bento {{
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-      gap: .75rem;
-      margin-top: .5rem;
-    }}
-    .metric-card {{
-      background: var(--paper);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1rem;
-      transition: border-color .15s;
-    }}
-    .metric-card:hover {{ border-color: var(--accent); }}
-    .metric-card .metric-label {{
-      font-family: 'Space Mono', ui-monospace, 'Cascadia Code', 'Fira Mono', monospace;
-      font-size: .68rem;
-      letter-spacing: .06em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: .35rem;
-    }}
-    .metric-card .metric-value {{
-      font-size: 1.75rem;
-      font-weight: 700;
-      color: var(--ink);
-      line-height: 1;
-    }}
-    .metric-card.accent {{ border-color: var(--accent); background: var(--accent-glow); }}
-    .metric-card.accent .metric-value {{ color: var(--accent-dark); }}
-
-    /* ── Category cards ────────────────────────────────────── */
-    .category-grid {{
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: .75rem;
-      margin-top: .5rem;
-    }}
-    .category-card {{
-      background: var(--paper);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1rem 1.25rem;
-      transition: box-shadow .15s, border-color .15s;
-    }}
-    .category-card:hover {{
-      border-color: var(--accent);
-      box-shadow: 0 4px 16px rgba(13,148,136,.1);
-    }}
-    .category-card h3 {{
-      font-size: .9rem;
-      font-weight: 700;
-      color: var(--ink);
-      margin-bottom: .5rem;
-    }}
-    .category-card p {{
-      font-size: .82rem;
-      color: var(--muted);
-      margin-bottom: .35rem;
-      line-height: 1.5;
-    }}
-    .category-card strong {{ color: var(--ink); }}
-
-    /* ── Action items ──────────────────────────────────────── */
-    ol {{ padding-left: 1.25rem; }}
-    ol li {{
-      padding: .4rem 0;
-      font-size: .9rem;
-      color: var(--ink);
-      border-bottom: 1px solid var(--warm);
-    }}
-    ol li:last-child {{ border-bottom: none; }}
-
-    /* ── Finding cards ─────────────────────────────────────── */
-    section.finding-section {{ margin-bottom: 1rem; }}
-    section.finding-section h3 {{
-      font-size: .85rem;
-      font-weight: 700;
-      color: var(--accent-dark);
-      margin-bottom: .5rem;
-      padding: .25rem .6rem;
-      background: var(--accent-glow);
-      border-radius: 6px;
-      display: inline-block;
-    }}
-    .finding-card {{
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: .75rem 1rem;
-      margin-bottom: .5rem;
-      background: #fff;
-      transition: border-color .15s;
-    }}
-    .finding-card:hover {{ border-color: var(--accent); }}
-    .finding-card p {{ font-size: .85rem; color: var(--muted); margin-top: .35rem; }}
-    .finding-card .finding-loc {{
-      font-family: 'Space Mono', ui-monospace, 'Cascadia Code', 'Fira Mono', monospace;
-      font-size: .75rem;
-      color: var(--muted);
-    }}
-
-    /* ── Severity chips ────────────────────────────────────── */
-    .sev {{
-      display: inline-block;
-      padding: .15rem .5rem;
-      border-radius: 6px;
-      font-family: 'Space Mono', ui-monospace, 'Cascadia Code', 'Fira Mono', monospace;
-      font-size: .68rem;
-      font-weight: 700;
-      letter-spacing: .04em;
-    }}
-    .sev-error   {{ background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }}
-    .sev-warning {{ background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }}
-    .sev-info    {{ background: var(--accent-glow); color: var(--accent-dark); border: 1px solid #99d9d4; }}
-
-    /* ── Table ─────────────────────────────────────────────── */
-    .table-wrap {{ overflow-x: auto; margin-top: .75rem; }}
-    table {{ border-collapse: collapse; width: 100%; font-size: .82rem; }}
-    th, td {{ border: 1px solid var(--border); padding: .55rem .75rem; text-align: left; vertical-align: top; }}
-    th {{
-      background: var(--warm);
-      font-family: 'Space Mono', ui-monospace, 'Cascadia Code', 'Fira Mono', monospace;
-      font-size: .68rem;
-      text-transform: uppercase;
-      letter-spacing: .06em;
-      color: var(--muted);
-      font-weight: 700;
-    }}
-    tr:hover td {{ background: var(--accent-glow); }}
-
-    /* ── No findings ───────────────────────────────────────── */
-    .no-findings {{
-      display: flex;
-      align-items: center;
-      gap: .75rem;
-      padding: 1rem 1.25rem;
-      background: var(--accent-glow);
-      border: 1px solid #99d9d4;
-      border-radius: 10px;
-      color: var(--accent-dark);
-      font-weight: 600;
-    }}
-    .no-findings::before {{ content: "✓"; font-size: 1.1rem; }}
+{_HTML_STYLES}
   </style>
 </head>
 <body>

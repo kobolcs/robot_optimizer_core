@@ -25,6 +25,7 @@ Example:
 from __future__ import annotations
 
 import sys
+from enum import StrEnum, auto
 from typing import ClassVar
 
 if sys.version_info >= (3, 12):
@@ -32,6 +33,7 @@ if sys.version_info >= (3, 12):
 else:
     from typing_extensions import override
 
+from ..config.settings import get_settings
 from ..di import get_container
 from ..domain.entities import TestFile
 from ..domain.repositories import TestResultRepository
@@ -46,7 +48,18 @@ from ..domain.value_objects import (
 from ..exceptions import ConfigurationError, RepositoryError
 from .base import BaseAnalyzer, ConfigValue
 
-__all__ = ["FlakinessAnalyzer"]
+__all__ = ["FlakinessAnalyzer", "FlakinessCategory"]
+
+
+class FlakinessCategory(StrEnum):
+    """Categorizes the likely root cause of test flakiness."""
+
+    LOGIC_ISSUE = auto()
+    UI_TIMING = auto()
+    API_TIMING = auto()
+    DATABASE_TIMING = auto()
+    FILE_OPERATION = auto()
+    TIMING_ISSUE = auto()
 
 
 class FlakinessAnalyzer(BaseAnalyzer):
@@ -92,7 +105,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
         self._days_back = self.get_config_value("days_back", 30)
         _need_settings = "failure_threshold" not in self.config or "min_runs" not in self.config
         if _need_settings:
-            _s = get_container().resolve("settings")
+            _s = get_settings()
             _default_failure = _s.flakiness_threshold
             _default_runs = _s.flakiness_min_runs
         else:
@@ -280,7 +293,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
             failures=stats.failures,
             last_failure=stats.last_failure.isoformat() if stats.last_failure else None,
             time_wasted_hours=time_wasted,
-            flakiness_category=self._categorize_flakiness(stats, test_file),
+            flakiness_category=self._categorize_flakiness(stats, test_file).value,
             trend=stats.trend,
         )
 
@@ -356,40 +369,37 @@ class FlakinessAnalyzer(BaseAnalyzer):
 
         return None
 
-    def _categorize_flakiness(self, stats: FlakinessStats, test_file: TestFile) -> str:
-        """Categorize the type of flakiness using pattern matching.
+    def _categorize_flakiness(
+        self, stats: FlakinessStats, test_file: TestFile
+    ) -> FlakinessCategory:
+        """Categorize the likely root cause of flakiness.
 
-        This is a simple categorization. The Pro version provides
-        more sophisticated root cause analysis.
+        This is a simple heuristic. The Pro version provides more sophisticated
+        root cause analysis.
 
         Args:
             stats: Flakiness statistics.
             test_file: The test file.
 
         Returns:
-            Flakiness category.
+            FlakinessCategory enum value.
         """
         rate = stats.failure_rate
         test_lower = stats.test_name.lower()
 
-        # High failure rate - likely logic issue
         if rate > 0.5:
-            return "logic_issue"
+            return FlakinessCategory.LOGIC_ISSUE
 
-        # Check test name for hints
-        match test_lower:
-            case name if any(
-                word in name for word in ["ui", "click", "element", "page"]
-            ):
-                return "ui_timing"
-            case name if any(word in name for word in ["api", "request", "response"]):
-                return "api_timing"
-            case name if any(word in name for word in ["database", "db", "query"]):
-                return "database_timing"
-            case name if any(word in name for word in ["file", "upload", "download"]):
-                return "file_operation"
-            case _:
-                return "timing_issue"
+        _NAME_HINTS: list[tuple[FlakinessCategory, list[str]]] = [
+            (FlakinessCategory.UI_TIMING, ["ui", "click", "element", "page"]),
+            (FlakinessCategory.API_TIMING, ["api", "request", "response"]),
+            (FlakinessCategory.DATABASE_TIMING, ["database", "db", "query"]),
+            (FlakinessCategory.FILE_OPERATION, ["file", "upload", "download"]),
+        ]
+        for category, keywords in _NAME_HINTS:
+            if any(word in test_lower for word in keywords):
+                return category
+        return FlakinessCategory.TIMING_ISSUE
 
     @override
     def validate_config(self) -> None:

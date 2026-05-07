@@ -20,7 +20,6 @@ __all__ = [
     "ServiceLifetime",
     "ThreadSafeContainer",
     "get_container",
-    "get_thread_safe_container",
     "reset_container",
 ]
 

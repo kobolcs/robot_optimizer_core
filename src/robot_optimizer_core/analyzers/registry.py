@@ -44,10 +44,6 @@ __all__ = [
 
 logger = get_logger(__name__)
 
-# Alias needed because AnalyzerRegistry defines a method named `list`, which
-# shadows the builtin inside the class body and breaks return-type annotations.
-_list = list
-
 
 def _iter_analyzer_entry_points() -> list[EntryPoint]:
     """Return analyzer entry points for the canonical group."""
@@ -214,7 +210,7 @@ class AnalyzerRegistry:
             "tags": ", ".join(analyzer.tags) if analyzer.tags else "",
         }
 
-    def get_default_analyzers(self) -> _list[BaseAnalyzer]:
+    def get_default_analyzers(self) -> list[BaseAnalyzer]:
         """Get default analyzer instances.
 
         Returns:
@@ -222,7 +218,7 @@ class AnalyzerRegistry:
         """
         return [self.get(name) for name in self.default_analyzers]
 
-    def set_default_analyzers(self, names: _list[str]) -> None:
+    def set_default_analyzers(self, names: list[str]) -> None:
         """Set the default analyzers.
 
         Args:

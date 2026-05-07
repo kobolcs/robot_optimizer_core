@@ -33,7 +33,7 @@ if sys.version_info >= (3, 12):
 else:
     from typing_extensions import override
 
-from ..di import get_container
+from ..config.settings import get_settings
 from ..domain.entities import TestFile
 from ..domain.value_objects import (
     Finding,
@@ -132,7 +132,7 @@ class SleepDetectorAnalyzer(BaseAnalyzer):
         super().__init__(config)
 
         if "severity_thresholds" not in self.config:
-            max_acceptable = get_container().resolve("settings").max_acceptable_sleep_seconds
+            max_acceptable = get_settings().max_acceptable_sleep_seconds
             self._severity_thresholds: dict[str, float] = {
                 "info": max_acceptable,
                 "warning": max_acceptable * 5,
