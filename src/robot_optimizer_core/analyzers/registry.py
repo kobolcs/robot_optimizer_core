@@ -21,6 +21,7 @@ Example:
 
 from __future__ import annotations
 
+import builtins
 from importlib.metadata import EntryPoint, entry_points
 from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
@@ -210,7 +211,7 @@ class AnalyzerRegistry:
             "tags": ", ".join(analyzer.tags) if analyzer.tags else "",
         }
 
-    def get_default_analyzers(self) -> list[BaseAnalyzer]:
+    def get_default_analyzers(self) -> builtins.list[BaseAnalyzer]:
         """Get default analyzer instances.
 
         Returns:
@@ -218,7 +219,7 @@ class AnalyzerRegistry:
         """
         return [self.get(name) for name in self.default_analyzers]
 
-    def set_default_analyzers(self, names: list[str]) -> None:
+    def set_default_analyzers(self, names: builtins.list[str]) -> None:
         """Set the default analyzers.
 
         Args:

@@ -37,7 +37,7 @@ import time
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Literal, TypedDict
+from typing import TYPE_CHECKING, Any, Callable, Literal, TypedDict, cast
 
 from .di import get_container
 from .domain.entities import TestFile
@@ -588,7 +588,7 @@ def _execute_directory_analysis(
 
 def _create_analyzer_instance(name: str) -> BaseAnalyzer:
     """Create a fresh analyzer instance for each analysis execution."""
-    return get_container().resolve("analyzer_registry").create(name)
+    return cast("BaseAnalyzer", get_container().resolve("analyzer_registry").create(name))
 
 
 def _get_analyzer_instances(
