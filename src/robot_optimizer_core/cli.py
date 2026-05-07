@@ -193,7 +193,7 @@ def _html_category_metadata(pattern_name: str) -> tuple[str, str, str]:
             "Normalize tag taxonomy and enforce conventions in review checks.",
         ),
         (
-            ("naming", "camelcase"),
+            ("naming", "camelcase", "camel_case"),
             "Readability / consistency risk",
             "Naming inconsistency reduces readability and increases review friction.",
             "Adopt naming standards and align keywords/tests incrementally.",
@@ -229,7 +229,8 @@ def _html_compute_stats(
 
     def _display_path(file_path: Path) -> str:
         try:
-            return str(file_path.resolve().relative_to(path.resolve()))
+            root = path.resolve() if path.is_dir() else path.parent.resolve()
+            return str(file_path.resolve().relative_to(root))
         except ValueError:
             return str(file_path)
 
@@ -255,7 +256,8 @@ def _html_compute_stats(
 def _format_html(findings: list[Finding], path: Path) -> str:
     def _display_path(file_path: Path) -> str:
         try:
-            return str(file_path.resolve().relative_to(path.resolve()))
+            root = path.resolve() if path.is_dir() else path.parent.resolve()
+            return str(file_path.resolve().relative_to(root))
         except ValueError:
             return str(file_path)
 
@@ -336,7 +338,7 @@ def _format_html(findings: list[Finding], path: Path) -> str:
     for label, matcher in recommended_actions:
         if matcher == "tag|naming":
             is_relevant = any(
-                any(part in f.pattern.name.lower() for part in ("tag", "naming"))
+                any(part in f.pattern.name.lower() for part in ("tag", "naming", "camel_case"))
                 for f in findings
             )
         else:

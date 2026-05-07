@@ -22,7 +22,7 @@ class _MinimalAnalyzer(BaseAnalyzer):
     def description(self) -> str:
         return "minimal"
 
-    def analyze(self, test_file: TestFile) -> list[Finding]:
+    def analyze(self, _test_file: TestFile) -> list[Finding]:
         return []
 
 

@@ -21,6 +21,7 @@ from robot_optimizer_core import (
     Settings,
     SleepDetector,
     TestFile,
+    analyze_directory,
     analyze_file,
     get_analyzer_registry,
     register_analyzer,
@@ -363,7 +364,7 @@ class TestRegistryResetIntegration:
         from robot_optimizer_core.analyzers.registry import reset_registry
 
         f = tmp_path / "sample.robot"
-        f.write_bytes("*** Test Cases ***\nT\n    Log    ok\n".encode("utf-8"))
+        f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
 
         reset_registry()
         findings = analyze_file(f, analyzers=["dead_code"])
@@ -459,7 +460,7 @@ class TestFailFastIntegration:
         """fail_fast=True should surface the first error and stop."""
         # Create a valid file and a binary file that will fail parsing
         valid = temp_dir / "a_valid.robot"
-        valid.write_bytes("*** Test Cases ***\nT\n    Log    hi\n".encode("utf-8"))
+        valid.write_bytes(b"*** Test Cases ***\nT\n    Log    hi\n")
         bad = temp_dir / "b_bad.robot"
         bad.write_bytes(b"\x00\x01\x02\x03\xff")  # binary → parse error
 
@@ -540,19 +541,23 @@ class TestResetContainerIntegration:
 @pytest.mark.integration
 class TestSleepDetectorAnalyzerIntegration:
     def test_alias_and_canonical_produce_same_findings(self, sample_robot_file: Path) -> None:
-        from robot_optimizer_core.analyzers.sleep_detector import SleepDetector, SleepDetectorAnalyzer
+        from robot_optimizer_core.analyzers.sleep_detector import (
+            SleepDetector,
+            SleepDetectorAnalyzer,
+        )
 
         tf = TestFile.from_path(sample_robot_file)
         f1 = SleepDetector().safe_analyze(tf)
         f2 = SleepDetectorAnalyzer().safe_analyze(tf)
         assert len(f1) == len(f2)
-        for a, b in zip(f1, f2):
+        for a, b in zip(f1, f2, strict=True):
             assert a.pattern == b.pattern
             assert a.location == b.location
             assert a.severity == b.severity
 
     def test_explicit_config_skips_settings_call(self) -> None:
         from unittest.mock import patch
+
         from robot_optimizer_core.analyzers.sleep_detector import SleepDetectorAnalyzer
 
         cfg = {'severity_thresholds': {'info': 0.5, 'warning': 2.0, 'error': float('inf')}}

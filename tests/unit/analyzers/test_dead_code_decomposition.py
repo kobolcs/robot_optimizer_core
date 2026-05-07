@@ -55,3 +55,19 @@ class TestDeadCodeWalkDecomposition:
         class FakeItem:
             pass
         assert list(self.analyzer._iter_nested_bodies(FakeItem())) == []
+
+    def test_iter_nested_bodies_next_chain(self) -> None:
+        """RF 7.1+ Try.next chain: EXCEPT/ELSE/FINALLY branches linked via .next."""
+        class Branch:
+            def __init__(self, body: list, nxt: object = None) -> None:
+                self.body = body
+                self.next = nxt
+
+        class TryItem:
+            body = ["try_body"]
+            next = Branch(["except_body"], Branch(["finally_body"]))
+
+        results = list(self.analyzer._iter_nested_bodies(TryItem()))
+        assert ["try_body"] in results
+        assert ["except_body"] in results
+        assert ["finally_body"] in results

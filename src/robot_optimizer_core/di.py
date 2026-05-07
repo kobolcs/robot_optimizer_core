@@ -331,8 +331,6 @@ def reset_container() -> None:
     """
     global _global_container
     with _global_container_lock:
-        if _global_container is not None:
-            _global_container.clear()
         _global_container = None
 
 

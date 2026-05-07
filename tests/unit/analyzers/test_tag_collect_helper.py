@@ -28,7 +28,8 @@ class TestCollectTagInfo:
         name, line_num, tags = result[0]
         assert name == "My Test"
         assert line_num == 2
-        assert "smoke" in tags and "regression" in tags
+        assert "smoke" in tags
+        assert "regression" in tags
 
     def test_multiple_tests(self) -> None:
         lines = [
