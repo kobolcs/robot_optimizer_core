@@ -35,9 +35,10 @@ import functools
 import os
 import time
 import warnings
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Literal, TypedDict, cast
+from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
 
 from .di import get_container
 from .domain.entities import TestFile
