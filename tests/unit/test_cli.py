@@ -10,8 +10,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from robot_optimizer_core.cli import (
+    _PATTERN_CATEGORY_DEFAULT,
+    _PATTERN_CATEGORY_MAP,
     _format_html,
     _format_sarif,
+    _html_category_metadata,
     _html_display_path,
     _html_health_status,
     _html_render_action_items,
@@ -604,3 +607,57 @@ class TestHtmlRenderGroupedFindings:
         f = _make_finding(file_path=tmp_path / "a.robot", message="Bad <tag>")
         result = _html_render_grouped_findings(["C"], {"C": [f]}, tmp_path)
         assert "Bad &lt;tag&gt;" in result
+
+
+# ---------------------------------------------------------------------------
+# _html_category_metadata / _PATTERN_CATEGORY_MAP
+# ---------------------------------------------------------------------------
+
+
+def _first_keyword(entry: tuple) -> str:
+    """Return the first keyword string from a _PATTERN_CATEGORY_MAP entry."""
+    return entry[0][0]
+
+
+class TestHtmlCategoryMetadata:
+    @pytest.mark.parametrize("entry", _PATTERN_CATEGORY_MAP)
+    def test_keyword_match_returns_correct_tuple(
+        self, entry: tuple[tuple[str, ...], str, str, str]
+    ) -> None:
+        keywords, category, impact, action = entry
+        result = _html_category_metadata(keywords[0])
+        assert result == (category, impact, action)
+
+    @pytest.mark.parametrize("entry", _PATTERN_CATEGORY_MAP)
+    def test_keyword_match_is_case_insensitive(
+        self, entry: tuple[tuple[str, ...], str, str, str]
+    ) -> None:
+        keywords, category, impact, action = entry
+        result = _html_category_metadata(keywords[0].upper())
+        assert result == (category, impact, action)
+
+    def test_all_keywords_in_each_entry_match(self) -> None:
+        for keywords, category, impact, action in _PATTERN_CATEGORY_MAP:
+            for kw in keywords:
+                assert _html_category_metadata(kw) == (category, impact, action)
+                assert _html_category_metadata(kw.upper()) == (category, impact, action)
+
+    def test_no_keyword_match_returns_default(self) -> None:
+        result = _html_category_metadata("zzz_no_such_pattern_zzz")
+        assert result == _PATTERN_CATEGORY_DEFAULT
+
+    def test_partial_keyword_match_within_pattern_name(self) -> None:
+        # "sleep" keyword should match a pattern name containing "sleep"
+        category, impact, action = _html_category_metadata("Sleep in Test Case")
+        assert category  # non-empty
+        assert impact
+        assert action
+
+    def test_integration_category_cards_contain_metadata(self, tmp_path: Path) -> None:
+        # Pattern name is "Sleep in Test Case" — "sleep" keyword triggers the first entry
+        keywords, category, impact, action = _PATTERN_CATEGORY_MAP[0]
+        top_categories = [(category, {"count": 1, "impact": impact, "action": action})]
+        html = _html_render_category_cards(top_categories)  # type: ignore[arg-type]
+        assert category in html
+        assert impact in html
+        assert action in html
