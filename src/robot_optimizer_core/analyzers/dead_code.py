@@ -57,6 +57,7 @@ class _UnreachableState:
         self.in_keyword = False
         self.found_return = False
         self.control_depth = 0
+        self.current_keyword = None
 
     def enter_keyword(self, name: str) -> None:
         self.in_keyword = True
@@ -68,6 +69,7 @@ class _UnreachableState:
         self.in_keyword = False
         self.found_return = False
         self.control_depth = 0
+        self.current_keyword = None
 
 
 def _match_prefixes(call: str, keyword_names: set[str], calls: set[str]) -> None:
@@ -569,6 +571,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                 continue
 
             if state.found_return:
+                assert state.current_keyword is not None
                 pattern = Pattern(
                     type=PatternType.UNREACHABLE_CODE,
                     name="Unreachable Code",

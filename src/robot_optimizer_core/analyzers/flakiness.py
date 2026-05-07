@@ -157,6 +157,14 @@ class FlakinessAnalyzer(BaseAnalyzer):
 
     requires_external_repo: ClassVar[bool] = True
 
+    # Heuristic keyword → category mapping used by _categorize_flakiness.
+    _NAME_HINTS: ClassVar[list[tuple[FlakinessCategory, list[str]]]] = [
+        (FlakinessCategory.UI_TIMING, ["ui", "click", "element", "page"]),
+        (FlakinessCategory.API_TIMING, ["api", "request", "response"]),
+        (FlakinessCategory.DATABASE_TIMING, ["database", "db", "query"]),
+        (FlakinessCategory.FILE_OPERATION, ["file", "upload", "download"]),
+    ]
+
     @override
     def analyze(self, test_file: TestFile) -> list[Finding]:
         """Analyze test file for flaky tests.
@@ -370,33 +378,25 @@ class FlakinessAnalyzer(BaseAnalyzer):
         return None
 
     def _categorize_flakiness(
-        self, stats: FlakinessStats, test_file: TestFile
+        self, stats: FlakinessStats, _test_file: TestFile
     ) -> FlakinessCategory:
         """Categorize the likely root cause of flakiness.
 
         This is a simple heuristic. The Pro version provides more sophisticated
-        root cause analysis.
+        root cause analysis using _test_file for AST-level analysis.
 
         Args:
             stats: Flakiness statistics.
-            test_file: The test file.
+            _test_file: Reserved for Pro root-cause analysis.
 
         Returns:
             FlakinessCategory enum value.
         """
-        rate = stats.failure_rate
-        test_lower = stats.test_name.lower()
-
-        if rate > 0.5:
+        if stats.failure_rate > 0.5:
             return FlakinessCategory.LOGIC_ISSUE
 
-        _NAME_HINTS: list[tuple[FlakinessCategory, list[str]]] = [
-            (FlakinessCategory.UI_TIMING, ["ui", "click", "element", "page"]),
-            (FlakinessCategory.API_TIMING, ["api", "request", "response"]),
-            (FlakinessCategory.DATABASE_TIMING, ["database", "db", "query"]),
-            (FlakinessCategory.FILE_OPERATION, ["file", "upload", "download"]),
-        ]
-        for category, keywords in _NAME_HINTS:
+        test_lower = stats.test_name.lower()
+        for category, keywords in self._NAME_HINTS:
             if any(word in test_lower for word in keywords):
                 return category
         return FlakinessCategory.TIMING_ISSUE

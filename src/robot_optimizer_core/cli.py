@@ -512,6 +512,7 @@ _HEALTH_COLORS: dict[str, tuple[str, str, str, str]] = {
     "High Risk":     ("#ef4444", "#ef44441a", "#ef444455", "#ef444433"),
     "Moderate Risk": ("#f59e0b", "#f59e0b1a", "#f59e0b55", "#f59e0b33"),
     "Healthy":       ("#0d9488", "#0d94881a", "#0d948855", "#0d948833"),
+    "Low Risk":      ("#0d9488", "#0d94881a", "#0d948855", "#0d948833"),
 }
 _HEALTH_COLOR_DEFAULT = ("#6b7280", "#6b72801a", "#6b728055", "#6b728033")
 
