@@ -56,18 +56,37 @@ class TestDeadCodeWalkDecomposition:
             pass
         assert list(self.analyzer._iter_nested_bodies(FakeItem())) == []
 
-    def test_iter_nested_bodies_next_chain(self) -> None:
-        """RF 7.1+ Try.next chain: EXCEPT/ELSE/FINALLY branches linked via .next."""
-        class Branch:
-            def __init__(self, body: list, nxt: object = None) -> None:
-                self.body = body
-                self.next = nxt
-
-        class TryItem:
+    def test_iter_nested_bodies_try_linked_list(self) -> None:
+        """Test that Try nodes are walked via .next linked list (RF 7.1+)."""
+        class FakeTryNode:
+            type = "TRY"
             body = ["try_body"]
-            next = Branch(["except_body"], Branch(["finally_body"]))
+            next = None
+            finalbody = None
 
-        results = list(self.analyzer._iter_nested_bodies(TryItem()))
-        assert ["try_body"] in results
-        assert ["except_body"] in results
-        assert ["finally_body"] in results
+        class FakeExceptNode:
+            type = "TRY"
+            body = ["except_body"]
+            next = None
+            finalbody = None
+
+        class FakeFinallyNode:
+            type = "TRY"
+            body = ["finally_body"]
+            next = None
+            finalbody = ["finalbody_content"]
+
+        # Link them together: TRY -> EXCEPT -> FINALLY
+        try_node = FakeTryNode()
+        except_node = FakeExceptNode()
+        finally_node = FakeFinallyNode()
+        try_node.next = except_node
+        except_node.next = finally_node
+
+        # Collect all yielded bodies
+        bodies = list(self.analyzer._iter_nested_bodies(try_node))
+        # Should yield: try body, except body, finally body, finalbody
+        assert ["try_body"] in bodies
+        assert ["except_body"] in bodies
+        assert ["finally_body"] in bodies
+        assert ["finalbody_content"] in bodies
