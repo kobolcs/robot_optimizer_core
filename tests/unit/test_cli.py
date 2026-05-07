@@ -9,7 +9,17 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from robot_optimizer_core.cli import _format_html, _format_sarif, _html_display_path, main
+from robot_optimizer_core.cli import (
+    _format_html,
+    _format_sarif,
+    _html_display_path,
+    _html_health_status,
+    _html_render_action_items,
+    _html_render_category_cards,
+    _html_render_findings_table,
+    _html_render_grouped_findings,
+    main,
+)
 from robot_optimizer_core.domain.value_objects import Finding, Severity
 from robot_optimizer_core.domain.value_objects.location import Location
 from robot_optimizer_core.domain.value_objects.pattern import Pattern, PatternType
@@ -264,7 +274,7 @@ class TestHtmlFormat:
         assert "Health status" in html
         assert "Recommended actions" in html
         assert "Appendix — Detailed Findings" in html
-        assert "Total findings: 1" in html
+        assert "Total findings: <strong>1</strong>" in html
         assert "suite.robot" in html
         assert "Use &lt;wait&gt;" in html
         assert str((suite_dir / "suite.robot").resolve()) not in html
@@ -310,7 +320,8 @@ class TestHtmlFormat:
         ]
 
         html = _format_html(findings, tmp_path)
-        assert "<strong>Auto-fixable findings</strong><div>1</div>" in html
+        assert "Auto-fixable findings" in html
+        assert ">1<" in html
 
 
 class TestUpgradeCommand:
@@ -417,3 +428,179 @@ class TestSarifFormat:
         rule_ids = [r["id"] for r in rules]
         assert len(rule_ids) == len(set(rule_ids)), "Duplicate rule IDs found"
         assert rule_ids == sorted(rule_ids), "Rules are not sorted"
+
+
+# ---------------------------------------------------------------------------
+# _html_health_status
+# ---------------------------------------------------------------------------
+
+
+class TestHtmlHealthStatus:
+    def _counts(self, error: int = 0, warning: int = 0, info: int = 0) -> dict[str, int]:
+        return {"ERROR": error, "WARNING": warning, "INFO": info}
+
+    def test_high_risk_on_any_error(self) -> None:
+        assert _html_health_status(self._counts(error=1), []) == "High Risk"
+
+    def test_high_risk_on_ten_or_more_warnings(self) -> None:
+        assert _html_health_status(self._counts(warning=10), []) == "High Risk"
+
+    def test_moderate_risk_on_some_warnings(self) -> None:
+        assert _html_health_status(self._counts(warning=3), []) == "Moderate Risk"
+
+    def test_healthy_when_no_findings(self) -> None:
+        assert _html_health_status(self._counts(), []) == "Healthy"
+
+    def test_low_risk_on_few_info_findings(self, tmp_path: Path) -> None:
+        findings = [_make_finding(tmp_path / "a.robot", severity=Severity.INFO) for _ in range(3)]
+        assert _html_health_status(self._counts(), findings) == "Low Risk"
+
+    def test_moderate_risk_on_many_info_findings(self, tmp_path: Path) -> None:
+        findings = [_make_finding(tmp_path / "a.robot", severity=Severity.INFO) for _ in range(6)]
+        assert _html_health_status(self._counts(), findings) == "Moderate Risk"
+
+
+# ---------------------------------------------------------------------------
+# _html_render_category_cards
+# ---------------------------------------------------------------------------
+
+
+class TestHtmlRenderCategoryCards:
+    def test_empty_list_returns_empty_string(self) -> None:
+        assert _html_render_category_cards([]) == ""
+
+    def test_renders_category_name_and_count(self) -> None:
+        cards = _html_render_category_cards(
+            [("Stability / flakiness risk", {"count": 3, "impact": "High", "action": "Fix it"})]
+        )
+        assert "Stability / flakiness risk" in cards
+        assert "<strong>3</strong>" in cards
+
+    def test_escapes_html_in_category(self) -> None:
+        cards = _html_render_category_cards(
+            [("<script>", {"count": 1, "impact": "x", "action": "y"})]
+        )
+        assert "<script>" not in cards
+        assert "&lt;script&gt;" in cards
+
+    def test_multiple_categories_all_rendered(self) -> None:
+        cats = [
+            ("Cat A", {"count": 1, "impact": "i1", "action": "a1"}),
+            ("Cat B", {"count": 2, "impact": "i2", "action": "a2"}),
+        ]
+        result = _html_render_category_cards(cats)
+        assert "Cat A" in result
+        assert "Cat B" in result
+
+
+# ---------------------------------------------------------------------------
+# _html_render_action_items
+# ---------------------------------------------------------------------------
+
+
+class TestHtmlRenderActionItems:
+    def _finding_with_pattern_name(self, name: str, tmp_path: Path) -> Finding:
+        pattern = Pattern(
+            type=PatternType.SLEEP_IN_TEST,
+            name=name,
+            description="desc",
+            recommendation="rec",
+        )
+        return Finding.create(
+            pattern=pattern,
+            severity=Severity.WARNING,
+            location=Location(file_path=tmp_path / "a.robot", line=1),
+            message="msg",
+        )
+
+    def test_no_findings_returns_empty(self) -> None:
+        assert _html_render_action_items([]) == ""
+
+    def test_sleep_finding_triggers_explicit_waits_item(self, tmp_path: Path) -> None:
+        f = self._finding_with_pattern_name("Sleep in Test Case", tmp_path)
+        result = _html_render_action_items([f])
+        assert "Replace fixed sleeps with explicit waits" in result
+
+    def test_unused_keyword_finding_triggers_item(self, tmp_path: Path) -> None:
+        f = self._finding_with_pattern_name("Unused Keyword detected", tmp_path)
+        result = _html_render_action_items([f])
+        assert "Remove or confirm unused legacy keywords" in result
+
+    def test_hardcoded_finding_triggers_item(self, tmp_path: Path) -> None:
+        f = self._finding_with_pattern_name("Hardcoded URL", tmp_path)
+        result = _html_render_action_items([f])
+        assert "Move hardcoded URLs/config into variables" in result
+
+    def test_irrelevant_finding_not_included(self, tmp_path: Path) -> None:
+        f = self._finding_with_pattern_name("Some Other Pattern", tmp_path)
+        result = _html_render_action_items([f])
+        assert "<li>" not in result
+
+
+# ---------------------------------------------------------------------------
+# _html_render_findings_table
+# ---------------------------------------------------------------------------
+
+
+class TestHtmlRenderFindingsTable:
+    def test_no_findings_returns_empty_string(self, tmp_path: Path) -> None:
+        assert _html_render_findings_table([], tmp_path) == ""
+
+    def test_renders_table_with_finding_data(self, tmp_path: Path) -> None:
+        f = _make_finding(file_path=tmp_path / "suite.robot", line=7)
+        result = _html_render_findings_table([f], tmp_path)
+        assert "<table>" in result
+        assert "suite.robot" in result
+        assert "7" in result
+        assert "WARNING" in result
+
+    def test_rows_sorted_by_file_then_line(self, tmp_path: Path) -> None:
+        f1 = _make_finding(file_path=tmp_path / "b.robot", line=5)
+        f2 = _make_finding(file_path=tmp_path / "a.robot", line=10)
+        f3 = _make_finding(file_path=tmp_path / "a.robot", line=2)
+        result = _html_render_findings_table([f1, f2, f3], tmp_path)
+        pos_a2 = result.index(">2<")
+        pos_a10 = result.index(">10<")
+        pos_b5 = result.index(">5<")
+        assert pos_a2 < pos_a10 < pos_b5
+
+    def test_escapes_html_in_message(self, tmp_path: Path) -> None:
+        f = _make_finding(file_path=tmp_path / "a.robot", message="Use <wait>")
+        result = _html_render_findings_table([f], tmp_path)
+        assert "Use &lt;wait&gt;" in result
+        assert "Use <wait>" not in result
+
+
+# ---------------------------------------------------------------------------
+# _html_render_grouped_findings
+# ---------------------------------------------------------------------------
+
+
+class TestHtmlRenderGroupedFindings:
+    def test_empty_categories_returns_empty_string(self, tmp_path: Path) -> None:
+        assert _html_render_grouped_findings([], {}, tmp_path) == ""
+
+    def test_renders_section_per_category(self, tmp_path: Path) -> None:
+        f = _make_finding(file_path=tmp_path / "a.robot", line=1)
+        result = _html_render_grouped_findings(
+            ["Cat A"], {"Cat A": [f]}, tmp_path
+        )
+        assert "<section" in result
+        assert "Cat A" in result
+
+    def test_findings_within_category_sorted_by_file_line(self, tmp_path: Path) -> None:
+        f1 = _make_finding(file_path=tmp_path / "b.robot", line=1)
+        f2 = _make_finding(file_path=tmp_path / "a.robot", line=5)
+        f3 = _make_finding(file_path=tmp_path / "a.robot", line=2)
+        result = _html_render_grouped_findings(
+            ["All"], {"All": [f1, f2, f3]}, tmp_path
+        )
+        pos_a2 = result.index(":2<")
+        pos_a5 = result.index(":5<")
+        pos_b1 = result.index(":1<")
+        assert pos_a2 < pos_a5 < pos_b1
+
+    def test_escapes_severity_and_message(self, tmp_path: Path) -> None:
+        f = _make_finding(file_path=tmp_path / "a.robot", message="Bad <tag>")
+        result = _html_render_grouped_findings(["C"], {"C": [f]}, tmp_path)
+        assert "Bad &lt;tag&gt;" in result
