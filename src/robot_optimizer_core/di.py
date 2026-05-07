@@ -331,7 +331,11 @@ def reset_container() -> None:
     """
     global _global_container
     with _global_container_lock:
+        old_container = _global_container
         _global_container = None
+    # Clean up the old container outside the lock to avoid mutating live instances
+    if old_container is not None:
+        old_container.clear()
 
 
 def _register_defaults(container: ThreadSafeContainer) -> None:

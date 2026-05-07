@@ -15,6 +15,12 @@ from robot_optimizer_core.domain.entities import TestFile
 from robot_optimizer_core.domain.value_objects import Finding
 
 
+@pytest.fixture(autouse=True)
+def _reset_analyzer_registry() -> None:
+    """Reset the analyzer registry before each test to avoid cross-test pollution."""
+    reset_registry()
+
+
 class ExternalAnalyzer(BaseAnalyzer):
     @property
     def name(self) -> str:
