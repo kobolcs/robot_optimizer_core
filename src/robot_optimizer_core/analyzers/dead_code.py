@@ -219,9 +219,10 @@ class DeadCodeAnalyzer(BaseAnalyzer):
 
             model = get_model(test_file.content)
         except Exception as e:
+            # Fallback: text-based extraction when the AST parse fails.
             self._logger.debug(
-                "AST parse failed, falling back to text extraction",
-                extra={"file": str(test_file.path), "error": str(e)},
+                f"AST parse failed for {test_file.path}, falling back to text-based extraction",
+                extra={"exception": str(e), "exception_type": type(e).__name__},
             )
             return self._extract_keywords_and_calls_text(test_file)
 
@@ -293,7 +294,11 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         return name_str
 
     def _iter_nested_bodies(self, item: object):  # type: ignore[return]
-        """Yield each body list reachable from *item* via body, orelse, or Try.next chain."""
+        """Yield each body list reachable from *item* via body/orelse and Try linked lists.
+
+        Robot Framework 7.1+ represents TRY/EXCEPT/FINALLY as linked Try instances via
+        the .next attribute, not as separate handler/finally_item attributes.
+        """
         body = getattr(item, "body", None)
         if body:
             yield body
@@ -302,13 +307,21 @@ class DeadCodeAnalyzer(BaseAnalyzer):
             orelse_body = getattr(orelse, "body", None)
             if orelse_body:
                 yield orelse_body
-        # RF 7.1+ Try/EXCEPT/ELSE/FINALLY branches are linked via .next (not .handlers/.finally_item)
-        next_branch = getattr(item, "next", None)
-        while next_branch is not None:
-            branch_body = getattr(next_branch, "body", None)
-            if branch_body:
-                yield branch_body
-            next_branch = getattr(next_branch, "next", None)
+        # Robot Framework 7.1+ Try nodes: walk the linked list via .next
+        item_type = getattr(item, "type", None)
+        if item_type == "TRY":
+            current = item
+            while current is not None:
+                # Already yielded the first body above; yield subsequent branches
+                if current is not item:
+                    branch_body = getattr(current, "body", None)
+                    if branch_body:
+                        yield branch_body
+                # Also check for orelse/finalbody in each Try node
+                finalbody = getattr(current, "finalbody", None)
+                if finalbody:
+                    yield finalbody
+                current = getattr(current, "next", None)
 
     def _extract_keywords_and_calls_text(
         self, test_file: TestFile
@@ -357,11 +370,11 @@ class DeadCodeAnalyzer(BaseAnalyzer):
             model = get_model(test_file.content)
             return self._collect_ast_calls(model)
         except Exception as e:
-            self._logger.debug(
-                "AST parse failed, falling back to text extraction",
-                extra={"file": str(test_file.path), "error": str(e)},
-            )
             # Fallback: indented lines from text
+            self._logger.debug(
+                f"AST parse failed for {test_file.path} in _extract_candidate_calls, falling back to text-based extraction",
+                extra={"exception": str(e), "exception_type": type(e).__name__},
+            )
             candidates: list[str] = []
             lines = test_file.content.splitlines()
             in_test_or_keyword = False

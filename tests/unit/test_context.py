@@ -178,23 +178,20 @@ class TestBuiltinAnalyzerRegistration:
     })
 
     def test_all_builtin_analyzers_registered(self) -> None:
-        ctx = create_test_application()
-        ctx.initialize()
-        registered = set(ctx.analyzer_registry.list())
-        missing = self.EXPECTED_BUILTINS - registered
-        assert not missing, f"ApplicationContext missing analyzers: {missing}"
-        ctx.shutdown()
+        with create_test_application() as ctx:
+            ctx.initialize()
+            registered = set(ctx.analyzer_registry.list())
+            missing = self.EXPECTED_BUILTINS - registered
+            assert not missing, f"ApplicationContext missing analyzers: {missing}"
 
     def test_no_builtin_analyzer_is_missing_after_reinit(self) -> None:
-        ctx = create_test_application()
-        ctx.initialize()
-        ctx.shutdown()
-        ctx2 = create_test_application()
-        ctx2.initialize()
-        registered = set(ctx2.analyzer_registry.list())
-        missing = self.EXPECTED_BUILTINS - registered
-        assert not missing, f"Missing after re-init: {missing}"
-        ctx2.shutdown()
+        with create_test_application() as ctx:
+            ctx.initialize()
+        with create_test_application() as ctx2:
+            ctx2.initialize()
+            registered = set(ctx2.analyzer_registry.list())
+            missing = self.EXPECTED_BUILTINS - registered
+            assert not missing, f"Missing after re-init: {missing}"
 
 
 class TestShutdownCleanup:

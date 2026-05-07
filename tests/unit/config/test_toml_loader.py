@@ -48,27 +48,27 @@ class TestTomlLoader:
 
     def test_reads_robot_toml(self, tmp_path: Path) -> None:
         (tmp_path / "robot.toml").write_bytes(
-            "[tool.robot-optimizer]\nmax_acceptable_sleep_seconds = 0.5\n".encode("utf-8")
+            b"[tool.robot-optimizer]\nmax_acceptable_sleep_seconds = 0.5\n"
         )
         settings = load_settings_from_toml(tmp_path)
         assert settings.max_acceptable_sleep_seconds == 0.5
 
     def test_reads_pyproject_toml(self, tmp_path: Path) -> None:
         (tmp_path / "pyproject.toml").write_bytes(
-            "[tool.robot-optimizer]\nmax_acceptable_sleep_seconds = 2.0\n".encode("utf-8")
+            b"[tool.robot-optimizer]\nmax_acceptable_sleep_seconds = 2.0\n"
         )
         settings = load_settings_from_toml(tmp_path)
         assert settings.max_acceptable_sleep_seconds == 2.0
 
     def test_overrides_take_precedence_over_toml(self, tmp_path: Path) -> None:
         (tmp_path / "robot.toml").write_bytes(
-            "[tool.robot-optimizer]\nmax_acceptable_sleep_seconds = 0.5\n".encode("utf-8")
+            b"[tool.robot-optimizer]\nmax_acceptable_sleep_seconds = 0.5\n"
         )
         settings = load_settings_from_toml(tmp_path, max_acceptable_sleep_seconds=5.0)
         assert settings.max_acceptable_sleep_seconds == 5.0
 
     def test_missing_section_gives_defaults(self, tmp_path: Path) -> None:
-        (tmp_path / "robot.toml").write_bytes("[project]\nname = 'foo'\n".encode("utf-8"))
+        (tmp_path / "robot.toml").write_bytes(b"[project]\nname = 'foo'\n")
         settings = load_settings_from_toml(tmp_path)
         # Should fall back to defaults without error
         assert isinstance(settings, Settings)
@@ -86,12 +86,12 @@ class TestTomlLoader:
         self, tmp_path: Path
     ) -> None:
         toml_path = tmp_path / "robot.toml"
-        toml_path.write_bytes("".encode("utf-8"))
+        toml_path.write_bytes(b"")
         assert _read_optimizer_section(toml_path) is None
 
     def test_read_optimizer_section_invalid_toml(self, tmp_path: Path) -> None:
         toml_path = tmp_path / "robot.toml"
-        toml_path.write_bytes("this is not valid toml }{{{".encode("utf-8"))
+        toml_path.write_bytes(b"this is not valid toml }{{{")
         # Should return None without raising
         result = _read_optimizer_section(toml_path)
         assert result is None
@@ -105,7 +105,7 @@ class TestSeverityFilter:
         from robot_optimizer_core import analyze_file
 
         f = tmp_path / "t.robot"
-        f.write_bytes("*** Test Cases ***\nMy Test\n    Sleep    2\n".encode("utf-8"))
+        f.write_bytes(b"*** Test Cases ***\nMy Test\n    Sleep    2\n")
         findings = analyze_file(str(f), severity_filter=Severity.ERROR)
         for finding in findings:
             assert finding.severity <= Severity.ERROR
@@ -114,7 +114,7 @@ class TestSeverityFilter:
         from robot_optimizer_core import analyze_file
 
         f = tmp_path / "t.robot"
-        f.write_bytes("*** Test Cases ***\nMy Test\n    Sleep    10\n".encode("utf-8"))
+        f.write_bytes(b"*** Test Cases ***\nMy Test\n    Sleep    10\n")
         findings = analyze_file(str(f), pattern_filter=["sleep_detector"])
         analyzer_names = {
             f.pattern.type.name

@@ -14,12 +14,14 @@ from pathlib import Path
 
 import pytest
 
-from robot_optimizer_core.analyzers.registry import get_analyzer_registry, reset_registry
+from robot_optimizer_core.analyzers.registry import (
+    get_analyzer_registry,
+    reset_registry,
+)
 from robot_optimizer_core.api import analyze_directory, analyze_file
 from robot_optimizer_core.context import create_test_application
 from robot_optimizer_core.domain.value_objects import PatternType
 from robot_optimizer_core.exceptions import AnalysisError
-
 
 # ---------------------------------------------------------------------------
 # Fix 1: ApplicationContext registers all 8 built-in analyzers
@@ -255,8 +257,11 @@ class TestFailFastBehaviour:
 @pytest.mark.component
 class TestPatternTypeIntegrity:
     def test_naming_convention_emits_camel_case_type(self, tmp_path: Path) -> None:
-        from robot_optimizer_core.analyzers.naming_convention import NamingConventionAnalyzer
         from datetime import UTC, datetime
+
+        from robot_optimizer_core.analyzers.naming_convention import (
+            NamingConventionAnalyzer,
+        )
         from robot_optimizer_core.domain.entities import TestFile
 
         content = '*** Test Cases ***\nLoginPage\n    Log    hi\n'
@@ -267,8 +272,11 @@ class TestPatternTypeIntegrity:
         assert any(fi.pattern.type == PatternType.CAMEL_CASE_NAME for fi in findings)
 
     def test_tag_consistency_emits_semantic_types(self, tmp_path: Path) -> None:
-        from robot_optimizer_core.analyzers.tag_consistency import TagConsistencyAnalyzer
         from datetime import UTC, datetime
+
+        from robot_optimizer_core.analyzers.tag_consistency import (
+            TagConsistencyAnalyzer,
+        )
         from robot_optimizer_core.domain.entities import TestFile
 
         def _tf(name: str, content: str) -> TestFile:
@@ -311,6 +319,9 @@ class TestGlobalStateIsolation:
         assert c1 is not c2
 
     def test_sleep_detector_alias_identity(self) -> None:
-        from robot_optimizer_core.analyzers.sleep_detector import SleepDetector, SleepDetectorAnalyzer
+        from robot_optimizer_core.analyzers.sleep_detector import (
+            SleepDetector,
+            SleepDetectorAnalyzer,
+        )
         assert SleepDetector is SleepDetectorAnalyzer
         assert SleepDetector().name == 'sleep_detector'
