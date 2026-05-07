@@ -21,6 +21,7 @@ from robot_optimizer_core import (
     Settings,
     SleepDetector,
     TestFile,
+    analyze_directory,
     analyze_file,
     get_analyzer_registry,
     register_analyzer,

@@ -131,8 +131,7 @@ class SleepDetectorAnalyzer(BaseAnalyzer):
         """
         super().__init__(config)
 
-        _cfg_thresholds = self.config.get("severity_thresholds")
-        if _cfg_thresholds is None:
+        if "severity_thresholds" not in self.config:
             max_acceptable = get_settings().max_acceptable_sleep_seconds
             self._severity_thresholds: dict[str, float] = {
                 "info": max_acceptable,
@@ -140,7 +139,7 @@ class SleepDetectorAnalyzer(BaseAnalyzer):
                 "error": float("inf"),
             }
         else:
-            self._severity_thresholds = _cfg_thresholds  # type: ignore[assignment]
+            self._severity_thresholds = self.config["severity_thresholds"]  # type: ignore[assignment]
 
         # Configuration
         self._suggest_alternatives = self.get_config_value("suggest_alternatives", True)

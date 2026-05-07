@@ -218,8 +218,11 @@ class DeadCodeAnalyzer(BaseAnalyzer):
             from robot.parsing.model import KeywordSection
 
             model = get_model(test_file.content)
-        except Exception:
-            # Fallback: text-based extraction when the AST parse fails.
+        except Exception as e:
+            self._logger.debug(
+                "AST parse failed, falling back to text extraction",
+                extra={"file": str(test_file.path), "error": str(e)},
+            )
             return self._extract_keywords_and_calls_text(test_file)
 
         # --- Keyword definitions (KeywordSection only) ---
@@ -290,7 +293,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         return name_str
 
     def _iter_nested_bodies(self, item: object):  # type: ignore[return]
-        """Yield each body list reachable from *item* via body/orelse/handlers/finally."""
+        """Yield each body list reachable from *item* via body, orelse, or Try.next chain."""
         body = getattr(item, "body", None)
         if body:
             yield body
@@ -299,12 +302,13 @@ class DeadCodeAnalyzer(BaseAnalyzer):
             orelse_body = getattr(orelse, "body", None)
             if orelse_body:
                 yield orelse_body
-        for attr in ("handlers", "finally_item"):
-            nested = getattr(item, attr, None)
-            if nested is not None:
-                nested_body = getattr(nested, "body", None)
-                if nested_body:
-                    yield nested_body
+        # RF 7.1+ Try/EXCEPT/ELSE/FINALLY branches are linked via .next (not .handlers/.finally_item)
+        next_branch = getattr(item, "next", None)
+        while next_branch is not None:
+            branch_body = getattr(next_branch, "body", None)
+            if branch_body:
+                yield branch_body
+            next_branch = getattr(next_branch, "next", None)
 
     def _extract_keywords_and_calls_text(
         self, test_file: TestFile
@@ -352,7 +356,11 @@ class DeadCodeAnalyzer(BaseAnalyzer):
 
             model = get_model(test_file.content)
             return self._collect_ast_calls(model)
-        except Exception:
+        except Exception as e:
+            self._logger.debug(
+                "AST parse failed, falling back to text extraction",
+                extra={"file": str(test_file.path), "error": str(e)},
+            )
             # Fallback: indented lines from text
             candidates: list[str] = []
             lines = test_file.content.splitlines()

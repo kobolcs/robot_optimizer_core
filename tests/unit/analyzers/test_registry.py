@@ -28,6 +28,13 @@ class ExternalAnalyzer(BaseAnalyzer):
         return []
 
 
+@pytest.fixture(autouse=True)
+def _isolate_registry_state() -> None:
+    reset_registry()
+    yield  # type: ignore[misc]
+    reset_registry()
+
+
 @pytest.mark.unit
 def test_registry_create_returns_fresh_instances() -> None:
     registry = AnalyzerRegistry()

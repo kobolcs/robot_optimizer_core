@@ -132,7 +132,7 @@ class TestSettingsValidation:
         """Settings with extra='forbid' must raise on unknown keys."""
         from pydantic import ValidationError
 
-        with pytest.raises((ValidationError, TypeError)):
+        with pytest.raises(ValidationError):
             Settings(completely_unknown_key_xyz="should_fail")
 
     def test_known_setting_keys_accepted(self) -> None:

@@ -79,7 +79,6 @@ class TagConsistencyAnalyzer(BaseAnalyzer):
     def tags(self) -> list[str]:
         return ["tags", "structure", "style"]
 
-    @override
     def _collect_tag_info(self, lines: list[str]) -> list[tuple[str, int, list[str]]]:
         """First pass: return (test_name, first_line_number, tags) for every test case."""
         tag_info: list[tuple[str, int, list[str]]] = []
