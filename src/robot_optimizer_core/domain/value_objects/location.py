@@ -236,10 +236,7 @@ class Location(ValueObject):
         if not self._start_column_contains(other):
             return False
 
-        if not self._end_column_contains(other):
-            return False
-
-        return True
+        return self._end_column_contains(other)
 
     def _lines_contain(self, other: Location) -> bool:
         """Check if this location's lines contain the other location's lines."""

@@ -798,12 +798,11 @@ def _format_output(args: argparse.Namespace, all_findings: list[Finding], path: 
     """Format findings based on --format argument."""
     if args.format == "json":
         return _format_json(all_findings)
-    elif args.format == "sarif":
+    if args.format == "sarif":
         return _format_sarif(all_findings, path)
-    elif args.format == "html":
+    if args.format == "html":
         return _format_html(all_findings, path)
-    else:
-        return _format_text(all_findings, path)
+    return _format_text(all_findings, path)
 
 
 def _write_output(args: argparse.Namespace, output: str) -> int:

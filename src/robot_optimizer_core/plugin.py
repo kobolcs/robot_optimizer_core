@@ -237,7 +237,7 @@ class SecurityVisitor(ast.NodeVisitor):
         }
         if func_name in dangerous_funcs:
             self.violations.append(f"Forbidden function call: {func_name}")
-        elif func_name in {"getattr", "setattr"} and len(node.args) >= 2:
+        elif func_name in {"getattr", "setattr"} and len(node.args) > 1:
             self._check_getattr_setattr(func_name, node.args[1])
 
     def _check_getattr_setattr(self, func_name: str, attr_arg: ast.expr) -> None:
@@ -433,7 +433,7 @@ class ValidatedPluginManager:
         exec(compiled, restricted_globals)
 
         plugin_class = None
-        for _, obj in restricted_globals.items():
+        for obj in restricted_globals.values():
             if (
                 isinstance(obj, type)
                 and issubclass(obj, Plugin)
