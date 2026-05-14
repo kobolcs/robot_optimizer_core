@@ -346,7 +346,7 @@ class ValidatedPluginManager:
         plugin_code = file_path.read_text(encoding="utf-8")
         compiled = compile(plugin_code, str(file_path), "exec", flags=0)
 
-        exec(compiled, restricted_globals)  # nosonar - S1523: Security provided by AST validation before execution
+        exec(compiled, restricted_globals)  # nosonar
 
         plugin_class = None
         for obj in restricted_globals.values():
