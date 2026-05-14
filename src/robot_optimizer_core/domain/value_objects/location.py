@@ -254,18 +254,20 @@ class Location(ValueObject):
         """Check if end columns are properly contained."""
         self_end_line = self.end_line or self.line
         other_end_line = other.end_line or other.line
-        if self.end_column is None or other_end_line != self_end_line:
+        # Use effective end column: for point locations, end at start column
+        self_end_column = self.column if self.end_line is None else self.end_column
+        if self_end_column is None or other_end_line != self_end_line:
             return True
         # Determine other's effective end column
         if other.end_column is not None:
             other_end_column: int | None = other.end_column
-        elif other.end_line is None or other.end_line == other.line:
-            # Point or single-line location: end column is the start column
+        elif other.end_line is None:
+            # Point location: end column is the start column
             other_end_column = other.column
         else:
-            # Multi-line range without explicit end column: be conservative
-            return True
-        return other_end_column is not None and other_end_column <= self.end_column
+            # Multi-line range without explicit end column: unknown bound
+            return False
+        return other_end_column is not None and other_end_column <= self_end_column
 
     def overlaps(self, other: Location) -> bool:
         """Check if this location overlaps with another location.

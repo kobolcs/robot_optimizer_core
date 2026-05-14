@@ -138,7 +138,7 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
         test_steps: list[tuple[str, int, list[str], bool]],
         test_file: TestFile,
         kind: str,
-        hints: set[str],
+        hints: frozenset[str],
         step_getter: Callable[[list[str]], str],
     ) -> list[Finding]:
         """Check for duplicated setup/teardown steps.

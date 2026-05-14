@@ -321,8 +321,9 @@ def get_thread_safe_container() -> ThreadSafeContainer:
         with _global_container_lock:
             # Double-check pattern
             if _global_container is None:
-                _global_container = ThreadSafeContainer()
-                _register_defaults(_global_container)
+                container = ThreadSafeContainer()
+                _register_defaults(container)
+                _global_container = container
 
     return _global_container
 
