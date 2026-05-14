@@ -9,6 +9,7 @@ import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from .exceptions import PluginError
 from .logging import get_logger
@@ -321,7 +322,7 @@ class ValidatedPluginManager:
 
         return file_hash
 
-    def _create_restricted_globals(self, file_path: Path) -> dict:
+    def _create_restricted_globals(self, file_path: Path) -> dict[str, Any]:
         """Create restricted globals environment for plugin execution."""
         builtin_dict = (
             __builtins__ if isinstance(__builtins__, dict) else vars(__builtins__)
@@ -339,7 +340,7 @@ class ValidatedPluginManager:
         }
 
     def _execute_and_load_plugin(
-        self, file_path: Path, restricted_globals: dict, file_hash: str
+        self, file_path: Path, restricted_globals: dict[str, Any], file_hash: str
     ) -> None:
         """Execute plugin code and register the Plugin subclass."""
         plugin_code = file_path.read_text(encoding="utf-8")

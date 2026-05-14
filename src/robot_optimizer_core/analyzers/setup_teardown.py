@@ -133,7 +133,7 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
         return ["structure", "duplication", "best-practices"]
 
     def _check_setup_hooks(
-        self, test_file: TestFile, test_steps: list
+        self, test_file: TestFile, test_steps: list[tuple[str, int, list[str], bool, bool]]
     ) -> list[Finding]:
         """Check for duplicate inline setup hooks."""
         findings: list[Finding] = []
@@ -165,7 +165,7 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
         return findings
 
     def _check_teardown_hooks(
-        self, test_file: TestFile, test_steps: list
+        self, test_file: TestFile, test_steps: list[tuple[str, int, list[str], bool, bool]]
     ) -> list[Finding]:
         """Check for duplicate inline teardown hooks."""
         findings: list[Finding] = []
