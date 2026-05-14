@@ -36,6 +36,18 @@ _EXIT_FINDINGS = 1
 _EXIT_ERROR = 2
 _EXIT_PARTIAL = 3  # Partial failure (some files could not be analysed).
 
+# Severity names (for JSON and HTML reports)
+_SEV_ERROR = "ERROR"
+_SEV_WARNING = "WARNING"
+_SEV_INFO = "INFO"
+
+# Health status labels
+_HEALTH_HIGH_RISK = "High Risk"
+_HEALTH_MODERATE_RISK = "Moderate Risk"
+_HEALTH_LOW_RISK = "Low Risk"
+_HEALTH_HEALTHY = "Healthy"
+_PLACEHOLDER_COMING_SOON = "coming soon"
+
 # ANSI colour helpers (disabled when not a tty)
 _COLOURS = {
     Severity.ERROR: "\033[31m",  # red
@@ -43,15 +55,6 @@ _COLOURS = {
     Severity.INFO: "\033[36m",  # cyan
 }
 _RESET = "\033[0m"
-
-# Health status labels
-_HEALTH_HIGH_RISK = "High Risk"
-_HEALTH_MODERATE_RISK = "Moderate Risk"
-_HEALTH_LOW_RISK = "Low Risk"
-_HEALTH_HEALTHY = "Healthy"
-
-# Feature matrix labels
-_FEATURE_COMING_SOON = "coming soon"
 
 
 def _colour(text: str, severity: Severity) -> str:
@@ -76,6 +79,7 @@ def _render_html_template(context: dict[str, Any]) -> str:
     """
     try:
         from jinja2 import Environment, FileSystemLoader
+        from markupsafe import Markup
     except ImportError:
         # Fallback if jinja2 not available; use legacy rendering
         return _format_html_legacy(context)
@@ -88,8 +92,28 @@ def _render_html_template(context: dict[str, Any]) -> str:
         loader=FileSystemLoader(str(template_path.parent)),
         autoescape=True,
     )
+    # Mark HTML strings as safe so they don't get double-escaped
+    # SAFETY: All values for these keys are either pre-escaped via html.escape()
+    # in their respective _html_render_* functions, or are hardcoded constants
+    # (_HTML_STYLES, _compute_no_findings_html). No user input is included.
+    safe_context = context.copy()
+    for key in (
+        "action_items",
+        "grouped_findings",
+        "findings_table",
+        "styles",
+        "no_findings_html",
+    ):
+        if key in safe_context:
+            value = safe_context[key]
+            if isinstance(value, list):
+                safe_context[key] = [
+                    Markup(v) if isinstance(v, str) else v for v in value  # noqa: S704
+                ]
+            elif isinstance(value, str):
+                safe_context[key] = Markup(value)  # noqa: S704
     template = env.get_template(template_path.name)
-    return template.render(**context)
+    return template.render(**safe_context)
 
 
 # ---------------------------------------------------------------------------
@@ -281,7 +305,7 @@ def _html_compute_stats(
     """Compute summary statistics used by the HTML report."""
     root = path.resolve() if path.is_dir() else path.parent.resolve()
     timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
-    sev_counts: dict[str, int] = {"ERROR": 0, "WARNING": 0, "INFO": 0}
+    sev_counts: dict[str, int] = {_SEV_ERROR: 0, _SEV_WARNING: 0, _SEV_INFO: 0}
     affected_files: set[str] = set()
     category_summary: dict[str, _CategoryInfo] = {}
     category_groups: dict[str, list[Finding]] = {}
@@ -293,21 +317,31 @@ def _html_compute_stats(
         category, impact, action = _html_category_metadata(finding.pattern.name)
         category_groups.setdefault(category, []).append(finding)
         if category not in category_summary:
-            category_summary[category] = {"count": 0, "impact": impact, "action": action}
-        category_summary[category]["count"] = int(category_summary[category]["count"]) + 1
+            category_summary[category] = {
+                "count": 0,
+                "impact": impact,
+                "action": action,
+            }
+        category_summary[category]["count"] = (
+            int(category_summary[category]["count"]) + 1
+        )
 
     return timestamp, sev_counts, affected_files, category_summary, category_groups
 
 
 def _html_health_status(sev_counts: dict[str, int], findings: list[Finding]) -> str:
     """Classify the overall suite health into a display label."""
-    if sev_counts["ERROR"] > 0 or sev_counts["WARNING"] >= 10:
+    if sev_counts[_SEV_ERROR] > 0 or sev_counts[_SEV_WARNING] >= 10:
         return _HEALTH_HIGH_RISK
-    if sev_counts["WARNING"] > 0:
+    if sev_counts[_SEV_WARNING] > 0:
         return _HEALTH_MODERATE_RISK
     if not findings:
         return _HEALTH_HEALTHY
-    if len(findings) <= 5 and sev_counts["WARNING"] == 0 and sev_counts["ERROR"] == 0:
+    if (
+        len(findings) <= 5
+        and sev_counts[_SEV_WARNING] == 0
+        and sev_counts[_SEV_ERROR] == 0
+    ):
         return _HEALTH_LOW_RISK
     return _HEALTH_MODERATE_RISK
 
@@ -328,7 +362,7 @@ def _html_render_category_cards(
 
 
 def _html_render_action_items(findings: list[Finding]) -> str:
-    """Return a string of <li> HTML elements for relevant recommended actions."""
+    """Return an HTML fragment of <li> elements for relevant recommended actions."""
     recommended_actions = [
         ("Replace fixed sleeps with explicit waits", "sleep"),
         ("Remove or confirm unused legacy keywords", "unused keyword"),
@@ -340,7 +374,10 @@ def _html_render_action_items(findings: list[Finding]) -> str:
     for label, matcher in recommended_actions:
         if matcher == "tag|naming":
             is_relevant = any(
-                any(part in f.pattern.name.lower() for part in ("tag", "naming", "camel_case"))
+                any(
+                    part in f.pattern.name.lower()
+                    for part in ("tag", "naming", "camelcase", "camel_case")
+                )
                 for f in findings
             )
         else:
@@ -373,7 +410,9 @@ def _html_render_grouped_findings(
             "</article>"
             for item in sorted_items
         )
-        sections.append(f"<section class='finding-section'><h3>{escape(category_name)}</h3>{item_cards}</section>")
+        sections.append(
+            f"<section class='finding-section'><h3>{escape(category_name)}</h3>{item_cards}</section>"
+        )
     return "".join(sections)
 
 
@@ -390,7 +429,9 @@ def _html_render_findings_table(findings: list[Finding], root: Path) -> str:
         f"<td>{escape(f.message)}</td>"
         f"<td>{escape(f.pattern.recommendation)}</td>"
         "</tr>"
-        for f in sorted(findings, key=lambda x: (str(x.location.file_path), x.location.line))
+        for f in sorted(
+            findings, key=lambda x: (str(x.location.file_path), x.location.line)
+        )
     ]
     return (
         "<table><thead><tr><th>Severity</th><th>File</th><th>Line</th><th>Pattern</th>"
@@ -398,6 +439,40 @@ def _html_render_findings_table(findings: list[Finding], root: Path) -> str:
         + "".join(rows)
         + "</tbody></table>"
     )
+
+
+def _compute_severity_phrase(findings: list[Finding], health_status: str) -> str:
+    """Determine severity description based on findings and health status."""
+    if not findings:
+        return "no significant"
+    if health_status == _HEALTH_HIGH_RISK:
+        return "high"
+    if health_status == _HEALTH_LOW_RISK:
+        return "low"
+    return "moderate"
+
+
+def _compute_summary_paragraph(
+    findings: list[Finding], severity_phrase: str, top_category_names: str
+) -> str:
+    """Compute the summary paragraph text for the report."""
+    if not findings:
+        return (
+            "The analyzed suite shows no significant maintainability or stability risk "
+            "based on the selected checks. Continue periodic review to keep this baseline healthy."
+        )
+    return (
+        f"The analyzed suite shows {severity_phrase} maintainability and stability risk. "
+        f"The most common issues are {top_category_names}, which can increase maintenance "
+        "cost, execution instability, and delivery risk if left unaddressed."
+    )
+
+
+def _compute_no_findings_html(findings: list[Finding]) -> str:
+    """Compute the HTML to display when no findings are present."""
+    if not findings:
+        return "<p class='no-findings'>No findings were detected for the selected analyzers.</p>"
+    return ""
 
 
 _HTML_STYLES = """\
@@ -550,10 +625,10 @@ _HTML_STYLES = """\
 
 _HEALTH_COLORS: dict[str, tuple[str, str, str, str]] = {
     # status: (base, bg-alpha, border-alpha, glow-alpha) as hex colours
-    "High Risk":     ("#ef4444", "#ef44441a", "#ef444455", "#ef444433"),
-    "Moderate Risk": ("#f59e0b", "#f59e0b1a", "#f59e0b55", "#f59e0b33"),
-    "Healthy":       ("#0d9488", "#0d94881a", "#0d948855", "#0d948833"),
-    "Low Risk":      ("#0d9488", "#0d94881a", "#0d948855", "#0d948833"),
+    _HEALTH_HIGH_RISK: ("#ef4444", "#ef44441a", "#ef444455", "#ef444433"),
+    _HEALTH_MODERATE_RISK: ("#f59e0b", "#f59e0b1a", "#f59e0b55", "#f59e0b33"),
+    _HEALTH_HEALTHY: ("#0d9488", "#0d94881a", "#0d948855", "#0d948833"),
+    _HEALTH_LOW_RISK: ("#0d9488", "#0d94881a", "#0d948855", "#0d948833"),
 }
 _HEALTH_COLOR_DEFAULT = ("#6b7280", "#6b72801a", "#6b728055", "#6b728033")
 
@@ -566,7 +641,9 @@ def _format_html(findings: list[Finding], path: Path) -> str:
     )
 
     health_status = _html_health_status(sev_counts, findings)
-    hc, hc_bg, hc_border, hc_glow = _HEALTH_COLORS.get(health_status, _HEALTH_COLOR_DEFAULT)
+    hc, hc_bg, hc_border, hc_glow = _HEALTH_COLORS.get(
+        health_status, _HEALTH_COLOR_DEFAULT
+    )
 
     top_categories = sorted(
         category_summary.items(), key=lambda item: int(item[1]["count"]), reverse=True
@@ -574,45 +651,18 @@ def _format_html(findings: list[Finding], path: Path) -> str:
     sorted_category_names = [name for name, _ in top_categories]
     top_category_names = ", ".join(cat for cat, _ in top_categories[:3])
 
-    severity_phrase = (
-        "no significant" if not findings
-        else "high" if health_status == "High Risk"
-        else "moderate"
+    severity_phrase = _compute_severity_phrase(findings, health_status)
+    summary_paragraph = _compute_summary_paragraph(
+        findings, severity_phrase, top_category_names
     )
-    summary_paragraph = (
-        "The analyzed suite shows no significant maintainability or stability risk based on the selected checks. "
-        "Continue periodic review to keep this baseline healthy."
-        if not findings
-        else (
-            f"The analyzed suite shows {severity_phrase} maintainability and stability risk. "
-            f"The most common issues are {top_category_names}, which can increase maintenance "
-            "cost, execution instability, and delivery risk if left unaddressed."
-        )
-    )
-
+    no_findings_html = _compute_no_findings_html(findings)
     auto_fixable_count = sum(1 for f in findings if f.pattern.auto_fixable)
 
-    action_items_raw = _html_render_action_items(findings)
-    grouped_findings = _html_render_grouped_findings(sorted_category_names, category_groups, root)
+    action_items = _html_render_action_items(findings)
+    grouped_findings = _html_render_grouped_findings(
+        sorted_category_names, category_groups, root
+    )
     table = _html_render_findings_table(findings, root)
-
-    try:
-        from markupsafe import Markup
-        action_items: list[Any] = [Markup(action_items_raw)] if action_items_raw else []
-        no_findings_html_val: Any = Markup(
-            "<p class='no-findings'>No findings were detected for the selected analyzers.</p>"
-            if not findings else ""
-        )
-        grouped_findings_val: list[Any] = [Markup(grouped_findings)]
-        findings_table_val: Any = Markup(table)
-    except ImportError:
-        action_items = [action_items_raw] if action_items_raw else []
-        no_findings_html_val = (
-            "<p class='no-findings'>No findings were detected for the selected analyzers.</p>"
-            if not findings else ""
-        )
-        grouped_findings_val = [grouped_findings]
-        findings_table_val = table
 
     # Prepare template context
     context: dict[str, Any] = {
@@ -625,19 +675,19 @@ def _format_html(findings: list[Finding], path: Path) -> str:
         "timestamp": timestamp,
         "health_status": health_status,
         "total_findings": len(findings),
-        "error_count": sev_counts["ERROR"],
-        "warning_count": sev_counts["WARNING"],
-        "info_count": sev_counts["INFO"],
-        "warning_error_count": sev_counts["WARNING"] + sev_counts["ERROR"],
+        "error_count": sev_counts[_SEV_ERROR],
+        "warning_count": sev_counts[_SEV_WARNING],
+        "info_count": sev_counts[_SEV_INFO],
+        "warning_error_count": sev_counts[_SEV_WARNING] + sev_counts[_SEV_ERROR],
         "affected_files_count": len(affected_files),
         "auto_fixable_count": auto_fixable_count,
         "top_categories": top_categories,
         "top_categories_str": top_category_names or "None",
         "summary_paragraph": summary_paragraph,
         "action_items": action_items,
-        "no_findings_html": no_findings_html_val,
-        "grouped_findings": grouped_findings_val,
-        "findings_table": findings_table_val,
+        "no_findings_html": no_findings_html,
+        "grouped_findings": [grouped_findings],
+        "findings_table": table,
         "escape": escape,
     }
 
@@ -655,12 +705,12 @@ def _format_html_legacy(context: dict[str, Any]) -> str:
   <title>Robot Framework Suite Health Report</title>
   <style>
     :root {{
-      --health-color: {context['health_color']};
-      --health-color-bg: {context['health_color_bg']};
-      --health-color-border: {context['health_color_border']};
-      --health-color-glow: {context['health_color_glow']};
+      --health-color: {context["health_color"]};
+      --health-color-bg: {context["health_color_bg"]};
+      --health-color-border: {context["health_color_border"]};
+      --health-color-glow: {context["health_color_glow"]};
     }}
-{context['styles']}
+{context["styles"]}
   </style>
 </head>
 <body>
@@ -670,58 +720,58 @@ def _format_html_legacy(context: dict[str, Any]) -> str:
     <h1>Suite Health Report</h1>
     <h2>Static analysis · maintainability &amp; stability</h2>
     <div class="cover-meta">
-      Analyzed: {escape(context['analyzed_path'])}<br>
-      Generated: {escape(context['timestamp'])}
+      Analyzed: {escape(context["analyzed_path"])}<br>
+      Generated: {escape(context["timestamp"])}
     </div>
   </section>
 
   <section class="panel">
     <h2>Health status</h2>
-    <span class="health-badge"><span class="health-dot"></span>{escape(context['health_status'])}</span>
+    <span class="health-badge"><span class="health-dot"></span>{escape(context["health_status"])}</span>
   </section>
 
   <section class="panel">
     <h2>Executive summary</h2>
-    <p>Total findings: <strong>{context['total_findings']}</strong> &nbsp;·&nbsp; Warnings/Errors: <strong>{context['warning_error_count']}</strong> &nbsp;·&nbsp; Main risk categories: <strong>{escape(context['top_categories_str'])}</strong></p>
-    <p>{escape(context['summary_paragraph'])}</p>
+    <p>Total findings: <strong>{context["total_findings"]}</strong> &nbsp;·&nbsp; Warnings/Errors: <strong>{context["warning_error_count"]}</strong> &nbsp;·&nbsp; Main risk categories: <strong>{escape(context["top_categories_str"])}</strong></p>
+    <p>{escape(context["summary_paragraph"])}</p>
   </section>
 
   <section class="panel">
     <h2>Key metrics</h2>
     <div class="bento">
-      <div class="metric-card"><div class="metric-label">Total findings</div><div class="metric-value">{context['total_findings']}</div></div>
-      <div class="metric-card"><div class="metric-label">ERROR</div><div class="metric-value">{context['error_count']}</div></div>
-      <div class="metric-card"><div class="metric-label">WARNING</div><div class="metric-value">{context['warning_count']}</div></div>
-      <div class="metric-card"><div class="metric-label">INFO</div><div class="metric-value">{context['info_count']}</div></div>
-      <div class="metric-card"><div class="metric-label">Affected files</div><div class="metric-value">{context['affected_files_count']}</div></div>
-      <div class="metric-card accent"><div class="metric-label">Auto-fixable findings</div><div class="metric-value">{context['auto_fixable_count']}</div></div>
+      <div class="metric-card"><div class="metric-label">Total findings</div><div class="metric-value">{context["total_findings"]}</div></div>
+      <div class="metric-card"><div class="metric-label">ERROR</div><div class="metric-value">{context["error_count"]}</div></div>
+      <div class="metric-card"><div class="metric-label">WARNING</div><div class="metric-value">{context["warning_count"]}</div></div>
+      <div class="metric-card"><div class="metric-label">INFO</div><div class="metric-value">{context["info_count"]}</div></div>
+      <div class="metric-card"><div class="metric-label">Affected files</div><div class="metric-value">{context["affected_files_count"]}</div></div>
+      <div class="metric-card accent"><div class="metric-label">Auto-fixable findings</div><div class="metric-value">{context["auto_fixable_count"]}</div></div>
     </div>
   </section>
 
   <section class="panel">
     <h2>Risk categories</h2>
     <div class="category-grid">
-      {_html_render_category_cards(context['top_categories']) or '<p>No risk categories detected.</p>'}
+      {_html_render_category_cards(context["top_categories"]) or "<p>No risk categories detected.</p>"}
     </div>
   </section>
 
   <section class="panel">
     <h2>Recommended actions</h2>
     <ol>
-      {''.join(context['action_items']) or '<li>Maintain current standards and monitor new findings.</li>'}
+      {"".join(context["action_items"]) or "<li>Maintain current standards and monitor new findings.</li>"}
     </ol>
   </section>
 
   <section class="panel">
     <h2>Findings by category</h2>
-    {context['no_findings_html']}
-    {''.join(context['grouped_findings'])}
+    {context["no_findings_html"]}
+    {"".join(context["grouped_findings"])}
   </section>
 
   <section class="panel">
     <h2>Appendix — Detailed Findings</h2>
-    {context['no_findings_html']}
-    <div class="table-wrap">{context['findings_table']}</div>
+    {context["no_findings_html"]}
+    <div class="table-wrap">{context["findings_table"]}</div>
   </section>
 </main>
 </body>
@@ -734,50 +784,45 @@ def _format_html_legacy(context: dict[str, Any]) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _parse_severity_filter(args: argparse.Namespace) -> tuple[Severity | None, int]:
-    """Parse --min-severity argument.
+def _run_analyze(args: argparse.Namespace) -> int:
+    path = Path(args.path)
+    from .analyzers import (
+        BaseAnalyzer,  # local import avoids circular import at module level
+    )
 
-    Returns (severity_filter, exit_code). Exit code is _EXIT_OK if valid, _EXIT_ERROR if not.
-    """
-    if not args.min_severity:
-        return None, _EXIT_OK
-    try:
-        return Severity.from_string(args.min_severity), _EXIT_OK
-    except ValueError as exc:
-        print(f"error: invalid --min-severity value: {exc}", file=sys.stderr)
-        return None, _EXIT_ERROR
+    analyzer_names: list[str | BaseAnalyzer] | None = (
+        [a.strip() for a in args.analyzers.split(",") if a.strip()]
+        if args.analyzers
+        else None
+    )
 
+    # Parse --min-severity.
+    severity_filter: Severity | None = None
+    if args.min_severity:
+        try:
+            severity_filter = Severity.from_string(args.min_severity)
+        except ValueError as exc:
+            print(f"error: invalid --min-severity value: {exc}", file=sys.stderr)
+            return _EXIT_ERROR
 
-def _load_settings(args: argparse.Namespace) -> tuple[Any, int]:
-    """Load settings from --config file.
+    # Load --config file.
+    settings = None
+    if getattr(args, "config", None):
+        try:
+            from .config.toml_loader import load_settings_from_toml
 
-    Returns (settings, exit_code). Exit code is _EXIT_OK if valid, _EXIT_ERROR if not.
-    """
-    if not getattr(args, "config", None):
-        return None, _EXIT_OK
-    try:
-        from .config.toml_loader import load_settings_from_toml
-        settings = load_settings_from_toml(Path(args.config).parent)
-        return settings, _EXIT_OK
-    except Exception as exc:
-        print(
-            f"error: failed to load config '{args.config}': {exc}", file=sys.stderr
-        )
-        return None, _EXIT_ERROR
+            settings = load_settings_from_toml(Path(args.config).parent)
+        except Exception as exc:
+            print(
+                f"error: failed to load config '{args.config}': {exc}", file=sys.stderr
+            )
+            return _EXIT_ERROR
 
+    partial_failure = False
 
-def _perform_analysis(
-    path: Path,
-    analyzer_names: list[str | Any] | None,
-    settings: Any,
-    severity_filter: Severity | None,
-) -> tuple[list[Finding], bool, int]:
-    """Perform analysis on file or directory.
-
-    Returns (findings, partial_failure, exit_code).
-    """
     try:
         if path.is_dir():
+            # Use error_handling="warn" so directory analysis can return partial results.
             results = analyze_directory(
                 path,
                 analyzers=analyzer_names,
@@ -785,6 +830,7 @@ def _perform_analysis(
                 severity_filter=severity_filter,
                 error_handling="warn",
             )
+            # Check if we had partial failures
             partial_failure = bool(getattr(results, "errors", []))
             all_findings: list[Finding] = [f for fs in results.values() for f in fs]
         elif path.is_file():
@@ -794,36 +840,29 @@ def _perform_analysis(
                 settings=settings,
                 severity_filter=severity_filter,
             )
-            partial_failure = False
         else:
             print(f"error: path does not exist: {path}", file=sys.stderr)
-            return [], False, _EXIT_ERROR
-        return all_findings, partial_failure, _EXIT_OK
+            return _EXIT_ERROR
+
     except AnalysisError as exc:
         print(f"error: {exc}", file=sys.stderr)
-        return [], False, _EXIT_ERROR
+        return _EXIT_ERROR
     except ExceptionGroup as eg:
         for sub_exc in eg.exceptions:
             print(f"error: {sub_exc}", file=sys.stderr)
-        return [], False, _EXIT_ERROR
+        return _EXIT_ERROR
 
-
-def _format_output(args: argparse.Namespace, all_findings: list[Finding], path: Path) -> str:
-    """Format findings based on --format argument."""
+    # Output
+    output: str
     if args.format == "json":
-        return _format_json(all_findings)
-    if args.format == "sarif":
-        return _format_sarif(all_findings, path)
-    if args.format == "html":
-        return _format_html(all_findings, path)
-    return _format_text(all_findings, path)
+        output = _format_json(all_findings)
+    elif args.format == "sarif":
+        output = _format_sarif(all_findings, path)
+    elif args.format == "html":
+        output = _format_html(all_findings, path)
+    else:
+        output = _format_text(all_findings, path)
 
-
-def _write_output(args: argparse.Namespace, output: str) -> int:
-    """Write output to file or stdout.
-
-    Returns exit code.
-    """
     if args.output_file:
         try:
             Path(args.output_file).write_text(output, encoding="utf-8")
@@ -836,61 +875,17 @@ def _write_output(args: argparse.Namespace, output: str) -> int:
         print(f"Results written to {args.output_file}")
     else:
         print(output, end="")
-    return _EXIT_OK
 
+    # Summary line on stderr so it doesn't pollute --format json stdout
+    _print_summary(all_findings)
 
-def _determine_exit_code(
-    all_findings: list[Finding],
-    partial_failure: bool,
-    args: argparse.Namespace,
-) -> int:
-    """Determine exit code based on analysis results."""
+    # Partial failures take precedence over findings exit code.
     if partial_failure:
         return _EXIT_PARTIAL
+
     if all_findings and not args.no_fail:
         return _EXIT_FINDINGS
     return _EXIT_OK
-
-
-def _run_analyze(args: argparse.Namespace) -> int:
-    path = Path(args.path)
-    from .analyzers import (
-        BaseAnalyzer,  # local import avoids circular import at module level
-    )
-
-    # Parse analyzers
-    analyzer_names: list[str | BaseAnalyzer] | None = (
-        [a.strip() for a in args.analyzers.split(",") if a.strip()]
-        if args.analyzers
-        else None
-    )
-
-    # Parse severity filter
-    severity_filter, exit_code = _parse_severity_filter(args)
-    if exit_code != _EXIT_OK:
-        return exit_code
-
-    # Load settings
-    settings, exit_code = _load_settings(args)
-    if exit_code != _EXIT_OK:
-        return exit_code
-
-    # Perform analysis
-    all_findings, partial_failure, exit_code = _perform_analysis(
-        path, analyzer_names, settings, severity_filter
-    )
-    if exit_code != _EXIT_OK:
-        return exit_code
-
-    # Format and output results
-    output = _format_output(args, all_findings, path)
-    exit_code = _write_output(args, output)
-    if exit_code != _EXIT_OK:
-        return exit_code
-
-    # Print summary and determine final exit code
-    _print_summary(all_findings)
-    return _determine_exit_code(all_findings, partial_failure, args)
 
 
 def _print_summary(findings: list[Finding]) -> None:
@@ -930,13 +925,13 @@ def _run_upgrade(_args: argparse.Namespace) -> int:
         ("Custom analyzer plugins", True, True),
         ("SARIF output format", True, True),
         ("Basic HTML report", True, True),
-        ("Auto-fix workflows", False, _FEATURE_COMING_SOON),
-        ("Advanced branded HTML reports", False, _FEATURE_COMING_SOON),
-        ("PDF export", False, _FEATURE_COMING_SOON),
-        ("Baseline diffing", False, _FEATURE_COMING_SOON),
-        ("Historical trend reports", False, _FEATURE_COMING_SOON),
-        ("Dashboards", False, _FEATURE_COMING_SOON),
-        ("Priority support", False, _FEATURE_COMING_SOON),
+        ("Auto-fix workflows", False, _PLACEHOLDER_COMING_SOON),
+        ("Advanced branded HTML reports", False, _PLACEHOLDER_COMING_SOON),
+        ("PDF export", False, _PLACEHOLDER_COMING_SOON),
+        ("Baseline diffing", False, _PLACEHOLDER_COMING_SOON),
+        ("Historical trend reports", False, _PLACEHOLDER_COMING_SOON),
+        ("Dashboards", False, _PLACEHOLDER_COMING_SOON),
+        ("Priority support", False, _PLACEHOLDER_COMING_SOON),
     ]
     for name, free, pro in features:
         free_mark = "✓" if free else "—"

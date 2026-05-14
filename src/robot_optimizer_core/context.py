@@ -132,7 +132,9 @@ class ApplicationContext:
 
             if self.config.enable_metrics:
                 self._metrics = MetricsCollector(enabled=True)
-                self._container.register_instance("metrics", self._metrics, override=True)
+                self._container.register_instance(
+                    "metrics", self._metrics, override=True
+                )
 
             # The global registry is already populated by _register_defaults
             # (via get_analyzer_registry / entry-point discovery).
