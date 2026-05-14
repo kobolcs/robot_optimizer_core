@@ -72,15 +72,20 @@ class TagConsistencyAnalyzer(BaseAnalyzer):
     @property
     @override
     def description(self) -> str:
-        return "Detects missing tags, singleton tags (likely typos), and reserved tag conflicts"
+        return (
+            "Detects missing tags, singleton tags (likely typos), "
+            "and reserved tag conflicts"
+        )
 
     @property
     @override
     def tags(self) -> list[str]:
         return ["tags", "structure", "style"]
 
-    def _collect_tag_info(self, lines: list[str]) -> list[tuple[str, int, list[str]]]:
-        """First pass: return (test_name, first_line_number, tags) for every test case."""
+    def _collect_tag_info(
+        self, lines: list[str]
+    ) -> list[tuple[str, int, list[str]]]:
+        """Collect test case info: (name, first_line, tags) for every test."""
         tag_info: list[tuple[str, int, list[str]]] = []
         in_test_cases = False
         current_name: str | None = None

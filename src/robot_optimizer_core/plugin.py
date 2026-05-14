@@ -187,7 +187,8 @@ class SecurityVisitor(ast.NodeVisitor):
             module = node.module.split(".")[0]
             if module not in ALLOWED_IMPORTS:
                 self.violations.append(
-                    f"Forbidden import: from {node.module} (only allowed: {ALLOWED_IMPORTS})"
+                    f"Forbidden import: from {node.module} "
+                    f"(only allowed: {ALLOWED_IMPORTS})"
                 )
         self.generic_visit(node)
 
@@ -235,7 +236,8 @@ class SecurityVisitor(ast.NodeVisitor):
         if isinstance(attr_arg, ast.Constant) and isinstance(attr_arg.value, str):
             if attr_arg.value in dangerous_attrs:
                 self.violations.append(
-                    f"Forbidden {func_name} with dangerous attribute: {attr_arg.value!r}"
+                    f"Forbidden {func_name} with dangerous attribute: "
+                    f"{attr_arg.value!r}"
                 )
         else:
             self.violations.append(

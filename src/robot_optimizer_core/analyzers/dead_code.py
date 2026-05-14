@@ -175,7 +175,12 @@ class DeadCodeAnalyzer(BaseAnalyzer):
 
     def _collect_suite_definitions(
         self, files: Sequence[TestFile]
-    ) -> tuple[dict[str, list[tuple[TestFile, int]]], list[str], dict[str, str], list[tuple[TestFile, dict[str, list[int]]]]]:
+    ) -> tuple[
+        dict[str, list[tuple[TestFile, int]]],
+        list[str],
+        dict[str, str],
+        list[tuple[TestFile, dict[str, list[int]]]],
+    ]:
         """Collect keyword definitions and calls from all files in the suite."""
         all_definitions: dict[str, list[tuple[TestFile, int]]] = defaultdict(list)
         raw_candidates: list[str] = []
@@ -223,12 +228,13 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                 auto_fixable=True,
             )
             test_file, line_num = locations[0]
+            msg = f"Keyword '{display_name}' is defined but never used in the suite"
             findings.append(
                 Finding.create(
                     pattern=pattern,
                     severity=Severity.WARNING,
                     location=Location(file_path=test_file.path, line=line_num),
-                    message=f"Keyword '{display_name}' is defined but never used in the suite",
+                    message=msg,
                     keyword_name=display_name,
                 )
             )
@@ -346,7 +352,10 @@ class DeadCodeAnalyzer(BaseAnalyzer):
             self._walk_body(body, calls)
 
     def _resolve_keyword_call_name(self, item: object) -> str | None:
-        """Return the effective call name for a KEYWORD node, handling Run Keyword dispatch."""
+        """Return the effective call name for a KEYWORD node.
+
+        Handles Run Keyword dispatch patterns.
+        """
         name = getattr(item, "keyword", None)
         if not name:
             return None
@@ -360,7 +369,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         return name_str
 
     def _iter_nested_bodies(self, item: object) -> Generator[object, None, None]:
-        """Yield each body list reachable from *item* via body, orelse, or Try.next chain."""
+        """Yield each body list reachable from *item* via body or orelse."""
         body = getattr(item, "body", None)
         if body:
             yield body
@@ -369,7 +378,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
             orelse_body = getattr(orelse, "body", None)
             if orelse_body:
                 yield orelse_body
-        # RF 7.1+ Try/EXCEPT/ELSE/FINALLY branches are linked via .next (not .handlers/.finally_item)
+        # RF 7.1+ branches via .next (not .handlers/.finally_item)
         next_branch = getattr(item, "next", None)
         while next_branch is not None:
             branch_body = getattr(next_branch, "body", None)
@@ -451,7 +460,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
     def _resolve_calls(
         self, candidates: list[str], keyword_names: set[str]
     ) -> set[str]:
-        """Match raw candidate strings against a keyword set, returning matched names."""
+        """Match raw candidate strings against a keyword set."""
         calls: set[str] = set()
         for call in candidates:
             lowered = call.lower()
@@ -462,11 +471,13 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                 _match_prefixes(" ".join(parts[1:]), keyword_names, calls)
 
             if lowered.startswith("run keyword "):
-                _match_prefixes(lowered.removeprefix("run keyword ").strip(), keyword_names, calls)
+                rk_arg = lowered.removeprefix("run keyword ").strip()
+                _match_prefixes(rk_arg, keyword_names, calls)
 
             if lowered.startswith("run keywords "):
+                rks_arg = lowered.removeprefix("run keywords ")
                 for part in re.split(
-                    r"\s+AND\s+", lowered.removeprefix("run keywords "), flags=re.IGNORECASE
+                    r"\s+AND\s+", rks_arg, flags=re.IGNORECASE
                 ):
                     _match_prefixes(part.strip(), keyword_names, calls)
 
@@ -526,11 +537,15 @@ class DeadCodeAnalyzer(BaseAnalyzer):
 
                 # Create findings for all duplicates after the first
                 for line_num in line_numbers[1:]:
+                    msg = (
+                        f"Keyword '{keyword_name}' is already "
+                        f"defined at line {line_numbers[0]}"
+                    )
                     finding = Finding.create(
                         pattern=pattern,
                         severity=Severity.ERROR,
                         location=Location(file_path=test_file.path, line=line_num),
-                        message=f"Keyword '{keyword_name}' is already defined at line {line_numbers[0]}",
+                        message=msg,
                         first_definition_line=line_numbers[0],
                         duplicate_count=len(line_numbers),
                     )
