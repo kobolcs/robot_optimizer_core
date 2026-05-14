@@ -587,7 +587,6 @@ def _format_html(findings: list[Finding], path: Path) -> str:
     )
     auto_fixable_count = sum(1 for f in findings if f.pattern.auto_fixable)
 
-    category_cards = _html_render_category_cards(top_categories)
     action_items = _html_render_action_items(findings)
     grouped_findings = _html_render_grouped_findings(sorted_category_names, category_groups, root)
     table = _html_render_findings_table(findings, root)

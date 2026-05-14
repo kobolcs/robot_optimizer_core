@@ -65,13 +65,6 @@ from .api import (
     analyze_suite,
 )
 
-# Service layer (recommended for most uses)
-from .service import (
-    AnalysisResult,
-    AnalysisService,
-    DirectoryAnalysisResult,
-)
-
 # Configuration
 from .config import Settings, get_settings, reset_settings
 
@@ -123,17 +116,6 @@ from .exceptions import (
     RobotOptimizerError,
 )
 
-# File I/O providers — for advanced use (testing, custom sources)
-from .providers import (
-    DiskFileProvider as DiskFileProvider,
-)
-from .providers import (
-    FileProvider as FileProvider,
-)
-from .providers import (
-    InMemoryFileProvider as InMemoryFileProvider,
-)
-
 # Listener — not part of the public API; importable for advanced use
 from .listener import FlakinessListener as FlakinessListener
 
@@ -156,6 +138,24 @@ from .parsers import RobotASTParser as RobotASTParser
 # Plugin system
 from .plugin import Plugin, PluginMetadata
 from .premium import PremiumFeatureError, is_premium_installed
+
+# File I/O providers — for advanced use (testing, custom sources)
+from .providers import (
+    DiskFileProvider as DiskFileProvider,
+)
+from .providers import (
+    FileProvider as FileProvider,
+)
+from .providers import (
+    InMemoryFileProvider as InMemoryFileProvider,
+)
+
+# Service layer (recommended for most uses)
+from .service import (
+    AnalysisResult,
+    AnalysisService,
+    DirectoryAnalysisResult,
+)
 
 # Deprecated alias — use ThreadSafeContainer directly; will be removed in a future release
 Container = ThreadSafeContainer

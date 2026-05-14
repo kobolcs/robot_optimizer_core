@@ -12,7 +12,7 @@ direct calls to api.analyze_file() and api.analyze_directory().
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from .api import analyze_directory as _api_analyze_directory
 from .api import analyze_file as _api_analyze_file
@@ -81,7 +81,7 @@ class DirectoryAnalysisResult(NamedTuple):
         """Total findings across all files."""
         return sum(len(findings) for findings in self.results.values())
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "directory": str(self.directory),
@@ -119,7 +119,7 @@ class AnalysisService:
     def analyze_file(
         self,
         file_path: str | Path,
-        analyzers: list[str] | None = None,
+        analyzers: list[str | BaseAnalyzer] | None = None,
         severity_filter: Severity | None = None,
     ) -> AnalysisResult:
         """Analyze a single Robot Framework file.
@@ -157,7 +157,7 @@ class AnalysisService:
         patterns: list[str] | None = None,
         exclude_patterns: list[str] | None = None,
         recursive: bool = True,
-        analyzers: list[str] | None = None,
+        analyzers: list[str | BaseAnalyzer] | None = None,
         severity_filter: Severity | None = None,
     ) -> DirectoryAnalysisResult:
         """Analyze all Robot Framework files in a directory.
@@ -194,7 +194,7 @@ class AnalysisService:
             errors=errors,
         )
 
-    def list_analyzers(self) -> dict[str, dict]:
+    def list_analyzers(self) -> dict[str, dict[str, Any]]:
         """List all available analyzers.
 
         Returns:
