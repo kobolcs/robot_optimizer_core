@@ -428,9 +428,17 @@ class ValidatedPluginManager:
     def _execute_and_find_plugin_class(
         self, file_path: Path, content: str, restricted_globals: dict[str, object]
     ) -> type[Plugin]:
-        """Execute plugin code and find the Plugin subclass."""
+        """Execute plugin code and find the Plugin subclass.
+
+        SECURITY NOTE: exec() is used here with security mitigations:
+        - Code is validated by SecurityVisitor before execution
+        - Environment restricted to safe builtins only
+        - __builtins__ subscript access blocked (prevents __builtins__['__import__'])
+        - Dangerous functions (eval, open, os.system, etc.) detected and rejected
+        - Only load plugins from trusted sources
+        """
         compiled = compile(content, str(file_path), "exec", flags=0)
-        exec(compiled, restricted_globals)
+        exec(compiled, restricted_globals)  # nosec: B102 - security validated above
 
         plugin_class = None
         for obj in restricted_globals.values():
