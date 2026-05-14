@@ -24,6 +24,9 @@ from ..domain.value_objects.robot_ast import (
     RobotVariable,
 )
 
+# AST node type constants
+_SETTING_HEADER_TYPE = "SETTING HEADER"
+
 
 def _argument_values(item: Any) -> list[str]:
     """Return values from ARGUMENT-type data tokens."""
@@ -303,7 +306,7 @@ class RobotASTParser(RobotParserRepository):
         imports = []
         for section in model.sections:
             header = getattr(section, "header", None)
-            if not (header and header.type == "SETTING HEADER"):
+            if not (header and header.type == _SETTING_HEADER_TYPE):
                 continue
             for item in section.body:
                 item_type = getattr(item, "type", None)
@@ -331,7 +334,7 @@ class RobotASTParser(RobotParserRepository):
     def _get_suite_documentation(self, model: Any) -> str | None:
         for section in model.sections:
             header = getattr(section, "header", None)
-            if not (header and header.type == "SETTING HEADER"):
+            if not (header and header.type == _SETTING_HEADER_TYPE):
                 continue
             for item in section.body:
                 if getattr(item, "type", None) == "DOCUMENTATION":
@@ -343,7 +346,7 @@ class RobotASTParser(RobotParserRepository):
         metadata: dict[str, str] = {}
         for section in model.sections:
             header = getattr(section, "header", None)
-            if not (header and header.type == "SETTING HEADER"):
+            if not (header and header.type == _SETTING_HEADER_TYPE):
                 continue
             for item in section.body:
                 if getattr(item, "type", None) != "METADATA":
