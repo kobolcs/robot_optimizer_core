@@ -52,6 +52,9 @@ from robot_optimizer_core.domain.value_objects import FlakinessStats, TestResult
 configure_logging(level="WARNING", format_json=False)
 configure_metrics(enabled=False)  # Disable metrics in tests
 
+# Test file paths
+_TEST_LOGIN_FILE = "tests/login.robot"
+
 
 def pytest_collection_modifyitems(config, items):
     """Modify test collection to skip certain patterns."""
@@ -205,21 +208,21 @@ def flaky_test_stats() -> list[FlakinessStats]:
     return [
         FlakinessStats(
             test_name="Flaky Login Test",
-            file_path=Path("tests/login.robot"),
+            file_path=Path(_TEST_LOGIN_FILE),
             total_runs=100,
             failures=15,
             last_failure=datetime.now() - timedelta(days=1),
         ),
         FlakinessStats(
             test_name="Very Flaky Test",
-            file_path=Path("tests/login.robot"),
+            file_path=Path(_TEST_LOGIN_FILE),
             total_runs=50,
             failures=25,
             last_failure=datetime.now() - timedelta(hours=6),
         ),
         FlakinessStats(
             test_name="Stable Test",
-            file_path=Path("tests/login.robot"),
+            file_path=Path(_TEST_LOGIN_FILE),
             total_runs=200,
             failures=0,
             last_failure=None,
@@ -234,14 +237,14 @@ def test_results() -> list[TestResult]:
     return [
         TestResult(
             test_name="Login Test",
-            file_path=Path("tests/login.robot"),
+            file_path=Path(_TEST_LOGIN_FILE),
             status="PASS",
             execution_time=1.5,
             timestamp=base_time,
         ),
         TestResult(
             test_name="Login Test",
-            file_path=Path("tests/login.robot"),
+            file_path=Path(_TEST_LOGIN_FILE),
             status="FAIL",
             execution_time=2.1,
             error_message="Element not found",
@@ -249,7 +252,7 @@ def test_results() -> list[TestResult]:
         ),
         TestResult(
             test_name="Logout Test",
-            file_path=Path("tests/login.robot"),
+            file_path=Path(_TEST_LOGIN_FILE),
             status="PASS",
             execution_time=0.8,
             timestamp=base_time - timedelta(hours=2),

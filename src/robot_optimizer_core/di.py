@@ -28,6 +28,9 @@ T = TypeVar("T")
 
 logger = get_logger(__name__)
 
+# Configuration key for service-related errors
+_CONFIG_KEY_SERVICE = "di.service"
+
 
 class ServiceLifetime(StrEnum):
     """Service lifetime options for dependency injection."""
@@ -113,7 +116,7 @@ class ThreadSafeContainer:
             if service_type in self._services and not override:
                 raise ConfigurationError(
                     f"Service already registered: {service_type}",
-                    config_key="di.service",
+                    config_key=_CONFIG_KEY_SERVICE,
                     provided_value=service_type,
                 )
 
@@ -148,7 +151,7 @@ class ThreadSafeContainer:
             available = self._list_all_services()
             raise ConfigurationError(
                 f"Service not registered: {service_type}",
-                config_key="di.service",
+                config_key=_CONFIG_KEY_SERVICE,
                 provided_value=service_type,
                 details={"available": available},
             )
@@ -280,7 +283,7 @@ class ThreadSafeContainer:
             if service_type in self._services and not override:
                 raise ConfigurationError(
                     f"Service already registered: {service_type}",
-                    config_key="di.service",
+                    config_key=_CONFIG_KEY_SERVICE,
                     provided_value=service_type,
                 )
 

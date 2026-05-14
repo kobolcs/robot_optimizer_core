@@ -249,8 +249,8 @@ class MetricsCollector:
             try:
                 with self._lock:
                     self._cleanup()
-            except Exception as e:
-                logger.error(f"Metrics cleanup error: {e}")
+            except Exception:
+                logger.exception("Metrics cleanup error")
 
     def _cleanup(self) -> None:
         """Perform cleanup of old data."""
