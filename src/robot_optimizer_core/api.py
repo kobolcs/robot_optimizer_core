@@ -601,7 +601,7 @@ def _execute_directory_analysis(
 def _create_analyzer_instance(name: str) -> BaseAnalyzer:
     """Create a fresh analyzer instance for each analysis execution."""
     return cast(
-        BaseAnalyzer, get_container().resolve("analyzer_registry").create(name)
+        "BaseAnalyzer", get_container().resolve("analyzer_registry").create(name)
     )
 
 
