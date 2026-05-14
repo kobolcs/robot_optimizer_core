@@ -40,6 +40,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
 
+from .analyzers import BaseAnalyzer
 from .di import get_container
 from .domain.entities import TestFile
 from .domain.value_objects import Finding, Severity
@@ -47,7 +48,6 @@ from .exceptions import AnalysisError, RobotFileNotFoundError
 from .logging import get_logger, log_analysis_complete, log_analysis_start
 
 if TYPE_CHECKING:
-    from .analyzers import BaseAnalyzer
     from .config import Settings
     from .domain.value_objects.robot_ast import RobotImport, RobotKeyword, RobotTestCase
     from .metrics import MetricsCollector
@@ -601,7 +601,7 @@ def _execute_directory_analysis(
 def _create_analyzer_instance(name: str) -> BaseAnalyzer:
     """Create a fresh analyzer instance for each analysis execution."""
     return cast(
-        "BaseAnalyzer", get_container().resolve("analyzer_registry").create(name)
+        BaseAnalyzer, get_container().resolve("analyzer_registry").create(name)
     )
 
 
