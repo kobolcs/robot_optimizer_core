@@ -720,45 +720,50 @@ def _format_html_legacy(context: dict[str, Any]) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _run_analyze(args: argparse.Namespace) -> int:
-    path = Path(args.path)
-    from .analyzers import (
-        BaseAnalyzer,  # local import avoids circular import at module level
-    )
+def _parse_severity_filter(args: argparse.Namespace) -> tuple[Severity | None, int]:
+    """Parse --min-severity argument.
 
-    analyzer_names: list[str | BaseAnalyzer] | None = (
-        [a.strip() for a in args.analyzers.split(",") if a.strip()]
-        if args.analyzers
-        else None
-    )
+    Returns (severity_filter, exit_code). Exit code is _EXIT_OK if valid, _EXIT_ERROR if not.
+    """
+    if not args.min_severity:
+        return None, _EXIT_OK
+    try:
+        return Severity.from_string(args.min_severity), _EXIT_OK
+    except ValueError as exc:
+        print(f"error: invalid --min-severity value: {exc}", file=sys.stderr)
+        return None, _EXIT_ERROR
 
-    # Parse --min-severity.
-    severity_filter: Severity | None = None
-    if args.min_severity:
-        try:
-            severity_filter = Severity.from_string(args.min_severity)
-        except ValueError as exc:
-            print(f"error: invalid --min-severity value: {exc}", file=sys.stderr)
-            return _EXIT_ERROR
 
-    # Load --config file.
-    settings = None
-    if getattr(args, "config", None):
-        try:
-            from .config.toml_loader import load_settings_from_toml
+def _load_settings(args: argparse.Namespace) -> tuple[Any, int]:
+    """Load settings from --config file.
 
-            settings = load_settings_from_toml(Path(args.config).parent)
-        except Exception as exc:
-            print(
-                f"error: failed to load config '{args.config}': {exc}", file=sys.stderr
-            )
-            return _EXIT_ERROR
+    Returns (settings, exit_code). Exit code is _EXIT_OK if valid, _EXIT_ERROR if not.
+    """
+    if not getattr(args, "config", None):
+        return None, _EXIT_OK
+    try:
+        from .config.toml_loader import load_settings_from_toml
+        settings = load_settings_from_toml(Path(args.config).parent)
+        return settings, _EXIT_OK
+    except Exception as exc:
+        print(
+            f"error: failed to load config '{args.config}': {exc}", file=sys.stderr
+        )
+        return None, _EXIT_ERROR
 
-    partial_failure = False
 
+def _perform_analysis(
+    path: Path,
+    analyzer_names: list[str | Any] | None,
+    settings: Any,
+    severity_filter: Severity | None,
+) -> tuple[list[Finding], bool, int]:
+    """Perform analysis on file or directory.
+
+    Returns (findings, partial_failure, exit_code).
+    """
     try:
         if path.is_dir():
-            # Use error_handling="warn" so directory analysis can return partial results.
             results = analyze_directory(
                 path,
                 analyzers=analyzer_names,
@@ -766,7 +771,6 @@ def _run_analyze(args: argparse.Namespace) -> int:
                 severity_filter=severity_filter,
                 error_handling="warn",
             )
-            # Check if we had partial failures
             partial_failure = bool(getattr(results, "errors", []))
             all_findings: list[Finding] = [f for fs in results.values() for f in fs]
         elif path.is_file():
@@ -776,29 +780,37 @@ def _run_analyze(args: argparse.Namespace) -> int:
                 settings=settings,
                 severity_filter=severity_filter,
             )
+            partial_failure = False
         else:
             print(f"error: path does not exist: {path}", file=sys.stderr)
-            return _EXIT_ERROR
-
+            return [], False, _EXIT_ERROR
+        return all_findings, partial_failure, _EXIT_OK
     except AnalysisError as exc:
         print(f"error: {exc}", file=sys.stderr)
-        return _EXIT_ERROR
+        return [], False, _EXIT_ERROR
     except ExceptionGroup as eg:
         for sub_exc in eg.exceptions:
             print(f"error: {sub_exc}", file=sys.stderr)
-        return _EXIT_ERROR
+        return [], False, _EXIT_ERROR
 
-    # Output
-    output: str
+
+def _format_output(args: argparse.Namespace, all_findings: list[Finding], path: Path) -> str:
+    """Format findings based on --format argument."""
     if args.format == "json":
-        output = _format_json(all_findings)
+        return _format_json(all_findings)
     elif args.format == "sarif":
-        output = _format_sarif(all_findings, path)
+        return _format_sarif(all_findings, path)
     elif args.format == "html":
-        output = _format_html(all_findings, path)
+        return _format_html(all_findings, path)
     else:
-        output = _format_text(all_findings, path)
+        return _format_text(all_findings, path)
 
+
+def _write_output(args: argparse.Namespace, output: str) -> int:
+    """Write output to file or stdout.
+
+    Returns exit code.
+    """
     if args.output_file:
         try:
             Path(args.output_file).write_text(output, encoding="utf-8")
@@ -811,17 +823,61 @@ def _run_analyze(args: argparse.Namespace) -> int:
         print(f"Results written to {args.output_file}")
     else:
         print(output, end="")
+    return _EXIT_OK
 
-    # Summary line on stderr so it doesn't pollute --format json stdout
-    _print_summary(all_findings)
 
-    # Partial failures take precedence over findings exit code.
+def _determine_exit_code(
+    all_findings: list[Finding],
+    partial_failure: bool,
+    args: argparse.Namespace,
+) -> int:
+    """Determine exit code based on analysis results."""
     if partial_failure:
         return _EXIT_PARTIAL
-
     if all_findings and not args.no_fail:
         return _EXIT_FINDINGS
     return _EXIT_OK
+
+
+def _run_analyze(args: argparse.Namespace) -> int:
+    path = Path(args.path)
+    from .analyzers import (
+        BaseAnalyzer,  # local import avoids circular import at module level
+    )
+
+    # Parse analyzers
+    analyzer_names: list[str | BaseAnalyzer] | None = (
+        [a.strip() for a in args.analyzers.split(",") if a.strip()]
+        if args.analyzers
+        else None
+    )
+
+    # Parse severity filter
+    severity_filter, exit_code = _parse_severity_filter(args)
+    if exit_code != _EXIT_OK:
+        return exit_code
+
+    # Load settings
+    settings, exit_code = _load_settings(args)
+    if exit_code != _EXIT_OK:
+        return exit_code
+
+    # Perform analysis
+    all_findings, partial_failure, exit_code = _perform_analysis(
+        path, analyzer_names, settings, severity_filter
+    )
+    if exit_code != _EXIT_OK:
+        return exit_code
+
+    # Format and output results
+    output = _format_output(args, all_findings, path)
+    exit_code = _write_output(args, output)
+    if exit_code != _EXIT_OK:
+        return exit_code
+
+    # Print summary and determine final exit code
+    _print_summary(all_findings)
+    return _determine_exit_code(all_findings, partial_failure, args)
 
 
 def _print_summary(findings: list[Finding]) -> None:
