@@ -179,7 +179,7 @@ class AnalyzerRegistry:
         analyzer_class = self.analyzers[name]
         container = get_container()
         if container.has_service(f"analyzer.{name}"):
-            return cast("BaseAnalyzer", container.resolve(f"analyzer.{name}"))
+            return cast(BaseAnalyzer, container.resolve(f"analyzer.{name}"))
         return analyzer_class()
 
     def list(self) -> list[str]:

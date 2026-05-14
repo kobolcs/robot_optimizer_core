@@ -168,8 +168,8 @@ class PluginSecurityValidator:
 class SecurityVisitor(ast.NodeVisitor):
     """AST visitor that checks for security violations."""
 
-    # Dangerous built-in functions
-    _DANGEROUS_FUNCS = {
+    # Dangerous built-in functions (immutable)
+    _DANGEROUS_FUNCS: frozenset[str] = frozenset({
         "eval",
         "exec",
         "compile",
@@ -180,10 +180,10 @@ class SecurityVisitor(ast.NodeVisitor):
         "execfile",
         "file",
         "reload",
-    }
+    })
 
-    # Dangerous attributes that can be used with getattr/setattr
-    _DANGEROUS_ATTRS = {
+    # Dangerous attributes that can be used with getattr/setattr (immutable)
+    _DANGEROUS_ATTRS: frozenset[str] = frozenset({
         "__dict__",
         "__globals__",
         "__builtins__",
@@ -192,17 +192,17 @@ class SecurityVisitor(ast.NodeVisitor):
         "__class__",
         "__bases__",
         "__subclasses__",
-    }
+    })
 
-    # Dangerous modules
-    _DANGEROUS_MODULES = {
+    # Dangerous modules (immutable)
+    _DANGEROUS_MODULES: frozenset[str] = frozenset({
         "os",
         "sys",
         "subprocess",
         "socket",
         "urllib",
         "requests",
-    }
+    })
 
     def __init__(self) -> None:
         self.violations: list[str] = []
@@ -366,7 +366,7 @@ class ValidatedPluginManager:
         plugin = plugin_class(self.registry)
         metadata = plugin.metadata
 
-        if not metadata.name or ".." in metadata.name or "/" in metadata.name:
+        if not metadata.name or ".." in metadata.name or "/" in metadata.name or "\\" in metadata.name:
             raise PluginError(f"Invalid plugin name: {metadata.name!r}")
 
         plugin.activate()

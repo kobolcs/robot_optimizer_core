@@ -93,6 +93,9 @@ def _render_html_template(context: dict[str, Any]) -> str:
         autoescape=True,
     )
     # Mark HTML strings as safe so they don't get double-escaped
+    # SAFETY: All values for these keys are either pre-escaped via html.escape()
+    # in their respective _html_render_* functions, or are hardcoded constants
+    # (_HTML_STYLES, _compute_no_findings_html). No user input is included.
     safe_context = context.copy()
     for key in (
         "action_items",
@@ -105,10 +108,10 @@ def _render_html_template(context: dict[str, Any]) -> str:
             value = safe_context[key]
             if isinstance(value, list):
                 safe_context[key] = [
-                    Markup(v) if isinstance(v, str) else v for v in value
+                    Markup(v) if isinstance(v, str) else v for v in value  # noqa: S704
                 ]
             elif isinstance(value, str):
-                safe_context[key] = Markup(value)
+                safe_context[key] = Markup(value)  # noqa: S704
     template = env.get_template(template_path.name)
     return template.render(**safe_context)
 
