@@ -644,5 +644,6 @@ class SleepDetectorAnalyzer(BaseAnalyzer):
                     provided_value=value,
                 )
 
+
 # Backward-compatible alias
 SleepDetector = SleepDetectorAnalyzer

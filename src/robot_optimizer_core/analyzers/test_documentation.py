@@ -138,6 +138,8 @@ class TestDocumentationAnalyzer(BaseAnalyzer):
                     if finding:
                         findings.append(finding)
                 current_name = None
+                has_doc = False
+                doc_text = ""
                 lower = stripped.lower()
                 in_test_cases = "test case" in lower
                 in_keywords = "keyword" in lower and "test case" not in lower
