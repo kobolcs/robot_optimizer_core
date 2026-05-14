@@ -193,67 +193,71 @@ class SecurityVisitor(ast.NodeVisitor):
 
     def visit_Call(self, node: ast.Call) -> None:
         """Check function calls for dangerous operations."""
-        # Check for dangerous functions
         if isinstance(node.func, ast.Name):
-            func_name = node.func.id
-            dangerous_funcs = {
-                "eval",
-                "exec",
-                "compile",
-                "__import__",
-                "open",
-                "input",
-                "raw_input",
-                "execfile",
-                "file",
-                "reload",
-            }
-            if func_name in dangerous_funcs:
-                self.violations.append(f"Forbidden function call: {func_name}")
-
-            # getattr/setattr with a dangerous or non-literal attr name bypass visit_Attribute
-            elif func_name in {"getattr", "setattr"} and len(node.args) >= 2:
-                attr_arg = node.args[1]
-                if isinstance(attr_arg, ast.Constant) and isinstance(
-                    attr_arg.value, str
-                ):
-                    dangerous_attrs = {
-                        "__dict__",
-                        "__globals__",
-                        "__builtins__",
-                        "__import__",
-                        "__code__",
-                        "__class__",
-                        "__bases__",
-                        "__subclasses__",
-                    }
-                    if attr_arg.value in dangerous_attrs:
-                        self.violations.append(
-                            f"Forbidden {func_name} with dangerous attribute: {attr_arg.value!r}"
-                        )
-                else:
-                    # Non-literal attribute name — can't verify safety at analysis time
-                    self.violations.append(
-                        f"Forbidden {func_name} with non-literal attribute name"
-                    )
-
-        # Check for subprocess, os, sys modules
+            self._check_name_function(node)
         elif isinstance(node.func, ast.Attribute):
-            if isinstance(node.func.value, ast.Name):
-                module = node.func.value.id
-                if module in {
-                    "os",
-                    "sys",
-                    "subprocess",
-                    "socket",
-                    "urllib",
-                    "requests",
-                }:
-                    self.violations.append(
-                        f"Forbidden module usage: {module}.{node.func.attr}"
-                    )
+            self._check_attribute_function(node)
 
         self.generic_visit(node)
+
+    def _check_name_function(self, node: ast.Call) -> None:
+        """Check a function call with a simple name."""
+        func_name = node.func.id
+        dangerous_funcs = {
+            "eval",
+            "exec",
+            "compile",
+            "__import__",
+            "open",
+            "input",
+            "raw_input",
+            "execfile",
+            "file",
+            "reload",
+        }
+        if func_name in dangerous_funcs:
+            self.violations.append(f"Forbidden function call: {func_name}")
+        elif func_name in {"getattr", "setattr"} and len(node.args) >= 2:
+            self._check_getattr_setattr(func_name, node.args[1])
+
+    def _check_getattr_setattr(self, func_name: str, attr_arg: ast.expr) -> None:
+        """Check getattr/setattr for dangerous attribute access."""
+        dangerous_attrs = {
+            "__dict__",
+            "__globals__",
+            "__builtins__",
+            "__import__",
+            "__code__",
+            "__class__",
+            "__bases__",
+            "__subclasses__",
+        }
+        if isinstance(attr_arg, ast.Constant) and isinstance(attr_arg.value, str):
+            if attr_arg.value in dangerous_attrs:
+                self.violations.append(
+                    f"Forbidden {func_name} with dangerous attribute: {attr_arg.value!r}"
+                )
+        else:
+            self.violations.append(
+                f"Forbidden {func_name} with non-literal attribute name"
+            )
+
+    def _check_attribute_function(self, node: ast.Call) -> None:
+        """Check a function call on an attribute (e.g., os.system)."""
+        if isinstance(node.func.value, ast.Name):
+            module = node.func.value.id
+            forbidden_modules = {
+                "os",
+                "sys",
+                "subprocess",
+                "socket",
+                "urllib",
+                "requests",
+            }
+            if module in forbidden_modules:
+                self.violations.append(
+                    f"Forbidden module usage: {module}.{node.func.attr}"
+                )
 
     def visit_Attribute(self, node: ast.Attribute) -> None:
         """Check attribute access for dangerous patterns."""
@@ -312,14 +316,30 @@ class ValidatedPluginManager:
         if not file_path.exists():
             raise PluginError(f"Plugin file not found: {file_path}")
 
-        # Check if plugin is trusted
         file_hash = self._compute_file_hash(file_path)
+        self._check_plugin_security(file_path, file_hash, force)
+
+        try:
+            restricted_globals = self._create_restricted_environment(file_path)
+            plugin_class = self._execute_and_find_plugin_class(
+                file_path, restricted_globals
+            )
+            self._register_plugin(plugin_class, file_path, file_hash)
+        except PluginError:
+            raise
+        except Exception as e:
+            raise PluginError(
+                f"Failed to load plugin: {file_path}", details={"error": str(e)}
+            ) from e
+
+    def _check_plugin_security(
+        self, file_path: Path, file_hash: str, force: bool
+    ) -> None:
+        """Check if plugin is trusted or validate its security."""
         if file_hash in self.trusted_hashes:
             logger.info(f"Loading trusted plugin: {file_path}")
         elif not force:
-            # Validate plugin security
             is_safe, violations = self.validator.validate_file(file_path)
-
             if not is_safe:
                 raise PluginError(
                     f"Plugin failed security validation: {file_path}",
@@ -331,75 +351,63 @@ class ValidatedPluginManager:
                 f"(hash: {file_hash})"
             )
 
-        # Load plugin in restricted environment
-        try:
-            # Create a restricted globals environment
-            # Handle both dict and module forms of __builtins__
-            builtin_dict = (
-                __builtins__ if isinstance(__builtins__, dict) else vars(__builtins__)
-            )
-            restricted_builtins = {
-                k: builtin_dict[k] for k in ALLOWED_BUILTINS if k in builtin_dict
-            }
-            # __import__ and __build_class__ are required by the Python runtime
-            # inside exec() for import statements and class definitions.
-            # Security is enforced by the AST validator that runs before exec,
-            # so restoring these here does not bypass the import allowlist.
-            for _name in ("__import__", "__build_class__"):
-                if _name in builtin_dict:
-                    restricted_builtins[_name] = builtin_dict[_name]
-            restricted_globals = {
-                "__builtins__": restricted_builtins,
-                "__name__": f"plugin_{file_path.stem}",
-                "__file__": str(file_path),
-            }
+    def _create_restricted_environment(self, file_path: Path) -> dict[str, object]:
+        """Create a restricted globals environment for plugin execution."""
+        builtin_dict = (
+            __builtins__ if isinstance(__builtins__, dict) else vars(__builtins__)
+        )
+        restricted_builtins = {
+            k: builtin_dict[k] for k in ALLOWED_BUILTINS if k in builtin_dict
+        }
+        for _name in ("__import__", "__build_class__"):
+            if _name in builtin_dict:
+                restricted_builtins[_name] = builtin_dict[_name]
+        return {
+            "__builtins__": restricted_builtins,
+            "__name__": f"plugin_{file_path.stem}",
+            "__file__": str(file_path),
+        }
 
-            # Read and compile the plugin code
-            plugin_code = file_path.read_text(encoding="utf-8")
+    def _execute_and_find_plugin_class(
+        self, file_path: Path, restricted_globals: dict[str, object]
+    ) -> type[Plugin]:
+        """Execute plugin code and find the Plugin subclass."""
+        plugin_code = file_path.read_text(encoding="utf-8")
+        compiled = compile(plugin_code, str(file_path), "exec", flags=0)
+        exec(compiled, restricted_globals)
 
-            # Compile with restricted mode
-            compiled = compile(plugin_code, str(file_path), "exec", flags=0)
+        plugin_class = None
+        for _, obj in restricted_globals.items():
+            if (
+                isinstance(obj, type)
+                and issubclass(obj, Plugin)
+                and obj is not Plugin
+            ):
+                plugin_class = obj
+                break
 
-            # Execute in restricted environment
-            exec(compiled, restricted_globals)
+        if not plugin_class:
+            raise PluginError(f"No Plugin subclass found in: {file_path}")
+        return plugin_class
 
-            # Find Plugin subclass
-            plugin_class = None
-            for _, obj in restricted_globals.items():
-                if (
-                    isinstance(obj, type)
-                    and issubclass(obj, Plugin)
-                    and obj is not Plugin
-                ):
-                    plugin_class = obj
-                    break
+    def _register_plugin(
+        self, plugin_class: type[Plugin], file_path: Path, file_hash: str
+    ) -> None:
+        """Create, validate, activate, and register a plugin."""
+        plugin = plugin_class(self.registry)
+        metadata = plugin.metadata
 
-            if not plugin_class:
-                raise PluginError(f"No Plugin subclass found in: {file_path}")
+        if not metadata.name or ".." in metadata.name or "/" in metadata.name:
+            raise PluginError(f"Invalid plugin name: {metadata.name!r}")
 
-            # Create and activate plugin
-            plugin = plugin_class(self.registry)
-            metadata = plugin.metadata
+        plugin.activate()
+        plugin.is_active = True
+        self.plugins[metadata.name] = plugin
 
-            # Additional validation of metadata
-            if not metadata.name or ".." in metadata.name or "/" in metadata.name:
-                raise PluginError(f"Invalid plugin name: {metadata.name!r}")
-
-            plugin.activate()
-            plugin.is_active = True
-            self.plugins[metadata.name] = plugin
-
-            logger.info(
-                f"Plugin loaded securely: {metadata.name} v{metadata.version}",
-                extra={"file_hash": file_hash},
-            )
-
-        except PluginError:
-            raise
-        except Exception as e:
-            raise PluginError(
-                f"Failed to load plugin: {file_path}", details={"error": str(e)}
-            ) from e
+        logger.info(
+            f"Plugin loaded securely: {metadata.name} v{metadata.version}",
+            extra={"file_hash": file_hash},
+        )
 
     def unload_plugin(self, name: str) -> None:
         """Unload a plugin."""

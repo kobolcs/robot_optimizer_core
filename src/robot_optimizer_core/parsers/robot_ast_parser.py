@@ -103,27 +103,13 @@ class RobotASTParser(RobotParserRepository):
         for item in keyword.body:
             item_type = getattr(item, "type", None)
             if item_type == "ARGUMENTS":
-                for arg_name in getattr(item, "values", ()):
-                    default = None
-                    name = arg_name
-                    if "=" in arg_name:
-                        name, default = arg_name.split("=", 1)
-                    arguments.append(
-                        RobotArgument(
-                            name=name,
-                            default_value=default,
-                            is_varargs=False,
-                            is_kwargs=False,
-                        )
-                    )
+                arguments = self._parse_arguments(item)
             elif item_type == "DOCUMENTATION":
-                args = _argument_values(item)
-                documentation = " ".join(args) if args else ""
+                documentation = self._parse_documentation(item)
             elif item_type == "TAGS":
-                tags = list(getattr(item, "values", ()))
+                tags = self._parse_tags(item)
             elif item_type == "RETURN":
-                vals = list(getattr(item, "values", ()))
-                return_value = " ".join(vals) if vals else ""
+                return_value = self._parse_return_value(item)
 
         body_calls = self._extract_keyword_calls(
             keyword.body, file_path, parent_keyword=keyword.name
@@ -138,6 +124,38 @@ class RobotASTParser(RobotParserRepository):
             body_calls=body_calls,
             return_value=return_value,
         )
+
+    def _parse_arguments(self, item: Any) -> list[RobotArgument]:
+        """Parse arguments from an ARGUMENTS item."""
+        arguments: list[RobotArgument] = []
+        for arg_name in getattr(item, "values", ()):
+            default = None
+            name = arg_name
+            if "=" in arg_name:
+                name, default = arg_name.split("=", 1)
+            arguments.append(
+                RobotArgument(
+                    name=name,
+                    default_value=default,
+                    is_varargs=False,
+                    is_kwargs=False,
+                )
+            )
+        return arguments
+
+    def _parse_documentation(self, item: Any) -> str | None:
+        """Parse documentation from a DOCUMENTATION item."""
+        args = _argument_values(item)
+        return " ".join(args) if args else ""
+
+    def _parse_tags(self, item: Any) -> list[str]:
+        """Parse tags from a TAGS item."""
+        return list(getattr(item, "values", ()))
+
+    def _parse_return_value(self, item: Any) -> str | None:
+        """Parse return value from a RETURN item."""
+        vals = list(getattr(item, "values", ()))
+        return " ".join(vals) if vals else ""
 
     # ------------------------------------------------------------------
     # Test cases
@@ -167,10 +185,9 @@ class RobotASTParser(RobotParserRepository):
         for item in test.body:
             item_type = getattr(item, "type", None)
             if item_type == "DOCUMENTATION":
-                args = _argument_values(item)
-                documentation = " ".join(args) if args else ""
+                documentation = self._parse_documentation(item)
             elif item_type == "TAGS":
-                tags = list(getattr(item, "values", ()))
+                tags = self._parse_tags(item)
             elif item_type == "SETUP":
                 setup = self._parse_setup_teardown(
                     item, file_path, parent_test=test.name
