@@ -111,7 +111,7 @@ class TestSettingsStrictness:
         from robot_optimizer_core.config import Settings
 
         s = Settings(max_file_size_mb=2.0, log_level="WARNING")
-        assert s.max_file_size_mb == 2.0
+        assert s.max_file_size_mb == pytest.approx(2.0)
 
 
 # ---------------------------------------------------------------------------

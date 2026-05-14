@@ -60,6 +60,52 @@ class TestDocumentationAnalyzer(BaseAnalyzer):
     def tags(self) -> list[str]:
         return ["documentation", "style", "readability"]
 
+    def _should_check_entity(self, entity: str) -> bool:
+        """Return True if the entity type should be checked."""
+        if entity == "test case":
+            return self._check_tests
+        return self._check_keywords
+
+    def _create_finding(
+        self,
+        test_file: TestFile,
+        name: str,
+        line: int,
+        entity: str,
+        *,
+        has_doc: bool,
+        doc_text: str,
+    ) -> Finding | None:
+        """Create a finding if entity lacks required documentation."""
+        if has_doc and len(doc_text.strip()) >= self._min_len:
+            return None
+        severity = (
+            self._sev_tests if entity == "test case" else self._sev_keywords
+        )
+        reason = (
+            "missing [Documentation]"
+            if not has_doc
+            else f"[Documentation] is too short (< {self._min_len} chars)"
+        )
+        pattern = Pattern(
+            type=PatternType.MISSING_DOCUMENTATION,
+            name="Missing Documentation",
+            description=f"{entity.title()} '{name}' has {reason}",
+            recommendation=(
+                f"Add [Documentation]    <description of what '{name}' does>"
+            ),
+            documentation_url=None,
+            auto_fixable=False,
+        )
+        return Finding.create(
+            pattern=pattern,
+            severity=severity,
+            location=Location(file_path=test_file.path, line=line),
+            message=(f"{entity.title()} '{name}' has {reason}"),
+            entity_type=entity,
+            entity_name=name,
+        )
+
     @override
     def analyze(self, test_file: TestFile) -> list[Finding]:
         findings: list[Finding] = []
@@ -67,54 +113,11 @@ class TestDocumentationAnalyzer(BaseAnalyzer):
 
         in_test_cases = False
         in_keywords = False
-
         current_name: str | None = None
         current_line: int = 1
         current_entity: str = "test case"
         has_doc = False
         doc_text = ""
-
-        def flush() -> None:
-            nonlocal has_doc, doc_text
-            if current_name is None:
-                return
-            entity = current_entity
-            check = (entity == "test case" and self._check_tests) or (
-                entity == "keyword" and self._check_keywords
-            )
-            if not check:
-                return
-            if not has_doc or len(doc_text.strip()) < self._min_len:
-                severity = (
-                    self._sev_tests if entity == "test case" else self._sev_keywords
-                )
-                reason = (
-                    "missing [Documentation]"
-                    if not has_doc
-                    else f"[Documentation] is too short (< {self._min_len} chars)"
-                )
-                pattern = Pattern(
-                    type=PatternType.MISSING_DOCUMENTATION,
-                    name="Missing Documentation",
-                    description=f"{entity.title()} '{current_name}' has {reason}",
-                    recommendation=(
-                        f"Add [Documentation]    <description of what '{current_name}' does>"
-                    ),
-                    documentation_url=None,
-                    auto_fixable=False,
-                )
-                findings.append(
-                    Finding.create(
-                        pattern=pattern,
-                        severity=severity,
-                        location=Location(file_path=test_file.path, line=current_line),
-                        message=(f"{entity.title()} '{current_name}' has {reason}"),
-                        entity_type=entity,
-                        entity_name=current_name,
-                    )
-                )
-            has_doc = False
-            doc_text = ""
 
         for line_num, line in enumerate(lines, 1):
             stripped = line.strip()
@@ -123,7 +126,17 @@ class TestDocumentationAnalyzer(BaseAnalyzer):
                 continue
 
             if stripped.startswith("***"):
-                flush()
+                if current_name and self._should_check_entity(current_entity):
+                    finding = self._create_finding(
+                        test_file,
+                        current_name,
+                        current_line,
+                        current_entity,
+                        has_doc=has_doc,
+                        doc_text=doc_text,
+                    )
+                    if finding:
+                        findings.append(finding)
                 current_name = None
                 has_doc = False
                 doc_text = ""
@@ -135,22 +148,44 @@ class TestDocumentationAnalyzer(BaseAnalyzer):
             # Non-indented line in a tracked section = new definition
             if not line.startswith((" ", "\t")):
                 if in_test_cases or in_keywords:
-                    flush()
-                    if stripped.startswith("#"):
-                        continue
-                    current_name = stripped
-                    current_line = line_num
-                    current_entity = "test case" if in_test_cases else "keyword"
-                    has_doc = False
-                    doc_text = ""
+                    if current_name and self._should_check_entity(current_entity):
+                        finding = self._create_finding(
+                            test_file,
+                            current_name,
+                            current_line,
+                            current_entity,
+                            has_doc=has_doc,
+                            doc_text=doc_text,
+                        )
+                        if finding:
+                            findings.append(finding)
+                    if not stripped.startswith("#"):
+                        current_name = stripped
+                        current_line = line_num
+                        current_entity = (
+                            "test case" if in_test_cases else "keyword"
+                        )
+                        has_doc = False
+                        doc_text = ""
                 continue
 
             # Indented line — check for [Documentation]
             if current_name and stripped.lower().startswith("[documentation]"):
                 has_doc = True
-                # Extract doc text after the tag
                 parts = stripped.split(None, 1)
                 doc_text = parts[1] if len(parts) > 1 else ""
 
-        flush()
+        # Final flush for last entity
+        if current_name and self._should_check_entity(current_entity):
+            finding = self._create_finding(
+                test_file,
+                current_name,
+                current_line,
+                current_entity,
+                has_doc=has_doc,
+                doc_text=doc_text,
+            )
+            if finding:
+                findings.append(finding)
+
         return findings

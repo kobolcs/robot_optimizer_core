@@ -139,16 +139,43 @@ class PathExclusionTrie:
 
         node.is_excluded = True
 
+    def _check_component_patterns(self, parts: tuple[str, ...]) -> bool:
+        """Check if any path component matches a component pattern."""
+        if not self._component_patterns:
+            return False
+        for part in parts:
+            for cpat in self._component_patterns:
+                if cpat.match(part):
+                    return True
+        return False
+
+    def _find_next_node(
+        self, node: TrieNode, part: str
+    ) -> tuple[TrieNode | None, bool]:
+        """Find the next node for a path part.
+
+        Returns (next_node, found). If not found, returns (None, False).
+        """
+        # Check exact match
+        if part in node.children:
+            return node.children[part], True
+
+        # Check for pattern children
+        for child_name, child_node in node.children.items():
+            if "*" in child_name or "?" in child_name:
+                pat = re.compile(fnmatch.translate(child_name))
+                if pat.match(part):
+                    return child_node, True
+
+        return None, False
+
     def is_excluded(self, path: Path) -> bool:
         """Check if path is excluded - O(d) where d is directory depth."""
         parts = path.parts
 
         # Fast component-pattern check for ** patterns
-        if self._component_patterns:
-            for part in parts:
-                for cpat in self._component_patterns:
-                    if cpat.match(part):
-                        return True
+        if self._check_component_patterns(parts):
+            return True
 
         node = self.root
 
@@ -162,20 +189,12 @@ class PathExclusionTrie:
                 if node.pattern.match(part):
                     return True
 
-            # Check exact match
-            if part in node.children:
-                node = node.children[part]
+            # Find next node
+            next_node, found = self._find_next_node(node, part)
+            if found:
+                node = next_node
             else:
-                # Check for pattern children
-                for child_name, child_node in node.children.items():
-                    if "*" in child_name or "?" in child_name:
-                        pat = re.compile(fnmatch.translate(child_name))
-                        if pat.match(part):
-                            node = child_node
-                            break
-                else:
-                    # No match found
-                    return False
+                return False
 
         return node.is_excluded
 

@@ -36,6 +36,7 @@ class TestDeprecatedDecorator:
     def test_message_includes_removed_in(self) -> None:
         @deprecated(since="1.0.0", removed_in="2.0.0")
         def old_fn() -> None:
+            # Intentionally empty; tests the decorator, not the function behavior.
             pass
 
         with warnings.catch_warnings(record=True) as w:
@@ -46,6 +47,7 @@ class TestDeprecatedDecorator:
     def test_message_includes_replacement(self) -> None:
         @deprecated(since="1.0.0", replacement="new_fn")
         def old_fn() -> None:
+            # Intentionally empty; tests the decorator, not the function behavior.
             pass
 
         with warnings.catch_warnings(record=True) as w:
@@ -103,12 +105,14 @@ class TestCheckAndGetDeprecationInfo:
     def test_check_deprecated_on_decorated(self) -> None:
         @deprecated(since="1.0.0")
         def old() -> None:
+            # Intentionally empty; tests the decorator, not the function behavior.
             pass
 
         assert check_deprecated(old) is True
 
     def test_check_deprecated_on_normal(self) -> None:
         def normal() -> None:
+            # Intentionally empty; tests that non-decorated functions are not flagged.
             pass
 
         assert check_deprecated(normal) is False
@@ -116,6 +120,7 @@ class TestCheckAndGetDeprecationInfo:
     def test_get_info_on_decorated(self) -> None:
         @deprecated(since="1.5.0", replacement="better")
         def old() -> None:
+            # Intentionally empty; tests the decorator, not the function behavior.
             pass
 
         info = get_deprecation_info(old)
@@ -125,6 +130,7 @@ class TestCheckAndGetDeprecationInfo:
 
     def test_get_info_on_normal_returns_none(self) -> None:
         def normal() -> None:
+            # Intentionally empty; tests that non-decorated functions return no info.
             pass
 
         assert get_deprecation_info(normal) is None

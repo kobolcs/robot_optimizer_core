@@ -233,6 +233,39 @@ def analyze_file(
     return all_findings
 
 
+def _validate_directory_path(directory_path: str | Path) -> Path:
+    """Validate that the directory path exists and is a directory."""
+    path = Path(directory_path)
+    if not path.exists():
+        raise RobotFileNotFoundError(path)
+    if not path.is_dir():
+        raise AnalysisError("Path is not a directory", file_path=path)
+    return path
+
+
+def _handle_directory_analysis_errors(
+    file_errors: list[tuple[Path, Exception]],
+    error_handling: ErrorHandling,
+    fail_fast: bool,
+    dir_results: DirectoryResults,
+) -> None:
+    """Handle errors from directory analysis based on error_handling mode."""
+    if not file_errors:
+        return
+    effective_handling = "raise" if fail_fast else error_handling
+    if effective_handling == "raise":
+        raise ExceptionGroup(
+            f"Analysis failed for {len(file_errors)} files",
+            [e for _, e in file_errors],
+        )
+    if effective_handling == "warn":
+        logger.warning(
+            f"Analysis had partial failures: {len(file_errors)} file(s) could not be analyzed",
+            extra={"failed_files": [str(p) for p, _ in file_errors]},
+        )
+        dir_results.errors = file_errors
+
+
 def analyze_directory(
     directory_path: str | Path,
     patterns: list[str] | None = None,
@@ -295,10 +328,7 @@ def analyze_directory(
         >>> for file_path, findings in findings_map.items():
         ...     print(f"{file_path}: {len(findings)} findings")
     """
-    # Convert to Path
-    path = Path(directory_path)
-
-    # Emit deprecation warning for fail_fast before any other processing
+    # Deprecation warning
     if fail_fast:
         warnings.warn(
             "The 'fail_fast' parameter is deprecated since 1.0.0b1 and will be "
@@ -307,30 +337,20 @@ def analyze_directory(
             stacklevel=2,
         )
 
-    # Validate directory exists
-    if not path.exists():
-        raise RobotFileNotFoundError(path)
-
-    if not path.is_dir():
-        raise AnalysisError("Path is not a directory", file_path=path)
-
-    # Resolve services through the DI container
+    # Validate directory and resolve settings
+    path = _validate_directory_path(directory_path)
     container = get_container()
     if settings is None:
         settings = container.resolve("settings")
     discovery: Any = container.resolve("file_discovery")
 
-    # Discover files
-    if patterns is None:
-        patterns = settings.file_patterns
-
-    if exclude_patterns is None:
-        exclude_patterns = settings.exclude_patterns
-
+    # Discover files with resolved patterns
+    resolved_patterns = patterns or settings.file_patterns
+    resolved_excludes = exclude_patterns or settings.exclude_patterns
     files = discovery.find_files(
         root_path=path,
-        patterns=patterns,
-        exclude_patterns=exclude_patterns,
+        patterns=resolved_patterns,
+        exclude_patterns=resolved_excludes,
         recursive=recursive,
     )
 
@@ -343,9 +363,9 @@ def analyze_directory(
         },
     )
 
+    # Execute analysis
     _default_workers = min(4, (os.cpu_count() or 1))
     effective_workers = max_workers if max_workers is not None else _default_workers
-
     analyze_fn = functools.partial(
         _analyze_one_file,
         analyzers=analyzers,
@@ -357,7 +377,7 @@ def analyze_directory(
         files, analyze_fn, effective_workers, fail_fast
     )
 
-    # Log summary
+    # Log and track metrics
     total_findings = sum(len(findings) for findings in dir_results.values())
     logger.info(
         "Directory analysis complete",
@@ -369,33 +389,120 @@ def analyze_directory(
         },
     )
 
-    # Track metrics
     if metrics is None:
         metrics = container.resolve("metrics")
     metrics.gauge("batch.files_analyzed", len(dir_results))
     metrics.gauge("batch.files_failed", len(file_errors))
     metrics.gauge("batch.total_findings", total_findings)
 
-    # Configurable per-file error handling.
-    if file_errors:
-        effective_handling = error_handling
-        if fail_fast:
-            effective_handling = "raise"
-
-        if effective_handling == "raise":
-            raise ExceptionGroup(
-                f"Analysis failed for {len(file_errors)} files",
-                [e for _, e in file_errors],
-            )
-        if effective_handling == "warn":
-            logger.warning(
-                f"Analysis had partial failures: {len(file_errors)} file(s) could not be analyzed",
-                extra={"failed_files": [str(p) for p, _ in file_errors]},
-            )
-            dir_results.errors = file_errors
-        # "skip": silently continue
+    # Handle errors
+    _handle_directory_analysis_errors(
+        file_errors, error_handling, fail_fast, dir_results
+    )
 
     return dir_results
+
+
+def _load_test_files(files: list[Path]) -> list[TestFile]:
+    """Load TestFile objects from file paths."""
+    test_files: list[TestFile] = []
+    for file_path in files:
+        try:
+            tf = TestFile.from_path(file_path)
+            test_files.append(tf)
+        except Exception as e:
+            logger.warning(
+                f"Failed to load file for suite analysis: {file_path}",
+                extra={"error": str(e)},
+            )
+    return test_files
+
+
+def _gather_suite_structure(
+    test_files: list[TestFile], parser: Any
+) -> SuiteInfo:
+    """Parse and gather suite structure information."""
+    suite_info: SuiteInfo = {
+        "files": len(test_files),
+        "keywords": [],
+        "test_cases": [],
+        "imports": [],
+    }
+    for tf in test_files:
+        try:
+            robot_suite = parser.parse_suite(tf)
+            suite_info["keywords"].extend(robot_suite.keywords)
+            suite_info["test_cases"].extend(robot_suite.test_cases)
+            suite_info["imports"].extend(robot_suite.imports)
+        except Exception as e:
+            logger.warning(
+                f"Failed to parse suite structure: {tf.path}", extra={"error": str(e)}
+            )
+    return suite_info
+
+
+def _analyze_with_other_analyzers(
+    test_files: list[TestFile],
+    other_analyzers: list[BaseAnalyzer],
+) -> tuple[list[Finding], dict[Path, list[Finding]]]:
+    """Run non-dead-code analyzers on each file."""
+    all_findings: list[Finding] = []
+    file_findings: dict[Path, list[Finding]] = {tf.path: [] for tf in test_files}
+
+    for tf in test_files:
+        for analyzer in other_analyzers:
+            try:
+                findings = analyzer.safe_analyze(tf)
+                all_findings.extend(findings)
+                file_findings[tf.path].extend(findings)
+            except Exception as e:
+                logger.error(
+                    f"Analyzer {analyzer.name} failed on {tf.path}: {e}",
+                    exc_info=True,
+                )
+
+    return all_findings, file_findings
+
+
+def _run_dead_code_analysis(
+    dead_code_analyzer: Any,
+    test_files: list[TestFile],
+    all_findings: list[Finding],
+    file_findings: dict[Path, list[Finding]],
+) -> None:
+    """Run dead code analyzer at suite level and integrate findings."""
+    if dead_code_analyzer is None or not test_files:
+        return
+    dc_findings = dead_code_analyzer.analyze_suite(test_files)
+    all_findings.extend(dc_findings)
+    for f in dc_findings:
+        fpath = f.location.file_path
+        if fpath in file_findings:
+            file_findings[fpath].append(f)
+        else:
+            file_findings[fpath] = [f]
+
+
+def _calculate_suite_statistics(
+    all_findings: list[Finding], suite_info: SuiteInfo
+) -> SuiteStatistics:
+    """Calculate analysis statistics."""
+    findings_by_severity: dict[str, int] = {}
+    findings_by_type: dict[str, int] = {}
+    for finding in all_findings:
+        sev = finding.severity.name
+        findings_by_severity[sev] = findings_by_severity.get(sev, 0) + 1
+        pt = finding.pattern.type.name  # type: ignore[attr-defined]
+        findings_by_type[pt] = findings_by_type.get(pt, 0) + 1
+
+    return {
+        "total_findings": len(all_findings),
+        "findings_by_severity": findings_by_severity,
+        "findings_by_type": findings_by_type,
+        "keyword_count": len(suite_info["keywords"]),
+        "test_count": len(suite_info["test_cases"]),
+        "import_count": len(suite_info["imports"]),
+    }
 
 
 def analyze_suite(
@@ -438,44 +545,17 @@ def analyze_suite(
         discovery: Any = container.resolve("file_discovery")
         files = discovery.find_files(path)
 
+    # Load test files and gather suite structure
     parser: Any = container.resolve("parser")
-    suite_info: SuiteInfo = {
-        "files": len(files),
-        "keywords": [],
-        "test_cases": [],
-        "imports": [],
-    }
+    test_files = _load_test_files(files)
+    suite_info = _gather_suite_structure(test_files, parser)
 
-    # Load TestFile objects once for suite-level dead-code analysis.
-    test_files: list[TestFile] = []
-    for file_path in files:
-        try:
-            tf = TestFile.from_path(file_path)
-            test_files.append(tf)
-        except Exception as e:
-            logger.warning(
-                f"Failed to load file for suite analysis: {file_path}",
-                extra={"error": str(e)},
-            )
-
-    # Gather suite structure info
-    for tf in test_files:
-        try:
-            robot_suite = parser.parse_suite(tf)
-            suite_info["keywords"].extend(robot_suite.keywords)
-            suite_info["test_cases"].extend(robot_suite.test_cases)
-            suite_info["imports"].extend(robot_suite.imports)
-        except Exception as e:
-            logger.warning(
-                f"Failed to parse suite structure: {tf.path}", extra={"error": str(e)}
-            )
-
-    # Determine effective analyzer list
+    # Resolve settings and analyzer instances
     if settings is None:
         settings = container.resolve("settings")
     analyzer_instances = _get_analyzer_instances(analyzers, settings)
 
-    # Separate dead_code for suite-level cross-file analysis.
+    # Separate dead_code analyzer
     from .analyzers import DeadCodeAnalyzer
 
     dead_code_analyzer: DeadCodeAnalyzer | None = None
@@ -486,50 +566,14 @@ def analyze_suite(
         else:
             other_analyzers.append(a)
 
-    # Run non-dead-code analyzers per file using safe analyzer execution.
-    all_findings: list[Finding] = []
-    file_findings: dict[Path, list[Finding]] = {tf.path: [] for tf in test_files}
+    # Run analyzers
+    all_findings, file_findings = _analyze_with_other_analyzers(
+        test_files, other_analyzers
+    )
+    _run_dead_code_analysis(dead_code_analyzer, test_files, all_findings, file_findings)
 
-    for tf in test_files:
-        for analyzer in other_analyzers:
-            try:
-                findings = analyzer.safe_analyze(tf)
-                all_findings.extend(findings)
-                file_findings[tf.path].extend(findings)
-            except Exception as e:
-                logger.error(
-                    f"Analyzer {analyzer.name} failed on {tf.path}: {e}",
-                    exc_info=True,
-                )
-
-    # Run dead_code at suite level for cross-file accuracy.
-    if dead_code_analyzer is not None and test_files:
-        dc_findings = dead_code_analyzer.analyze_suite(test_files)
-        all_findings.extend(dc_findings)
-        # Distribute findings back to file_findings map
-        for f in dc_findings:
-            fpath = f.location.file_path
-            if fpath in file_findings:
-                file_findings[fpath].append(f)
-            else:
-                file_findings[fpath] = [f]
-
-    findings_by_severity: dict[str, int] = {}
-    findings_by_type: dict[str, int] = {}
-    for finding in all_findings:
-        sev = finding.severity.name
-        findings_by_severity[sev] = findings_by_severity.get(sev, 0) + 1
-        pt = finding.pattern.type.name  # type: ignore[attr-defined]
-        findings_by_type[pt] = findings_by_type.get(pt, 0) + 1
-
-    statistics: SuiteStatistics = {
-        "total_findings": len(all_findings),
-        "findings_by_severity": findings_by_severity,
-        "findings_by_type": findings_by_type,
-        "keyword_count": len(suite_info["keywords"]),
-        "test_count": len(suite_info["test_cases"]),
-        "import_count": len(suite_info["imports"]),
-    }
+    # Calculate statistics
+    statistics = _calculate_suite_statistics(all_findings, suite_info)
 
     return SuiteAnalysisResult(
         findings=all_findings,

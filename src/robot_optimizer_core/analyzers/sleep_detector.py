@@ -439,36 +439,44 @@ class SleepDetectorAnalyzer(BaseAnalyzer):
             duration_seconds, self._severity_thresholds
         )
 
+    # Wait keyword constants
+    _WAIT_ELEMENT_VISIBLE = "Wait Until Element Is Visible"
+    _WAIT_PAGE_CONTAINS = "Wait Until Page Contains"
+    _WAIT_KEYWORD_SUCCEEDS = "Wait Until Keyword Succeeds"
+    _WAIT_FOR_ELEMENTS_STATE = "Wait For Elements State"
+    _WAIT_FOR_NAVIGATION = "Wait For Navigation"
+    _WAIT_FOR_RESPONSE = "Wait For Response"
+
     # Library-specific wait keywords keyed by context category
     _LIBRARY_WAITS: ClassVar[dict[str, dict[str, str]]] = {
         "seleniumlibrary": {
-            "ui": "Wait Until Element Is Visible",
-            "page": "Wait Until Page Contains",
-            "verify": "Wait Until Keyword Succeeds",
-            "network": "Wait Until Keyword Succeeds",
-            "generic": "Wait Until Element Is Visible",
+            "ui": _WAIT_ELEMENT_VISIBLE,
+            "page": _WAIT_PAGE_CONTAINS,
+            "verify": _WAIT_KEYWORD_SUCCEEDS,
+            "network": _WAIT_KEYWORD_SUCCEEDS,
+            "generic": _WAIT_ELEMENT_VISIBLE,
         },
         "browser": {
-            "ui": "Wait For Elements State",
-            "page": "Wait For Navigation",
-            "verify": "Wait Until Keyword Succeeds",
-            "network": "Wait For Response",
-            "generic": "Wait For Elements State",
+            "ui": _WAIT_FOR_ELEMENTS_STATE,
+            "page": _WAIT_FOR_NAVIGATION,
+            "verify": _WAIT_KEYWORD_SUCCEEDS,
+            "network": _WAIT_FOR_RESPONSE,
+            "generic": _WAIT_FOR_ELEMENTS_STATE,
         },
         "appiumlibrary": {
-            "ui": "Wait Until Element Is Visible",
-            "page": "Wait Until Page Contains",
-            "verify": "Wait Until Keyword Succeeds",
-            "network": "Wait Until Keyword Succeeds",
-            "generic": "Wait Until Element Is Visible",
+            "ui": _WAIT_ELEMENT_VISIBLE,
+            "page": _WAIT_PAGE_CONTAINS,
+            "verify": _WAIT_KEYWORD_SUCCEEDS,
+            "network": _WAIT_KEYWORD_SUCCEEDS,
+            "generic": _WAIT_ELEMENT_VISIBLE,
         },
     }
     _GENERIC_WAITS: ClassVar[dict[str, str]] = {
-        "ui": "Wait Until Element Is Visible",
-        "page": "Wait Until Page Contains",
-        "verify": "Wait Until Keyword Succeeds",
-        "network": "Wait Until Keyword Succeeds",
-        "generic": "Wait Until Keyword Succeeds",
+        "ui": _WAIT_ELEMENT_VISIBLE,
+        "page": _WAIT_PAGE_CONTAINS,
+        "verify": _WAIT_KEYWORD_SUCCEEDS,
+        "network": _WAIT_KEYWORD_SUCCEEDS,
+        "generic": _WAIT_KEYWORD_SUCCEEDS,
     }
 
     def _detect_library(self, lines: list[str]) -> str | None:
