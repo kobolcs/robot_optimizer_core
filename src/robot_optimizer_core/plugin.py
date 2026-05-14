@@ -167,6 +167,42 @@ class PluginSecurityValidator:
 class SecurityVisitor(ast.NodeVisitor):
     """AST visitor that checks for security violations."""
 
+    # Dangerous built-in functions
+    _DANGEROUS_FUNCS = {
+        "eval",
+        "exec",
+        "compile",
+        "__import__",
+        "open",
+        "input",
+        "raw_input",
+        "execfile",
+        "file",
+        "reload",
+    }
+
+    # Dangerous attributes that can be used with getattr/setattr
+    _DANGEROUS_ATTRS = {
+        "__dict__",
+        "__globals__",
+        "__builtins__",
+        "__import__",
+        "__code__",
+        "__class__",
+        "__bases__",
+        "__subclasses__",
+    }
+
+    # Dangerous modules
+    _DANGEROUS_MODULES = {
+        "os",
+        "sys",
+        "subprocess",
+        "socket",
+        "urllib",
+        "requests",
+    }
+
     def __init__(self) -> None:
         self.violations: list[str] = []
         self.in_plugin_class = False
@@ -191,86 +227,50 @@ class SecurityVisitor(ast.NodeVisitor):
                 )
         self.generic_visit(node)
 
-    def visit_Call(self, node: ast.Call) -> None:
-        """Check function calls for dangerous operations."""
-        # Check for dangerous functions
-        if isinstance(node.func, ast.Name):
-            func_name = node.func.id
-            dangerous_funcs = {
-                "eval",
-                "exec",
-                "compile",
-                "__import__",
-                "open",
-                "input",
-                "raw_input",
-                "execfile",
-                "file",
-                "reload",
-            }
-            if func_name in dangerous_funcs:
-                self.violations.append(f"Forbidden function call: {func_name}")
+    def _check_dangerous_func(self, func_name: str) -> None:
+        """Check if function call is dangerous."""
+        if func_name in self._DANGEROUS_FUNCS:
+            self.violations.append(f"Forbidden function call: {func_name}")
 
-            # getattr/setattr with a dangerous or non-literal attr name bypass visit_Attribute
-            elif func_name in {"getattr", "setattr"} and len(node.args) >= 2:
-                attr_arg = node.args[1]
-                if isinstance(attr_arg, ast.Constant) and isinstance(
-                    attr_arg.value, str
-                ):
-                    dangerous_attrs = {
-                        "__dict__",
-                        "__globals__",
-                        "__builtins__",
-                        "__import__",
-                        "__code__",
-                        "__class__",
-                        "__bases__",
-                        "__subclasses__",
-                    }
-                    if attr_arg.value in dangerous_attrs:
-                        self.violations.append(
-                            f"Forbidden {func_name} with dangerous attribute: {attr_arg.value!r}"
-                        )
-                else:
-                    # Non-literal attribute name — can't verify safety at analysis time
+    def _check_getattr_setattr(self, func_name: str, node: ast.Call) -> None:
+        """Check getattr/setattr with dangerous attributes."""
+        if len(node.args) >= 2:
+            attr_arg = node.args[1]
+            if isinstance(attr_arg, ast.Constant) and isinstance(attr_arg.value, str):
+                if attr_arg.value in self._DANGEROUS_ATTRS:
                     self.violations.append(
-                        f"Forbidden {func_name} with non-literal attribute name"
+                        f"Forbidden {func_name} with dangerous attribute: {attr_arg.value!r}"
                     )
+            else:
+                self.violations.append(
+                    f"Forbidden {func_name} with non-literal attribute name"
+                )
 
-        # Check for subprocess, os, sys modules
-        elif isinstance(node.func, ast.Attribute):
+    def _check_module_usage(self, node: ast.Call) -> None:
+        """Check for dangerous module usage."""
+        if isinstance(node.func, ast.Attribute):
             if isinstance(node.func.value, ast.Name):
                 module = node.func.value.id
-                if module in {
-                    "os",
-                    "sys",
-                    "subprocess",
-                    "socket",
-                    "urllib",
-                    "requests",
-                }:
+                if module in self._DANGEROUS_MODULES:
                     self.violations.append(
                         f"Forbidden module usage: {module}.{node.func.attr}"
                     )
 
+    def visit_Call(self, node: ast.Call) -> None:
+        """Check function calls for dangerous operations."""
+        if isinstance(node.func, ast.Name):
+            func_name = node.func.id
+            self._check_dangerous_func(func_name)
+            if func_name in {"getattr", "setattr"}:
+                self._check_getattr_setattr(func_name, node)
+        else:
+            self._check_module_usage(node)
         self.generic_visit(node)
 
     def visit_Attribute(self, node: ast.Attribute) -> None:
         """Check attribute access for dangerous patterns."""
-        # Check for __dict__, __globals__, etc.
-        if node.attr.startswith("__") and node.attr.endswith("__"):
-            dangerous_attrs = {
-                "__dict__",
-                "__globals__",
-                "__builtins__",
-                "__import__",
-                "__code__",
-                "__class__",
-                "__bases__",
-                "__subclasses__",
-            }
-            if node.attr in dangerous_attrs:
-                self.violations.append(f"Forbidden attribute access: {node.attr}")
+        if node.attr in self._DANGEROUS_ATTRS:
+            self.violations.append(f"Forbidden attribute access: {node.attr}")
 
         self.generic_visit(node)
 
@@ -299,6 +299,78 @@ class ValidatedPluginManager:
         """Compute SHA-256 hash of a file."""
         return hashlib.sha256(file_path.read_bytes()).hexdigest()
 
+    def _validate_and_check_plugin(self, file_path: Path, force: bool = False) -> str:
+        """Validate plugin file and return its hash. Raises PluginError if validation fails."""
+        file_hash = self._compute_file_hash(file_path)
+        if file_hash in self.trusted_hashes:
+            logger.info(f"Loading trusted plugin: {file_path}")
+            return file_hash
+
+        if not force:
+            is_safe, violations = self.validator.validate_file(file_path)
+            if not is_safe:
+                raise PluginError(
+                    f"Plugin failed security validation: {file_path}",
+                    details={"violations": violations, "file_hash": file_hash},
+                )
+        else:
+            logger.warning(
+                f"Plugin security validation bypassed via force=True: {file_path} "
+                f"(hash: {file_hash})"
+            )
+
+        return file_hash
+
+    def _create_restricted_globals(self, file_path: Path) -> dict:
+        """Create restricted globals environment for plugin execution."""
+        builtin_dict = (
+            __builtins__ if isinstance(__builtins__, dict) else vars(__builtins__)
+        )
+        restricted_builtins = {
+            k: builtin_dict[k] for k in ALLOWED_BUILTINS if k in builtin_dict
+        }
+        for _name in ("__import__", "__build_class__"):
+            if _name in builtin_dict:
+                restricted_builtins[_name] = builtin_dict[_name]
+        return {
+            "__builtins__": restricted_builtins,
+            "__name__": f"plugin_{file_path.stem}",
+            "__file__": str(file_path),
+        }
+
+    def _execute_and_load_plugin(
+        self, file_path: Path, restricted_globals: dict, file_hash: str
+    ) -> None:
+        """Execute plugin code and register the Plugin subclass."""
+        plugin_code = file_path.read_text(encoding="utf-8")
+        compiled = compile(plugin_code, str(file_path), "exec", flags=0)
+
+        exec(compiled, restricted_globals)
+
+        plugin_class = None
+        for obj in restricted_globals.values():
+            if isinstance(obj, type) and issubclass(obj, Plugin) and obj is not Plugin:
+                plugin_class = obj
+                break
+
+        if not plugin_class:
+            raise PluginError(f"No Plugin subclass found in: {file_path}")
+
+        plugin = plugin_class(self.registry)
+        metadata = plugin.metadata
+
+        if not metadata.name or ".." in metadata.name or "/" in metadata.name:
+            raise PluginError(f"Invalid plugin name: {metadata.name!r}")
+
+        plugin.activate()
+        plugin.is_active = True
+        self.plugins[metadata.name] = plugin
+
+        logger.info(
+            f"Plugin loaded securely: {metadata.name} v{metadata.version}",
+            extra={"file_hash": file_hash},
+        )
+
     def load_plugin_from_file(self, file_path: Path, force: bool = False) -> None:
         """Securely load a plugin from a file.
 
@@ -312,53 +384,9 @@ class ValidatedPluginManager:
         if not file_path.exists():
             raise PluginError(f"Plugin file not found: {file_path}")
 
-        # Check if plugin is trusted
-        file_hash = self._compute_file_hash(file_path)
-        if file_hash in self.trusted_hashes:
-            logger.info(f"Loading trusted plugin: {file_path}")
-        elif not force:
-            # Validate plugin security
-            is_safe, violations = self.validator.validate_file(file_path)
-
-            if not is_safe:
-                raise PluginError(
-                    f"Plugin failed security validation: {file_path}",
-                    details={"violations": violations, "file_hash": file_hash},
-                )
-        else:
-            logger.warning(
-                f"Plugin security validation bypassed via force=True: {file_path} "
-                f"(hash: {file_hash})"
-            )
-
-        # Load plugin in restricted environment
         try:
-            # Create a restricted globals environment
-            # Handle both dict and module forms of __builtins__
-            builtin_dict = (
-                __builtins__ if isinstance(__builtins__, dict) else vars(__builtins__)
-            )
-            restricted_builtins = {
-                k: builtin_dict[k] for k in ALLOWED_BUILTINS if k in builtin_dict
-            }
-            # __import__ and __build_class__ are required by the Python runtime
-            # inside exec() for import statements and class definitions.
-            # Security is enforced by the AST validator that runs before exec,
-            # so restoring these here does not bypass the import allowlist.
-            for _name in ("__import__", "__build_class__"):
-                if _name in builtin_dict:
-                    restricted_builtins[_name] = builtin_dict[_name]
-            restricted_globals = {
-                "__builtins__": restricted_builtins,
-                "__name__": f"plugin_{file_path.stem}",
-                "__file__": str(file_path),
-            }
-
-            # Read and compile the plugin code
-            plugin_code = file_path.read_text(encoding="utf-8")
-
-            # Compile with restricted mode
-            compiled = compile(plugin_code, str(file_path), "exec", flags=0)
+            file_hash = self._validate_and_check_plugin(file_path, force)
+            restricted_globals = self._create_restricted_globals(file_path)
 
             # Execute in restricted environment with layered security:
             # 1. AST validation before execution detects forbidden imports, dangerous function
@@ -372,38 +400,7 @@ class ValidatedPluginManager:
             # 4. Plugin hash validation allows pre-approved plugins to skip validation.
             # This approach provides defense-in-depth: AST validation catches code patterns
             # before execution, and restricted environment limits runtime capabilities.
-            exec(compiled, restricted_globals)
-
-            # Find Plugin subclass
-            plugin_class = None
-            for _, obj in restricted_globals.items():
-                if (
-                    isinstance(obj, type)
-                    and issubclass(obj, Plugin)
-                    and obj is not Plugin
-                ):
-                    plugin_class = obj
-                    break
-
-            if not plugin_class:
-                raise PluginError(f"No Plugin subclass found in: {file_path}")
-
-            # Create and activate plugin
-            plugin = plugin_class(self.registry)
-            metadata = plugin.metadata
-
-            # Additional validation of metadata
-            if not metadata.name or ".." in metadata.name or "/" in metadata.name:
-                raise PluginError(f"Invalid plugin name: {metadata.name!r}")
-
-            plugin.activate()
-            plugin.is_active = True
-            self.plugins[metadata.name] = plugin
-
-            logger.info(
-                f"Plugin loaded securely: {metadata.name} v{metadata.version}",
-                extra={"file_hash": file_hash},
-            )
+            self._execute_and_load_plugin(file_path, restricted_globals, file_hash)
 
         except PluginError:
             raise

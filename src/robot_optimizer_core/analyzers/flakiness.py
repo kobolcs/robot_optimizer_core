@@ -103,7 +103,9 @@ class FlakinessAnalyzer(BaseAnalyzer):
         self._repository: TestResultRepository | None = test_result_repository
 
         self._days_back = self.get_config_value("days_back", 30)
-        _need_settings = "failure_threshold" not in self.config or "min_runs" not in self.config
+        _need_settings = (
+            "failure_threshold" not in self.config or "min_runs" not in self.config
+        )
         if _need_settings:
             _s = get_settings()
             _default_failure = _s.flakiness_threshold
@@ -111,7 +113,9 @@ class FlakinessAnalyzer(BaseAnalyzer):
         else:
             _default_failure = 0.05
             _default_runs = 4
-        self._failure_threshold = self.get_config_value("failure_threshold", _default_failure)
+        self._failure_threshold = self.get_config_value(
+            "failure_threshold", _default_failure
+        )
         self._min_runs = self.get_config_value("min_runs", _default_runs)
 
         # Severity thresholds

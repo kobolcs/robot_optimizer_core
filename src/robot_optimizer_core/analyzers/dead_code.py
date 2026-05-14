@@ -307,6 +307,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         if not hasattr(items, "__iter__"):
             return
         from collections.abc import Iterable
+
         for item in items if isinstance(items, Iterable) else []:
             self._collect_item_calls(item, calls)
 
@@ -442,11 +443,15 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                 _match_prefixes(" ".join(parts[1:]), keyword_names, calls)
 
             if lowered.startswith("run keyword "):
-                _match_prefixes(lowered.removeprefix("run keyword ").strip(), keyword_names, calls)
+                _match_prefixes(
+                    lowered.removeprefix("run keyword ").strip(), keyword_names, calls
+                )
 
             if lowered.startswith("run keywords "):
                 for part in re.split(
-                    r"\s+AND\s+", lowered.removeprefix("run keywords "), flags=re.IGNORECASE
+                    r"\s+AND\s+",
+                    lowered.removeprefix("run keywords "),
+                    flags=re.IGNORECASE,
                 ):
                     _match_prefixes(part.strip(), keyword_names, calls)
 

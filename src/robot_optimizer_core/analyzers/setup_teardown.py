@@ -132,6 +132,70 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
     def tags(self) -> list[str]:
         return ["structure", "duplication", "best-practices"]
 
+    def _check_setup_hooks(
+        self, test_file: TestFile, test_steps: list
+    ) -> list[Finding]:
+        """Check for duplicate inline setup hooks."""
+        findings: list[Finding] = []
+        first_steps: Counter[str] = Counter()
+        for _, _, steps, has_setup, _ in test_steps:
+            if steps and not has_setup:
+                first = steps[0]
+                if _matches_hint(first, _SETUP_HINTS):
+                    first_steps[first.lower()] += 1
+
+        for test_name, line_num, steps, has_setup, _ in test_steps:
+            if not steps or has_setup:
+                continue
+            first = steps[0]
+            if (
+                _matches_hint(first, _SETUP_HINTS)
+                and first_steps[first.lower()] >= self._threshold
+            ):
+                findings.append(
+                    self._make_finding(
+                        test_name,
+                        line_num,
+                        test_file,
+                        step=first,
+                        kind="setup",
+                        count=first_steps[first.lower()],
+                    )
+                )
+        return findings
+
+    def _check_teardown_hooks(
+        self, test_file: TestFile, test_steps: list
+    ) -> list[Finding]:
+        """Check for duplicate inline teardown hooks."""
+        findings: list[Finding] = []
+        last_steps: Counter[str] = Counter()
+        for _, _, steps, _, has_teardown in test_steps:
+            if steps and not has_teardown:
+                last = steps[-1]
+                if _matches_hint(last, _TEARDOWN_HINTS):
+                    last_steps[last.lower()] += 1
+
+        for test_name, line_num, steps, _, has_teardown in test_steps:
+            if not steps or has_teardown:
+                continue
+            last = steps[-1]
+            if (
+                _matches_hint(last, _TEARDOWN_HINTS)
+                and last_steps[last.lower()] >= self._threshold
+            ):
+                findings.append(
+                    self._make_finding(
+                        test_name,
+                        line_num,
+                        test_file,
+                        step=last,
+                        kind="teardown",
+                        count=last_steps[last.lower()],
+                    )
+                )
+        return findings
+
     @override
     def analyze(self, test_file: TestFile) -> list[Finding]:
         findings: list[Finding] = []
@@ -140,60 +204,11 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
         if not test_steps:
             return findings
 
-        # Collect first and last steps per test for counting
         if self._check_setup:
-            first_steps: Counter[str] = Counter()
-            for _, _, steps, has_setup, _ in test_steps:
-                if steps and not has_setup:
-                    first = steps[0]
-                    if _matches_hint(first, _SETUP_HINTS):
-                        first_steps[first.lower()] += 1
-
-            for test_name, line_num, steps, has_setup, _ in test_steps:
-                if not steps or has_setup:
-                    continue
-                first = steps[0]
-                if (
-                    _matches_hint(first, _SETUP_HINTS)
-                    and first_steps[first.lower()] >= self._threshold
-                ):
-                    findings.append(
-                        self._make_finding(
-                            test_name,
-                            line_num,
-                            test_file,
-                            step=first,
-                            kind="setup",
-                            count=first_steps[first.lower()],
-                        )
-                    )
+            findings.extend(self._check_setup_hooks(test_file, test_steps))
 
         if self._check_teardown:
-            last_steps: Counter[str] = Counter()
-            for _, _, steps, _, has_teardown in test_steps:
-                if steps and not has_teardown:
-                    last = steps[-1]
-                    if _matches_hint(last, _TEARDOWN_HINTS):
-                        last_steps[last.lower()] += 1
-
-            for test_name, line_num, steps, _, has_teardown in test_steps:
-                if not steps or has_teardown:
-                    continue
-                last = steps[-1]
-                if (
-                    _matches_hint(last, _TEARDOWN_HINTS)
-                    and last_steps[last.lower()] >= self._threshold
-                ):
-                    findings.append(
-                        self._make_finding(
-                            test_name,
-                            line_num,
-                            test_file,
-                            step=last,
-                            kind="teardown",
-                            count=last_steps[last.lower()],
-                        )
-                    )
+            findings.extend(self._check_teardown_hooks(test_file, test_steps))
 
         return findings
 

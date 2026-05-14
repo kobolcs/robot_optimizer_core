@@ -23,7 +23,7 @@ from .domain.value_objects import Finding, Severity
 if TYPE_CHECKING:
     from .analyzers import BaseAnalyzer
 
-__all__ = ["AnalysisResult", "DirectoryAnalysisResult", "AnalysisService"]
+__all__ = ["AnalysisResult", "AnalysisService", "DirectoryAnalysisResult"]
 
 
 class AnalysisResult(NamedTuple):

@@ -74,7 +74,9 @@ class BaseAnalyzer(ABC):
         """
         self.config = config or {}
         self.metrics_enabled = metrics_enabled
-        self._metrics: MetricsCollector | None = None  # resolved lazily on first safe_analyze call
+        self._metrics: MetricsCollector | None = (
+            None  # resolved lazily on first safe_analyze call
+        )
         self._logger = get_logger(
             f"{__name__}.{self.__class__.__name__}", {"analyzer": self.name}
         )

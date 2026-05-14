@@ -41,6 +41,13 @@ _SEV_ERROR = "ERROR"
 _SEV_WARNING = "WARNING"
 _SEV_INFO = "INFO"
 
+# Health status labels
+_HEALTH_HIGH_RISK = "High Risk"
+_HEALTH_MODERATE_RISK = "Moderate Risk"
+_HEALTH_LOW_RISK = "Low Risk"
+_HEALTH_HEALTHY = "Healthy"
+_PLACEHOLDER_COMING_SOON = "coming soon"
+
 # ANSI colour helpers (disabled when not a tty)
 _COLOURS = {
     Severity.ERROR: "\033[31m",  # red
@@ -322,18 +329,18 @@ def _html_compute_stats(
 def _html_health_status(sev_counts: dict[str, int], findings: list[Finding]) -> str:
     """Classify the overall suite health into a display label."""
     if sev_counts[_SEV_ERROR] > 0 or sev_counts[_SEV_WARNING] >= 10:
-        return "High Risk"
+        return _HEALTH_HIGH_RISK
     if sev_counts[_SEV_WARNING] > 0:
-        return "Moderate Risk"
+        return _HEALTH_MODERATE_RISK
     if not findings:
-        return "Healthy"
+        return _HEALTH_HEALTHY
     if (
         len(findings) <= 5
         and sev_counts[_SEV_WARNING] == 0
         and sev_counts[_SEV_ERROR] == 0
     ):
-        return "Low Risk"
-    return "Moderate Risk"
+        return _HEALTH_LOW_RISK
+    return _HEALTH_MODERATE_RISK
 
 
 def _html_render_category_cards(
@@ -429,6 +436,38 @@ def _html_render_findings_table(findings: list[Finding], root: Path) -> str:
         + "".join(rows)
         + "</tbody></table>"
     )
+
+
+def _compute_severity_phrase(findings: list[Finding], health_status: str) -> str:
+    """Determine severity description based on findings and health status."""
+    if not findings:
+        return "no significant"
+    if health_status == _HEALTH_HIGH_RISK:
+        return "high"
+    return "moderate"
+
+
+def _compute_summary_paragraph(
+    findings: list[Finding], severity_phrase: str, top_category_names: str
+) -> str:
+    """Compute the summary paragraph text for the report."""
+    if not findings:
+        return (
+            "The analyzed suite shows no significant maintainability or stability risk "
+            "based on the selected checks. Continue periodic review to keep this baseline healthy."
+        )
+    return (
+        f"The analyzed suite shows {severity_phrase} maintainability and stability risk. "
+        f"The most common issues are {top_category_names}, which can increase maintenance "
+        "cost, execution instability, and delivery risk if left unaddressed."
+    )
+
+
+def _compute_no_findings_html(findings: list[Finding]) -> str:
+    """Compute the HTML to display when no findings are present."""
+    if not findings:
+        return "<p class='no-findings'>No findings were detected for the selected analyzers.</p>"
+    return ""
 
 
 _HTML_STYLES = """\
@@ -581,10 +620,10 @@ _HTML_STYLES = """\
 
 _HEALTH_COLORS: dict[str, tuple[str, str, str, str]] = {
     # status: (base, bg-alpha, border-alpha, glow-alpha) as hex colours
-    "High Risk": ("#ef4444", "#ef44441a", "#ef444455", "#ef444433"),
-    "Moderate Risk": ("#f59e0b", "#f59e0b1a", "#f59e0b55", "#f59e0b33"),
-    "Healthy": ("#0d9488", "#0d94881a", "#0d948855", "#0d948833"),
-    "Low Risk": ("#0d9488", "#0d94881a", "#0d948855", "#0d948833"),
+    _HEALTH_HIGH_RISK: ("#ef4444", "#ef44441a", "#ef444455", "#ef444433"),
+    _HEALTH_MODERATE_RISK: ("#f59e0b", "#f59e0b1a", "#f59e0b55", "#f59e0b33"),
+    _HEALTH_HEALTHY: ("#0d9488", "#0d94881a", "#0d948855", "#0d948833"),
+    _HEALTH_LOW_RISK: ("#0d9488", "#0d94881a", "#0d948855", "#0d948833"),
 }
 _HEALTH_COLOR_DEFAULT = ("#6b7280", "#6b72801a", "#6b728055", "#6b728033")
 
@@ -607,29 +646,11 @@ def _format_html(findings: list[Finding], path: Path) -> str:
     sorted_category_names = [name for name, _ in top_categories]
     top_category_names = ", ".join(cat for cat, _ in top_categories[:3])
 
-    severity_phrase = (
-        "no significant"
-        if not findings
-        else "high"
-        if health_status == "High Risk"
-        else "moderate"
+    severity_phrase = _compute_severity_phrase(findings, health_status)
+    summary_paragraph = _compute_summary_paragraph(
+        findings, severity_phrase, top_category_names
     )
-    summary_paragraph = (
-        "The analyzed suite shows no significant maintainability or stability risk based on the selected checks. "
-        "Continue periodic review to keep this baseline healthy."
-        if not findings
-        else (
-            f"The analyzed suite shows {severity_phrase} maintainability and stability risk. "
-            f"The most common issues are {top_category_names}, which can increase maintenance "
-            "cost, execution instability, and delivery risk if left unaddressed."
-        )
-    )
-
-    no_findings_html = (
-        "<p class='no-findings'>No findings were detected for the selected analyzers.</p>"
-        if not findings
-        else ""
-    )
+    no_findings_html = _compute_no_findings_html(findings)
     auto_fixable_count = sum(1 for f in findings if f.pattern.auto_fixable)
 
     action_items = _html_render_action_items(findings)
@@ -899,13 +920,13 @@ def _run_upgrade(_args: argparse.Namespace) -> int:
         ("Custom analyzer plugins", True, True),
         ("SARIF output format", True, True),
         ("Basic HTML report", True, True),
-        ("Auto-fix workflows", False, "coming soon"),
-        ("Advanced branded HTML reports", False, "coming soon"),
-        ("PDF export", False, "coming soon"),
-        ("Baseline diffing", False, "coming soon"),
-        ("Historical trend reports", False, "coming soon"),
-        ("Dashboards", False, "coming soon"),
-        ("Priority support", False, "coming soon"),
+        ("Auto-fix workflows", False, _PLACEHOLDER_COMING_SOON),
+        ("Advanced branded HTML reports", False, _PLACEHOLDER_COMING_SOON),
+        ("PDF export", False, _PLACEHOLDER_COMING_SOON),
+        ("Baseline diffing", False, _PLACEHOLDER_COMING_SOON),
+        ("Historical trend reports", False, _PLACEHOLDER_COMING_SOON),
+        ("Dashboards", False, _PLACEHOLDER_COMING_SOON),
+        ("Priority support", False, _PLACEHOLDER_COMING_SOON),
     ]
     for name, free, pro in features:
         free_mark = "✓" if free else "—"
