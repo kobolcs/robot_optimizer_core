@@ -125,6 +125,8 @@ class TestDocumentationAnalyzer(BaseAnalyzer):
             if stripped.startswith("***"):
                 flush()
                 current_name = None
+                has_doc = False
+                doc_text = ""
                 lower = stripped.lower()
                 in_test_cases = "test case" in lower
                 in_keywords = "keyword" in lower and "test case" not in lower

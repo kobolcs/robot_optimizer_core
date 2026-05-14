@@ -143,13 +143,13 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
         # Collect first and last steps per test for counting
         if self._check_setup:
             first_steps: Counter[str] = Counter()
-            for _, _, steps, _ in test_steps:
+            for _, _, steps, _, _ in test_steps:
                 if steps:
                     first = steps[0]
                     if _matches_hint(first, _SETUP_HINTS):
                         first_steps[first.lower()] += 1
 
-            for test_name, line_num, steps, has_setup in test_steps:
+            for test_name, line_num, steps, has_setup, _ in test_steps:
                 if not steps or has_setup:
                     continue
                 first = steps[0]
@@ -170,13 +170,13 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
 
         if self._check_teardown:
             last_steps: Counter[str] = Counter()
-            for _, _, steps, _ in test_steps:
+            for _, _, steps, _, _ in test_steps:
                 if steps:
                     last = steps[-1]
                     if _matches_hint(last, _TEARDOWN_HINTS):
                         last_steps[last.lower()] += 1
 
-            for test_name, line_num, steps, has_teardown in test_steps:
+            for test_name, line_num, steps, _, has_teardown in test_steps:
                 if not steps or has_teardown:
                     continue
                 last = steps[-1]
@@ -203,20 +203,27 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
 
     def _parse_test_steps(
         self, test_file: TestFile
-    ) -> list[tuple[str, int, list[str], bool]]:
-        """Parse test cases returning (name, line, steps, has_setup_or_teardown)."""
-        result: list[tuple[str, int, list[str], bool]] = []
+    ) -> list[tuple[str, int, list[str], bool, bool]]:
+        """Parse test cases returning (name, line, steps, has_setup, has_teardown)."""
+        result: list[tuple[str, int, list[str], bool, bool]] = []
         lines = test_file.content.splitlines()
         in_test_cases = False
         current_name: str | None = None
         current_line = 1
         current_steps: list[str] = []
-        has_hook = False
+        has_setup = False
+        has_teardown = False
 
         def flush() -> None:
             if current_name:
                 result.append(
-                    (current_name, current_line, list(current_steps), has_hook)
+                    (
+                        current_name,
+                        current_line,
+                        list(current_steps),
+                        has_setup,
+                        has_teardown,
+                    )
                 )
 
         for line_num, line in enumerate(lines, 1):
@@ -227,7 +234,8 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
                 flush()
                 current_name = None
                 current_steps = []
-                has_hook = False
+                has_setup = False
+                has_teardown = False
                 in_test_cases = "test case" in stripped.lower()
                 continue
 
@@ -236,13 +244,17 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
                 current_name = stripped if not stripped.startswith("#") else None
                 current_line = line_num
                 current_steps = []
-                has_hook = False
+                has_setup = False
+                has_teardown = False
                 continue
 
             if current_name and line.startswith((" ", "\t")):
                 lower = stripped.lower()
-                if lower.startswith("[setup]") or lower.startswith("[teardown]"):
-                    has_hook = True
+                if lower.startswith("[setup]"):
+                    has_setup = True
+                    continue
+                if lower.startswith("[teardown]"):
+                    has_teardown = True
                     continue
                 if lower.startswith("[") and lower.endswith("]"):
                     continue  # other settings like [Tags], [Documentation]

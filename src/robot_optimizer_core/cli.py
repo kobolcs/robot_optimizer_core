@@ -36,6 +36,11 @@ _EXIT_FINDINGS = 1
 _EXIT_ERROR = 2
 _EXIT_PARTIAL = 3  # Partial failure (some files could not be analysed).
 
+# Severity names (for JSON and HTML reports)
+_SEV_ERROR = "ERROR"
+_SEV_WARNING = "WARNING"
+_SEV_INFO = "INFO"
+
 # ANSI colour helpers (disabled when not a tty)
 _COLOURS = {
     Severity.ERROR: "\033[31m",  # red
@@ -67,6 +72,7 @@ def _render_html_template(context: dict[str, Any]) -> str:
     """
     try:
         from jinja2 import Environment, FileSystemLoader
+        from markupsafe import Markup
     except ImportError:
         # Fallback if jinja2 not available; use legacy rendering
         return _format_html_legacy(context)
@@ -79,8 +85,25 @@ def _render_html_template(context: dict[str, Any]) -> str:
         loader=FileSystemLoader(str(template_path.parent)),
         autoescape=True,
     )
+    # Mark HTML strings as safe so they don't get double-escaped
+    safe_context = context.copy()
+    for key in (
+        "action_items",
+        "grouped_findings",
+        "findings_table",
+        "styles",
+        "no_findings_html",
+    ):
+        if key in safe_context:
+            value = safe_context[key]
+            if isinstance(value, list):
+                safe_context[key] = [
+                    Markup(v) if isinstance(v, str) else v for v in value
+                ]
+            elif isinstance(value, str):
+                safe_context[key] = Markup(value)
     template = env.get_template(template_path.name)
-    return template.render(**context)
+    return template.render(**safe_context)
 
 
 # ---------------------------------------------------------------------------
@@ -272,7 +295,7 @@ def _html_compute_stats(
     """Compute summary statistics used by the HTML report."""
     root = path.resolve() if path.is_dir() else path.parent.resolve()
     timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
-    sev_counts: dict[str, int] = {"ERROR": 0, "WARNING": 0, "INFO": 0}
+    sev_counts: dict[str, int] = {_SEV_ERROR: 0, _SEV_WARNING: 0, _SEV_INFO: 0}
     affected_files: set[str] = set()
     category_summary: dict[str, _CategoryInfo] = {}
     category_groups: dict[str, list[Finding]] = {}
@@ -284,21 +307,31 @@ def _html_compute_stats(
         category, impact, action = _html_category_metadata(finding.pattern.name)
         category_groups.setdefault(category, []).append(finding)
         if category not in category_summary:
-            category_summary[category] = {"count": 0, "impact": impact, "action": action}
-        category_summary[category]["count"] = int(category_summary[category]["count"]) + 1
+            category_summary[category] = {
+                "count": 0,
+                "impact": impact,
+                "action": action,
+            }
+        category_summary[category]["count"] = (
+            int(category_summary[category]["count"]) + 1
+        )
 
     return timestamp, sev_counts, affected_files, category_summary, category_groups
 
 
 def _html_health_status(sev_counts: dict[str, int], findings: list[Finding]) -> str:
     """Classify the overall suite health into a display label."""
-    if sev_counts["ERROR"] > 0 or sev_counts["WARNING"] >= 10:
+    if sev_counts[_SEV_ERROR] > 0 or sev_counts[_SEV_WARNING] >= 10:
         return "High Risk"
-    if sev_counts["WARNING"] > 0:
+    if sev_counts[_SEV_WARNING] > 0:
         return "Moderate Risk"
     if not findings:
         return "Healthy"
-    if len(findings) <= 5 and sev_counts["WARNING"] == 0 and sev_counts["ERROR"] == 0:
+    if (
+        len(findings) <= 5
+        and sev_counts[_SEV_WARNING] == 0
+        and sev_counts[_SEV_ERROR] == 0
+    ):
         return "Low Risk"
     return "Moderate Risk"
 
@@ -331,7 +364,10 @@ def _html_render_action_items(findings: list[Finding]) -> str:
     for label, matcher in recommended_actions:
         if matcher == "tag|naming":
             is_relevant = any(
-                any(part in f.pattern.name.lower() for part in ("tag", "naming", "camel_case"))
+                any(
+                    part in f.pattern.name.lower()
+                    for part in ("tag", "naming", "camel_case")
+                )
                 for f in findings
             )
         else:
@@ -364,7 +400,9 @@ def _html_render_grouped_findings(
             "</article>"
             for item in sorted_items
         )
-        sections.append(f"<section class='finding-section'><h3>{escape(category_name)}</h3>{item_cards}</section>")
+        sections.append(
+            f"<section class='finding-section'><h3>{escape(category_name)}</h3>{item_cards}</section>"
+        )
     return "".join(sections)
 
 
@@ -381,7 +419,9 @@ def _html_render_findings_table(findings: list[Finding], root: Path) -> str:
         f"<td>{escape(f.message)}</td>"
         f"<td>{escape(f.pattern.recommendation)}</td>"
         "</tr>"
-        for f in sorted(findings, key=lambda x: (str(x.location.file_path), x.location.line))
+        for f in sorted(
+            findings, key=lambda x: (str(x.location.file_path), x.location.line)
+        )
     ]
     return (
         "<table><thead><tr><th>Severity</th><th>File</th><th>Line</th><th>Pattern</th>"
@@ -541,10 +581,10 @@ _HTML_STYLES = """\
 
 _HEALTH_COLORS: dict[str, tuple[str, str, str, str]] = {
     # status: (base, bg-alpha, border-alpha, glow-alpha) as hex colours
-    "High Risk":     ("#ef4444", "#ef44441a", "#ef444455", "#ef444433"),
+    "High Risk": ("#ef4444", "#ef44441a", "#ef444455", "#ef444433"),
     "Moderate Risk": ("#f59e0b", "#f59e0b1a", "#f59e0b55", "#f59e0b33"),
-    "Healthy":       ("#0d9488", "#0d94881a", "#0d948855", "#0d948833"),
-    "Low Risk":      ("#0d9488", "#0d94881a", "#0d948855", "#0d948833"),
+    "Healthy": ("#0d9488", "#0d94881a", "#0d948855", "#0d948833"),
+    "Low Risk": ("#0d9488", "#0d94881a", "#0d948855", "#0d948833"),
 }
 _HEALTH_COLOR_DEFAULT = ("#6b7280", "#6b72801a", "#6b728055", "#6b728033")
 
@@ -557,7 +597,9 @@ def _format_html(findings: list[Finding], path: Path) -> str:
     )
 
     health_status = _html_health_status(sev_counts, findings)
-    hc, hc_bg, hc_border, hc_glow = _HEALTH_COLORS.get(health_status, _HEALTH_COLOR_DEFAULT)
+    hc, hc_bg, hc_border, hc_glow = _HEALTH_COLORS.get(
+        health_status, _HEALTH_COLOR_DEFAULT
+    )
 
     top_categories = sorted(
         category_summary.items(), key=lambda item: int(item[1]["count"]), reverse=True
@@ -566,8 +608,10 @@ def _format_html(findings: list[Finding], path: Path) -> str:
     top_category_names = ", ".join(cat for cat, _ in top_categories[:3])
 
     severity_phrase = (
-        "no significant" if not findings
-        else "high" if health_status == "High Risk"
+        "no significant"
+        if not findings
+        else "high"
+        if health_status == "High Risk"
         else "moderate"
     )
     summary_paragraph = (
@@ -583,12 +627,15 @@ def _format_html(findings: list[Finding], path: Path) -> str:
 
     no_findings_html = (
         "<p class='no-findings'>No findings were detected for the selected analyzers.</p>"
-        if not findings else ""
+        if not findings
+        else ""
     )
     auto_fixable_count = sum(1 for f in findings if f.pattern.auto_fixable)
 
     action_items = _html_render_action_items(findings)
-    grouped_findings = _html_render_grouped_findings(sorted_category_names, category_groups, root)
+    grouped_findings = _html_render_grouped_findings(
+        sorted_category_names, category_groups, root
+    )
     table = _html_render_findings_table(findings, root)
 
     # Prepare template context
@@ -602,10 +649,10 @@ def _format_html(findings: list[Finding], path: Path) -> str:
         "timestamp": timestamp,
         "health_status": health_status,
         "total_findings": len(findings),
-        "error_count": sev_counts["ERROR"],
-        "warning_count": sev_counts["WARNING"],
-        "info_count": sev_counts["INFO"],
-        "warning_error_count": sev_counts["WARNING"] + sev_counts["ERROR"],
+        "error_count": sev_counts[_SEV_ERROR],
+        "warning_count": sev_counts[_SEV_WARNING],
+        "info_count": sev_counts[_SEV_INFO],
+        "warning_error_count": sev_counts[_SEV_WARNING] + sev_counts[_SEV_ERROR],
         "affected_files_count": len(affected_files),
         "auto_fixable_count": auto_fixable_count,
         "top_categories": top_categories,
@@ -632,12 +679,12 @@ def _format_html_legacy(context: dict[str, Any]) -> str:
   <title>Robot Framework Suite Health Report</title>
   <style>
     :root {{
-      --health-color: {context['health_color']};
-      --health-color-bg: {context['health_color_bg']};
-      --health-color-border: {context['health_color_border']};
-      --health-color-glow: {context['health_color_glow']};
+      --health-color: {context["health_color"]};
+      --health-color-bg: {context["health_color_bg"]};
+      --health-color-border: {context["health_color_border"]};
+      --health-color-glow: {context["health_color_glow"]};
     }}
-{context['styles']}
+{context["styles"]}
   </style>
 </head>
 <body>
@@ -647,58 +694,58 @@ def _format_html_legacy(context: dict[str, Any]) -> str:
     <h1>Suite Health Report</h1>
     <h2>Static analysis · maintainability &amp; stability</h2>
     <div class="cover-meta">
-      Analyzed: {escape(context['analyzed_path'])}<br>
-      Generated: {escape(context['timestamp'])}
+      Analyzed: {escape(context["analyzed_path"])}<br>
+      Generated: {escape(context["timestamp"])}
     </div>
   </section>
 
   <section class="panel">
     <h2>Health status</h2>
-    <span class="health-badge"><span class="health-dot"></span>{escape(context['health_status'])}</span>
+    <span class="health-badge"><span class="health-dot"></span>{escape(context["health_status"])}</span>
   </section>
 
   <section class="panel">
     <h2>Executive summary</h2>
-    <p>Total findings: <strong>{context['total_findings']}</strong> &nbsp;·&nbsp; Warnings/Errors: <strong>{context['warning_error_count']}</strong> &nbsp;·&nbsp; Main risk categories: <strong>{escape(context['top_categories_str'])}</strong></p>
-    <p>{escape(context['summary_paragraph'])}</p>
+    <p>Total findings: <strong>{context["total_findings"]}</strong> &nbsp;·&nbsp; Warnings/Errors: <strong>{context["warning_error_count"]}</strong> &nbsp;·&nbsp; Main risk categories: <strong>{escape(context["top_categories_str"])}</strong></p>
+    <p>{escape(context["summary_paragraph"])}</p>
   </section>
 
   <section class="panel">
     <h2>Key metrics</h2>
     <div class="bento">
-      <div class="metric-card"><div class="metric-label">Total findings</div><div class="metric-value">{context['total_findings']}</div></div>
-      <div class="metric-card"><div class="metric-label">ERROR</div><div class="metric-value">{context['error_count']}</div></div>
-      <div class="metric-card"><div class="metric-label">WARNING</div><div class="metric-value">{context['warning_count']}</div></div>
-      <div class="metric-card"><div class="metric-label">INFO</div><div class="metric-value">{context['info_count']}</div></div>
-      <div class="metric-card"><div class="metric-label">Affected files</div><div class="metric-value">{context['affected_files_count']}</div></div>
-      <div class="metric-card accent"><div class="metric-label">Auto-fixable findings</div><div class="metric-value">{context['auto_fixable_count']}</div></div>
+      <div class="metric-card"><div class="metric-label">Total findings</div><div class="metric-value">{context["total_findings"]}</div></div>
+      <div class="metric-card"><div class="metric-label">ERROR</div><div class="metric-value">{context["error_count"]}</div></div>
+      <div class="metric-card"><div class="metric-label">WARNING</div><div class="metric-value">{context["warning_count"]}</div></div>
+      <div class="metric-card"><div class="metric-label">INFO</div><div class="metric-value">{context["info_count"]}</div></div>
+      <div class="metric-card"><div class="metric-label">Affected files</div><div class="metric-value">{context["affected_files_count"]}</div></div>
+      <div class="metric-card accent"><div class="metric-label">Auto-fixable findings</div><div class="metric-value">{context["auto_fixable_count"]}</div></div>
     </div>
   </section>
 
   <section class="panel">
     <h2>Risk categories</h2>
     <div class="category-grid">
-      {_html_render_category_cards(context['top_categories']) or '<p>No risk categories detected.</p>'}
+      {_html_render_category_cards(context["top_categories"]) or "<p>No risk categories detected.</p>"}
     </div>
   </section>
 
   <section class="panel">
     <h2>Recommended actions</h2>
     <ol>
-      {''.join(context['action_items']) or '<li>Maintain current standards and monitor new findings.</li>'}
+      {"".join(context["action_items"]) or "<li>Maintain current standards and monitor new findings.</li>"}
     </ol>
   </section>
 
   <section class="panel">
     <h2>Findings by category</h2>
-    {context['no_findings_html']}
-    {''.join(context['grouped_findings'])}
+    {context["no_findings_html"]}
+    {"".join(context["grouped_findings"])}
   </section>
 
   <section class="panel">
     <h2>Appendix — Detailed Findings</h2>
-    {context['no_findings_html']}
-    <div class="table-wrap">{context['findings_table']}</div>
+    {context["no_findings_html"]}
+    <div class="table-wrap">{context["findings_table"]}</div>
   </section>
 </main>
 </body>
