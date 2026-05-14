@@ -275,15 +275,15 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         for section in model.sections:
             if not isinstance(section, KeywordSection):
                 continue
-            for kw in section.body:
-                name: str | None = getattr(kw, "name", None)
+            for keyword_node in section.body:
+                name: str | None = getattr(keyword_node, "name", None)
                 if not name or not isinstance(name, str):
                     continue
                 if name[0].isdigit():
                     continue
                 normalized = name.lower()
-                lineno: int = getattr(kw, "lineno", 0) or 0
-                keywords[normalized].append(lineno)
+                line_number: int = getattr(keyword_node, "lineno", 0) or 0
+                keywords[normalized].append(line_number)
                 keyword_display_names.setdefault(normalized, name)
 
         # --- Keyword calls (all sections, recursively) ---

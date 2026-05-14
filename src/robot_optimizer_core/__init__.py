@@ -65,6 +65,13 @@ from .api import (
     analyze_suite,
 )
 
+# Service layer (recommended for most uses)
+from .service import (
+    AnalysisResult,
+    AnalysisService,
+    DirectoryAnalysisResult,
+)
+
 # Configuration
 from .config import Settings, get_settings, reset_settings
 
@@ -116,6 +123,17 @@ from .exceptions import (
     RobotOptimizerError,
 )
 
+# File I/O providers — for advanced use (testing, custom sources)
+from .providers import (
+    DiskFileProvider as DiskFileProvider,
+)
+from .providers import (
+    FileProvider as FileProvider,
+)
+from .providers import (
+    InMemoryFileProvider as InMemoryFileProvider,
+)
+
 # Listener — not part of the public API; importable for advanced use
 from .listener import FlakinessListener as FlakinessListener
 
@@ -144,15 +162,22 @@ Container = ThreadSafeContainer
 
 __all__ = [
     "AnalysisError",
+    # Service layer (recommended for most uses)
+    "AnalysisResult",
+    "AnalysisService",
+    "DirectoryAnalysisResult",
     # Analyzer classes
     "BaseAnalyzer",
     "ConfigurationError",
     "Container",  # deprecated alias for ThreadSafeContainer
     "DeadCodeAnalyzer",
     # Domain value objects used in findings
+    "DiskFileProvider",
+    "FileProvider",
     "Finding",
     "FlakinessAnalyzer",
     "HardcodedValueAnalyzer",
+    "InMemoryFileProvider",
     "Location",
     "NamingConventionAnalyzer",
     "Pattern",

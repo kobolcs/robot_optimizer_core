@@ -21,7 +21,7 @@ import sys
 from datetime import UTC, datetime
 from html import escape
 from pathlib import Path
-from typing import NoReturn, TypedDict
+from typing import Any, NoReturn, TypedDict
 
 from .api import analyze_directory, analyze_file
 from .domain.value_objects import Finding, Severity
@@ -49,6 +49,38 @@ def _colour(text: str, severity: Severity) -> str:
     if not sys.stdout.isatty():
         return text
     return f"{_COLOURS.get(severity, '')}{text}{_RESET}"
+
+
+def _get_template_path() -> Path:
+    """Get path to the HTML report template."""
+    return Path(__file__).parent / "resources" / "report.html.j2"
+
+
+def _render_html_template(context: dict[str, Any]) -> str:
+    """Render HTML report using Jinja2 template.
+
+    Args:
+        context: Template variables
+
+    Returns:
+        Rendered HTML string
+    """
+    try:
+        from jinja2 import Environment, FileSystemLoader
+    except ImportError:
+        # Fallback if jinja2 not available; use legacy rendering
+        return _format_html_legacy(context)
+
+    template_path = _get_template_path()
+    if not template_path.exists():
+        return _format_html_legacy(context)
+
+    env = Environment(
+        loader=FileSystemLoader(str(template_path.parent)),
+        autoescape=True,
+    )
+    template = env.get_template(template_path.name)
+    return template.render(**context)
 
 
 # ---------------------------------------------------------------------------
@@ -518,6 +550,7 @@ _HEALTH_COLOR_DEFAULT = ("#6b7280", "#6b72801a", "#6b728055", "#6b728033")
 
 
 def _format_html(findings: list[Finding], path: Path) -> str:
+    """Format findings as HTML report using template-based rendering."""
     root = path.resolve() if path.is_dir() else path.parent.resolve()
     timestamp, sev_counts, affected_files, category_summary, category_groups = (
         _html_compute_stats(findings, path)
@@ -559,23 +592,53 @@ def _format_html(findings: list[Finding], path: Path) -> str:
     grouped_findings = _html_render_grouped_findings(sorted_category_names, category_groups, root)
     table = _html_render_findings_table(findings, root)
 
+    # Prepare template context
+    context: dict[str, Any] = {
+        "health_color": hc,
+        "health_color_bg": hc_bg,
+        "health_color_border": hc_border,
+        "health_color_glow": hc_glow,
+        "styles": _HTML_STYLES,
+        "analyzed_path": str(path),
+        "timestamp": timestamp,
+        "health_status": health_status,
+        "total_findings": len(findings),
+        "error_count": sev_counts["ERROR"],
+        "warning_count": sev_counts["WARNING"],
+        "info_count": sev_counts["INFO"],
+        "warning_error_count": sev_counts["WARNING"] + sev_counts["ERROR"],
+        "affected_files_count": len(affected_files),
+        "auto_fixable_count": auto_fixable_count,
+        "top_categories": top_categories,
+        "top_categories_str": top_category_names or "None",
+        "summary_paragraph": summary_paragraph,
+        "action_items": action_items,
+        "no_findings_html": no_findings_html,
+        "grouped_findings": [grouped_findings],
+        "findings_table": table,
+        "escape": escape,
+    }
+
+    return _render_html_template(context)
+
+
+def _format_html_legacy(context: dict[str, Any]) -> str:
+    """Legacy HTML rendering (fallback if template not available)."""
+    # Use context dict to generate HTML the old way
     return f"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Robot Framework Suite Health Report</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
     :root {{
-      --health-color: {hc};
-      --health-color-bg: {hc_bg};
-      --health-color-border: {hc_border};
-      --health-color-glow: {hc_glow};
+      --health-color: {context['health_color']};
+      --health-color-bg: {context['health_color_bg']};
+      --health-color-border: {context['health_color_border']};
+      --health-color-glow: {context['health_color_glow']};
     }}
-{_HTML_STYLES}
+{context['styles']}
   </style>
 </head>
 <body>
@@ -585,53 +648,58 @@ def _format_html(findings: list[Finding], path: Path) -> str:
     <h1>Suite Health Report</h1>
     <h2>Static analysis · maintainability &amp; stability</h2>
     <div class="cover-meta">
-      Analyzed: {escape(str(path))}<br>
-      Generated: {escape(timestamp)}
+      Analyzed: {escape(context['analyzed_path'])}<br>
+      Generated: {escape(context['timestamp'])}
     </div>
   </section>
 
   <section class="panel">
     <h2>Health status</h2>
-    <span class="health-badge"><span class="health-dot"></span>{escape(health_status)}</span>
+    <span class="health-badge"><span class="health-dot"></span>{escape(context['health_status'])}</span>
   </section>
 
   <section class="panel">
     <h2>Executive summary</h2>
-    <p>Total findings: <strong>{len(findings)}</strong> &nbsp;·&nbsp; Warnings/Errors: <strong>{sev_counts["WARNING"] + sev_counts["ERROR"]}</strong> &nbsp;·&nbsp; Main risk categories: <strong>{escape(top_category_names or "None")}</strong></p>
-    <p>{escape(summary_paragraph)}</p>
+    <p>Total findings: <strong>{context['total_findings']}</strong> &nbsp;·&nbsp; Warnings/Errors: <strong>{context['warning_error_count']}</strong> &nbsp;·&nbsp; Main risk categories: <strong>{escape(context['top_categories_str'])}</strong></p>
+    <p>{escape(context['summary_paragraph'])}</p>
   </section>
 
   <section class="panel">
     <h2>Key metrics</h2>
     <div class="bento">
-      <div class="metric-card"><div class="metric-label">Total findings</div><div class="metric-value">{len(findings)}</div></div>
-      <div class="metric-card"><div class="metric-label">ERROR</div><div class="metric-value">{sev_counts["ERROR"]}</div></div>
-      <div class="metric-card"><div class="metric-label">WARNING</div><div class="metric-value">{sev_counts["WARNING"]}</div></div>
-      <div class="metric-card"><div class="metric-label">INFO</div><div class="metric-value">{sev_counts["INFO"]}</div></div>
-      <div class="metric-card"><div class="metric-label">Affected files</div><div class="metric-value">{len(affected_files)}</div></div>
-      <div class="metric-card accent"><div class="metric-label">Auto-fixable findings</div><div class="metric-value">{auto_fixable_count}</div></div>
+      <div class="metric-card"><div class="metric-label">Total findings</div><div class="metric-value">{context['total_findings']}</div></div>
+      <div class="metric-card"><div class="metric-label">ERROR</div><div class="metric-value">{context['error_count']}</div></div>
+      <div class="metric-card"><div class="metric-label">WARNING</div><div class="metric-value">{context['warning_count']}</div></div>
+      <div class="metric-card"><div class="metric-label">INFO</div><div class="metric-value">{context['info_count']}</div></div>
+      <div class="metric-card"><div class="metric-label">Affected files</div><div class="metric-value">{context['affected_files_count']}</div></div>
+      <div class="metric-card accent"><div class="metric-label">Auto-fixable findings</div><div class="metric-value">{context['auto_fixable_count']}</div></div>
     </div>
   </section>
 
   <section class="panel">
     <h2>Risk categories</h2>
-    <div class="category-grid">{category_cards or "<p>No risk categories detected.</p>"}</div>
+    <div class="category-grid">
+      {_html_render_category_cards(context['top_categories']) or '<p>No risk categories detected.</p>'}
+    </div>
   </section>
 
   <section class="panel">
     <h2>Recommended actions</h2>
-    <ol>{action_items or "<li>Maintain current standards and monitor new findings.</li>"}</ol>
+    <ol>
+      {''.join(context['action_items']) or '<li>Maintain current standards and monitor new findings.</li>'}
+    </ol>
   </section>
 
   <section class="panel">
     <h2>Findings by category</h2>
-    {no_findings_html}{grouped_findings}
+    {context['no_findings_html']}
+    {''.join(context['grouped_findings'])}
   </section>
 
   <section class="panel">
     <h2>Appendix — Detailed Findings</h2>
-    {no_findings_html}
-    <div class="table-wrap">{table}</div>
+    {context['no_findings_html']}
+    <div class="table-wrap">{context['findings_table']}</div>
   </section>
 </main>
 </body>

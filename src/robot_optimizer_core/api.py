@@ -50,6 +50,7 @@ if TYPE_CHECKING:
     from .analyzers import BaseAnalyzer
     from .config import Settings
     from .domain.value_objects.robot_ast import RobotImport, RobotKeyword, RobotTestCase
+    from .metrics import MetricsCollector
 
 from .premium import PremiumFeatureError
 
@@ -120,6 +121,7 @@ def analyze_file(
     settings: Settings | None = None,
     severity_filter: Severity | None = None,
     pattern_filter: list[str] | None = None,
+    metrics: MetricsCollector | None = None,
 ) -> list[Finding]:
     """Analyze a single Robot Framework file.
 
@@ -134,6 +136,9 @@ def analyze_file(
             this level are returned (e.g. ``Severity.WARNING`` drops INFO).
         pattern_filter: When given, only findings whose analyzer name
             matches one of these strings are returned.
+        metrics: Optional metrics collector for recording analysis metrics
+            (default: global metrics instance). Pass a no-op implementation
+            to disable metrics collection.
 
     Returns:
         List of findings from all analyzers.
@@ -159,7 +164,8 @@ def analyze_file(
     if settings is None:
         settings = container.resolve("settings")
 
-    metrics = container.resolve("metrics")
+    if metrics is None:
+        metrics = container.resolve("metrics")
 
     # Enforce max file size before reading content and load file
     try:
@@ -239,6 +245,7 @@ def analyze_directory(
     severity_filter: Severity | None = None,
     pattern_filter: list[str] | None = None,
     max_workers: int | None = None,
+    metrics: MetricsCollector | None = None,
 ) -> DirectoryResults:
     """Analyze all Robot Framework files in a directory.
 
@@ -271,6 +278,9 @@ def analyze_directory(
         max_workers: Maximum number of threads for parallel file analysis
             Defaults to ``min(4, cpu_count)``. Pass ``1`` to
             force sequential behaviour.
+        metrics: Optional metrics collector for recording batch metrics
+            (default: global metrics instance). Pass a no-op implementation
+            to disable metrics collection.
 
     Returns:
         Dictionary mapping file paths to findings.
@@ -360,7 +370,8 @@ def analyze_directory(
     )
 
     # Track metrics
-    metrics = container.resolve("metrics")
+    if metrics is None:
+        metrics = container.resolve("metrics")
     metrics.gauge("batch.files_analyzed", len(dir_results))
     metrics.gauge("batch.files_failed", len(file_errors))
     metrics.gauge("batch.total_findings", total_findings)
