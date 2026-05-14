@@ -11,7 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol
 
-__all__ = ["FileProvider", "DiskFileProvider", "InMemoryFileProvider"]
+__all__ = ["DiskFileProvider", "FileProvider", "InMemoryFileProvider"]
 
 
 class FileProvider(Protocol):

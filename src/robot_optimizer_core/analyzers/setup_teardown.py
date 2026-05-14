@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import sys
 from collections import Counter
+from collections.abc import Callable
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -138,7 +139,7 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
         test_file: TestFile,
         kind: str,
         hints: set[str],
-        step_getter: callable,
+        step_getter: Callable[[list[str]], str],
     ) -> list[Finding]:
         """Check for duplicated setup/teardown steps.
 

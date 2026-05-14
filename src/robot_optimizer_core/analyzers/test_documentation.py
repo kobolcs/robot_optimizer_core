@@ -72,6 +72,7 @@ class TestDocumentationAnalyzer(BaseAnalyzer):
         name: str,
         line: int,
         entity: str,
+        *,
         has_doc: bool,
         doc_text: str,
     ) -> Finding | None:
@@ -127,8 +128,12 @@ class TestDocumentationAnalyzer(BaseAnalyzer):
             if stripped.startswith("***"):
                 if current_name and self._should_check_entity(current_entity):
                     finding = self._create_finding(
-                        test_file, current_name, current_line,
-                        current_entity, has_doc, doc_text
+                        test_file,
+                        current_name,
+                        current_line,
+                        current_entity,
+                        has_doc=has_doc,
+                        doc_text=doc_text,
                     )
                     if finding:
                         findings.append(finding)
@@ -143,8 +148,12 @@ class TestDocumentationAnalyzer(BaseAnalyzer):
                 if in_test_cases or in_keywords:
                     if current_name and self._should_check_entity(current_entity):
                         finding = self._create_finding(
-                            test_file, current_name, current_line,
-                            current_entity, has_doc, doc_text
+                            test_file,
+                            current_name,
+                            current_line,
+                            current_entity,
+                            has_doc=has_doc,
+                            doc_text=doc_text,
                         )
                         if finding:
                             findings.append(finding)
@@ -167,8 +176,12 @@ class TestDocumentationAnalyzer(BaseAnalyzer):
         # Final flush for last entity
         if current_name and self._should_check_entity(current_entity):
             finding = self._create_finding(
-                test_file, current_name, current_line,
-                current_entity, has_doc, doc_text
+                test_file,
+                current_name,
+                current_line,
+                current_entity,
+                has_doc=has_doc,
+                doc_text=doc_text,
             )
             if finding:
                 findings.append(finding)

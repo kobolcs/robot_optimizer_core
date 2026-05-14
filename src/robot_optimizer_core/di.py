@@ -303,18 +303,14 @@ class ThreadSafeContainer:
 # Global container with thread safety
 _global_container: ThreadSafeContainer | None = None
 _global_container_lock = threading.RLock()
-_container_initialized = False
 
 
 def get_thread_safe_container() -> ThreadSafeContainer:
     """Get the global thread-safe container.
 
-    Returns the global DI container. For production use, prefer calling
-    this through ApplicationContext.initialize() to ensure proper setup.
-
-    Raises:
-        RuntimeError: If called before ApplicationContext.initialize() in a
-            production environment (detected via application config).
+    Returns the global DI container, creating it lazily if needed.
+    For production use, prefer calling this through
+    ApplicationContext.initialize() to ensure proper setup.
 
     Returns:
         The thread-safe global container.

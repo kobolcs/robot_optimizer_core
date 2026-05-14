@@ -108,6 +108,7 @@ class NamingConventionAnalyzer(BaseAnalyzer):
         line: str,
         line_num: int,
         test_file: TestFile,
+        *,
         in_test_cases: bool,
         in_keywords: bool,
     ) -> Finding | None:
@@ -158,14 +159,19 @@ class NamingConventionAnalyzer(BaseAnalyzer):
             # Non-indented line inside a section = definition name
             if not line.startswith((" ", "\t")):
                 finding = self._check_definition_name(
-                    stripped, line_num, test_file, in_test_cases, in_keywords
+                    stripped,
+                    line_num,
+                    test_file,
+                    in_test_cases=in_test_cases,
+                    in_keywords=in_keywords,
                 )
                 if finding:
                     findings.append(finding)
                 continue
 
             # Indented line — look for variable assignments
-            findings.extend(self._check_variables_in_line(stripped, line_num, test_file))
+            var_findings = self._check_variables_in_line(stripped, line_num, test_file)
+            findings.extend(var_findings)
 
         return findings
 
