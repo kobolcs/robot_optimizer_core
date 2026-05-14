@@ -51,21 +51,21 @@ class TestTomlLoader:
             b"[tool.robot-optimizer]\nmax_acceptable_sleep_seconds = 0.5\n"
         )
         settings = load_settings_from_toml(tmp_path)
-        assert settings.max_acceptable_sleep_seconds == 0.5
+        assert settings.max_acceptable_sleep_seconds == pytest.approx(0.5)
 
     def test_reads_pyproject_toml(self, tmp_path: Path) -> None:
         (tmp_path / "pyproject.toml").write_bytes(
             b"[tool.robot-optimizer]\nmax_acceptable_sleep_seconds = 2.0\n"
         )
         settings = load_settings_from_toml(tmp_path)
-        assert settings.max_acceptable_sleep_seconds == 2.0
+        assert settings.max_acceptable_sleep_seconds == pytest.approx(2.0)
 
     def test_overrides_take_precedence_over_toml(self, tmp_path: Path) -> None:
         (tmp_path / "robot.toml").write_bytes(
             b"[tool.robot-optimizer]\nmax_acceptable_sleep_seconds = 0.5\n"
         )
         settings = load_settings_from_toml(tmp_path, max_acceptable_sleep_seconds=5.0)
-        assert settings.max_acceptable_sleep_seconds == 5.0
+        assert settings.max_acceptable_sleep_seconds == pytest.approx(5.0)
 
     def test_missing_section_gives_defaults(self, tmp_path: Path) -> None:
         (tmp_path / "robot.toml").write_bytes(b"[project]\nname = 'foo'\n")
@@ -143,4 +143,4 @@ class TestSettingsValidation:
             enable_metrics=False,
             plugins_enabled=False,
         )
-        assert s.max_file_size_mb == 5.0
+        assert s.max_file_size_mb == pytest.approx(5.0)

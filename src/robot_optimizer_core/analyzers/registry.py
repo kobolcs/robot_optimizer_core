@@ -51,11 +51,11 @@ def _iter_analyzer_entry_points() -> list[EntryPoint]:
     eps: Any = entry_points()
     if hasattr(eps, "select"):
         return cast(
-            list[EntryPoint],
+            "list[EntryPoint]",
             list(eps.select(group="robot_optimizer_core.analyzers")),
         )
     return cast(
-        list[EntryPoint],
+        "list[EntryPoint]",
         list(eps.get("robot_optimizer_core.analyzers", [])),
     )
 
@@ -179,7 +179,7 @@ class AnalyzerRegistry:
         analyzer_class = self.analyzers[name]
         container = get_container()
         if container.has_service(f"analyzer.{name}"):
-            return cast(BaseAnalyzer, container.resolve(f"analyzer.{name}"))
+            return cast("BaseAnalyzer", container.resolve(f"analyzer.{name}"))
         return analyzer_class()
 
     def list(self) -> list[str]:

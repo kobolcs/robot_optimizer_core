@@ -173,6 +173,73 @@ class DeadCodeAnalyzer(BaseAnalyzer):
 
         return findings
 
+    def _collect_suite_definitions(
+        self, files: Sequence[TestFile]
+    ) -> tuple[
+        dict[str, list[tuple[TestFile, int]]],
+        list[str],
+        dict[str, str],
+        list[tuple[TestFile, dict[str, list[int]]]],
+    ]:
+        """Collect keyword definitions and calls from all files in the suite."""
+        all_definitions: dict[str, list[tuple[TestFile, int]]] = defaultdict(list)
+        raw_candidates: list[str] = []
+        per_file_display: dict[str, str] = {}
+        file_keywords: list[tuple[TestFile, dict[str, list[int]]]] = []
+
+        for test_file in files:
+            keywords, _, display_names = self._extract_keywords_and_calls(test_file)
+            file_keywords.append((test_file, keywords))
+            for kw_name, line_numbers in keywords.items():
+                for line_num in line_numbers:
+                    all_definitions[kw_name].append((test_file, line_num))
+                per_file_display.setdefault(
+                    kw_name, display_names.get(kw_name, kw_name)
+                )
+            raw_candidates.extend(self._extract_candidate_calls(test_file))
+
+        return all_definitions, raw_candidates, per_file_display, file_keywords
+
+    def _check_unused_keywords(
+        self,
+        all_definitions: dict[str, list[tuple[TestFile, int]]],
+        all_calls: set[str],
+        per_file_display: dict[str, str],
+    ) -> list[Finding]:
+        """Check for unused keywords across the suite."""
+        findings: list[Finding] = []
+        if not self._check_unused:
+            return findings
+
+        for kw_name, locations in all_definitions.items():
+            if kw_name in all_calls:
+                continue
+            display_name = per_file_display.get(kw_name, kw_name)
+            if kw_name in _LIFECYCLE_KEYWORDS or any(
+                p.match(display_name) for p in self._ignore_patterns
+            ):
+                continue
+            pattern = Pattern(
+                type=PatternType.UNUSED_KEYWORD,
+                name="Unused Keyword",
+                description=f"Keyword '{display_name}' is never called in the suite",
+                recommendation="Remove this keyword or use it in your tests",
+                documentation_url=None,
+                auto_fixable=True,
+            )
+            test_file, line_num = locations[0]
+            msg = f"Keyword '{display_name}' is defined but never used in the suite"
+            findings.append(
+                Finding.create(
+                    pattern=pattern,
+                    severity=Severity.WARNING,
+                    location=Location(file_path=test_file.path, line=line_num),
+                    message=msg,
+                    keyword_name=display_name,
+                )
+            )
+        return findings
+
     def analyze_suite(self, files: Sequence[TestFile]) -> list[Finding]:
         """Analyze a suite of files for dead code with cross-file awareness.
 
@@ -189,58 +256,17 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         if not files:
             return []
 
-        # --- First pass: collect definitions and raw candidate calls -----------
-        all_definitions: dict[str, list[tuple[TestFile, int]]] = defaultdict(list)
-        raw_candidates: list[str] = []
-        per_file_display: dict[str, str] = {}
-        # Cache parsed keywords per file to avoid re-parsing in duplicate/unreachable pass
-        file_keywords: list[tuple[TestFile, dict[str, list[int]]]] = []
-
-        for test_file in files:
-            keywords, _, display_names = self._extract_keywords_and_calls(test_file)
-            file_keywords.append((test_file, keywords))
-            for kw_name, line_numbers in keywords.items():
-                for line_num in line_numbers:
-                    all_definitions[kw_name].append((test_file, line_num))
-                per_file_display.setdefault(
-                    kw_name, display_names.get(kw_name, kw_name)
-                )
-            raw_candidates.extend(self._extract_candidate_calls(test_file))
-
-        # Resolve raw candidates against the full suite-wide keyword set
+        # Collect definitions and calls
+        all_definitions, raw_candidates, per_file_display, file_keywords = (
+            self._collect_suite_definitions(files)
+        )
         all_calls = self._resolve_calls(raw_candidates, set(all_definitions))
 
-        # --- Second pass: emit findings ---------------------------------------
+        # Emit findings
         findings: list[Finding] = []
-
-        if self._check_unused:
-            for kw_name, locations in all_definitions.items():
-                if kw_name in all_calls:
-                    continue
-                display_name = per_file_display.get(kw_name, kw_name)
-                if kw_name in _LIFECYCLE_KEYWORDS:
-                    continue
-                if any(p.match(display_name) for p in self._ignore_patterns):
-                    continue
-                pattern = Pattern(
-                    type=PatternType.UNUSED_KEYWORD,
-                    name="Unused Keyword",
-                    description=f"Keyword '{display_name}' is never called in the suite",
-                    recommendation="Remove this keyword or use it in your tests",
-                    documentation_url=None,
-                    auto_fixable=True,
-                )
-                # Report only the first definition site to avoid noise
-                test_file, line_num = locations[0]
-                findings.append(
-                    Finding.create(
-                        pattern=pattern,
-                        severity=Severity.WARNING,
-                        location=Location(file_path=test_file.path, line=line_num),
-                        message=f"Keyword '{display_name}' is defined but never used in the suite",
-                        keyword_name=display_name,
-                    )
-                )
+        findings.extend(
+            self._check_unused_keywords(all_definitions, all_calls, per_file_display)
+        )
 
         if self._check_duplicates:
             for test_file, keywords in file_keywords:
@@ -326,7 +352,10 @@ class DeadCodeAnalyzer(BaseAnalyzer):
             self._walk_body(body, calls)
 
     def _resolve_keyword_call_name(self, item: object) -> str | None:
-        """Return the effective call name for a KEYWORD node, handling Run Keyword dispatch."""
+        """Return the effective call name for a KEYWORD node.
+
+        Handles Run Keyword dispatch patterns.
+        """
         name = getattr(item, "keyword", None)
         if not name:
             return None
@@ -340,7 +369,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         return name_str
 
     def _iter_nested_bodies(self, item: object) -> Generator[object, None, None]:
-        """Yield each body list reachable from *item* via body, orelse, or Try.next chain."""
+        """Yield each body list reachable from *item* via body or orelse."""
         body = getattr(item, "body", None)
         if body:
             yield body
@@ -349,7 +378,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
             orelse_body = getattr(orelse, "body", None)
             if orelse_body:
                 yield orelse_body
-        # RF 7.1+ Try/EXCEPT/ELSE/FINALLY branches are linked via .next (not .handlers/.finally_item)
+        # RF 7.1+ branches via .next (not .handlers/.finally_item)
         next_branch = getattr(item, "next", None)
         while next_branch is not None:
             branch_body = getattr(next_branch, "body", None)
@@ -431,7 +460,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
     def _resolve_calls(
         self, candidates: list[str], keyword_names: set[str]
     ) -> set[str]:
-        """Match raw candidate strings against a keyword set, returning matched names."""
+        """Match raw candidate strings against a keyword set."""
         calls: set[str] = set()
         for call in candidates:
             lowered = call.lower()
@@ -442,11 +471,13 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                 _match_prefixes(" ".join(parts[1:]), keyword_names, calls)
 
             if lowered.startswith("run keyword "):
-                _match_prefixes(lowered.removeprefix("run keyword ").strip(), keyword_names, calls)
+                rk_arg = lowered.removeprefix("run keyword ").strip()
+                _match_prefixes(rk_arg, keyword_names, calls)
 
             if lowered.startswith("run keywords "):
+                rks_arg = lowered.removeprefix("run keywords ")
                 for part in re.split(
-                    r"\s+AND\s+", lowered.removeprefix("run keywords "), flags=re.IGNORECASE
+                    r"\s+AND\s+", rks_arg, flags=re.IGNORECASE
                 ):
                     _match_prefixes(part.strip(), keyword_names, calls)
 
@@ -506,17 +537,91 @@ class DeadCodeAnalyzer(BaseAnalyzer):
 
                 # Create findings for all duplicates after the first
                 for line_num in line_numbers[1:]:
+                    msg = (
+                        f"Keyword '{keyword_name}' is already "
+                        f"defined at line {line_numbers[0]}"
+                    )
                     finding = Finding.create(
                         pattern=pattern,
                         severity=Severity.ERROR,
                         location=Location(file_path=test_file.path, line=line_num),
-                        message=f"Keyword '{keyword_name}' is already defined at line {line_numbers[0]}",
+                        message=msg,
                         first_definition_line=line_numbers[0],
                         duplicate_count=len(line_numbers),
                     )
                     findings.append(finding)
 
         return findings
+
+    def _create_unreachable_finding(
+        self,
+        test_file: TestFile,
+        line_num: int,
+        keyword_name: str,
+    ) -> Finding:
+        """Create a finding for unreachable code."""
+        pattern = Pattern(
+            type=PatternType.UNREACHABLE_CODE,
+            name="Unreachable Code",
+            description="Code after RETURN statement will never execute",
+            recommendation="Remove the unreachable code or move it before RETURN",
+            documentation_url=None,
+            auto_fixable=True,
+        )
+        return Finding.create(
+            pattern=pattern,
+            severity=Severity.WARNING,
+            location=Location(file_path=test_file.path, line=line_num),
+            message=f"Unreachable code after RETURN in keyword '{keyword_name}'",
+            keyword_name=keyword_name,
+        )
+
+    def _handle_section_line(self, stripped: str, state: _UnreachableState) -> None:
+        """Handle a section header line."""
+        state.enter_section(stripped)
+
+    def _handle_definition_line(self, stripped: str, state: _UnreachableState) -> None:
+        """Handle a definition line (keyword start or end)."""
+        if state.in_keywords_section:
+            state.enter_keyword(stripped)
+        else:
+            state.exit_keyword()
+
+    def _handle_statement_line(
+        self,
+        stripped: str,
+        state: _UnreachableState,
+        test_file: TestFile,
+        line_num: int,
+        findings: list[Finding],
+    ) -> None:
+        """Handle a statement line inside a keyword."""
+        upper = stripped.upper()
+
+        if upper in _CONTROL_FLOW_OPENERS:
+            state.control_depth += 1
+            state.found_return = False
+            return
+
+        if upper == "END":
+            if state.control_depth > 0:
+                state.control_depth -= 1
+            state.found_return = False
+            return
+
+        if upper.startswith("RETURN"):
+            if state.control_depth == 0:
+                state.found_return = True
+            return
+
+        if state.found_return:
+            assert state.current_keyword is not None
+            findings.append(
+                self._create_unreachable_finding(
+                    test_file, line_num, state.current_keyword
+                )
+            )
+            state.found_return = False
 
     def _find_unreachable_code(self, test_file: TestFile) -> list[Finding]:
         """Find code after RETURN statements inside Keyword definitions.
@@ -536,60 +641,17 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                 continue
 
             if stripped.startswith("***"):
-                state.enter_section(stripped)
+                self._handle_section_line(stripped, state)
                 continue
 
             # Non-indented line: boundary between keywords (or a new keyword start)
             if not line.startswith((" ", "\t")):
-                if state.in_keywords_section:
-                    state.enter_keyword(stripped)
-                else:
-                    state.exit_keyword()
+                self._handle_definition_line(stripped, state)
                 continue
 
             if not state.in_keyword:
                 continue
 
-            upper = stripped.upper()
-
-            if upper in _CONTROL_FLOW_OPENERS:
-                state.control_depth += 1
-                # A top-level RETURN before this block no longer makes subsequent
-                # lines unreachable once we enter a nested scope.
-                state.found_return = False
-                continue
-
-            if upper == "END":
-                if state.control_depth > 0:
-                    state.control_depth -= 1
-                state.found_return = False
-                continue
-
-            if upper.startswith("RETURN"):
-                if state.control_depth == 0:
-                    state.found_return = True
-                continue
-
-            if state.found_return:
-                assert state.current_keyword is not None
-                pattern = Pattern(
-                    type=PatternType.UNREACHABLE_CODE,
-                    name="Unreachable Code",
-                    description="Code after RETURN statement will never execute",
-                    recommendation="Remove the unreachable code or move it before RETURN",
-                    documentation_url=None,
-                    auto_fixable=True,
-                )
-                findings.append(
-                    Finding.create(
-                        pattern=pattern,
-                        severity=Severity.WARNING,
-                        location=Location(file_path=test_file.path, line=line_num),
-                        message=f"Unreachable code after RETURN in keyword '{state.current_keyword}'",
-                        keyword_name=state.current_keyword,
-                    )
-                )
-                # Report only the first unreachable line per keyword
-                state.found_return = False
+            self._handle_statement_line(stripped, state, test_file, line_num, findings)
 
         return findings

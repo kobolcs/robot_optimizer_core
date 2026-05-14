@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import sys
 from collections import Counter
+from collections.abc import Callable
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -132,6 +133,58 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
     def tags(self) -> list[str]:
         return ["structure", "duplication", "best-practices"]
 
+    def _check_for_duplicates(
+        self,
+        test_steps: list[tuple[str, int, list[str], bool]],
+        test_file: TestFile,
+        kind: str,
+        hints: frozenset[str],
+        step_getter: Callable[[list[str]], str],
+    ) -> list[Finding]:
+        """Check for duplicated setup/teardown steps.
+
+        Args:
+            test_steps: Parsed test case steps.
+            test_file: The test file being analyzed.
+            kind: Either "setup" or "teardown".
+            hints: Set of hint keywords for this kind.
+            step_getter: Function to extract step (lambda for first/last element).
+
+        Returns:
+            List of findings.
+        """
+        findings: list[Finding] = []
+
+        # Count occurrences of hints
+        step_counts: Counter[str] = Counter()
+        for _, _, steps, _ in test_steps:
+            if steps:
+                step = step_getter(steps)
+                if _matches_hint(step, hints):
+                    step_counts[step.lower()] += 1
+
+        # Check each test for duplicated steps
+        for test_name, line_num, steps, hook_info in test_steps:
+            if not steps or hook_info:
+                continue
+            step = step_getter(steps)
+            if (
+                _matches_hint(step, hints)
+                and step_counts[step.lower()] >= self._threshold
+            ):
+                findings.append(
+                    self._make_finding(
+                        test_name,
+                        line_num,
+                        test_file,
+                        step=step,
+                        kind=kind,
+                        count=step_counts[step.lower()],
+                    )
+                )
+
+        return findings
+
     @override
     def analyze(self, test_file: TestFile) -> list[Finding]:
         findings: list[Finding] = []
@@ -140,60 +193,27 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
         if not test_steps:
             return findings
 
-        # Collect first and last steps per test for counting
         if self._check_setup:
-            first_steps: Counter[str] = Counter()
-            for _, _, steps, _ in test_steps:
-                if steps:
-                    first = steps[0]
-                    if _matches_hint(first, _SETUP_HINTS):
-                        first_steps[first.lower()] += 1
-
-            for test_name, line_num, steps, has_setup in test_steps:
-                if not steps or has_setup:
-                    continue
-                first = steps[0]
-                if (
-                    _matches_hint(first, _SETUP_HINTS)
-                    and first_steps[first.lower()] >= self._threshold
-                ):
-                    findings.append(
-                        self._make_finding(
-                            test_name,
-                            line_num,
-                            test_file,
-                            step=first,
-                            kind="setup",
-                            count=first_steps[first.lower()],
-                        )
-                    )
+            findings.extend(
+                self._check_for_duplicates(
+                    test_steps,
+                    test_file,
+                    kind="setup",
+                    hints=_SETUP_HINTS,
+                    step_getter=lambda steps: steps[0],
+                )
+            )
 
         if self._check_teardown:
-            last_steps: Counter[str] = Counter()
-            for _, _, steps, _ in test_steps:
-                if steps:
-                    last = steps[-1]
-                    if _matches_hint(last, _TEARDOWN_HINTS):
-                        last_steps[last.lower()] += 1
-
-            for test_name, line_num, steps, has_teardown in test_steps:
-                if not steps or has_teardown:
-                    continue
-                last = steps[-1]
-                if (
-                    _matches_hint(last, _TEARDOWN_HINTS)
-                    and last_steps[last.lower()] >= self._threshold
-                ):
-                    findings.append(
-                        self._make_finding(
-                            test_name,
-                            line_num,
-                            test_file,
-                            step=last,
-                            kind="teardown",
-                            count=last_steps[last.lower()],
-                        )
-                    )
+            findings.extend(
+                self._check_for_duplicates(
+                    test_steps,
+                    test_file,
+                    kind="teardown",
+                    hints=_TEARDOWN_HINTS,
+                    step_getter=lambda steps: steps[-1],
+                )
+            )
 
         return findings
 

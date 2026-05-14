@@ -131,79 +131,118 @@ class HardcodedValueAnalyzer(BaseAnalyzer):
         results: list[Finding] = []
 
         if self._check_urls:
-            for m in _URL_RE.finditer(line):
-                url = m.group(0)
-                results.append(
-                    self._make_finding(
-                        line_num,
-                        test_file,
-                        f"Hardcoded URL '{url}'",
-                        "Replace with a variable, e.g. ${BASE_URL}",
-                        value=url,
-                        value_type="url",
-                    )
-                )
+            results.extend(self._check_urls_in_line(line, line_num, test_file))
 
-        if self._check_localhost and _LOCALHOST_RE.search(line):
-            # Don't double-report if URL check already caught this line
-            if not (self._check_urls and _URL_RE.search(line)):
-                results.append(
-                    self._make_finding(
-                        line_num,
-                        test_file,
-                        "Hardcoded 'localhost' reference",
-                        "Replace with ${HOST} or ${BASE_URL} variable",
-                        value="localhost",
-                        value_type="localhost",
-                    )
-                )
+        if self._check_localhost:
+            results.extend(self._check_localhost_in_line(line, line_num, test_file))
 
         if self._check_ips:
-            for m in _IP_RE.finditer(line):
-                ip = m.group(0)
-                results.append(
-                    self._make_finding(
-                        line_num,
-                        test_file,
-                        f"Hardcoded IP address '{ip}'",
-                        "Replace with a variable, e.g. ${SERVER_IP}",
-                        value=ip,
-                        value_type="ip_address",
-                    )
-                )
+            results.extend(self._check_ips_in_line(line, line_num, test_file))
 
         if self._check_creds:
-            for m in _CRED_RE.finditer(line):
-                token = m.group(0)
-                # Truncate value for display
-                display = token[:40] + "..." if len(token) > 40 else token
-                results.append(
-                    self._make_finding(
-                        line_num,
-                        test_file,
-                        f"Possible hardcoded credential: '{display}'",
-                        "Replace with a secret variable or vault reference",
-                        value=display,
-                        value_type="credential",
-                        severity=Severity.ERROR,
-                    )
-                )
+            results.extend(self._check_creds_in_line(line, line_num, test_file))
 
         if self._check_ports:
-            for m in _PORT_RE.finditer(line):
-                port = m.group(0)
-                results.append(
-                    self._make_finding(
-                        line_num,
-                        test_file,
-                        f"Hardcoded port number '{port}'",
-                        "Replace with a variable, e.g. ${APP_PORT}",
-                        value=port,
-                        value_type="port",
-                        severity=Severity.INFO,
-                    )
-                )
+            results.extend(self._check_ports_in_line(line, line_num, test_file))
 
+        return results
+
+    def _check_urls_in_line(
+        self, line: str, line_num: int, test_file: TestFile
+    ) -> list[Finding]:
+        """Check for hardcoded URLs."""
+        results: list[Finding] = []
+        for m in _URL_RE.finditer(line):
+            url = m.group(0)
+            results.append(
+                self._make_finding(
+                    line_num,
+                    test_file,
+                    f"Hardcoded URL '{url}'",
+                    "Replace with a variable, e.g. ${BASE_URL}",
+                    value=url,
+                    value_type="url",
+                )
+            )
+        return results
+
+    def _check_localhost_in_line(
+        self, line: str, line_num: int, test_file: TestFile
+    ) -> list[Finding]:
+        """Check for hardcoded localhost references."""
+        if not _LOCALHOST_RE.search(line):
+            return []
+        if self._check_urls and _URL_RE.search(line):
+            return []
+        return [
+            self._make_finding(
+                line_num,
+                test_file,
+                "Hardcoded 'localhost' reference",
+                "Replace with ${HOST} or ${BASE_URL} variable",
+                value="localhost",
+                value_type="localhost",
+            )
+        ]
+
+    def _check_ips_in_line(
+        self, line: str, line_num: int, test_file: TestFile
+    ) -> list[Finding]:
+        """Check for hardcoded IP addresses."""
+        results: list[Finding] = []
+        for m in _IP_RE.finditer(line):
+            ip = m.group(0)
+            results.append(
+                self._make_finding(
+                    line_num,
+                    test_file,
+                    f"Hardcoded IP address '{ip}'",
+                    "Replace with a variable, e.g. ${SERVER_IP}",
+                    value=ip,
+                    value_type="ip_address",
+                )
+            )
+        return results
+
+    def _check_creds_in_line(
+        self, line: str, line_num: int, test_file: TestFile
+    ) -> list[Finding]:
+        """Check for credential-like patterns."""
+        results: list[Finding] = []
+        for m in _CRED_RE.finditer(line):
+            token = m.group(0)
+            display = token[:40] + "..." if len(token) > 40 else token
+            results.append(
+                self._make_finding(
+                    line_num,
+                    test_file,
+                    f"Possible hardcoded credential: '{display}'",
+                    "Replace with a secret variable or vault reference",
+                    value=display,
+                    value_type="credential",
+                    severity=Severity.ERROR,
+                )
+            )
+        return results
+
+    def _check_ports_in_line(
+        self, line: str, line_num: int, test_file: TestFile
+    ) -> list[Finding]:
+        """Check for hardcoded port numbers."""
+        results: list[Finding] = []
+        for m in _PORT_RE.finditer(line):
+            port = m.group(0)
+            results.append(
+                self._make_finding(
+                    line_num,
+                    test_file,
+                    f"Hardcoded port number '{port}'",
+                    "Replace with a variable, e.g. ${APP_PORT}",
+                    value=port,
+                    value_type="port",
+                    severity=Severity.INFO,
+                )
+            )
         return results
 
     def _make_finding(

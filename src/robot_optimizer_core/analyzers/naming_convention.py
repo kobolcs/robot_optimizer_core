@@ -72,6 +72,8 @@ class NamingConventionAnalyzer(BaseAnalyzer):
             the full name).
     """
 
+    _TEST_CASE_SECTION = "test case"
+
     def __init__(self, config: dict[str, ConfigValue] | None = None) -> None:
         super().__init__(config)
         self._check_tests: bool = bool(self.get_config_value("check_test_names", True))
@@ -101,6 +103,37 @@ class NamingConventionAnalyzer(BaseAnalyzer):
     def tags(self) -> list[str]:
         return ["style", "naming", "readability"]
 
+    def _check_definition_name(
+        self,
+        line: str,
+        line_num: int,
+        test_file: TestFile,
+        *,
+        in_test_cases: bool,
+        in_keywords: bool,
+    ) -> Finding | None:
+        """Check a definition line (test case or keyword name) for violations."""
+        if in_test_cases and self._check_tests:
+            return self._check_name(line, line_num, test_file, entity_type="test case")
+        if in_keywords and self._check_keywords:
+            return self._check_name(line, line_num, test_file, entity_type="keyword")
+        return None
+
+    def _check_variables_in_line(
+        self, line: str, line_num: int, test_file: TestFile
+    ) -> list[Finding]:
+        """Extract and check variables in an indented line."""
+        findings: list[Finding] = []
+        if not self._check_variables:
+            return findings
+        for match in _VAR_INNER_RE.finditer(line):
+            inner = match.group(1)
+            if _variable_is_camel(inner) and not self._is_ignored(inner):
+                findings.append(
+                    self._make_variable_finding(inner, line_num, test_file)
+                )
+        return findings
+
     @override
     def analyze(self, test_file: TestFile) -> list[Finding]:
         findings: list[Finding] = []
@@ -116,42 +149,29 @@ class NamingConventionAnalyzer(BaseAnalyzer):
 
             if stripped.startswith("***"):
                 lower = stripped.lower()
-                in_test_cases = "test case" in lower
-                in_keywords = "keyword" in lower and "test case" not in lower
+                in_test_cases = self._TEST_CASE_SECTION in lower
+                in_keywords = (
+                    "keyword" in lower
+                    and self._TEST_CASE_SECTION not in lower
+                )
                 continue
 
             # Non-indented line inside a section = definition name
             if not line.startswith((" ", "\t")):
-                if in_test_cases and self._check_tests:
-                    finding = self._check_name(
-                        stripped,
-                        line_num,
-                        test_file,
-                        entity_type="test case",
-                    )
-                    if finding:
-                        findings.append(finding)
-
-                elif in_keywords and self._check_keywords:
-                    finding = self._check_name(
-                        stripped,
-                        line_num,
-                        test_file,
-                        entity_type="keyword",
-                    )
-                    if finding:
-                        findings.append(finding)
+                finding = self._check_definition_name(
+                    stripped,
+                    line_num,
+                    test_file,
+                    in_test_cases=in_test_cases,
+                    in_keywords=in_keywords,
+                )
+                if finding:
+                    findings.append(finding)
                 continue
 
-            # Indented line — look for variable assignments (${Var}=  or  ${Var}    value)
-            if self._check_variables:
-                for match in _VAR_INNER_RE.finditer(stripped):
-                    inner = match.group(1)
-                    if _variable_is_camel(inner):
-                        if not self._is_ignored(inner):
-                            findings.append(
-                                self._make_variable_finding(inner, line_num, test_file)
-                            )
+            # Indented line — look for variable assignments
+            var_findings = self._check_variables_in_line(stripped, line_num, test_file)
+            findings.extend(var_findings)
 
         return findings
 

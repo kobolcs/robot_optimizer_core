@@ -230,22 +230,44 @@ class Location(ValueObject):
         if self.file_path != other.file_path:
             return False
 
-        self_end_line = self.end_line or self.line
-        other_end_line = other.end_line or other.line
-
-        if other.line < self.line or other_end_line > self_end_line:
+        if not self._lines_contain(other):
             return False
 
-        if self.column is not None and other.line == self.line:
-            if other.column is None or other.column < self.column:
-                return False
+        if not self._start_column_contains(other):
+            return False
 
-        if self.end_column is not None and other_end_line == self_end_line:
-            other_end_column = other.end_column or other.column
-            if other_end_column is None or other_end_column > self.end_column:
-                return False
+        return self._end_column_contains(other)
 
-        return True
+    def _lines_contain(self, other: Location) -> bool:
+        """Check if this location's lines contain the other location's lines."""
+        self_end_line = self.end_line or self.line
+        other_end_line = other.end_line or other.line
+        return not (other.line < self.line or other_end_line > self_end_line)
+
+    def _start_column_contains(self, other: Location) -> bool:
+        """Check if start columns are properly contained."""
+        if self.column is None or other.line != self.line:
+            return True
+        return other.column is not None and other.column >= self.column
+
+    def _end_column_contains(self, other: Location) -> bool:
+        """Check if end columns are properly contained."""
+        self_end_line = self.end_line or self.line
+        other_end_line = other.end_line or other.line
+        # Use effective end column: for point locations, end at start column
+        self_end_column = self.column if self.end_line is None else self.end_column
+        if self_end_column is None or other_end_line != self_end_line:
+            return True
+        # Determine other's effective end column
+        if other.end_column is not None:
+            other_end_column: int | None = other.end_column
+        elif other.end_line is None:
+            # Point location: end column is the start column
+            other_end_column = other.column
+        else:
+            # Multi-line range without explicit end column: unknown bound
+            return False
+        return other_end_column is not None and other_end_column <= self_end_column
 
     def overlaps(self, other: Location) -> bool:
         """Check if this location overlaps with another location.
