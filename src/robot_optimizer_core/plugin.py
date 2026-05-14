@@ -129,8 +129,14 @@ class PluginSecurityValidator:
     def __init__(self) -> None:
         self.violations: list[str] = []
 
-    def validate_file(self, file_path: Path) -> tuple[bool, list[str]]:
-        """Validate a plugin file for security issues.
+    def validate_content(
+        self, content: str, file_path: Path
+    ) -> tuple[bool, list[str]]:
+        """Validate plugin content for security issues.
+
+        Args:
+            content: Plugin file content
+            file_path: Path to plugin file (for error reporting and permissions check)
 
         Returns:
             Tuple of (is_safe, violations)
@@ -138,8 +144,6 @@ class PluginSecurityValidator:
         self.violations = []
 
         try:
-            content = file_path.read_text(encoding="utf-8")
-
             # Parse AST
             tree = ast.parse(content, filename=str(file_path))
 
@@ -162,6 +166,18 @@ class PluginSecurityValidator:
         except Exception as e:
             self.violations.append(f"Failed to parse plugin: {e}")
             return False, self.violations
+
+    def validate_file(self, file_path: Path) -> tuple[bool, list[str]]:
+        """Validate a plugin file for security issues.
+
+        Returns:
+            Tuple of (is_safe, violations)
+        """
+        try:
+            content = file_path.read_text(encoding="utf-8")
+            return self.validate_content(content, file_path)
+        except Exception as e:
+            return False, [f"Failed to read plugin file: {e}"]
 
 
 class SecurityVisitor(ast.NodeVisitor):
@@ -203,7 +219,10 @@ class SecurityVisitor(ast.NodeVisitor):
 
     def _check_name_function(self, node: ast.Call) -> None:
         """Check a function call with a simple name."""
-        func_name = node.func.id
+        func = node.func
+        if not isinstance(func, ast.Name):
+            return
+        func_name = func.id
         dangerous_funcs = {
             "eval",
             "exec",
@@ -246,8 +265,9 @@ class SecurityVisitor(ast.NodeVisitor):
 
     def _check_attribute_function(self, node: ast.Call) -> None:
         """Check a function call on an attribute (e.g., os.system)."""
-        if isinstance(node.func.value, ast.Name):
-            module = node.func.value.id
+        func = node.func
+        if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):
+            module = func.value.id
             forbidden_modules = {
                 "os",
                 "sys",
@@ -258,8 +278,34 @@ class SecurityVisitor(ast.NodeVisitor):
             }
             if module in forbidden_modules:
                 self.violations.append(
-                    f"Forbidden module usage: {module}.{node.func.attr}"
+                    f"Forbidden module usage: {module}.{func.attr}"
                 )
+
+    def visit_Name(self, node: ast.Name) -> None:
+        """Check bare name access for dangerous identifiers."""
+        dangerous_names = {
+            "__builtins__",
+            "__import__",
+            "__dict__",
+            "__globals__",
+            "__code__",
+            "__class__",
+            "__bases__",
+            "__subclasses__",
+        }
+        if node.id in dangerous_names:
+            self.violations.append(f"Forbidden identifier access: {node.id}")
+        self.generic_visit(node)
+
+    def visit_Subscript(self, node: ast.Subscript) -> None:
+        """Check subscript access for sandbox escape via __builtins__[...]."""
+        value = node.value
+        if isinstance(value, ast.Name) and value.id == "__builtins__":
+            self.violations.append(
+                "Forbidden __builtins__ subscript access: "
+                "__builtins__[...] bypasses sandbox restrictions"
+            )
+        self.generic_visit(node)
 
     def visit_Attribute(self, node: ast.Attribute) -> None:
         """Check attribute access for dangerous patterns."""
@@ -301,9 +347,9 @@ class ValidatedPluginManager:
         """Add a trusted plugin hash (for pre-approved plugins)."""
         self.trusted_hashes.add(file_hash)
 
-    def _compute_file_hash(self, file_path: Path) -> str:
-        """Compute SHA-256 hash of a file."""
-        return hashlib.sha256(file_path.read_bytes()).hexdigest()
+    def _compute_content_hash(self, content: bytes) -> str:
+        """Compute SHA-256 hash of file content."""
+        return hashlib.sha256(content).hexdigest()
 
     def load_plugin_from_file(self, file_path: Path, force: bool = False) -> None:
         """Securely load a plugin from a file.
@@ -318,15 +364,22 @@ class ValidatedPluginManager:
         if not file_path.exists():
             raise PluginError(f"Plugin file not found: {file_path}")
 
-        file_hash = self._compute_file_hash(file_path)
-        self._check_plugin_security(file_path, file_hash, force)
+        # Read file once to avoid TOCTOU vulnerability
+        try:
+            content_bytes = file_path.read_bytes()
+            content_str = content_bytes.decode("utf-8")
+        except Exception as e:
+            raise PluginError(f"Failed to read plugin file: {file_path}") from e
+
+        file_hash = self._compute_content_hash(content_bytes)
+        self._check_plugin_security(file_path, content_str, file_hash, force)
 
         try:
             restricted_globals = self._create_restricted_environment(file_path)
             plugin_class = self._execute_and_find_plugin_class(
-                file_path, restricted_globals
+                file_path, content_str, restricted_globals
             )
-            self._register_plugin(plugin_class, file_path, file_hash)
+            self._register_plugin(plugin_class, file_hash)
         except PluginError:
             raise
         except Exception as e:
@@ -335,13 +388,13 @@ class ValidatedPluginManager:
             ) from e
 
     def _check_plugin_security(
-        self, file_path: Path, file_hash: str, force: bool
+        self, file_path: Path, content: str, file_hash: str, force: bool
     ) -> None:
         """Check if plugin is trusted or validate its security."""
         if file_hash in self.trusted_hashes:
             logger.info(f"Loading trusted plugin: {file_path}")
         elif not force:
-            is_safe, violations = self.validator.validate_file(file_path)
+            is_safe, violations = self.validator.validate_content(content, file_path)
             if not is_safe:
                 raise PluginError(
                     f"Plugin failed security validation: {file_path}",
@@ -361,9 +414,6 @@ class ValidatedPluginManager:
         restricted_builtins = {
             k: builtin_dict[k] for k in ALLOWED_BUILTINS if k in builtin_dict
         }
-        for _name in ("__import__", "__build_class__"):
-            if _name in builtin_dict:
-                restricted_builtins[_name] = builtin_dict[_name]
         return {
             "__builtins__": restricted_builtins,
             "__name__": f"plugin_{file_path.stem}",
@@ -371,11 +421,10 @@ class ValidatedPluginManager:
         }
 
     def _execute_and_find_plugin_class(
-        self, file_path: Path, restricted_globals: dict[str, object]
+        self, file_path: Path, content: str, restricted_globals: dict[str, object]
     ) -> type[Plugin]:
         """Execute plugin code and find the Plugin subclass."""
-        plugin_code = file_path.read_text(encoding="utf-8")
-        compiled = compile(plugin_code, str(file_path), "exec", flags=0)
+        compiled = compile(content, str(file_path), "exec", flags=0)
         exec(compiled, restricted_globals)
 
         plugin_class = None
@@ -393,7 +442,7 @@ class ValidatedPluginManager:
         return plugin_class
 
     def _register_plugin(
-        self, plugin_class: type[Plugin], file_path: Path, file_hash: str
+        self, plugin_class: type[Plugin], file_hash: str
     ) -> None:
         """Create, validate, activate, and register a plugin."""
         plugin = plugin_class(self.registry)
@@ -401,6 +450,13 @@ class ValidatedPluginManager:
 
         if not metadata.name or ".." in metadata.name or "/" in metadata.name:
             raise PluginError(f"Invalid plugin name: {metadata.name!r}")
+
+        # Check for duplicate plugin names
+        if metadata.name in self.plugins:
+            raise PluginError(
+                f"Plugin already loaded: {metadata.name!r}",
+                details={"existing": self.plugins[metadata.name]},
+            )
 
         plugin.activate()
         plugin.is_active = True
