@@ -91,6 +91,7 @@ class TagConsistencyAnalyzer(BaseAnalyzer):
             stripped = line.strip()
             if not stripped:
                 continue
+
             if stripped.startswith("***"):
                 if current_name is not None:
                     tag_info.append((current_name, current_line, current_tags))
@@ -111,16 +112,24 @@ class TagConsistencyAnalyzer(BaseAnalyzer):
                 current_tags = []
                 continue
 
-            if current_name and stripped.lower().startswith("[tags]"):
-                rest = stripped[len("[tags]") :].strip()
-                if rest:
-                    tag_parts = re.split(r"  +|\t+", rest)
-                    current_tags = [t.strip() for t in tag_parts if t.strip()]
+            if current_name:
+                current_tags = self._extract_tags_from_line(stripped, current_tags)
 
         if current_name is not None:
             tag_info.append((current_name, current_line, current_tags))
 
         return tag_info
+
+    def _extract_tags_from_line(
+        self, stripped: str, current_tags: list[str]
+    ) -> list[str]:
+        """Extract tags from a [Tags] line."""
+        if stripped.lower().startswith("[tags]"):
+            rest = stripped[len("[tags]") :].strip()
+            if rest:
+                tag_parts = re.split(r"  +|\t+", rest)
+                return [t.strip() for t in tag_parts if t.strip()]
+        return current_tags
 
     def analyze(self, test_file: TestFile) -> list[Finding]:
         findings: list[Finding] = []
