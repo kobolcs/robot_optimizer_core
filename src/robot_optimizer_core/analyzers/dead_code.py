@@ -173,6 +173,67 @@ class DeadCodeAnalyzer(BaseAnalyzer):
 
         return findings
 
+    def _collect_suite_definitions(
+        self, files: Sequence[TestFile]
+    ) -> tuple[dict[str, list[tuple[TestFile, int]]], list[str], dict[str, str], list[tuple[TestFile, dict[str, list[int]]]]]:
+        """Collect keyword definitions and calls from all files in the suite."""
+        all_definitions: dict[str, list[tuple[TestFile, int]]] = defaultdict(list)
+        raw_candidates: list[str] = []
+        per_file_display: dict[str, str] = {}
+        file_keywords: list[tuple[TestFile, dict[str, list[int]]]] = []
+
+        for test_file in files:
+            keywords, _, display_names = self._extract_keywords_and_calls(test_file)
+            file_keywords.append((test_file, keywords))
+            for kw_name, line_numbers in keywords.items():
+                for line_num in line_numbers:
+                    all_definitions[kw_name].append((test_file, line_num))
+                per_file_display.setdefault(
+                    kw_name, display_names.get(kw_name, kw_name)
+                )
+            raw_candidates.extend(self._extract_candidate_calls(test_file))
+
+        return all_definitions, raw_candidates, per_file_display, file_keywords
+
+    def _check_unused_keywords(
+        self,
+        all_definitions: dict[str, list[tuple[TestFile, int]]],
+        all_calls: set[str],
+        per_file_display: dict[str, str],
+    ) -> list[Finding]:
+        """Check for unused keywords across the suite."""
+        findings: list[Finding] = []
+        if not self._check_unused:
+            return findings
+
+        for kw_name, locations in all_definitions.items():
+            if kw_name in all_calls:
+                continue
+            display_name = per_file_display.get(kw_name, kw_name)
+            if kw_name in _LIFECYCLE_KEYWORDS or any(
+                p.match(display_name) for p in self._ignore_patterns
+            ):
+                continue
+            pattern = Pattern(
+                type=PatternType.UNUSED_KEYWORD,
+                name="Unused Keyword",
+                description=f"Keyword '{display_name}' is never called in the suite",
+                recommendation="Remove this keyword or use it in your tests",
+                documentation_url=None,
+                auto_fixable=True,
+            )
+            test_file, line_num = locations[0]
+            findings.append(
+                Finding.create(
+                    pattern=pattern,
+                    severity=Severity.WARNING,
+                    location=Location(file_path=test_file.path, line=line_num),
+                    message=f"Keyword '{display_name}' is defined but never used in the suite",
+                    keyword_name=display_name,
+                )
+            )
+        return findings
+
     def analyze_suite(self, files: Sequence[TestFile]) -> list[Finding]:
         """Analyze a suite of files for dead code with cross-file awareness.
 
@@ -189,58 +250,17 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         if not files:
             return []
 
-        # --- First pass: collect definitions and raw candidate calls -----------
-        all_definitions: dict[str, list[tuple[TestFile, int]]] = defaultdict(list)
-        raw_candidates: list[str] = []
-        per_file_display: dict[str, str] = {}
-        # Cache parsed keywords per file to avoid re-parsing in duplicate/unreachable pass
-        file_keywords: list[tuple[TestFile, dict[str, list[int]]]] = []
-
-        for test_file in files:
-            keywords, _, display_names = self._extract_keywords_and_calls(test_file)
-            file_keywords.append((test_file, keywords))
-            for kw_name, line_numbers in keywords.items():
-                for line_num in line_numbers:
-                    all_definitions[kw_name].append((test_file, line_num))
-                per_file_display.setdefault(
-                    kw_name, display_names.get(kw_name, kw_name)
-                )
-            raw_candidates.extend(self._extract_candidate_calls(test_file))
-
-        # Resolve raw candidates against the full suite-wide keyword set
+        # Collect definitions and calls
+        all_definitions, raw_candidates, per_file_display, file_keywords = (
+            self._collect_suite_definitions(files)
+        )
         all_calls = self._resolve_calls(raw_candidates, set(all_definitions))
 
-        # --- Second pass: emit findings ---------------------------------------
+        # Emit findings
         findings: list[Finding] = []
-
-        if self._check_unused:
-            for kw_name, locations in all_definitions.items():
-                if kw_name in all_calls:
-                    continue
-                display_name = per_file_display.get(kw_name, kw_name)
-                if kw_name in _LIFECYCLE_KEYWORDS:
-                    continue
-                if any(p.match(display_name) for p in self._ignore_patterns):
-                    continue
-                pattern = Pattern(
-                    type=PatternType.UNUSED_KEYWORD,
-                    name="Unused Keyword",
-                    description=f"Keyword '{display_name}' is never called in the suite",
-                    recommendation="Remove this keyword or use it in your tests",
-                    documentation_url=None,
-                    auto_fixable=True,
-                )
-                # Report only the first definition site to avoid noise
-                test_file, line_num = locations[0]
-                findings.append(
-                    Finding.create(
-                        pattern=pattern,
-                        severity=Severity.WARNING,
-                        location=Location(file_path=test_file.path, line=line_num),
-                        message=f"Keyword '{display_name}' is defined but never used in the suite",
-                        keyword_name=display_name,
-                    )
-                )
+        findings.extend(
+            self._check_unused_keywords(all_definitions, all_calls, per_file_display)
+        )
 
         if self._check_duplicates:
             for test_file, keywords in file_keywords:
