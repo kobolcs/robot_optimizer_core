@@ -173,6 +173,23 @@ class DeadCodeAnalyzer(BaseAnalyzer):
 
         return findings
 
+    def _process_file_definitions(
+        self,
+        test_file: TestFile,
+        all_definitions: dict[str, list[tuple[TestFile, int]]],
+        per_file_display: dict[str, str],
+        raw_candidates: list[str],
+        file_keywords: list[tuple[TestFile, dict[str, list[int]]]],
+    ) -> None:
+        """Process one file's keyword definitions into the suite-level accumulators."""
+        keywords, _, display_names = self._extract_keywords_and_calls(test_file)
+        file_keywords.append((test_file, keywords))
+        for kw_name, line_numbers in keywords.items():
+            for line_num in line_numbers:
+                all_definitions[kw_name].append((test_file, line_num))
+            per_file_display.setdefault(kw_name, display_names.get(kw_name, kw_name))
+        raw_candidates.extend(self._extract_candidate_calls(test_file))
+
     def _collect_suite_definitions(
         self, files: Sequence[TestFile]
     ) -> tuple[
@@ -188,15 +205,9 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         file_keywords: list[tuple[TestFile, dict[str, list[int]]]] = []
 
         for test_file in files:
-            keywords, _, display_names = self._extract_keywords_and_calls(test_file)
-            file_keywords.append((test_file, keywords))
-            for kw_name, line_numbers in keywords.items():
-                for line_num in line_numbers:
-                    all_definitions[kw_name].append((test_file, line_num))
-                per_file_display.setdefault(
-                    kw_name, display_names.get(kw_name, kw_name)
-                )
-            raw_candidates.extend(self._extract_candidate_calls(test_file))
+            self._process_file_definitions(
+                test_file, all_definitions, per_file_display, raw_candidates, file_keywords
+            )
 
         return all_definitions, raw_candidates, per_file_display, file_keywords
 
@@ -428,6 +439,27 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         calls = self._resolve_calls(candidate_calls, keyword_names)
         return dict(keywords), calls, keyword_display_names
 
+    def _fallback_text_candidates(self, test_file: TestFile) -> list[str]:
+        """Return indented call-like lines from *test_file* without the RF AST.
+
+        Used as the except-branch fallback inside ``_extract_candidate_calls``.
+        """
+        candidates: list[str] = []
+        lines = test_file.content.splitlines()
+        in_test_or_keyword = False
+        for line in lines:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            if stripped.startswith("***"):
+                in_test_or_keyword = (
+                    "test case" in stripped.lower() or "keyword" in stripped.lower()
+                )
+                continue
+            if in_test_or_keyword and line.startswith((" ", "\t")):
+                candidates.append(stripped)
+        return candidates
+
     def _extract_candidate_calls(self, test_file: TestFile) -> list[str]:
         """Return all keyword call names from test/keyword sections via the RF AST."""
         try:
@@ -440,22 +472,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                 "AST parse failed, falling back to text extraction",
                 extra={"file": str(test_file.path), "error": str(e)},
             )
-            # Fallback: indented lines from text
-            candidates: list[str] = []
-            lines = test_file.content.splitlines()
-            in_test_or_keyword = False
-            for line in lines:
-                stripped = line.strip()
-                if not stripped or stripped.startswith("#"):
-                    continue
-                if stripped.startswith("***"):
-                    in_test_or_keyword = (
-                        "test case" in stripped.lower() or "keyword" in stripped.lower()
-                    )
-                    continue
-                if in_test_or_keyword and line.startswith((" ", "\t")):
-                    candidates.append(stripped)
-            return candidates
+            return self._fallback_text_candidates(test_file)
 
     def _resolve_calls(
         self, candidates: list[str], keyword_names: set[str]
@@ -483,6 +500,16 @@ class DeadCodeAnalyzer(BaseAnalyzer):
 
         return calls
 
+    def _is_keyword_ignored(self, kw_name: str, display_name: str) -> bool:
+        """Return True if the keyword should be exempt from unused-keyword reporting.
+
+        Checks lifecycle keywords (suite/test setup & teardown) and any
+        configured ignore patterns.
+        """
+        if kw_name in _LIFECYCLE_KEYWORDS:
+            return True
+        return any(pattern.match(display_name) for pattern in self._ignore_patterns)
+
     def _find_unused_keywords(
         self,
         keywords: dict[str, list[int]],
@@ -494,34 +521,28 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         findings = []
 
         for keyword_name, line_numbers in keywords.items():
-            if keyword_name not in calls:
-                display_name = keyword_display_names.get(keyword_name, keyword_name)
+            if keyword_name in calls:
+                continue
+            display_name = keyword_display_names.get(keyword_name, keyword_name)
+            if self._is_keyword_ignored(keyword_name, display_name):
+                continue
 
-                # Skip special keywords and configured ignore patterns
-                if keyword_name in _LIFECYCLE_KEYWORDS:
-                    continue
-                if any(
-                    pattern.match(display_name) for pattern in self._ignore_patterns
-                ):
-                    continue
-
-                pattern = Pattern(
-                    type=PatternType.UNUSED_KEYWORD,
-                    name="Unused Keyword",
-                    description=f"Keyword '{display_name}' is never called",
-                    recommendation="Remove this keyword or use it in your tests",
-                    documentation_url=None,
-                    auto_fixable=True,
-                )
-
-                finding = Finding.create(
-                    pattern=pattern,
-                    severity=Severity.WARNING,
-                    location=Location(file_path=test_file.path, line=line_numbers[0]),
-                    message=f"Keyword '{display_name}' is defined but never used",
-                    keyword_name=display_name,
-                )
-                findings.append(finding)
+            pattern = Pattern(
+                type=PatternType.UNUSED_KEYWORD,
+                name="Unused Keyword",
+                description=f"Keyword '{display_name}' is never called",
+                recommendation="Remove this keyword or use it in your tests",
+                documentation_url=None,
+                auto_fixable=True,
+            )
+            finding = Finding.create(
+                pattern=pattern,
+                severity=Severity.WARNING,
+                location=Location(file_path=test_file.path, line=line_numbers[0]),
+                message=f"Keyword '{display_name}' is defined but never used",
+                keyword_name=display_name,
+            )
+            findings.append(finding)
 
         return findings
 

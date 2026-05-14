@@ -278,6 +278,70 @@ class SleepDetectorAnalyzer(BaseAnalyzer):
         re.IGNORECASE,
     )
 
+    def _detect_evaluate_sleep(self, line: str) -> dict[str, str | Decimal | None] | None:
+        """Detect ``Evaluate  time.sleep(N)`` on *line*.
+
+        Returns:
+            Sleep information dict, or ``None`` if not matched.
+        """
+        m = self._EVALUATE_SLEEP_RE.match(line)
+        if not m:
+            return None
+        duration_str = m.group(1)
+        try:
+            duration = Decimal(duration_str)
+            return {
+                "type": "evaluate_sleep",
+                "duration": duration,
+                "unit": "s",
+                "duration_str": duration_str,
+            }
+        except (ValueError, InvalidOperation):
+            return None
+
+    def _detect_pattern_sleep(
+        self, match: re.Match[str], sleep_type: str
+    ) -> dict[str, str | Decimal | None] | None:
+        """Build a sleep-info dict from a compiled-pattern match result.
+
+        Args:
+            match: Regex match object from one of ``_sleep_patterns``.
+            sleep_type: Pattern category label (e.g. ``"builtin"``, ``"variable"``).
+
+        Returns:
+            Sleep information dict, or ``None`` when the duration is unparseable.
+        """
+        if sleep_type == "variable":
+            return {
+                "type": sleep_type,
+                "variable": match.group(1),
+                "duration": None,
+                "unit": None,
+            }
+
+        # Numeric sleep
+        duration_str = match.group(1)
+        raw_unit = (
+            match.group(2)
+            if match.lastindex is not None and match.lastindex >= 2
+            else None
+        )
+        unit = _normalise_unit(raw_unit)
+        try:
+            duration = Decimal(duration_str)
+            return {
+                "type": sleep_type,
+                "duration": duration,
+                "unit": unit,
+                "duration_str": duration_str,
+            }
+        except (ValueError, InvalidOperation):
+            self._logger.warning(
+                f"Invalid sleep duration: {duration_str}",
+                extra={"line": match.string},
+            )
+            return None
+
     def _detect_sleep(self, line: str) -> dict[str, str | Decimal | None] | None:
         """Detect sleep pattern in a line.
 
@@ -291,56 +355,13 @@ class SleepDetectorAnalyzer(BaseAnalyzer):
         Returns:
             Sleep information dict or None.
         """
-        # check for time.sleep() inside Evaluate first
         if self._check_builtin:
-            if m := self._EVALUATE_SLEEP_RE.match(line):
-                duration_str = m.group(1)
-                try:
-                    duration = Decimal(duration_str)
-                    return {
-                        "type": "evaluate_sleep",
-                        "duration": duration,
-                        "unit": "s",
-                        "duration_str": duration_str,
-                    }
-                except (ValueError, InvalidOperation):
-                    pass
+            if result := self._detect_evaluate_sleep(line):
+                return result
 
         for pattern, sleep_type in self._sleep_patterns:
             if match := pattern.match(line):
-                match sleep_type:
-                    case "variable":
-                        # Variable sleep - can't determine duration
-                        return {
-                            "type": sleep_type,
-                            "variable": match.group(1),
-                            "duration": None,
-                            "unit": None,
-                        }
-                    case _:
-                        # Numeric sleep
-                        duration_str = match.group(1)
-                        raw_unit = (
-                            match.group(2)
-                            if match.lastindex is not None and match.lastindex >= 2
-                            else None
-                        )
-                        unit = _normalise_unit(raw_unit)
-
-                        try:
-                            duration = Decimal(duration_str)
-                            return {
-                                "type": sleep_type,
-                                "duration": duration,
-                                "unit": unit,
-                                "duration_str": duration_str,
-                            }
-                        except (ValueError, InvalidOperation):
-                            self._logger.warning(
-                                f"Invalid sleep duration: {duration_str}",
-                                extra={"line": line},
-                            )
-                            return None
+                return self._detect_pattern_sleep(match, sleep_type)
 
         return None
 

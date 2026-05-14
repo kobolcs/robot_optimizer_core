@@ -328,7 +328,7 @@ def _html_render_category_cards(
 
 
 def _html_render_action_items(findings: list[Finding]) -> str:
-    """Return an HTML fragment of <li> elements for relevant recommended actions."""
+    """Return a string of <li> HTML elements for relevant recommended actions."""
     recommended_actions = [
         ("Replace fixed sleeps with explicit waits", "sleep"),
         ("Remove or confirm unused legacy keywords", "unused keyword"),
@@ -590,15 +590,29 @@ def _format_html(findings: list[Finding], path: Path) -> str:
         )
     )
 
-    no_findings_html = (
-        "<p class='no-findings'>No findings were detected for the selected analyzers.</p>"
-        if not findings else ""
-    )
     auto_fixable_count = sum(1 for f in findings if f.pattern.auto_fixable)
 
-    action_items = _html_render_action_items(findings)
+    action_items_raw = _html_render_action_items(findings)
     grouped_findings = _html_render_grouped_findings(sorted_category_names, category_groups, root)
     table = _html_render_findings_table(findings, root)
+
+    try:
+        from markupsafe import Markup
+        action_items: list[Any] = [Markup(action_items_raw)] if action_items_raw else []
+        no_findings_html_val: Any = Markup(
+            "<p class='no-findings'>No findings were detected for the selected analyzers.</p>"
+            if not findings else ""
+        )
+        grouped_findings_val: list[Any] = [Markup(grouped_findings)]
+        findings_table_val: Any = Markup(table)
+    except ImportError:
+        action_items = [action_items_raw] if action_items_raw else []
+        no_findings_html_val = (
+            "<p class='no-findings'>No findings were detected for the selected analyzers.</p>"
+            if not findings else ""
+        )
+        grouped_findings_val = [grouped_findings]
+        findings_table_val = table
 
     # Prepare template context
     context: dict[str, Any] = {
@@ -621,9 +635,9 @@ def _format_html(findings: list[Finding], path: Path) -> str:
         "top_categories_str": top_category_names or "None",
         "summary_paragraph": summary_paragraph,
         "action_items": action_items,
-        "no_findings_html": no_findings_html,
-        "grouped_findings": [grouped_findings],
-        "findings_table": table,
+        "no_findings_html": no_findings_html_val,
+        "grouped_findings": grouped_findings_val,
+        "findings_table": findings_table_val,
         "escape": escape,
     }
 

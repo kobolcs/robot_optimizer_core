@@ -73,6 +73,55 @@ def _matches_hint(call: str, hints: frozenset[str]) -> bool:
     return any(hint in lower for hint in hints)
 
 
+def _coerce_threshold(raw_threshold: object) -> int:
+    """Coerce a config value to a valid positive integer threshold.
+
+    Raises TypeError for unsupported types or booleans; raises ValueError for
+    non-integer floats or non-numeric strings.
+    """
+    if isinstance(raw_threshold, bool):
+        msg = "duplication_threshold must be an integer, not a boolean"
+        raise TypeError(msg)
+    if isinstance(raw_threshold, int):
+        return raw_threshold
+    if isinstance(raw_threshold, float):
+        if not raw_threshold.is_integer():
+            msg = f"duplication_threshold must be a whole number, got: {raw_threshold}"
+            raise ValueError(msg)
+        return int(raw_threshold)
+    if isinstance(raw_threshold, str):
+        try:
+            return int(raw_threshold.strip())
+        except ValueError as e:
+            msg = f"duplication_threshold must be an integer, got: {raw_threshold}"
+            raise ValueError(msg) from e
+    msg = f"duplication_threshold must be an integer, got {type(raw_threshold).__name__}"
+    raise TypeError(msg)
+
+
+def _flush_test_case(
+    result: list[tuple[str, int, list[str], bool]],
+    current_name: str | None,
+    current_line: int,
+    current_steps: list[str],
+    has_hook: bool,
+) -> None:
+    """Append the current test case to *result* if a name has been recorded."""
+    if current_name:
+        result.append((current_name, current_line, list(current_steps), has_hook))
+
+
+def _extract_step_keyword(stripped: str) -> str:
+    """Return the keyword call, stripping any leading variable-assignment prefix.
+
+    Example: ``${var}=    My Keyword  arg`` → ``My Keyword  arg``
+    """
+    if stripped.startswith("${") and "=" in stripped:
+        parts = stripped.split("=", 1)
+        return parts[1].strip() if len(parts) > 1 else stripped
+    return stripped
+
+
 class SetupTeardownAnalyzer(BaseAnalyzer):
     """Detects repeated inline setup/teardown steps.
 
@@ -90,25 +139,7 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
     def __init__(self, config: dict[str, ConfigValue] | None = None) -> None:
         super().__init__(config)
         raw_threshold = self.get_config_value("duplication_threshold", 2)
-        if isinstance(raw_threshold, bool):
-            msg = "duplication_threshold must be an integer, not a boolean"
-            raise TypeError(msg)
-        if isinstance(raw_threshold, int):
-            self._threshold = raw_threshold
-        elif isinstance(raw_threshold, float):
-            if not raw_threshold.is_integer():
-                msg = f"duplication_threshold must be a whole number, got: {raw_threshold}"
-                raise ValueError(msg)
-            self._threshold = int(raw_threshold)
-        elif isinstance(raw_threshold, str):
-            try:
-                self._threshold = int(raw_threshold.strip())
-            except ValueError as e:
-                msg = f"duplication_threshold must be an integer, got: {raw_threshold}"
-                raise ValueError(msg) from e
-        else:
-            msg = f"duplication_threshold must be an integer, got {type(raw_threshold).__name__}"
-            raise TypeError(msg)
+        self._threshold = _coerce_threshold(raw_threshold)
         if self._threshold < 1:
             msg = "duplication_threshold must be >= 1"
             raise ValueError(msg)
@@ -233,18 +264,12 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
         current_steps: list[str] = []
         has_hook = False
 
-        def flush() -> None:
-            if current_name:
-                result.append(
-                    (current_name, current_line, list(current_steps), has_hook)
-                )
-
         for line_num, line in enumerate(lines, 1):
             stripped = line.strip()
             if not stripped:
                 continue
             if stripped.startswith("***"):
-                flush()
+                _flush_test_case(result, current_name, current_line, current_steps, has_hook)
                 current_name = None
                 current_steps = []
                 has_hook = False
@@ -252,7 +277,7 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
                 continue
 
             if in_test_cases and not line.startswith((" ", "\t")):
-                flush()
+                _flush_test_case(result, current_name, current_line, current_steps, has_hook)
                 current_name = stripped if not stripped.startswith("#") else None
                 current_line = line_num
                 current_steps = []
@@ -268,14 +293,9 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
                     continue  # other settings like [Tags], [Documentation]
                 if stripped.startswith("#"):
                     continue
-                # Strip variable assignment prefix:  ${var}=    Keyword  → Keyword
-                keyword_call = stripped
-                if stripped.startswith("${") and "=" in stripped:
-                    parts = stripped.split("=", 1)
-                    keyword_call = parts[1].strip() if len(parts) > 1 else stripped
-                current_steps.append(keyword_call)
+                current_steps.append(_extract_step_keyword(stripped))
 
-        flush()
+        _flush_test_case(result, current_name, current_line, current_steps, has_hook)
         return result
 
     # ------------------------------------------------------------------

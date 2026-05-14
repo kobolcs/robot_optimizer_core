@@ -136,8 +136,46 @@ class TagConsistencyAnalyzer(BaseAnalyzer):
                 return [t.strip() for t in tag_parts if t.strip()]
         return current_tags
 
-    def analyze(self, test_file: TestFile) -> list[Finding]:
+    def _check_test_tags(
+        self,
+        test_name: str,
+        test_line: int,
+        tags: list[str],
+        tag_counts: Counter[str],
+        test_file: TestFile,
+    ) -> list[Finding]:
+        """Return all findings for a single test's tags.
+
+        Args:
+            test_name: Name of the test case.
+            test_line: Line number where the test case starts.
+            tags: Tags declared on the test.
+            tag_counts: Suite-wide counter of tag occurrences.
+            test_file: The file being analysed.
+
+        Returns:
+            List of findings (may be empty).
+        """
+        if self._check_missing and not tags:
+            return [self._missing_tag_finding(test_name, test_line, test_file)]
+
         findings: list[Finding] = []
+        for tag in tags:
+            if self._check_reserved and (
+                tag.lower() in _RESERVED_NORMALIZED and tag not in _RESERVED_TAGS
+            ):
+                findings.append(
+                    self._reserved_tag_finding(tag, test_name, test_line, test_file)
+                )
+
+            if self._check_singletons and tag_counts[tag] < self._singleton_threshold:
+                findings.append(
+                    self._singleton_tag_finding(tag, test_name, test_line, test_file)
+                )
+
+        return findings
+
+    def analyze(self, test_file: TestFile) -> list[Finding]:
         lines = test_file.content.splitlines()
         test_tag_info = self._collect_tag_info(lines)
 
@@ -145,30 +183,11 @@ class TagConsistencyAnalyzer(BaseAnalyzer):
         all_tags: list[str] = [t for _, _, tags in test_tag_info for t in tags]
         tag_counts = Counter(all_tags)
 
+        findings: list[Finding] = []
         for test_name, test_line, tags in test_tag_info:
-            if self._check_missing and not tags:
-                findings.append(
-                    self._missing_tag_finding(test_name, test_line, test_file)
-                )
-                continue  # no point checking further if no tags
-
-            for tag in tags:
-                if self._check_reserved and (
-                    tag.lower() in _RESERVED_NORMALIZED and tag not in _RESERVED_TAGS
-                ):
-                    findings.append(
-                        self._reserved_tag_finding(tag, test_name, test_line, test_file)
-                    )
-
-                if (
-                    self._check_singletons
-                    and tag_counts[tag] < self._singleton_threshold
-                ):
-                    findings.append(
-                        self._singleton_tag_finding(
-                            tag, test_name, test_line, test_file
-                        )
-                    )
+            findings.extend(
+                self._check_test_tags(test_name, test_line, tags, tag_counts, test_file)
+            )
 
         return findings
 

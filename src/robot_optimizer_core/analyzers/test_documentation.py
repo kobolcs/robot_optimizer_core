@@ -106,6 +106,87 @@ class TestDocumentationAnalyzer(BaseAnalyzer):
             entity_name=name,
         )
 
+    def _flush_entity(
+        self,
+        test_file: TestFile,
+        current_name: str | None,
+        current_line: int,
+        current_entity: str,
+        has_doc: bool,
+        doc_text: str,
+        findings: list[Finding],
+    ) -> None:
+        """Emit a finding for the current entity if it lacks required documentation."""
+        if current_name and self._should_check_entity(current_entity):
+            finding = self._create_finding(
+                test_file,
+                current_name,
+                current_line,
+                current_entity,
+                has_doc=has_doc,
+                doc_text=doc_text,
+            )
+            if finding:
+                findings.append(finding)
+
+    def _handle_section_header(
+        self,
+        stripped: str,
+        current_name: str | None,
+        current_line: int,
+        current_entity: str,
+        has_doc: bool,
+        doc_text: str,
+        test_file: TestFile,
+        findings: list[Finding],
+    ) -> tuple[str | None, bool, bool]:
+        """Handle a ``***`` section header line.
+
+        Flushes the current entity and returns
+        ``(new_current_name, new_in_test_cases, new_in_keywords)``.
+        """
+        self._flush_entity(
+            test_file, current_name, current_line, current_entity,
+            has_doc, doc_text, findings,
+        )
+        lower = stripped.lower()
+        new_in_test_cases = "test case" in lower
+        new_in_keywords = "keyword" in lower and "test case" not in lower
+        return None, new_in_test_cases, new_in_keywords
+
+    def _handle_definition_line(
+        self,
+        stripped: str,
+        line_num: int,
+        in_test_cases: bool,
+        in_keywords: bool,
+        current_name: str | None,
+        current_line: int,
+        current_entity: str,
+        has_doc: bool,
+        doc_text: str,
+        test_file: TestFile,
+        findings: list[Finding],
+    ) -> tuple[str | None, int, str, bool, str]:
+        """Handle a non-indented definition line inside a tracked section.
+
+        Flushes the previous entity and starts tracking a new one.
+        Returns ``(current_name, current_line, current_entity, has_doc, doc_text)``.
+        """
+        if not (in_test_cases or in_keywords):
+            return current_name, current_line, current_entity, has_doc, doc_text
+
+        self._flush_entity(
+            test_file, current_name, current_line, current_entity,
+            has_doc, doc_text, findings,
+        )
+
+        if stripped.startswith("#"):
+            return current_name, current_line, current_entity, has_doc, doc_text
+
+        new_entity = "test case" if in_test_cases else "keyword"
+        return stripped, line_num, new_entity, False, ""
+
     @override
     def analyze(self, test_file: TestFile) -> list[Finding]:
         findings: list[Finding] = []
@@ -126,45 +207,23 @@ class TestDocumentationAnalyzer(BaseAnalyzer):
                 continue
 
             if stripped.startswith("***"):
-                if current_name and self._should_check_entity(current_entity):
-                    finding = self._create_finding(
-                        test_file,
-                        current_name,
-                        current_line,
-                        current_entity,
-                        has_doc=has_doc,
-                        doc_text=doc_text,
-                    )
-                    if finding:
-                        findings.append(finding)
-                current_name = None
-                lower = stripped.lower()
-                in_test_cases = "test case" in lower
-                in_keywords = "keyword" in lower and "test case" not in lower
+                current_name, in_test_cases, in_keywords = self._handle_section_header(
+                    stripped, current_name, current_line, current_entity,
+                    has_doc, doc_text, test_file, findings,
+                )
+                has_doc = False
+                doc_text = ""
                 continue
 
             # Non-indented line in a tracked section = new definition
             if not line.startswith((" ", "\t")):
-                if in_test_cases or in_keywords:
-                    if current_name and self._should_check_entity(current_entity):
-                        finding = self._create_finding(
-                            test_file,
-                            current_name,
-                            current_line,
-                            current_entity,
-                            has_doc=has_doc,
-                            doc_text=doc_text,
-                        )
-                        if finding:
-                            findings.append(finding)
-                    if not stripped.startswith("#"):
-                        current_name = stripped
-                        current_line = line_num
-                        current_entity = (
-                            "test case" if in_test_cases else "keyword"
-                        )
-                        has_doc = False
-                        doc_text = ""
+                current_name, current_line, current_entity, has_doc, doc_text = (
+                    self._handle_definition_line(
+                        stripped, line_num, in_test_cases, in_keywords,
+                        current_name, current_line, current_entity,
+                        has_doc, doc_text, test_file, findings,
+                    )
+                )
                 continue
 
             # Indented line — check for [Documentation]
@@ -174,16 +233,9 @@ class TestDocumentationAnalyzer(BaseAnalyzer):
                 doc_text = parts[1] if len(parts) > 1 else ""
 
         # Final flush for last entity
-        if current_name and self._should_check_entity(current_entity):
-            finding = self._create_finding(
-                test_file,
-                current_name,
-                current_line,
-                current_entity,
-                has_doc=has_doc,
-                doc_text=doc_text,
-            )
-            if finding:
-                findings.append(finding)
+        self._flush_entity(
+            test_file, current_name, current_line, current_entity,
+            has_doc, doc_text, findings,
+        )
 
         return findings
