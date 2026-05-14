@@ -233,6 +233,39 @@ def analyze_file(
     return all_findings
 
 
+def _validate_directory_path(directory_path: str | Path) -> Path:
+    """Validate that the directory path exists and is a directory."""
+    path = Path(directory_path)
+    if not path.exists():
+        raise RobotFileNotFoundError(path)
+    if not path.is_dir():
+        raise AnalysisError("Path is not a directory", file_path=path)
+    return path
+
+
+def _handle_directory_analysis_errors(
+    file_errors: list[tuple[Path, Exception]],
+    error_handling: ErrorHandling,
+    fail_fast: bool,
+    dir_results: DirectoryResults,
+) -> None:
+    """Handle errors from directory analysis based on error_handling mode."""
+    if not file_errors:
+        return
+    effective_handling = "raise" if fail_fast else error_handling
+    if effective_handling == "raise":
+        raise ExceptionGroup(
+            f"Analysis failed for {len(file_errors)} files",
+            [e for _, e in file_errors],
+        )
+    if effective_handling == "warn":
+        logger.warning(
+            f"Analysis had partial failures: {len(file_errors)} file(s) could not be analyzed",
+            extra={"failed_files": [str(p) for p, _ in file_errors]},
+        )
+        dir_results.errors = file_errors
+
+
 def analyze_directory(
     directory_path: str | Path,
     patterns: list[str] | None = None,
@@ -295,10 +328,7 @@ def analyze_directory(
         >>> for file_path, findings in findings_map.items():
         ...     print(f"{file_path}: {len(findings)} findings")
     """
-    # Convert to Path
-    path = Path(directory_path)
-
-    # Emit deprecation warning for fail_fast before any other processing
+    # Deprecation warning
     if fail_fast:
         warnings.warn(
             "The 'fail_fast' parameter is deprecated since 1.0.0b1 and will be "
@@ -307,30 +337,20 @@ def analyze_directory(
             stacklevel=2,
         )
 
-    # Validate directory exists
-    if not path.exists():
-        raise RobotFileNotFoundError(path)
-
-    if not path.is_dir():
-        raise AnalysisError("Path is not a directory", file_path=path)
-
-    # Resolve services through the DI container
+    # Validate directory and resolve settings
+    path = _validate_directory_path(directory_path)
     container = get_container()
     if settings is None:
         settings = container.resolve("settings")
     discovery: Any = container.resolve("file_discovery")
 
-    # Discover files
-    if patterns is None:
-        patterns = settings.file_patterns
-
-    if exclude_patterns is None:
-        exclude_patterns = settings.exclude_patterns
-
+    # Discover files with resolved patterns
+    resolved_patterns = patterns or settings.file_patterns
+    resolved_excludes = exclude_patterns or settings.exclude_patterns
     files = discovery.find_files(
         root_path=path,
-        patterns=patterns,
-        exclude_patterns=exclude_patterns,
+        patterns=resolved_patterns,
+        exclude_patterns=resolved_excludes,
         recursive=recursive,
     )
 
@@ -343,9 +363,9 @@ def analyze_directory(
         },
     )
 
+    # Execute analysis
     _default_workers = min(4, (os.cpu_count() or 1))
     effective_workers = max_workers if max_workers is not None else _default_workers
-
     analyze_fn = functools.partial(
         _analyze_one_file,
         analyzers=analyzers,
@@ -357,7 +377,7 @@ def analyze_directory(
         files, analyze_fn, effective_workers, fail_fast
     )
 
-    # Log summary
+    # Log and track metrics
     total_findings = sum(len(findings) for findings in dir_results.values())
     logger.info(
         "Directory analysis complete",
@@ -369,31 +389,16 @@ def analyze_directory(
         },
     )
 
-    # Track metrics
     if metrics is None:
         metrics = container.resolve("metrics")
     metrics.gauge("batch.files_analyzed", len(dir_results))
     metrics.gauge("batch.files_failed", len(file_errors))
     metrics.gauge("batch.total_findings", total_findings)
 
-    # Configurable per-file error handling.
-    if file_errors:
-        effective_handling = error_handling
-        if fail_fast:
-            effective_handling = "raise"
-
-        if effective_handling == "raise":
-            raise ExceptionGroup(
-                f"Analysis failed for {len(file_errors)} files",
-                [e for _, e in file_errors],
-            )
-        if effective_handling == "warn":
-            logger.warning(
-                f"Analysis had partial failures: {len(file_errors)} file(s) could not be analyzed",
-                extra={"failed_files": [str(p) for p, _ in file_errors]},
-            )
-            dir_results.errors = file_errors
-        # "skip": silently continue
+    # Handle errors
+    _handle_directory_analysis_errors(
+        file_errors, error_handling, fail_fast, dir_results
+    )
 
     return dir_results
 
