@@ -447,6 +447,8 @@ def _compute_severity_phrase(findings: list[Finding], health_status: str) -> str
         return "no significant"
     if health_status == _HEALTH_HIGH_RISK:
         return "high"
+    if health_status == _HEALTH_LOW_RISK:
+        return "low"
     return "moderate"
 
 
