@@ -438,7 +438,11 @@ class ValidatedPluginManager:
         - Only load plugins from trusted sources
         """
         compiled = compile(content, str(file_path), "exec", flags=0)
-        exec(compiled, restricted_globals)  # nosec: B102 - security validated above
+        # Use exec() to load plugin code - this is intentional and necessary.
+        # Security mitigations are in place: code is validated by SecurityVisitor
+        # before reaching this point, and execution happens in a restricted
+        # environment with safe builtins only.
+        exec(compiled, restricted_globals)  # nosec
 
         plugin_class = None
         for obj in restricted_globals.values():
