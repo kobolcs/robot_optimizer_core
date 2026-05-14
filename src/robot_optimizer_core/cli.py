@@ -366,7 +366,7 @@ def _html_render_action_items(findings: list[Finding]) -> str:
             is_relevant = any(
                 any(
                     part in f.pattern.name.lower()
-                    for part in ("tag", "naming", "camel_case")
+                    for part in ("tag", "naming", "camelcase", "camel_case")
                 )
                 for f in findings
             )

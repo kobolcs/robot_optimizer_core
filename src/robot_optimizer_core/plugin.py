@@ -364,9 +364,9 @@ class ValidatedPluginManager:
             # 1. AST validation before execution detects forbidden imports, dangerous function
             #    calls, and attribute access patterns (__dict__, __globals__, etc.)
             # 2. Restricted builtins whitelist allows only safe functions (len, str, isinstance,
-            #    etc.) and blocks dangerous ones (eval, exec, open, file, __import__, etc.).
-            #    __import__ and __build_class__ are restored ONLY because AST validation
-            #    already blocked non-whitelisted imports at the syntax level.
+            #    etc.) and blocks dangerous ones (eval, exec, open, file, etc.).
+            #    __import__ and __build_class__ are intentionally restored ONLY because AST
+            #    validation already blocked non-whitelisted imports at the syntax level.
             # 3. File permissions validated on POSIX to ensure only trusted users can modify
             #    plugin files (st_mode & 0o022 check on non-Windows).
             # 4. Plugin hash validation allows pre-approved plugins to skip validation.

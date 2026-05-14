@@ -143,8 +143,8 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
         # Collect first and last steps per test for counting
         if self._check_setup:
             first_steps: Counter[str] = Counter()
-            for _, _, steps, _, _ in test_steps:
-                if steps:
+            for _, _, steps, has_setup, _ in test_steps:
+                if steps and not has_setup:
                     first = steps[0]
                     if _matches_hint(first, _SETUP_HINTS):
                         first_steps[first.lower()] += 1
@@ -170,8 +170,8 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
 
         if self._check_teardown:
             last_steps: Counter[str] = Counter()
-            for _, _, steps, _, _ in test_steps:
-                if steps:
+            for _, _, steps, _, has_teardown in test_steps:
+                if steps and not has_teardown:
                     last = steps[-1]
                     if _matches_hint(last, _TEARDOWN_HINTS):
                         last_steps[last.lower()] += 1
