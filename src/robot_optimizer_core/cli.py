@@ -44,6 +44,15 @@ _COLOURS = {
 }
 _RESET = "\033[0m"
 
+# Health status labels
+_HEALTH_HIGH_RISK = "High Risk"
+_HEALTH_MODERATE_RISK = "Moderate Risk"
+_HEALTH_LOW_RISK = "Low Risk"
+_HEALTH_HEALTHY = "Healthy"
+
+# Feature matrix labels
+_FEATURE_COMING_SOON = "coming soon"
+
 
 def _colour(text: str, severity: Severity) -> str:
     if not sys.stdout.isatty():
@@ -293,14 +302,14 @@ def _html_compute_stats(
 def _html_health_status(sev_counts: dict[str, int], findings: list[Finding]) -> str:
     """Classify the overall suite health into a display label."""
     if sev_counts["ERROR"] > 0 or sev_counts["WARNING"] >= 10:
-        return "High Risk"
+        return _HEALTH_HIGH_RISK
     if sev_counts["WARNING"] > 0:
-        return "Moderate Risk"
+        return _HEALTH_MODERATE_RISK
     if not findings:
-        return "Healthy"
+        return _HEALTH_HEALTHY
     if len(findings) <= 5 and sev_counts["WARNING"] == 0 and sev_counts["ERROR"] == 0:
-        return "Low Risk"
-    return "Moderate Risk"
+        return _HEALTH_LOW_RISK
+    return _HEALTH_MODERATE_RISK
 
 
 def _html_render_category_cards(
@@ -852,13 +861,13 @@ def _run_upgrade(_args: argparse.Namespace) -> int:
         ("Custom analyzer plugins", True, True),
         ("SARIF output format", True, True),
         ("Basic HTML report", True, True),
-        ("Auto-fix workflows", False, "coming soon"),
-        ("Advanced branded HTML reports", False, "coming soon"),
-        ("PDF export", False, "coming soon"),
-        ("Baseline diffing", False, "coming soon"),
-        ("Historical trend reports", False, "coming soon"),
-        ("Dashboards", False, "coming soon"),
-        ("Priority support", False, "coming soon"),
+        ("Auto-fix workflows", False, _FEATURE_COMING_SOON),
+        ("Advanced branded HTML reports", False, _FEATURE_COMING_SOON),
+        ("PDF export", False, _FEATURE_COMING_SOON),
+        ("Baseline diffing", False, _FEATURE_COMING_SOON),
+        ("Historical trend reports", False, _FEATURE_COMING_SOON),
+        ("Dashboards", False, _FEATURE_COMING_SOON),
+        ("Priority support", False, _FEATURE_COMING_SOON),
     ]
     for name, free, pro in features:
         free_mark = "✓" if free else "—"

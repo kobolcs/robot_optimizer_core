@@ -72,6 +72,8 @@ class NamingConventionAnalyzer(BaseAnalyzer):
             the full name).
     """
 
+    _TEST_CASE_SECTION = "test case"
+
     def __init__(self, config: dict[str, ConfigValue] | None = None) -> None:
         super().__init__(config)
         self._check_tests: bool = bool(self.get_config_value("check_test_names", True))
@@ -116,8 +118,11 @@ class NamingConventionAnalyzer(BaseAnalyzer):
 
             if stripped.startswith("***"):
                 lower = stripped.lower()
-                in_test_cases = "test case" in lower
-                in_keywords = "keyword" in lower and "test case" not in lower
+                in_test_cases = self._TEST_CASE_SECTION in lower
+                in_keywords = (
+                    "keyword" in lower
+                    and self._TEST_CASE_SECTION not in lower
+                )
                 continue
 
             # Non-indented line inside a section = definition name
