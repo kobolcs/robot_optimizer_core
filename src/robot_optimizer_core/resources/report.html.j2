@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Robot Framework Suite Health Report</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --health-color: {{ health_color }};
+      --health-color-bg: {{ health_color_bg }};
+      --health-color-border: {{ health_color_border }};
+      --health-color-glow: {{ health_color_glow }};
+    }
+{{ styles }}
+  </style>
+</head>
+<body>
+<main>
+  <section class="cover">
+    <div class="cover-eyebrow">Robot Framework Optimizer</div>
+    <h1>Suite Health Report</h1>
+    <h2>Static analysis · maintainability &amp; stability</h2>
+    <div class="cover-meta">
+      Analyzed: {{ escape(analyzed_path) }}<br>
+      Generated: {{ escape(timestamp) }}
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Health status</h2>
+    <span class="health-badge"><span class="health-dot"></span>{{ escape(health_status) }}</span>
+  </section>
+
+  <section class="panel">
+    <h2>Executive summary</h2>
+    <p>Total findings: <strong>{{ total_findings }}</strong> &nbsp;·&nbsp; Warnings/Errors: <strong>{{ warning_error_count }}</strong> &nbsp;·&nbsp; Main risk categories: <strong>{{ escape(top_categories_str) }}</strong></p>
+    <p>{{ escape(summary_paragraph) }}</p>
+  </section>
+
+  <section class="panel">
+    <h2>Key metrics</h2>
+    <div class="bento">
+      <div class="metric-card"><div class="metric-label">Total findings</div><div class="metric-value">{{ total_findings }}</div></div>
+      <div class="metric-card"><div class="metric-label">ERROR</div><div class="metric-value">{{ error_count }}</div></div>
+      <div class="metric-card"><div class="metric-label">WARNING</div><div class="metric-value">{{ warning_count }}</div></div>
+      <div class="metric-card"><div class="metric-label">INFO</div><div class="metric-value">{{ info_count }}</div></div>
+      <div class="metric-card"><div class="metric-label">Affected files</div><div class="metric-value">{{ affected_files_count }}</div></div>
+      <div class="metric-card accent"><div class="metric-label">Auto-fixable findings</div><div class="metric-value">{{ auto_fixable_count }}</div></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Risk categories</h2>
+    <div class="category-grid">
+{% for category, meta in top_categories %}
+      <div class='category-card'>
+        <h3>{{ escape(category) }}</h3>
+        <p><strong>{{ meta.count }}</strong> finding(s)</p>
+        <p><strong>Why it matters:</strong> {{ escape(meta.impact) }}</p>
+        <p><strong>Suggested action:</strong> {{ escape(meta.action) }}</p>
+      </div>
+{% endfor %}
+{% if not top_categories %}
+      <p>No risk categories detected.</p>
+{% endif %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Recommended actions</h2>
+    <ol>
+{% for action_item in action_items %}
+      {{ action_item }}
+{% endfor %}
+{% if not action_items %}
+      <li>Maintain current standards and monitor new findings.</li>
+{% endif %}
+    </ol>
+  </section>
+
+  <section class="panel">
+    <h2>Findings by category</h2>
+{{ no_findings_html }}
+{% for section_html in grouped_findings %}
+{{ section_html }}
+{% endfor %}
+  </section>
+
+  <section class="panel">
+    <h2>Appendix — Detailed Findings</h2>
+{{ no_findings_html }}
+    <div class="table-wrap">{{ findings_table }}</div>
+  </section>
+</main>
+</body>
+</html>

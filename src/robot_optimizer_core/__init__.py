@@ -139,20 +139,45 @@ from .parsers import RobotASTParser as RobotASTParser
 from .plugin import Plugin, PluginMetadata
 from .premium import PremiumFeatureError, is_premium_installed
 
+# File I/O providers — for advanced use (testing, custom sources)
+from .providers import (
+    DiskFileProvider as DiskFileProvider,
+)
+from .providers import (
+    FileProvider as FileProvider,
+)
+from .providers import (
+    InMemoryFileProvider as InMemoryFileProvider,
+)
+
+# Service layer (recommended for most uses)
+from .service import (
+    AnalysisResult,
+    AnalysisService,
+    DirectoryAnalysisResult,
+)
+
 # Deprecated alias — use ThreadSafeContainer directly; will be removed in a future release
 Container = ThreadSafeContainer
 
 __all__ = [
     "AnalysisError",
+    # Service layer (recommended for most uses)
+    "AnalysisResult",
+    "AnalysisService",
+    "DirectoryAnalysisResult",
     # Analyzer classes
     "BaseAnalyzer",
     "ConfigurationError",
     "Container",  # deprecated alias for ThreadSafeContainer
     "DeadCodeAnalyzer",
     # Domain value objects used in findings
+    "DiskFileProvider",
+    "FileProvider",
     "Finding",
     "FlakinessAnalyzer",
     "HardcodedValueAnalyzer",
+    "InMemoryFileProvider",
     "Location",
     "NamingConventionAnalyzer",
     "Pattern",
