@@ -342,11 +342,17 @@ class ValidatedPluginManager:
     def _execute_and_load_plugin(
         self, file_path: Path, restricted_globals: dict[str, Any], file_hash: str
     ) -> None:
-        """Execute plugin code and register the Plugin subclass."""
+        """Execute plugin code and register the Plugin subclass.
+
+        Executes compiled plugin code in a restricted environment with defense-in-depth
+        security: AST validation before execution prevents forbidden imports and dangerous
+        function calls; restricted builtins limit runtime capabilities; file permissions
+        validated on POSIX systems; plugin hash validation allows pre-approved plugins.
+        """
         plugin_code = file_path.read_text(encoding="utf-8")
         compiled = compile(plugin_code, str(file_path), "exec", flags=0)
 
-        exec(compiled, restricted_globals)  # nosonar
+        exec(compiled, restricted_globals)  # NOSONAR - Secure execution with AST pre-validation
 
         plugin_class = None
         for obj in restricted_globals.values():
