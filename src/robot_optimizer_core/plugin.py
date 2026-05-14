@@ -414,6 +414,11 @@ class ValidatedPluginManager:
         restricted_builtins = {
             k: builtin_dict[k] for k in ALLOWED_BUILTINS if k in builtin_dict
         }
+        # Add __import__ and __build_class__ for module imports and class definitions
+        # __builtins__ subscript access is blocked by SecurityVisitor during validation
+        for special_name in ("__import__", "__build_class__"):
+            if special_name in builtin_dict:
+                restricted_builtins[special_name] = builtin_dict[special_name]
         return {
             "__builtins__": restricted_builtins,
             "__name__": f"plugin_{file_path.stem}",
