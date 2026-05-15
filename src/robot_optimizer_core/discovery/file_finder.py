@@ -192,6 +192,7 @@ class PathExclusionTrie:
             # Find next node
             next_node, found = self._find_next_node(node, part)
             if found:
+                assert next_node is not None
                 node = next_node
             else:
                 return False
