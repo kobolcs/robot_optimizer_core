@@ -21,6 +21,9 @@ from robot_optimizer_core.domain.entities import TestFile
 from robot_optimizer_core.domain.value_objects import Severity
 
 
+_TEST_IP_ADDRESS = "192.168.1.100"
+
+
 def _make_file(content: str, name: str = "test.robot") -> TestFile:
     return TestFile(
         path=Path(name),
@@ -125,9 +128,9 @@ class TestHardcodedValueAnalyzer:
         assert findings  # should flag localhost
 
     def test_ip_address_flagged(self, analyzer: HardcodedValueAnalyzer) -> None:
-        content = "*** Test Cases ***\nMy Test\n    Connect    192.168.1.100\n"
+        content = f"*** Test Cases ***\nMy Test\n    Connect    {_TEST_IP_ADDRESS}\n"
         findings = analyzer.analyze(_make_file(content))
-        assert any("192.168.1.100" in f.message for f in findings)
+        assert any(_TEST_IP_ADDRESS in f.message for f in findings)
 
     def test_credential_flagged_as_error(
         self, analyzer: HardcodedValueAnalyzer

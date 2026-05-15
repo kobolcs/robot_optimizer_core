@@ -655,7 +655,7 @@ class TestHtmlCategoryMetadata:
 
     def test_integration_category_cards_contain_metadata(self, tmp_path: Path) -> None:
         # Pattern name is "Sleep in Test Case" — "sleep" keyword triggers the first entry
-        keywords, category, impact, action = _PATTERN_CATEGORY_MAP[0]
+        _, category, impact, action = _PATTERN_CATEGORY_MAP[0]
         top_categories = [(category, {"count": 1, "impact": impact, "action": action})]
         html = _html_render_category_cards(top_categories)  # type: ignore[arg-type]
         assert category in html

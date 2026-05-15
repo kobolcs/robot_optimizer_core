@@ -91,9 +91,9 @@ Very Flaky Test
         )
 
         assert analyzer._days_back == 60
-        assert analyzer._failure_threshold == 0.1
+        assert analyzer._failure_threshold == pytest.approx(0.1)
         assert analyzer._min_runs == 10
-        assert analyzer._severity_thresholds["warning"] == 0.2
+        assert analyzer._severity_thresholds["warning"] == pytest.approx(0.2)
 
     def test_analyze_no_flaky_tests(
         self, mock_repository: Mock, test_file: TestFile
@@ -167,7 +167,7 @@ Very Flaky Test
             f for f in findings if "Flaky Login Test" in f.context["test_name"]
         )
         assert finding1.severity == Severity.WARNING
-        assert finding1.context["failure_rate"] == 0.15
+        assert finding1.context["failure_rate"] == pytest.approx(0.15)
         assert finding1.context["total_runs"] == 100
         assert finding1.context["failures"] == 15
         assert finding1.location.line == 2  # Found in file
@@ -179,7 +179,7 @@ Very Flaky Test
             f for f in findings if "Very Flaky Test" in f.context["test_name"]
         )
         assert finding2.severity == Severity.ERROR  # High failure rate
-        assert finding2.context["failure_rate"] == 0.5
+        assert finding2.context["failure_rate"] == pytest.approx(0.5)
         assert finding2.location.line == 11  # Found in file
         assert "50.0% failure rate" in finding2.message
 

@@ -594,6 +594,68 @@ class DeadCodeAnalyzer(BaseAnalyzer):
 
         return findings
 
+    def _make_unreachable_finding(
+        self, test_file: TestFile, line_num: int, keyword_name: str
+    ) -> Finding:
+        pattern = Pattern(
+            type=PatternType.UNREACHABLE_CODE,
+            name="Unreachable Code",
+            description="Code after RETURN statement will never execute",
+            recommendation="Remove the unreachable code or move it before RETURN",
+            documentation_url=None,
+            auto_fixable=True,
+        )
+        return Finding.create(
+            pattern=pattern,
+            severity=Severity.WARNING,
+            location=Location(file_path=test_file.path, line=line_num),
+            message=f"Unreachable code after RETURN in keyword '{keyword_name}'",
+            keyword_name=keyword_name,
+        )
+
+    def _process_unreachable_line(
+        self,
+        line: str,
+        stripped: str,
+        state: _UnreachableState,
+        test_file: TestFile,
+        line_num: int,
+        findings: list[Finding],
+    ) -> None:
+        if not stripped or stripped.startswith("#"):
+            return
+        if stripped.startswith("***"):
+            state.enter_section(stripped)
+            return
+        if not line.startswith((" ", "\t")):
+            if state.in_keywords_section:
+                state.enter_keyword(stripped)
+            else:
+                state.exit_keyword()
+            return
+        if not state.in_keyword:
+            return
+        upper = stripped.upper()
+        if upper in _CONTROL_FLOW_OPENERS:
+            state.control_depth += 1
+            state.found_return = False
+            return
+        if upper == "END":
+            if state.control_depth > 0:
+                state.control_depth -= 1
+            state.found_return = False
+            return
+        if upper.startswith("RETURN"):
+            if state.control_depth == 0:
+                state.found_return = True
+            return
+        if state.found_return:
+            assert state.current_keyword is not None
+            findings.append(
+                self._make_unreachable_finding(test_file, line_num, state.current_keyword)
+            )
+            state.found_return = False
+
     def _find_unreachable_code(self, test_file: TestFile) -> list[Finding]:
         """Find code after RETURN statements inside Keyword definitions.
 
@@ -601,71 +663,10 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         END unreachable.  ``_UnreachableState.control_depth`` tracks nesting so
         ``found_return`` is only set for top-level RETURNs in the keyword body.
         """
-        findings = []
-        lines = test_file.content.splitlines()
+        findings: list[Finding] = []
         state = _UnreachableState()
-
-        for line_num, line in enumerate(lines, 1):
-            stripped = line.strip()
-
-            if not stripped or stripped.startswith("#"):
-                continue
-
-            if stripped.startswith("***"):
-                state.enter_section(stripped)
-                continue
-
-            # Non-indented line: boundary between keywords (or a new keyword start)
-            if not line.startswith((" ", "\t")):
-                if state.in_keywords_section:
-                    state.enter_keyword(stripped)
-                else:
-                    state.exit_keyword()
-                continue
-
-            if not state.in_keyword:
-                continue
-
-            upper = stripped.upper()
-
-            if upper in _CONTROL_FLOW_OPENERS:
-                state.control_depth += 1
-                # A top-level RETURN before this block no longer makes subsequent
-                # lines unreachable once we enter a nested scope.
-                state.found_return = False
-                continue
-
-            if upper == "END":
-                if state.control_depth > 0:
-                    state.control_depth -= 1
-                state.found_return = False
-                continue
-
-            if upper.startswith("RETURN"):
-                if state.control_depth == 0:
-                    state.found_return = True
-                continue
-
-            if state.found_return:
-                assert state.current_keyword is not None
-                pattern = Pattern(
-                    type=PatternType.UNREACHABLE_CODE,
-                    name="Unreachable Code",
-                    description="Code after RETURN statement will never execute",
-                    recommendation="Remove the unreachable code or move it before RETURN",
-                    documentation_url=None,
-                    auto_fixable=True,
-                )
-                findings.append(
-                    Finding.create(
-                        pattern=pattern,
-                        severity=Severity.WARNING,
-                        location=Location(file_path=test_file.path, line=line_num),
-                        message=f"Unreachable code after RETURN in keyword '{state.current_keyword}'",
-                        keyword_name=state.current_keyword,
-                    )
-                )
-                # Report only the first unreachable line per keyword
-                state.found_return = False
-
+        for line_num, line in enumerate(test_file.content.splitlines(), 1):
+            self._process_unreachable_line(
+                line, line.strip(), state, test_file, line_num, findings
+            )
         return findings

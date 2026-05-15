@@ -165,7 +165,7 @@ Unused Keyword {i}
             findings = analyzer.analyze(test_file)
 
             assert len(findings) == 1
-            assert findings[0].context["failure_rate"] == 0.1
+            assert findings[0].context["failure_rate"] == pytest.approx(0.1)
 
     def test_analyze_file_integration(
         self, sample_robot_file: Path, settings: Settings

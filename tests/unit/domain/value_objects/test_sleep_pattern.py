@@ -137,13 +137,13 @@ class TestSleepPattern:
             line_number=1,
             original_text="Sleep    5.5 s",
         )
-        assert pattern_s.duration_in_seconds == 5.5
+        assert pattern_s.duration_in_seconds == pytest.approx(5.5)
 
         # Minutes
         pattern_m = SleepPattern(
             duration=Decimal("2"), unit="m", line_number=1, original_text="Sleep    2 m"
         )
-        assert pattern_m.duration_in_seconds == 120.0
+        assert pattern_m.duration_in_seconds == pytest.approx(120.0)
 
         # Milliseconds
         pattern_ms = SleepPattern(
@@ -152,7 +152,7 @@ class TestSleepPattern:
             line_number=1,
             original_text="Sleep    500 ms",
         )
-        assert pattern_ms.duration_in_seconds == 0.5
+        assert pattern_ms.duration_in_seconds == pytest.approx(0.5)
 
         # Different unit variations
         pattern_seconds = SleepPattern(
@@ -161,7 +161,7 @@ class TestSleepPattern:
             line_number=1,
             original_text="Sleep    3 seconds",
         )
-        assert pattern_seconds.duration_in_seconds == 3.0
+        assert pattern_seconds.duration_in_seconds == pytest.approx(3.0)
 
     def test_is_excessive_property(self) -> None:
         """Test the is_excessive property (> 5 seconds)."""
@@ -378,10 +378,10 @@ class TestSleepPattern:
 
         # Decimal converted to float
         assert isinstance(json_data["duration"], float)
-        assert json_data["duration"] == 3.75
+        assert json_data["duration"] == pytest.approx(3.75)
 
         # Computed fields included
-        assert json_data["duration_in_seconds"] == 3.75
+        assert json_data["duration_in_seconds"] == pytest.approx(3.75)
         assert json_data["is_excessive"] is False
         assert json_data["normalized_unit"] == "seconds"
         assert json_data["severity_hint"] == "WARNING"

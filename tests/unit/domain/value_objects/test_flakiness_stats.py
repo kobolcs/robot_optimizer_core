@@ -45,7 +45,7 @@ class TestFlakinessStats:
 
         assert stats.failures == 0
         assert stats.last_failure is None
-        assert stats.failure_rate == 0.0
+        assert stats.failure_rate == pytest.approx(0.0)
 
     def test_test_name_validation(self) -> None:
         """Test test name validation."""
@@ -83,25 +83,25 @@ class TestFlakinessStats:
         stats1 = FlakinessStats(
             test_name="Test", file_path=Path("test.robot"), total_runs=100, failures=25
         )
-        assert stats1.failure_rate == 0.25
+        assert stats1.failure_rate == pytest.approx(0.25)
 
         # No failures
         stats2 = FlakinessStats(
             test_name="Test", file_path=Path("test.robot"), total_runs=50, failures=0
         )
-        assert stats2.failure_rate == 0.0
+        assert stats2.failure_rate == pytest.approx(0.0)
 
         # All failures
         stats3 = FlakinessStats(
             test_name="Test", file_path=Path("test.robot"), total_runs=10, failures=10
         )
-        assert stats3.failure_rate == 1.0
+        assert stats3.failure_rate == pytest.approx(1.0)
 
         # No runs (edge case)
         stats4 = FlakinessStats(
             test_name="Test", file_path=Path("test.robot"), total_runs=0, failures=0
         )
-        assert stats4.failure_rate == 0.0
+        assert stats4.failure_rate == pytest.approx(0.0)
 
     def test_is_flaky_property(self) -> None:
         """Test flakiness detection logic."""
@@ -239,7 +239,7 @@ class TestFlakinessStats:
         )
 
         # The failure rate would be > 1, which is illogical
-        assert stats.failure_rate == 2.0  # Shows the issue
+        assert stats.failure_rate == pytest.approx(2.0)  # Shows the issue
 
         # But is_flaky should handle this gracefully
         assert stats.is_flaky is False  # Not flaky if rate >= 1

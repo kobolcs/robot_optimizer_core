@@ -35,7 +35,7 @@ class TestSeverity:
         assert Severity.INFO > Severity.ERROR
 
         # Equality
-        assert Severity.ERROR == Severity.ERROR
+        assert Severity.ERROR is Severity.ERROR
         assert not (Severity.ERROR == Severity.WARNING)
 
     def test_severity_string_representation(self) -> None:

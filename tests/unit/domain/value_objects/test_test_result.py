@@ -34,7 +34,7 @@ class TestTestResult:
         assert result.test_name == "Login Test"
         assert result.file_path == Path("tests/login.robot")
         assert result.status == "PASS"
-        assert result.execution_time == 1.5
+        assert result.execution_time == pytest.approx(1.5)
         assert result.timestamp == timestamp
         assert result.error_message is None
 
@@ -113,7 +113,7 @@ class TestTestResult:
             execution_time=0.0,
             timestamp=datetime.now(),
         )
-        assert result.execution_time == 0.0
+        assert result.execution_time == pytest.approx(0.0)
 
     def test_is_failure_property(self) -> None:
         """Test is_failure property."""

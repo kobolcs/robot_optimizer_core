@@ -237,7 +237,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
             return False
 
         # Check failure rate
-        if stats.failure_rate <= 0 or stats.failure_rate >= 1:
+        if stats.failure_rate == 0 or stats.failure_rate >= 1:
             # Always fails or always passes - not flaky
             return False
 

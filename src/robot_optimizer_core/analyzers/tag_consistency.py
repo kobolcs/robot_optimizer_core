@@ -82,6 +82,16 @@ class TagConsistencyAnalyzer(BaseAnalyzer):
     def tags(self) -> list[str]:
         return ["tags", "structure", "style"]
 
+    def _flush_tag_entry(
+        self,
+        tag_info: list[tuple[str, int, list[str]]],
+        current_name: str | None,
+        current_line: int,
+        current_tags: list[str],
+    ) -> None:
+        if current_name is not None:
+            tag_info.append((current_name, current_line, current_tags))
+
     def _collect_tag_info(
         self, lines: list[str]
     ) -> list[tuple[str, int, list[str]]]:
@@ -98,16 +108,14 @@ class TagConsistencyAnalyzer(BaseAnalyzer):
                 continue
 
             if stripped.startswith("***"):
-                if current_name is not None:
-                    tag_info.append((current_name, current_line, current_tags))
-                    current_name = None
-                    current_tags = []
+                self._flush_tag_entry(tag_info, current_name, current_line, current_tags)
+                current_name = None
+                current_tags = []
                 in_test_cases = "test case" in stripped.lower()
                 continue
 
             if in_test_cases and not line.startswith((" ", "\t")):
-                if current_name is not None:
-                    tag_info.append((current_name, current_line, current_tags))
+                self._flush_tag_entry(tag_info, current_name, current_line, current_tags)
                 if stripped.startswith("#"):
                     current_name = None
                     current_tags = []
@@ -120,9 +128,7 @@ class TagConsistencyAnalyzer(BaseAnalyzer):
             if current_name:
                 current_tags = self._extract_tags_from_line(stripped, current_tags)
 
-        if current_name is not None:
-            tag_info.append((current_name, current_line, current_tags))
-
+        self._flush_tag_entry(tag_info, current_name, current_line, current_tags)
         return tag_info
 
     def _extract_tags_from_line(

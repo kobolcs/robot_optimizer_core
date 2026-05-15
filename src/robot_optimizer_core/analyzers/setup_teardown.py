@@ -216,6 +216,29 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
     # Parsing helpers
     # ------------------------------------------------------------------
 
+    def _extract_keyword_call(self, stripped: str) -> str:
+        """Strip variable-assignment prefix from a keyword call line."""
+        if stripped.startswith("${") and "=" in stripped:
+            parts = stripped.split("=", 1)
+            return parts[1].strip() if len(parts) > 1 else stripped
+        return stripped
+
+    def _classify_indented_line(
+        self, stripped: str
+    ) -> tuple[bool, bool, str | None]:
+        """Classify an indented test-step line.
+
+        Returns (is_setup, is_teardown, keyword_call_or_None).
+        """
+        lower = stripped.lower()
+        if lower.startswith("[setup]"):
+            return True, False, None
+        if lower.startswith("[teardown]"):
+            return False, True, None
+        if (lower.startswith("[") and lower.endswith("]")) or stripped.startswith("#"):
+            return False, False, None
+        return False, False, self._extract_keyword_call(stripped)
+
     def _parse_test_steps(
         self, test_file: TestFile
     ) -> list[tuple[str, int, list[str], bool, bool]]:
@@ -232,13 +255,7 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
         def flush() -> None:
             if current_name:
                 result.append(
-                    (
-                        current_name,
-                        current_line,
-                        list(current_steps),
-                        has_setup,
-                        has_teardown,
-                    )
+                    (current_name, current_line, list(current_steps), has_setup, has_teardown)
                 )
 
         for line_num, line in enumerate(lines, 1):
@@ -264,23 +281,13 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
                 continue
 
             if current_name and line.startswith((" ", "\t")):
-                lower = stripped.lower()
-                if lower.startswith("[setup]"):
+                is_setup, is_teardown, keyword = self._classify_indented_line(stripped)
+                if is_setup:
                     has_setup = True
-                    continue
-                if lower.startswith("[teardown]"):
+                elif is_teardown:
                     has_teardown = True
-                    continue
-                if lower.startswith("[") and lower.endswith("]"):
-                    continue  # other settings like [Tags], [Documentation]
-                if stripped.startswith("#"):
-                    continue
-                # Strip variable assignment prefix:  ${var}=    Keyword  → Keyword
-                keyword_call = stripped
-                if stripped.startswith("${") and "=" in stripped:
-                    parts = stripped.split("=", 1)
-                    keyword_call = parts[1].strip() if len(parts) > 1 else stripped
-                current_steps.append(keyword_call)
+                elif keyword is not None:
+                    current_steps.append(keyword)
 
         flush()
         return result

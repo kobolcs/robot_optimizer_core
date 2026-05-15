@@ -22,7 +22,7 @@ class TestTimingStats:
     def test_initial_state(self) -> None:
         stats = TimingStats()
         assert stats.count == 0
-        assert stats.mean == 0.0
+        assert stats.mean == pytest.approx(0.0)
         assert stats.last is None
 
     def test_add_values(self) -> None:
@@ -30,11 +30,11 @@ class TestTimingStats:
         stats.add(1.0)
         stats.add(3.0)
         assert stats.count == 2
-        assert stats.total == 4.0
-        assert stats.min == 1.0
-        assert stats.max == 3.0
-        assert stats.mean == 2.0
-        assert stats.last == 3.0
+        assert stats.total == pytest.approx(4.0)
+        assert stats.min == pytest.approx(1.0)
+        assert stats.max == pytest.approx(3.0)
+        assert stats.mean == pytest.approx(2.0)
+        assert stats.last == pytest.approx(3.0)
 
     def test_cleanup_old_samples(self) -> None:
         from datetime import timedelta
@@ -61,12 +61,12 @@ class TestMetricsCollector:
     def test_gauge(self, collector: MetricsCollector) -> None:
         collector.gauge("test.gauge", 42.0)
         data = collector.get_metrics()
-        assert data["gauges"]["test.gauge"] == 42.0
+        assert data["gauges"]["test.gauge"] == pytest.approx(42.0)
 
     def test_gauge_overwrite(self, collector: MetricsCollector) -> None:
         collector.gauge("g", 1.0)
         collector.gauge("g", 2.0)
-        assert collector.get_metrics()["gauges"]["g"] == 2.0
+        assert collector.get_metrics()["gauges"]["g"] == pytest.approx(2.0)
 
     def test_timing(self, collector: MetricsCollector) -> None:
         collector.timing("test.timing", 0.5)

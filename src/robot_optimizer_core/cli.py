@@ -971,7 +971,12 @@ def _run_upgrade(_args: argparse.Namespace) -> int:
     ]
     for name, free, pro in features:
         free_mark = "✓" if free else "—"
-        pro_mark = pro if isinstance(pro, str) else ("✓" if pro else "—")
+        if isinstance(pro, str):
+            pro_mark = pro
+        elif pro:
+            pro_mark = "✓"
+        else:
+            pro_mark = "—"
         print(f"  {name:<36} {free_mark:<10} {pro_mark}")
     print()
 

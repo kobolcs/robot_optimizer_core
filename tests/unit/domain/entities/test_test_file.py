@@ -210,7 +210,7 @@ class TestTestFile:
         assert test_file.has_content is True
 
         # size_kb property
-        assert test_file.size_kb == 2.0
+        assert test_file.size_kb == pytest.approx(2.0)
 
     def test_resource_file_detection(self) -> None:
         """Test resource file detection logic."""
@@ -252,7 +252,7 @@ class TestTestFile:
 
         assert test_file.line_count == 1  # Empty string is still 1 "line"
         assert test_file.has_content is False
-        assert test_file.size_kb == 0.0
+        assert test_file.size_kb == pytest.approx(0.0)
 
     def test_get_lines(self) -> None:
         """Test getting specific lines from content."""
@@ -383,7 +383,7 @@ class TestTestFile:
         )
 
         assert len(test_file.content) == 1024 * 1024
-        assert test_file.size_kb == 1024.0
+        assert test_file.size_kb == pytest.approx(1024.0)
         assert test_file.has_content is True
 
     def test_unicode_content(self) -> None:

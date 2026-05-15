@@ -106,11 +106,31 @@ class TestDocumentationAnalyzer(BaseAnalyzer):
             entity_name=name,
         )
 
+    def _flush_entity(
+        self,
+        findings: list[Finding],
+        test_file: TestFile,
+        current_name: str | None,
+        current_line: int,
+        current_entity: str,
+        has_doc: bool,
+        doc_text: str,
+    ) -> None:
+        if current_name and self._should_check_entity(current_entity):
+            finding = self._create_finding(
+                test_file, current_name, current_line, current_entity,
+                has_doc=has_doc, doc_text=doc_text,
+            )
+            if finding:
+                findings.append(finding)
+
+    def _section_flags(self, stripped: str) -> tuple[bool, bool]:
+        lower = stripped.lower()
+        return "test case" in lower, "keyword" in lower and "test case" not in lower
+
     @override
     def analyze(self, test_file: TestFile) -> list[Finding]:
         findings: list[Finding] = []
-        lines = test_file.content.splitlines()
-
         in_test_cases = False
         in_keywords = False
         current_name: str | None = None
@@ -119,73 +139,43 @@ class TestDocumentationAnalyzer(BaseAnalyzer):
         has_doc = False
         doc_text = ""
 
-        for line_num, line in enumerate(lines, 1):
+        for line_num, line in enumerate(test_file.content.splitlines(), 1):
             stripped = line.strip()
-
             if not stripped:
                 continue
 
             if stripped.startswith("***"):
-                if current_name and self._should_check_entity(current_entity):
-                    finding = self._create_finding(
-                        test_file,
-                        current_name,
-                        current_line,
-                        current_entity,
-                        has_doc=has_doc,
-                        doc_text=doc_text,
-                    )
-                    if finding:
-                        findings.append(finding)
+                self._flush_entity(
+                    findings, test_file, current_name, current_line,
+                    current_entity, has_doc, doc_text,
+                )
                 current_name = None
                 has_doc = False
                 doc_text = ""
-                lower = stripped.lower()
-                in_test_cases = "test case" in lower
-                in_keywords = "keyword" in lower and "test case" not in lower
+                in_test_cases, in_keywords = self._section_flags(stripped)
                 continue
 
-            # Non-indented line in a tracked section = new definition
             if not line.startswith((" ", "\t")):
                 if in_test_cases or in_keywords:
-                    if current_name and self._should_check_entity(current_entity):
-                        finding = self._create_finding(
-                            test_file,
-                            current_name,
-                            current_line,
-                            current_entity,
-                            has_doc=has_doc,
-                            doc_text=doc_text,
-                        )
-                        if finding:
-                            findings.append(finding)
+                    self._flush_entity(
+                        findings, test_file, current_name, current_line,
+                        current_entity, has_doc, doc_text,
+                    )
                     if not stripped.startswith("#"):
                         current_name = stripped
                         current_line = line_num
-                        current_entity = (
-                            "test case" if in_test_cases else "keyword"
-                        )
+                        current_entity = "test case" if in_test_cases else "keyword"
                         has_doc = False
                         doc_text = ""
                 continue
 
-            # Indented line — check for [Documentation]
             if current_name and stripped.lower().startswith("[documentation]"):
                 has_doc = True
                 parts = stripped.split(None, 1)
                 doc_text = parts[1] if len(parts) > 1 else ""
 
-        # Final flush for last entity
-        if current_name and self._should_check_entity(current_entity):
-            finding = self._create_finding(
-                test_file,
-                current_name,
-                current_line,
-                current_entity,
-                has_doc=has_doc,
-                doc_text=doc_text,
-            )
-            if finding:
-                findings.append(finding)
-
+        self._flush_entity(
+            findings, test_file, current_name, current_line,
+            current_entity, has_doc, doc_text,
+        )
         return findings
