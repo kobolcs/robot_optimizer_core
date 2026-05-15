@@ -154,7 +154,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         findings = []
 
         # Parse the file structure in a single pass (optimization)
-        keywords, keyword_calls, keyword_display_names = (
+        keywords, keyword_calls, keyword_display_names, _ = (
             self._extract_keywords_and_calls(test_file)
         )
 
@@ -220,7 +220,9 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         file_keywords: list[tuple[TestFile, dict[str, list[int]]]] = []
 
         for test_file in files:
-            keywords, _, display_names = self._extract_keywords_and_calls(test_file)
+            keywords, _, display_names, candidates = self._extract_keywords_and_calls(
+                test_file
+            )
             file_keywords.append((test_file, keywords))
             for kw_name, line_numbers in keywords.items():
                 for line_num in line_numbers:
@@ -228,7 +230,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                 per_file_display.setdefault(
                     kw_name, display_names.get(kw_name, kw_name)
                 )
-            raw_candidates.extend(self._extract_candidate_calls(test_file))
+            raw_candidates.extend(candidates)
 
         all_calls = self._resolve_calls(raw_candidates, set(all_definitions))
         return all_definitions, file_keywords, all_calls, per_file_display
@@ -287,7 +289,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
 
     def _extract_keywords_and_calls(
         self, test_file: TestFile
-    ) -> tuple[dict[str, list[int]], set[str], dict[str, str]]:
+    ) -> tuple[dict[str, list[int]], set[str], dict[str, str], list[str]]:
         """Extract keyword definitions and resolved keyword calls via the RF AST."""
         keywords: dict[str, list[int]] = defaultdict(list)
         keyword_display_names: dict[str, str] = {}
@@ -324,7 +326,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         keyword_names = set(keywords)
         calls = self._resolve_calls(candidate_calls, keyword_names)
 
-        return dict(keywords), calls, keyword_display_names
+        return dict(keywords), calls, keyword_display_names, candidate_calls
 
     def _collect_ast_calls(self, model: object) -> list[str]:
         """Recursively collect all keyword call names from a robot model."""
@@ -396,7 +398,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
 
     def _extract_keywords_and_calls_text(
         self, test_file: TestFile
-    ) -> tuple[dict[str, list[int]], set[str], dict[str, str]]:
+    ) -> tuple[dict[str, list[int]], set[str], dict[str, str], list[str]]:
         """Text-based fallback for _extract_keywords_and_calls."""
         keywords: dict[str, list[int]] = defaultdict(list)
         keyword_display_names: dict[str, str] = {}
@@ -409,7 +411,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
 
         keyword_names = set(keywords)
         calls = self._resolve_calls(candidate_calls, keyword_names)
-        return dict(keywords), calls, keyword_display_names
+        return dict(keywords), calls, keyword_display_names, candidate_calls
 
     def _process_text_lines(
         self,

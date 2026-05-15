@@ -811,9 +811,12 @@ def _load_config(args: argparse.Namespace) -> Settings | None:
     if not getattr(args, "config", None):
         return None
     try:
-        from .config.toml_loader import load_settings_from_toml
+        from .config.toml_loader import load_settings_from_toml_file
 
-        return load_settings_from_toml(Path(args.config).parent)
+        return load_settings_from_toml_file(args.config)
+    except FileNotFoundError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return None
     except Exception as exc:
         print(
             f"error: failed to load config '{args.config}': {exc}", file=sys.stderr

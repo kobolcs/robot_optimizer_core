@@ -24,7 +24,7 @@ from typing import Any
 
 from .settings import Settings
 
-__all__ = ["load_settings_from_toml"]
+__all__ = ["load_settings_from_toml", "load_settings_from_toml_file"]
 
 # Section key searched in robot.toml and pyproject.toml
 _PYPROJECT_KEY = "tool.robot-optimizer"
@@ -101,6 +101,42 @@ def load_settings_from_toml(
             if section:
                 toml_config = section
                 break
+
+    # Merge: overrides win over TOML, TOML wins over defaults
+    merged = {**toml_config, **overrides}
+    settings = Settings(**merged)
+    settings.validate_settings()
+    return settings
+
+
+def load_settings_from_toml_file(
+    file_path: str | Path,
+    **overrides: Any,
+) -> Settings:
+    """Load ``Settings`` from an explicit TOML file.
+
+    Unlike ``load_settings_from_toml``, this function loads config from the
+    exact file specified, not by searching a directory. Useful for CLI --config
+    arguments where the user provides an explicit file path.
+
+    Args:
+        file_path: Path to the TOML config file.
+        **overrides: Additional keyword arguments forwarded to ``Settings``.
+
+    Returns:
+        Configured :class:`Settings` instance.
+
+    Raises:
+        FileNotFoundError: If the file does not exist.
+    """
+    file_path = Path(file_path)
+    if not file_path.is_file():
+        raise FileNotFoundError(f"Config file not found: {file_path}")
+
+    toml_config: dict[str, Any] = {}
+    section = _read_optimizer_section(file_path)
+    if section:
+        toml_config = section
 
     # Merge: overrides win over TOML, TOML wins over defaults
     merged = {**toml_config, **overrides}
