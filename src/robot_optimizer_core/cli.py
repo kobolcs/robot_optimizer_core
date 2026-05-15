@@ -21,12 +21,16 @@ import sys
 from datetime import UTC, datetime
 from html import escape
 from pathlib import Path
-from typing import Any, NoReturn, TypedDict
+from typing import TYPE_CHECKING, Any, NoReturn, TypedDict
 
 from .api import analyze_directory, analyze_file
+from .config.settings import Settings
 from .domain.value_objects import Finding, Severity
 from .exceptions import AnalysisError
 from .logging import configure_logging
+
+if TYPE_CHECKING:
+    from .analyzers import BaseAnalyzer
 
 __all__ = ["main"]
 
@@ -784,45 +788,52 @@ def _format_html_legacy(context: dict[str, Any]) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _run_analyze(args: argparse.Namespace) -> int:
-    path = Path(args.path)
-    from .analyzers import (
-        BaseAnalyzer,  # local import avoids circular import at module level
-    )
+def _parse_analyzers(args: argparse.Namespace) -> list[str | BaseAnalyzer] | None:
+    """Parse analyzer names from arguments."""
+    if hasattr(args, "analyzers") and args.analyzers:
+        return [a.strip() for a in args.analyzers.split(",") if a.strip()]
+    return None
 
-    analyzer_names: list[str | BaseAnalyzer] | None = (
-        [a.strip() for a in args.analyzers.split(",") if a.strip()]
-        if args.analyzers
-        else None
-    )
 
-    # Parse --min-severity.
-    severity_filter: Severity | None = None
-    if args.min_severity:
-        try:
-            severity_filter = Severity.from_string(args.min_severity)
-        except ValueError as exc:
-            print(f"error: invalid --min-severity value: {exc}", file=sys.stderr)
-            return _EXIT_ERROR
+def _parse_severity(args: argparse.Namespace) -> Severity | None:
+    """Parse and validate severity filter. Returns None on error or if not set."""
+    if not args.min_severity:
+        return None
+    try:
+        return Severity.from_string(args.min_severity)
+    except ValueError as exc:
+        print(f"error: invalid --min-severity value: {exc}", file=sys.stderr)
+        return None
 
-    # Load --config file.
-    settings = None
-    if getattr(args, "config", None):
-        try:
-            from .config.toml_loader import load_settings_from_toml
 
-            settings = load_settings_from_toml(Path(args.config).parent)
-        except Exception as exc:
-            print(
-                f"error: failed to load config '{args.config}': {exc}", file=sys.stderr
-            )
-            return _EXIT_ERROR
+def _load_config(args: argparse.Namespace) -> Settings | None:
+    """Load config file. Returns None on error or if not set."""
+    if not getattr(args, "config", None):
+        return None
+    try:
+        from .config.toml_loader import load_settings_from_toml_file
 
+        return load_settings_from_toml_file(args.config)
+    except FileNotFoundError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return None
+    except Exception as exc:
+        print(
+            f"error: failed to load config '{args.config}': {exc}", file=sys.stderr
+        )
+        return None
+
+
+def _analyze_path(
+    path: Path,
+    analyzer_names: list[str | BaseAnalyzer] | None,
+    settings: Settings | None,
+    severity_filter: Severity | None,
+) -> tuple[list[Finding] | None, bool]:
+    """Analyze a file or directory and return findings and partial failure status."""
     partial_failure = False
-
     try:
         if path.is_dir():
-            # Use error_handling="warn" so directory analysis can return partial results.
             results = analyze_directory(
                 path,
                 analyzers=analyzer_names,
@@ -830,7 +841,6 @@ def _run_analyze(args: argparse.Namespace) -> int:
                 severity_filter=severity_filter,
                 error_handling="warn",
             )
-            # Check if we had partial failures
             partial_failure = bool(getattr(results, "errors", []))
             all_findings: list[Finding] = [f for fs in results.values() for f in fs]
         elif path.is_file():
@@ -842,18 +852,22 @@ def _run_analyze(args: argparse.Namespace) -> int:
             )
         else:
             print(f"error: path does not exist: {path}", file=sys.stderr)
-            return _EXIT_ERROR
+            return None, False
 
     except AnalysisError as exc:
         print(f"error: {exc}", file=sys.stderr)
-        return _EXIT_ERROR
+        return None, False
     except ExceptionGroup as eg:
         for sub_exc in eg.exceptions:
             print(f"error: {sub_exc}", file=sys.stderr)
-        return _EXIT_ERROR
+        return None, False
 
-    # Output
-    output: str
+    return all_findings, partial_failure
+
+
+def _write_output(all_findings: list[Finding], args: argparse.Namespace) -> int:
+    """Format and write analysis results. Returns exit code."""
+    path = Path(args.path)
     if args.format == "json":
         output = _format_json(all_findings)
     elif args.format == "sarif":
@@ -876,13 +890,35 @@ def _run_analyze(args: argparse.Namespace) -> int:
     else:
         print(output, end="")
 
-    # Summary line on stderr so it doesn't pollute --format json stdout
+    return _EXIT_OK
+
+
+def _run_analyze(args: argparse.Namespace) -> int:
+    path = Path(args.path)
+
+    analyzer_names = _parse_analyzers(args)
+
+    severity_filter = _parse_severity(args)
+    if severity_filter is None and args.min_severity:
+        return _EXIT_ERROR
+
+    settings = _load_config(args)
+    if settings is None and getattr(args, "config", None):
+        return _EXIT_ERROR
+
+    all_findings, partial_failure = _analyze_path(
+        path, analyzer_names, settings, severity_filter
+    )
+    if all_findings is None:
+        return _EXIT_ERROR
+
+    if _write_output(all_findings, args) == _EXIT_ERROR:
+        return _EXIT_ERROR
+
     _print_summary(all_findings)
 
-    # Partial failures take precedence over findings exit code.
     if partial_failure:
         return _EXIT_PARTIAL
-
     if all_findings and not args.no_fail:
         return _EXIT_FINDINGS
     return _EXIT_OK

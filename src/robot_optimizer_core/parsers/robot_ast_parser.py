@@ -98,6 +98,25 @@ class RobotASTParser(RobotParserRepository):
             end_line=keyword.end_lineno if hasattr(keyword, "end_lineno") else None,
         )
 
+        arguments, documentation, tags, return_value = self._extract_keyword_headers(
+            keyword
+        )
+        body_calls = self._extract_keyword_calls(
+            keyword.body, file_path, parent_keyword=keyword.name
+        )
+
+        return RobotKeyword(
+            name=keyword.name,
+            arguments=arguments,
+            documentation=documentation,
+            tags=tags,
+            location=location,
+            body_calls=body_calls,
+            return_value=return_value,
+        )
+
+    def _extract_keyword_headers(self, keyword: Any) -> tuple[list[RobotArgument], str | None, list[str], str | None]:
+        """Extract header metadata from keyword body."""
         arguments: list[RobotArgument] = []
         documentation: str | None = None
         tags: list[str] = []
@@ -113,20 +132,7 @@ class RobotASTParser(RobotParserRepository):
                 tags = self._parse_tags(item)
             elif item_type == "RETURN":
                 return_value = self._parse_return_value(item)
-
-        body_calls = self._extract_keyword_calls(
-            keyword.body, file_path, parent_keyword=keyword.name
-        )
-
-        return RobotKeyword(
-            name=keyword.name,
-            arguments=arguments,
-            documentation=documentation,
-            tags=tags,
-            location=location,
-            body_calls=body_calls,
-            return_value=return_value,
-        )
+        return arguments, documentation, tags, return_value
 
     def _parse_arguments(self, item: Any) -> list[RobotArgument]:
         """Parse arguments from an ARGUMENTS item."""
@@ -180,6 +186,25 @@ class RobotASTParser(RobotParserRepository):
             end_line=test.end_lineno if hasattr(test, "end_lineno") else None,
         )
 
+        documentation, tags, setup, teardown = self._extract_test_headers(
+            test, file_path
+        )
+        body_calls = self._extract_keyword_calls(
+            test.body, file_path, parent_test=test.name
+        )
+
+        return RobotTestCase(
+            name=test.name,
+            documentation=documentation,
+            tags=tags,
+            setup=setup,
+            teardown=teardown,
+            location=location,
+            body_calls=body_calls,
+        )
+
+    def _extract_test_headers(self, test: Any, file_path: Path) -> tuple[str | None, list[str], KeywordCall | None, KeywordCall | None]:
+        """Extract header metadata from test body."""
         documentation: str | None = None
         tags: list[str] = []
         setup: KeywordCall | None = None
@@ -199,20 +224,7 @@ class RobotASTParser(RobotParserRepository):
                 teardown = self._parse_setup_teardown(
                     item, file_path, parent_test=test.name
                 )
-
-        body_calls = self._extract_keyword_calls(
-            test.body, file_path, parent_test=test.name
-        )
-
-        return RobotTestCase(
-            name=test.name,
-            documentation=documentation,
-            tags=tags,
-            setup=setup,
-            teardown=teardown,
-            location=location,
-            body_calls=body_calls,
-        )
+        return documentation, tags, setup, teardown
 
     # ------------------------------------------------------------------
     # Keyword calls

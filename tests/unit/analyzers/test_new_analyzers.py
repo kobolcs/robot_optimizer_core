@@ -132,7 +132,8 @@ class TestHardcodedValueAnalyzer:
     def test_credential_flagged_as_error(
         self, analyzer: HardcodedValueAnalyzer
     ) -> None:
-        content = "*** Test Cases ***\nMy Test\n    Login    password=s3cr3t123\n"
+        test_value = "test_credential_12345"  # noqa: S105  # Test fixture, not real credential
+        content = f"*** Test Cases ***\nMy Test\n    Login    password={test_value}\n"
         findings = analyzer.analyze(_make_file(content))
         cred_findings = [f for f in findings if f.severity == Severity.ERROR]
         assert cred_findings

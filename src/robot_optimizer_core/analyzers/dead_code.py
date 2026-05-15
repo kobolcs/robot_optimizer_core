@@ -154,7 +154,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         findings = []
 
         # Parse the file structure in a single pass (optimization)
-        keywords, keyword_calls, keyword_display_names = (
+        keywords, keyword_calls, keyword_display_names, _ = (
             self._extract_keywords_and_calls(test_file)
         )
 
@@ -189,15 +189,40 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         if not files:
             return []
 
-        # --- First pass: collect definitions and raw candidate calls -----------
+        all_definitions, file_keywords, all_calls, per_file_display = (
+            self._collect_suite_definitions(files)
+        )
+
+        findings: list[Finding] = []
+        if self._check_unused:
+            findings.extend(
+                self._find_suite_unused_keywords(all_definitions, all_calls, per_file_display)
+            )
+        if self._check_duplicates:
+            findings.extend(self._find_all_duplicate_keywords(file_keywords))
+        if self._check_unreachable:
+            findings.extend(self._find_all_unreachable_code(files))
+
+        return findings
+
+    def _collect_suite_definitions(
+        self, files: Sequence[TestFile]
+    ) -> tuple[
+        dict[str, list[tuple[TestFile, int]]],
+        list[tuple[TestFile, dict[str, list[int]]]],
+        set[str],
+        dict[str, str],
+    ]:
+        """Collect all keyword definitions and calls across suite files."""
         all_definitions: dict[str, list[tuple[TestFile, int]]] = defaultdict(list)
         raw_candidates: list[str] = []
         per_file_display: dict[str, str] = {}
-        # Cache parsed keywords per file to avoid re-parsing in duplicate/unreachable pass
         file_keywords: list[tuple[TestFile, dict[str, list[int]]]] = []
 
         for test_file in files:
-            keywords, _, display_names = self._extract_keywords_and_calls(test_file)
+            keywords, _, display_names, candidates = self._extract_keywords_and_calls(
+                test_file
+            )
             file_keywords.append((test_file, keywords))
             for kw_name, line_numbers in keywords.items():
                 for line_num in line_numbers:
@@ -205,56 +230,66 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                 per_file_display.setdefault(
                     kw_name, display_names.get(kw_name, kw_name)
                 )
-            raw_candidates.extend(self._extract_candidate_calls(test_file))
+            raw_candidates.extend(candidates)
 
-        # Resolve raw candidates against the full suite-wide keyword set
         all_calls = self._resolve_calls(raw_candidates, set(all_definitions))
+        return all_definitions, file_keywords, all_calls, per_file_display
 
-        # --- Second pass: emit findings ---------------------------------------
+    def _find_suite_unused_keywords(
+        self,
+        all_definitions: dict[str, list[tuple[TestFile, int]]],
+        all_calls: set[str],
+        per_file_display: dict[str, str],
+    ) -> list[Finding]:
+        """Find unused keywords across the suite."""
         findings: list[Finding] = []
-
-        if self._check_unused:
-            for kw_name, locations in all_definitions.items():
-                if kw_name in all_calls:
-                    continue
-                display_name = per_file_display.get(kw_name, kw_name)
-                if kw_name in _LIFECYCLE_KEYWORDS:
-                    continue
-                if any(p.match(display_name) for p in self._ignore_patterns):
-                    continue
-                pattern = Pattern(
-                    type=PatternType.UNUSED_KEYWORD,
-                    name="Unused Keyword",
-                    description=f"Keyword '{display_name}' is never called in the suite",
-                    recommendation="Remove this keyword or use it in your tests",
-                    documentation_url=None,
-                    auto_fixable=True,
+        for kw_name, locations in all_definitions.items():
+            if kw_name in all_calls:
+                continue
+            display_name = per_file_display.get(kw_name, kw_name)
+            if kw_name in _LIFECYCLE_KEYWORDS:
+                continue
+            if any(p.match(display_name) for p in self._ignore_patterns):
+                continue
+            pattern = Pattern(
+                type=PatternType.UNUSED_KEYWORD,
+                name="Unused Keyword",
+                description=f"Keyword '{display_name}' is never called in the suite",
+                recommendation="Remove this keyword or use it in your tests",
+                documentation_url=None,
+                auto_fixable=True,
+            )
+            test_file, line_num = locations[0]
+            findings.append(
+                Finding.create(
+                    pattern=pattern,
+                    severity=Severity.WARNING,
+                    location=Location(file_path=test_file.path, line=line_num),
+                    message=f"Keyword '{display_name}' is defined but never used in the suite",
+                    keyword_name=display_name,
                 )
-                # Report only the first definition site to avoid noise
-                test_file, line_num = locations[0]
-                findings.append(
-                    Finding.create(
-                        pattern=pattern,
-                        severity=Severity.WARNING,
-                        location=Location(file_path=test_file.path, line=line_num),
-                        message=f"Keyword '{display_name}' is defined but never used in the suite",
-                        keyword_name=display_name,
-                    )
-                )
+            )
+        return findings
 
-        if self._check_duplicates:
-            for test_file, keywords in file_keywords:
-                findings.extend(self._find_duplicate_keywords(keywords, test_file))
+    def _find_all_duplicate_keywords(
+        self, file_keywords: list[tuple[TestFile, dict[str, list[int]]]]
+    ) -> list[Finding]:
+        """Find duplicate keywords across all files."""
+        findings: list[Finding] = []
+        for test_file, keywords in file_keywords:
+            findings.extend(self._find_duplicate_keywords(keywords, test_file))
+        return findings
 
-        if self._check_unreachable:
-            for test_file in files:
-                findings.extend(self._find_unreachable_code(test_file))
-
+    def _find_all_unreachable_code(self, files: Sequence[TestFile]) -> list[Finding]:
+        """Find unreachable code across all files."""
+        findings: list[Finding] = []
+        for test_file in files:
+            findings.extend(self._find_unreachable_code(test_file))
         return findings
 
     def _extract_keywords_and_calls(
         self, test_file: TestFile
-    ) -> tuple[dict[str, list[int]], set[str], dict[str, str]]:
+    ) -> tuple[dict[str, list[int]], set[str], dict[str, str], list[str]]:
         """Extract keyword definitions and resolved keyword calls via the RF AST."""
         keywords: dict[str, list[int]] = defaultdict(list)
         keyword_display_names: dict[str, str] = {}
@@ -291,7 +326,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         keyword_names = set(keywords)
         calls = self._resolve_calls(candidate_calls, keyword_names)
 
-        return dict(keywords), calls, keyword_display_names
+        return dict(keywords), calls, keyword_display_names, candidate_calls
 
     def _collect_ast_calls(self, model: object) -> list[str]:
         """Recursively collect all keyword call names from a robot model."""
@@ -363,42 +398,78 @@ class DeadCodeAnalyzer(BaseAnalyzer):
 
     def _extract_keywords_and_calls_text(
         self, test_file: TestFile
-    ) -> tuple[dict[str, list[int]], set[str], dict[str, str]]:
+    ) -> tuple[dict[str, list[int]], set[str], dict[str, str], list[str]]:
         """Text-based fallback for _extract_keywords_and_calls."""
         keywords: dict[str, list[int]] = defaultdict(list)
         keyword_display_names: dict[str, str] = {}
         candidate_calls: list[str] = []
 
         lines = test_file.content.splitlines()
+        self._process_text_lines(
+            lines, keywords, keyword_display_names, candidate_calls
+        )
+
+        keyword_names = set(keywords)
+        calls = self._resolve_calls(candidate_calls, keyword_names)
+        return dict(keywords), calls, keyword_display_names, candidate_calls
+
+    def _process_text_lines(
+        self,
+        lines: list[str],
+        keywords: dict[str, list[int]],
+        keyword_display_names: dict[str, str],
+        candidate_calls: list[str],
+    ) -> None:
+        """Process lines from a text-based Robot Framework file."""
         in_keywords_section = False
         in_test_or_keyword = False
 
         for line_num, line in enumerate(lines, 1):
             stripped = line.strip()
-
             if not stripped or stripped.startswith("#"):
                 continue
-
             if stripped.startswith("***"):
-                section = stripped.lower()
-                in_keywords_section = "keyword" in section
-                in_test_or_keyword = "test case" in section or "keyword" in section
+                in_keywords_section, in_test_or_keyword = (
+                    self._update_section_state(stripped)
+                )
                 continue
+            self._process_content_line(
+                line,
+                stripped,
+                line_num,
+                in_keywords_section,
+                in_test_or_keyword,
+                keywords,
+                keyword_display_names,
+                candidate_calls,
+            )
 
-            if in_keywords_section and not line.startswith((" ", "\t")):
-                if stripped[0].isdigit():
-                    continue
+    def _update_section_state(self, section_line: str) -> tuple[bool, bool]:
+        """Update state based on section header."""
+        section = section_line.lower()
+        in_keywords = "keyword" in section
+        in_test_or_kw = "test case" in section or "keyword" in section
+        return in_keywords, in_test_or_kw
+
+    def _process_content_line(
+        self,
+        line: str,
+        stripped: str,
+        line_num: int,
+        in_keywords_section: bool,
+        in_test_or_keyword: bool,
+        keywords: dict[str, list[int]],
+        keyword_display_names: dict[str, str],
+        candidate_calls: list[str],
+    ) -> None:
+        """Process a non-empty, non-comment line."""
+        if in_keywords_section and not line.startswith((" ", "\t")):
+            if not stripped[0].isdigit():
                 normalized = stripped.lower()
                 keywords[normalized].append(line_num)
                 keyword_display_names.setdefault(normalized, stripped)
-                continue
-
-            if in_test_or_keyword and line.startswith((" ", "\t")):
-                candidate_calls.append(stripped)
-
-        keyword_names = set(keywords)
-        calls = self._resolve_calls(candidate_calls, keyword_names)
-        return dict(keywords), calls, keyword_display_names
+        elif in_test_or_keyword and line.startswith((" ", "\t")):
+            candidate_calls.append(stripped)
 
     def _extract_candidate_calls(self, test_file: TestFile) -> list[str]:
         """Return all keyword call names from test/keyword sections via the RF AST."""
