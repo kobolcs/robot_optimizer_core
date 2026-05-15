@@ -244,9 +244,11 @@ class TestAnalyzeOneFile:
     def test_propagates_exception(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         rf = tmp_path / "t.robot"
         rf.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
-        monkeypatch.setattr(
-            _api_module, "analyze_file", lambda *a, **kw: (_ for _ in ()).throw(AnalysisError("boom"))
-        )
+
+        def raise_analysis_error(*a, **kw):
+            raise AnalysisError("boom")
+
+        monkeypatch.setattr(_api_module, "analyze_file", raise_analysis_error)
         with pytest.raises(AnalysisError):
             _analyze_one_file(rf, None, Settings(), None, None)
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Generator
 from importlib.metadata import EntryPoint
 
 import pytest
@@ -35,9 +36,9 @@ class ExternalAnalyzer(BaseAnalyzer):
 
 
 @pytest.fixture(autouse=True)
-def _isolate_registry_state() -> None:
+def _isolate_registry_state() -> Generator[None, None, None]:
     reset_registry()
-    yield  # type: ignore[misc]
+    yield
     reset_registry()
 
 

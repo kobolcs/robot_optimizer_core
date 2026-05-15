@@ -141,7 +141,7 @@ class TestApplicationContextRequestScope:
     def test_request_scope_restores_context_after_exit(self) -> None:
         with create_test_application() as ctx:
             with ctx.request_scope(key="value"):
-                pass
+                assert ctx._local.context == {"key": "value"}
             # After exiting scope, context should be restored
             assert not hasattr(ctx._local, "context") or ctx._local.context == {}
 
@@ -160,7 +160,7 @@ class TestFactoryFunctions:
 
     def test_create_test_application_small_max_file_size(self) -> None:
         ctx = create_test_application()
-        assert ctx.config.settings.max_file_size_mb == 1.0
+        assert ctx.config.settings.max_file_size_mb == pytest.approx(1.0)
 
 
 class TestBuiltinAnalyzerRegistration:

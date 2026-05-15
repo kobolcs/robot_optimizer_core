@@ -132,7 +132,8 @@ class TestHardcodedValueAnalyzer:
     def test_credential_flagged_as_error(
         self, analyzer: HardcodedValueAnalyzer
     ) -> None:
-        content = "*** Test Cases ***\nMy Test\n    Login    password=s3cr3t123\n"
+        test_pwd = "dummy_test_secret_xyz"  # Intentional for testing credential detection
+        content = f"*** Test Cases ***\nMy Test\n    Login    password={test_pwd}\n"
         findings = analyzer.analyze(_make_file(content))
         cred_findings = [f for f in findings if f.severity == Severity.ERROR]
         assert cred_findings
