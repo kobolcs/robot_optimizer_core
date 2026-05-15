@@ -78,10 +78,10 @@ Another Unused
             assert finding.is_auto_fixable is True
             assert "never used" in finding.message.lower()
 
-    def test_extract_keywords_and_calls_returns_three_values(
+    def test_extract_keywords_and_calls_returns_four_values(
         self, analyzer: DeadCodeAnalyzer
     ) -> None:
-        """Regression test for display-name refactor tuple shape."""
+        """Regression test for tuple shape: (keywords, calls, display_names, raw_candidates)."""
         content = """*** Test Cases ***
 Case
     My Keyword
@@ -97,13 +97,17 @@ My Keyword
             last_modified_utc=datetime.now(UTC),
         )
 
-        keywords, calls, display_names = analyzer._extract_keywords_and_calls(test_file)
+        keywords, calls, display_names, raw_candidates = analyzer._extract_keywords_and_calls(
+            test_file
+        )
 
         assert isinstance(keywords, dict)
         assert isinstance(calls, set)
         assert isinstance(display_names, dict)
+        assert isinstance(raw_candidates, list)
         assert "my keyword" in display_names
         assert display_names["my keyword"] == "My Keyword"
+        assert "My Keyword" in raw_candidates
 
     def test_unused_keyword_preserves_original_display_case(
         self, analyzer: DeadCodeAnalyzer
