@@ -128,14 +128,26 @@ def load_settings_from_toml_file(
 
     Raises:
         FileNotFoundError: If the file does not exist.
+        ValueError: If the file is invalid TOML or missing the config section.
     """
     file_path = Path(file_path)
     if not file_path.is_file():
         raise FileNotFoundError(f"Config file not found: {file_path}")
 
+    try:
+        with open(file_path, "rb") as fh:
+            data = tomllib.load(fh)
+    except tomllib.TOMLDecodeError as exc:
+        raise ValueError(f"Invalid TOML in config file {file_path}: {exc}") from exc
+
     toml_config: dict[str, Any] = {}
-    section = _read_optimizer_section(file_path)
-    if section:
+    section: Any = data
+    for key in ["tool", "robot-optimizer"]:
+        if not isinstance(section, dict) or key not in section:
+            break
+        section = section[key]
+
+    if isinstance(section, dict):
         toml_config = section
 
     # Merge: overrides win over TOML, TOML wins over defaults

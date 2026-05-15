@@ -471,35 +471,6 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         elif in_test_or_keyword and line.startswith((" ", "\t")):
             candidate_calls.append(stripped)
 
-    def _extract_candidate_calls(self, test_file: TestFile) -> list[str]:
-        """Return all keyword call names from test/keyword sections via the RF AST."""
-        try:
-            from robot.parsing import get_model
-
-            model = get_model(test_file.content)
-            return self._collect_ast_calls(model)
-        except Exception as e:
-            self._logger.debug(
-                "AST parse failed, falling back to text extraction",
-                extra={"file": str(test_file.path), "error": str(e)},
-            )
-            # Fallback: indented lines from text
-            candidates: list[str] = []
-            lines = test_file.content.splitlines()
-            in_test_or_keyword = False
-            for line in lines:
-                stripped = line.strip()
-                if not stripped or stripped.startswith("#"):
-                    continue
-                if stripped.startswith("***"):
-                    in_test_or_keyword = (
-                        "test case" in stripped.lower() or "keyword" in stripped.lower()
-                    )
-                    continue
-                if in_test_or_keyword and line.startswith((" ", "\t")):
-                    candidates.append(stripped)
-            return candidates
-
     def _resolve_calls(
         self, candidates: list[str], keyword_names: set[str]
     ) -> set[str]:

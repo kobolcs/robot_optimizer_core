@@ -218,7 +218,7 @@ Unused Keyword {i}
         assert invalid_file not in files
 
         # Direct analysis should fail gracefully
-        with pytest.raises(Exception, match=r".+"):  # noqa: B017  # various exception types possible
+        with pytest.raises(Exception, match=r".+"):  # various exception types possible
             TestFile.from_path(invalid_file)
 
         # Create file with invalid encoding

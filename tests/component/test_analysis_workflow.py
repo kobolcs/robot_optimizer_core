@@ -264,8 +264,8 @@ class TestPatternTypeIntegrity:
         )
         from robot_optimizer_core.domain.entities import TestFile
 
-        content = '*** Test Cases ***\nLoginPage\n    Log    hi\n'
-        f = tmp_path / 't.robot'
+        content = "*** Test Cases ***\nLoginPage\n    Log    hi\n"
+        f = tmp_path / "t.robot"
         f.write_bytes(content.encode())
         tf = TestFile(path=f, content=content, size_bytes=len(content), last_modified_utc=datetime.now(UTC))
         findings = NamingConventionAnalyzer().analyze(tf)
@@ -284,16 +284,16 @@ class TestPatternTypeIntegrity:
             f.write_bytes(content.encode())
             return TestFile(path=f, content=content, size_bytes=len(content), last_modified_utc=datetime.now(UTC))
 
-        findings = TagConsistencyAnalyzer(config={'singleton_threshold': 2}).analyze(
-            _tf('a.robot', '*** Test Cases ***\nMy Test\n    [Tags]    unique_xyz\n'))
+        findings = TagConsistencyAnalyzer(config={"singleton_threshold": 2}).analyze(
+            _tf("a.robot", "*** Test Cases ***\nMy Test\n    [Tags]    unique_xyz\n"))
         assert any(fi.pattern.type == PatternType.SINGLETON_TAG for fi in findings)
 
         findings2 = TagConsistencyAnalyzer().analyze(
-            _tf('b.robot', '*** Test Cases ***\nMy Test\n    [Tags]    Robot:Skip\n'))
+            _tf("b.robot", "*** Test Cases ***\nMy Test\n    [Tags]    Robot:Skip\n"))
         assert any(fi.pattern.type == PatternType.RESERVED_TAG for fi in findings2)
 
         findings3 = TagConsistencyAnalyzer().analyze(
-            _tf('c.robot', '*** Test Cases ***\nMy Test\n    Log    hi\n'))
+            _tf("c.robot", "*** Test Cases ***\nMy Test\n    Log    hi\n"))
         assert any(fi.pattern.type == PatternType.NO_TAGS for fi in findings3)
 
 
@@ -324,4 +324,4 @@ class TestGlobalStateIsolation:
             SleepDetectorAnalyzer,
         )
         assert SleepDetector is SleepDetectorAnalyzer
-        assert SleepDetector().name == 'sleep_detector'
+        assert SleepDetector().name == "sleep_detector"

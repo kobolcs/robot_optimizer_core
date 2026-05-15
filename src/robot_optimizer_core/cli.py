@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING, Any, NoReturn, TypedDict
 from .api import analyze_directory, analyze_file
 from .config.settings import Settings
 from .domain.value_objects import Finding, Severity
-from .exceptions import AnalysisError
+from .exceptions import AnalysisError, ConfigurationError
 from .logging import configure_logging
 
 if TYPE_CHECKING:
@@ -112,10 +112,10 @@ def _render_html_template(context: dict[str, Any]) -> str:
             value = safe_context[key]
             if isinstance(value, list):
                 safe_context[key] = [
-                    Markup(v) if isinstance(v, str) else v for v in value  # noqa: S704
+                    Markup(v) if isinstance(v, str) else v for v in value
                 ]
             elif isinstance(value, str):
-                safe_context[key] = Markup(value)  # noqa: S704
+                safe_context[key] = Markup(value)
     template = env.get_template(template_path.name)
     return template.render(**safe_context)
 
@@ -817,7 +817,7 @@ def _load_config(args: argparse.Namespace) -> Settings | None:
     except FileNotFoundError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return None
-    except Exception as exc:
+    except (ConfigurationError, ValueError) as exc:
         print(
             f"error: failed to load config '{args.config}': {exc}", file=sys.stderr
         )
