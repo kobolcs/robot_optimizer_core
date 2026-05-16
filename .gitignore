@@ -181,5 +181,8 @@ run_test_coverage_check.py
 
 # mutmut cache
 .mutmut-cache
+
+# SonarCloud cache
+.sonar/
 uv.lock
 *.bak
