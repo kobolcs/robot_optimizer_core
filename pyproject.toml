@@ -160,8 +160,10 @@ addopts = [
 ]
 markers = [
     "unit: Unit tests - fast and isolated",
-    "integration: Integration tests - component interactions", 
+    "integration: Integration tests - component interactions",
+    "component: Component tests - multi-component workflows",
     "slow: Tests that take significant time",
+    "performance: Performance benchmarks",
 ]
 filterwarnings = [
     "error",
