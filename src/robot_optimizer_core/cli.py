@@ -39,6 +39,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, NoReturn, TypedDict
 
 from .api import analyze_directory, analyze_file
+from .cache import AnalysisCache
 from .config.settings import Settings
 from .domain.value_objects import Finding, Severity
 from .exceptions import AnalysisError
@@ -844,6 +845,7 @@ def _analyze_path(
     analyzer_names: list[str | BaseAnalyzer] | None,
     settings: Settings | None,
     severity_filter: Severity | None,
+    use_cache: bool = True,
 ) -> tuple[list[Finding] | None, bool]:
     """Analyze a file or directory and return findings and partial failure status."""
     partial_failure = False
@@ -855,6 +857,7 @@ def _analyze_path(
                 settings=settings,
                 severity_filter=severity_filter,
                 error_handling="warn",
+                use_cache=use_cache,
             )
             partial_failure = bool(results.errors)
             all_findings: list[Finding] = [f for fs in results.findings.values() for f in fs]
@@ -921,8 +924,12 @@ def _run_analyze(args: argparse.Namespace) -> int:
     if settings is None and getattr(args, "config", None):
         return _EXIT_ERROR
 
+    if getattr(args, "clear_cache", False):
+        AnalysisCache().clear()
+
+    use_cache = not getattr(args, "no_cache", False)
     all_findings, partial_failure = _analyze_path(
-        path, analyzer_names, settings, severity_filter
+        path, analyzer_names, settings, severity_filter, use_cache=use_cache
     )
     if all_findings is None:
         return _EXIT_ERROR
@@ -1115,6 +1122,18 @@ def _build_parser() -> argparse.ArgumentParser:
             "Path to a TOML configuration file (robot.toml or pyproject.toml). "
             "Overrides settings defaults."
         ),
+    )
+    analyze_cmd.add_argument(
+        "--no-cache",
+        action="store_true",
+        default=False,
+        help="Disable the file-hash result cache for this run.",
+    )
+    analyze_cmd.add_argument(
+        "--clear-cache",
+        action="store_true",
+        default=False,
+        help="Clear the result cache before analysing.",
     )
 
     # -- list-analyzers subcommand ---------------------------------
