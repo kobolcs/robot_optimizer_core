@@ -17,6 +17,7 @@ else:
 
 from ..domain.entities import TestFile
 from ..domain.value_objects import Finding, Location, Pattern, PatternType, Severity
+from ..parsers.robot_ast_parser import RobotASTParser
 from .base import BaseAnalyzer, ConfigValue
 
 __all__ = ["SetupTeardownAnalyzer"]
@@ -198,18 +199,27 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
 
     @override
     def analyze(self, test_file: TestFile) -> list[Finding]:
-        findings: list[Finding] = []
-        test_steps = self._parse_test_steps(test_file)
+        suite = RobotASTParser().parse_suite(test_file)
+
+        test_steps: list[tuple[str, int, list[str], bool, bool]] = [
+            (
+                tc.name,
+                tc.location.line,
+                [call.keyword_name for call in tc.body_calls],
+                tc.setup is not None,
+                tc.teardown is not None,
+            )
+            for tc in suite.test_cases
+        ]
 
         if not test_steps:
-            return findings
+            return []
 
+        findings: list[Finding] = []
         if self._check_setup:
             findings.extend(self._check_setup_hooks(test_file, test_steps))
-
         if self._check_teardown:
             findings.extend(self._check_teardown_hooks(test_file, test_steps))
-
         return findings
 
     # ------------------------------------------------------------------

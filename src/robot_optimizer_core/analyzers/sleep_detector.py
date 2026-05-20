@@ -43,7 +43,9 @@ from ..domain.value_objects import (
     Severity,
     SleepPattern,
 )
+from ..domain.value_objects.robot_ast import KeywordCall
 from ..exceptions import ConfigurationError
+from ..parsers.robot_ast_parser import RobotASTParser
 from .base import BaseAnalyzer, ConfigValue
 
 __all__ = ["SleepDetector", "SleepDetectorAnalyzer"]
@@ -190,6 +192,85 @@ class SleepDetectorAnalyzer(BaseAnalyzer):
         """
         return True
 
+    # Regex to parse a numeric duration from a single keyword argument value.
+    _DURATION_ARG_RE: re.Pattern[str] = re.compile(
+        r"^(\d+(?:\.\d+)?)\s*(s|seconds?|m|minutes?|ms|milliseconds?|h|hours?|d|days?|min)?$",
+        re.IGNORECASE,
+    )
+    _VAR_ARG_RE: re.Pattern[str] = re.compile(r"^\$\{([^}]+)\}$")
+    _TIME_SLEEP_ARG_RE: re.Pattern[str] = re.compile(
+        r"time\.sleep\s*\(\s*(\d+(?:\.\d+)?)\s*\)"
+    )
+
+    def _detect_sleep_from_call(
+        self, call: KeywordCall
+    ) -> dict[str, str | Decimal | None] | None:
+        """Detect a sleep pattern from an AST keyword call."""
+        name_lower = call.keyword_name.lower()
+
+        # Evaluate / Run Keyword containing time.sleep(N)
+        if self._check_builtin and name_lower in ("evaluate", "run keyword"):
+            arg = call.arguments[0] if call.arguments else ""
+            m = self._TIME_SLEEP_ARG_RE.search(arg)
+            if m:
+                try:
+                    return {
+                        "type": "evaluate_sleep",
+                        "duration": Decimal(m.group(1)),
+                        "unit": "s",
+                        "duration_str": m.group(1),
+                    }
+                except (ValueError, InvalidOperation):
+                    pass
+            return None
+
+        is_builtin = self._check_builtin and name_lower in ("sleep", "builtin.sleep")
+        is_custom = self._check_custom and name_lower in ("wait", "pause", "delay")
+        if not (is_builtin or is_custom):
+            return None
+        if not call.arguments:
+            return None
+
+        arg = call.arguments[0]
+
+        # Variable sleep (check_custom guards this branch, matching original behaviour)
+        if self._check_custom and name_lower == "sleep":
+            var_m = self._VAR_ARG_RE.match(arg)
+            if var_m:
+                return {
+                    "type": "variable",
+                    "variable": var_m.group(1),
+                    "duration": None,
+                    "unit": None,
+                }
+
+        # Numeric duration
+        dur_m = self._DURATION_ARG_RE.match(arg)
+        if dur_m:
+            duration_str = dur_m.group(1)
+            unit = _normalise_unit(dur_m.group(2))
+            try:
+                duration = Decimal(duration_str)
+                if name_lower == "builtin.sleep":
+                    sleep_type = "builtin_qualified"
+                elif is_custom:
+                    sleep_type = "custom"
+                else:
+                    sleep_type = "builtin"
+                return {
+                    "type": sleep_type,
+                    "duration": duration,
+                    "unit": unit,
+                    "duration_str": duration_str,
+                }
+            except (ValueError, InvalidOperation):
+                self._logger.warning(
+                    f"Invalid sleep duration: {duration_str}",
+                    extra={"call": call.keyword_name},
+                )
+
+        return None
+
     @override
     def analyze(self, test_file: TestFile) -> list[Finding]:
         """Find all sleep patterns in the test file.
@@ -206,10 +287,15 @@ class SleepDetectorAnalyzer(BaseAnalyzer):
         block_names, _ = self._build_file_index(lines)
         ctx = _AnalyzeCtx(lines=lines, library=library, block_names=block_names)
 
-        for line_num, line in enumerate(lines, 1):
-            if sleep_info := self._detect_sleep(line):
+        suite = RobotASTParser().parse_suite(test_file)
+        for call in suite.all_keyword_calls:
+            if sleep_info := self._detect_sleep_from_call(call):
+                line_num = call.location.line
+                original_text = (
+                    lines[line_num - 1].strip() if 0 < line_num <= len(lines) else ""
+                )
                 if finding := self._create_finding(
-                    sleep_info, test_file, line_num, line.strip(), ctx
+                    sleep_info, test_file, line_num, original_text, ctx
                 ):
                     findings.append(finding)
 

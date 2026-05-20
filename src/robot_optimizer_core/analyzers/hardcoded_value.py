@@ -17,6 +17,7 @@ else:
 
 from ..domain.entities import TestFile
 from ..domain.value_objects import Finding, Location, Pattern, PatternType, Severity
+from ..parsers.robot_ast_parser import RobotASTParser
 from .base import BaseAnalyzer, ConfigValue
 
 __all__ = ["HardcodedValueAnalyzer"]
@@ -103,21 +104,16 @@ class HardcodedValueAnalyzer(BaseAnalyzer):
     @override
     def analyze(self, test_file: TestFile) -> list[Finding]:
         findings: list[Finding] = []
-        lines = test_file.content.splitlines()
+        suite = RobotASTParser().parse_suite(test_file)
 
-        for line_num, line in enumerate(lines, 1):
-            stripped = line.strip()
-            # Skip comments and section headers
-            if not stripped or stripped.startswith("#") or stripped.startswith("***"):
+        for call in suite.all_keyword_calls:
+            if not call.arguments:
                 continue
-            # Skip variable-section definitions (legitimate defaults)
-            if not line.startswith((" ", "\t")):
+            line_num = call.location.line
+            arg_text = " ".join(call.arguments)
+            if self._is_ignored(arg_text):
                 continue
-
-            if self._is_ignored(stripped):
-                continue
-
-            findings.extend(self._check_line(stripped, line_num, test_file))
+            findings.extend(self._check_line(arg_text, line_num, test_file))
 
         return findings
 

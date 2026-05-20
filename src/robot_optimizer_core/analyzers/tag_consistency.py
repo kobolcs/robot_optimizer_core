@@ -20,6 +20,7 @@ else:
 
 from ..domain.entities import TestFile
 from ..domain.value_objects import Finding, Location, Pattern, PatternType, Severity
+from ..parsers.robot_ast_parser import RobotASTParser
 from .base import BaseAnalyzer, ConfigValue
 
 __all__ = ["TagConsistencyAnalyzer"]
@@ -143,20 +144,21 @@ class TagConsistencyAnalyzer(BaseAnalyzer):
         return current_tags
 
     def analyze(self, test_file: TestFile) -> list[Finding]:
-        findings: list[Finding] = []
-        lines = test_file.content.splitlines()
-        test_tag_info = self._collect_tag_info(lines)
+        suite = RobotASTParser().parse_suite(test_file)
+        test_tag_info = [
+            (tc.name, tc.location.line, list(tc.tags)) for tc in suite.test_cases
+        ]
 
-        # Build suite-wide tag counter for singleton detection
         all_tags: list[str] = [t for _, _, tags in test_tag_info for t in tags]
         tag_counts = Counter(all_tags)
 
+        findings: list[Finding] = []
         for test_name, test_line, tags in test_tag_info:
             if self._check_missing and not tags:
                 findings.append(
                     self._missing_tag_finding(test_name, test_line, test_file)
                 )
-                continue  # no point checking further if no tags
+                continue
 
             for tag in tags:
                 if self._check_reserved and (
@@ -171,9 +173,7 @@ class TagConsistencyAnalyzer(BaseAnalyzer):
                     and tag_counts[tag] < self._singleton_threshold
                 ):
                     findings.append(
-                        self._singleton_tag_finding(
-                            tag, test_name, test_line, test_file
-                        )
+                        self._singleton_tag_finding(tag, test_name, test_line, test_file)
                     )
 
         return findings

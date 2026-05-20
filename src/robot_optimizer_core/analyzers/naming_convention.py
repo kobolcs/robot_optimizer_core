@@ -23,6 +23,7 @@ else:
 
 from ..domain.entities import TestFile
 from ..domain.value_objects import Finding, Location, Pattern, PatternType, Severity
+from ..parsers.robot_ast_parser import RobotASTParser
 from .base import BaseAnalyzer, ConfigValue
 
 __all__ = ["NamingConventionAnalyzer"]
@@ -162,41 +163,34 @@ class NamingConventionAnalyzer(BaseAnalyzer):
     @override
     def analyze(self, test_file: TestFile) -> list[Finding]:
         findings: list[Finding] = []
-        lines = test_file.content.splitlines()
+        suite = RobotASTParser().parse_suite(test_file)
 
-        in_test_cases = False
-        in_keywords = False
-
-        for line_num, line in enumerate(lines, 1):
-            stripped = line.strip()
-            if not stripped or stripped.startswith("#"):
-                continue
-
-            if stripped.startswith("***"):
-                lower = stripped.lower()
-                in_test_cases = self._TEST_CASE_SECTION in lower
-                in_keywords = (
-                    "keyword" in lower
-                    and self._TEST_CASE_SECTION not in lower
-                )
-                continue
-
-            # Non-indented line inside a section = definition name
-            if not line.startswith((" ", "\t")):
-                finding = self._check_definition_name(
-                    stripped,
-                    line_num,
-                    test_file,
-                    in_test_cases=in_test_cases,
-                    in_keywords=in_keywords,
+        if self._check_tests:
+            for tc in suite.test_cases:
+                finding = self._check_name(
+                    tc.name, tc.location.line, test_file, entity_type="test case"
                 )
                 if finding:
                     findings.append(finding)
-                continue
 
-            # Indented line — look for variable assignments
-            var_findings = self._check_variables_in_line(stripped, line_num, test_file)
-            findings.extend(var_findings)
+        if self._check_keywords:
+            for kw in suite.keywords:
+                finding = self._check_name(
+                    kw.name, kw.location.line, test_file, entity_type="keyword"
+                )
+                if finding:
+                    findings.append(finding)
+
+        # Variable names: scan indented lines to catch assignment targets (${x}=)
+        # and inline usages, as the AST model does not surface assignment variables.
+        if self._check_variables:
+            for line_num, line in enumerate(test_file.content.splitlines(), 1):
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#") or stripped.startswith("***"):
+                    continue
+                if not line.startswith((" ", "\t")):
+                    continue
+                findings.extend(self._check_variables_in_line(stripped, line_num, test_file))
 
         return findings
 
