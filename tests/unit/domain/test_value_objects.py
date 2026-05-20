@@ -152,6 +152,104 @@ class TestLocation:
         with pytest.raises(ValidationError):
             loc.line = 20  # Pydantic frozen models raise ValidationError
 
+    def test_range_str_end_line_no_column(self):
+        loc = Location(file_path=Path("test.robot"), line=5, end_line=10)
+        s = loc.range_str
+        assert "5" in s
+        assert "10" in s
+
+    def test_range_str_column_and_end_line_no_end_column(self):
+        loc = Location(file_path=Path("test.robot"), line=5, column=3, end_line=10)
+        s = loc.range_str
+        assert "5" in s
+        assert "3" in s
+        assert "10" in s
+
+    def test_merge_self_starts_earlier(self):
+        a = Location(file_path=Path("f.robot"), line=1, end_line=5)
+        b = Location(file_path=Path("f.robot"), line=3, end_line=8)
+        merged = a.merge(b)
+        assert merged.line == 1
+        assert merged.end_line == 8
+
+    def test_merge_other_starts_earlier(self):
+        a = Location(file_path=Path("f.robot"), line=5, end_line=10)
+        b = Location(file_path=Path("f.robot"), line=2, end_line=7)
+        merged = a.merge(b)
+        assert merged.line == 2
+        assert merged.end_line == 10
+
+    def test_merge_different_files_raises(self):
+        a = Location(file_path=Path("a.robot"), line=1)
+        b = Location(file_path=Path("b.robot"), line=1)
+        with pytest.raises(ValueError, match="different files"):
+            a.merge(b)
+
+    def test_merge_same_end_line(self):
+        a = Location(file_path=Path("f.robot"), line=1, column=1, end_line=5, end_column=3)
+        b = Location(file_path=Path("f.robot"), line=1, column=2, end_line=5, end_column=8)
+        merged = a.merge(b)
+        assert merged.end_line == 5
+        assert merged.end_column == 8
+
+    def test_offset_with_column(self):
+        loc = Location(file_path=Path("f.robot"), line=5, column=3)
+        shifted = loc.offset(lines=2, columns=1)
+        assert shifted.line == 7
+        assert shifted.column == 4
+
+    def test_offset_with_end_line(self):
+        loc = Location(file_path=Path("f.robot"), line=5, end_line=10)
+        shifted = loc.offset(lines=1)
+        assert shifted.end_line == 11
+
+    def test_offset_invalid_line_raises(self):
+        loc = Location(file_path=Path("f.robot"), line=1)
+        with pytest.raises(ValueError, match="invalid line"):
+            loc.offset(lines=-5)
+
+    def test_offset_invalid_column_raises(self):
+        loc = Location(file_path=Path("f.robot"), line=5, column=1)
+        with pytest.raises(ValueError, match="invalid column"):
+            loc.offset(columns=-10)
+
+    def test_offset_with_end_column(self):
+        loc = Location(
+            file_path=Path("f.robot"), line=1, column=5, end_line=2, end_column=10
+        )
+        shifted = loc.offset(columns=2)
+        assert shifted.end_column == 12
+
+    def test_offset_invalid_end_column_raises(self):
+        loc = Location(
+            file_path=Path("f.robot"), line=1, column=10, end_line=2, end_column=3
+        )
+        with pytest.raises(ValueError, match="invalid end column"):
+            loc.offset(columns=-9)
+
+    def test_overlaps_different_files(self):
+        a = Location(file_path=Path("a.robot"), line=1, end_line=5)
+        b = Location(file_path=Path("b.robot"), line=1, end_line=5)
+        assert a.overlaps(b) is False
+
+    def test_overlaps_non_overlapping_ranges(self):
+        a = Location(file_path=Path("f.robot"), line=1, end_line=5)
+        b = Location(file_path=Path("f.robot"), line=10, end_line=15)
+        assert a.overlaps(b) is False
+
+    def test_overlaps_overlapping_ranges(self):
+        a = Location(file_path=Path("f.robot"), line=1, end_line=10)
+        b = Location(file_path=Path("f.robot"), line=5, end_line=15)
+        assert a.overlaps(b) is True
+
+    def test_is_range_and_is_point(self):
+        point = Location(file_path=Path("f.robot"), line=5)
+        rng = Location(file_path=Path("f.robot"), line=5, end_line=10)
+        assert point.is_point is True
+        assert point.is_range is False
+        assert rng.is_range is True
+        assert rng.is_point is False
+
 
 class TestPattern:
     """Test the Pattern value object."""

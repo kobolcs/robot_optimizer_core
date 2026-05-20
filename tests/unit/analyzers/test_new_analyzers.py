@@ -174,7 +174,7 @@ class TestHardcodedValueAnalyzer:
 
 
 @pytest.mark.unit
-class DocAnalyzerTests:
+class TestDocAnalyzerAnalyzer:
     @pytest.fixture
     def analyzer(self) -> DocAnalyzer:
         return DocAnalyzer()
@@ -352,3 +352,111 @@ class TestSetupTeardownAnalyzer:
     def test_empty_file(self, analyzer: SetupTeardownAnalyzer) -> None:
         findings = analyzer.analyze(_make_file(""))
         assert findings == []
+
+    def test_threshold_float_whole_number_accepted(self) -> None:
+        a = SetupTeardownAnalyzer(config={"duplication_threshold": 2.0})
+        assert a._threshold == 2
+
+    def test_threshold_float_non_whole_raises(self) -> None:
+        with pytest.raises(ValueError, match="whole number"):
+            SetupTeardownAnalyzer(config={"duplication_threshold": 1.5})
+
+    def test_threshold_string_accepted(self) -> None:
+        a = SetupTeardownAnalyzer(config={"duplication_threshold": "3"})
+        assert a._threshold == 3
+
+    def test_threshold_string_invalid_raises(self) -> None:
+        with pytest.raises(ValueError, match="integer"):
+            SetupTeardownAnalyzer(config={"duplication_threshold": "abc"})
+
+    def test_threshold_other_type_raises(self) -> None:
+        with pytest.raises(TypeError):
+            SetupTeardownAnalyzer(config={"duplication_threshold": []})
+
+    def test_threshold_bool_raises(self) -> None:
+        with pytest.raises(TypeError, match="boolean"):
+            SetupTeardownAnalyzer(config={"duplication_threshold": True})
+
+    def test_threshold_less_than_one_raises(self) -> None:
+        with pytest.raises(ValueError, match=">= 1"):
+            SetupTeardownAnalyzer(config={"duplication_threshold": 0})
+
+    def test_check_setup_false_skips_setup(self) -> None:
+        content = (
+            "*** Test Cases ***\nTest A\n"
+            "    Open Browser    ${URL}\n"
+            "    Log    a\n\n"
+            "Test B\n"
+            "    Open Browser    ${URL}\n"
+            "    Log    b\n"
+        )
+        a = SetupTeardownAnalyzer(config={"check_setup": False})
+        findings = a.analyze(_make_file(content))
+        assert findings == []
+
+    def test_check_teardown_false_skips_teardown(self) -> None:
+        content = (
+            "*** Test Cases ***\nTest A\n"
+            "    Log    a\n"
+            "    Close Browser\n\n"
+            "Test B\n"
+            "    Log    b\n"
+            "    Close Browser\n"
+        )
+        a = SetupTeardownAnalyzer(config={"check_teardown": False})
+        findings = a.analyze(_make_file(content))
+        assert findings == []
+
+    def test_teardown_hook_not_flagged(self) -> None:
+        content = (
+            "*** Test Cases ***\nTest A\n"
+            "    Log    a\n"
+            "    [Teardown]    Close Browser\n\n"
+            "Test B\n"
+            "    Log    b\n"
+            "    [Teardown]    Close Browser\n"
+        )
+        a = SetupTeardownAnalyzer()
+        findings = a.analyze(_make_file(content))
+        assert findings == []
+
+    def test_inline_comment_inside_test_ignored(self) -> None:
+        content = (
+            "*** Test Cases ***\nTest A\n"
+            "    # setup comment\n"
+            "    Open Browser    ${URL}\n"
+            "    Log    a\n\n"
+            "Test B\n"
+            "    # setup comment\n"
+            "    Open Browser    ${URL}\n"
+            "    Log    b\n"
+        )
+        a = SetupTeardownAnalyzer()
+        findings = a.analyze(_make_file(content))
+        # comment line is None keyword, Open Browser is steps[1] not [0], no finding
+        assert isinstance(findings, list)
+
+    def test_variable_assignment_step_stripped(self) -> None:
+        content = (
+            "*** Test Cases ***\nTest A\n"
+            "    ${result} =    Open Browser    ${URL}\n"
+            "    Log    a\n\n"
+            "Test B\n"
+            "    ${result} =    Open Browser    ${URL}\n"
+            "    Log    b\n"
+        )
+        a = SetupTeardownAnalyzer()
+        findings = a.analyze(_make_file(content))
+        assert findings  # variable prefix stripped, duplicate detected
+
+    def test_comment_as_test_name_ignored(self) -> None:
+        content = (
+            "*** Test Cases ***\n"
+            "# This is a comment\n"
+            "    Log    a\n\n"
+            "Test B\n"
+            "    Log    b\n"
+        )
+        a = SetupTeardownAnalyzer()
+        findings = a.analyze(_make_file(content))
+        assert findings == []  # comment test name → current_name=None, steps skipped

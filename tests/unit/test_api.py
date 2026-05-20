@@ -302,3 +302,204 @@ class TestExecuteDirectoryAnalysis:
         results, errors = _execute_directory_analysis(files, self._fail_fn, 4, fail_fast=False)
         assert len(errors) == 3
         assert len(results) == 0
+
+
+# ---------------------------------------------------------------------------
+# analyze_file edge cases
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_analyze_file_raises_for_nonexistent_file(tmp_path: Path) -> None:
+    from robot_optimizer_core.exceptions import RobotFileNotFoundError
+
+    with pytest.raises(RobotFileNotFoundError):
+        analyze_file(tmp_path / "missing.robot")
+
+
+@pytest.mark.unit
+def test_analyze_file_wraps_load_exception(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    robot_file = tmp_path / "t.robot"
+    robot_file.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+
+    def boom(*a, **kw):
+        raise ValueError("parse kaboom")
+
+    monkeypatch.setattr("robot_optimizer_core.api.TestFile.from_path", boom)
+
+    with pytest.raises(AnalysisError, match="Failed to load file"):
+        analyze_file(robot_file)
+
+
+@pytest.mark.unit
+def test_analyze_file_analyzer_failure_raises_analysis_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    robot_file = tmp_path / "t.robot"
+    robot_file.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+
+    class ExplodingAnalyzer:
+        name = "exploder"
+
+        def safe_analyze(self, test_file: object) -> list:
+            raise RuntimeError("analyzer boom")
+
+    monkeypatch.setattr(
+        "robot_optimizer_core.api._get_analyzer_instances",
+        lambda *a, **kw: [ExplodingAnalyzer()],
+    )
+
+    with pytest.raises(AnalysisError, match="Analysis failed"):
+        analyze_file(robot_file)
+
+
+# ---------------------------------------------------------------------------
+# _validate_directory_path
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_validate_directory_path_nonexistent(tmp_path: Path) -> None:
+    from robot_optimizer_core.api import _validate_directory_path
+    from robot_optimizer_core.exceptions import RobotFileNotFoundError
+
+    with pytest.raises(RobotFileNotFoundError):
+        _validate_directory_path(tmp_path / "nope")
+
+
+@pytest.mark.unit
+def test_validate_directory_path_file_raises(tmp_path: Path) -> None:
+    f = tmp_path / "f.robot"
+    f.write_bytes(b"x")
+    with pytest.raises(AnalysisError, match="not a directory"):
+        from robot_optimizer_core.api import _validate_directory_path
+
+        _validate_directory_path(f)
+
+
+# ---------------------------------------------------------------------------
+# _handle_directory_analysis_errors
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_handle_errors_raise_mode(tmp_path: Path) -> None:
+    from robot_optimizer_core.api import DirectoryResults, _handle_directory_analysis_errors
+
+    errors = [(tmp_path / "f.robot", AnalysisError("bad"))]
+    dr = DirectoryResults()
+    with pytest.raises(ExceptionGroup):
+        _handle_directory_analysis_errors(errors, "raise", False, dr)
+
+
+@pytest.mark.unit
+def test_handle_errors_warn_mode_attaches_to_result(tmp_path: Path) -> None:
+    from robot_optimizer_core.api import DirectoryResults, _handle_directory_analysis_errors
+
+    errors = [(tmp_path / "f.robot", AnalysisError("bad"))]
+    dr = DirectoryResults()
+    _handle_directory_analysis_errors(errors, "warn", False, dr)
+    assert len(dr.errors) == 1
+
+
+@pytest.mark.unit
+def test_handle_errors_skip_mode_no_exception(tmp_path: Path) -> None:
+    from robot_optimizer_core.api import DirectoryResults, _handle_directory_analysis_errors
+
+    errors = [(tmp_path / "f.robot", AnalysisError("bad"))]
+    dr = DirectoryResults()
+    _handle_directory_analysis_errors(errors, "skip", False, dr)
+    # no exception, no errors attached
+    assert dr.errors == []
+
+
+@pytest.mark.unit
+def test_handle_errors_no_op_for_empty(tmp_path: Path) -> None:
+    from robot_optimizer_core.api import DirectoryResults, _handle_directory_analysis_errors
+
+    dr = DirectoryResults()
+    _handle_directory_analysis_errors([], "raise", False, dr)  # must not raise
+
+
+# ---------------------------------------------------------------------------
+# analyze_suite
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_analyze_suite_single_file(tmp_path: Path) -> None:
+    from robot_optimizer_core.api import analyze_suite
+
+    f = tmp_path / "suite.robot"
+    f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+    result = analyze_suite(f)
+    assert "findings" in result
+    assert "suite_info" in result
+    assert "statistics" in result
+
+
+@pytest.mark.unit
+def test_analyze_suite_directory(tmp_path: Path) -> None:
+    from robot_optimizer_core.api import analyze_suite
+
+    (tmp_path / "a.robot").write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+    result = analyze_suite(tmp_path)
+    assert isinstance(result["findings"], list)
+
+
+@pytest.mark.unit
+def test_analyze_suite_with_dead_code_analyzer(tmp_path: Path) -> None:
+    from robot_optimizer_core.api import analyze_suite
+
+    f = tmp_path / "suite.robot"
+    f.write_bytes(
+        b"*** Keywords ***\nUsed KW\n    Log    ok\n"
+        b"Unused KW\n    Log    never called\n"
+        b"*** Test Cases ***\nT\n    Used KW\n"
+    )
+    result = analyze_suite(f, analyzers=["dead_code"])
+    assert "findings" in result
+
+
+@pytest.mark.unit
+def test_load_test_files_logs_warning_on_bad_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import robot_optimizer_core.api as _api_mod
+
+    monkeypatch.setattr(_api_mod.TestFile, "from_path", lambda p: (_ for _ in ()).throw(RuntimeError("bad")))
+    from robot_optimizer_core.api import _load_test_files
+
+    result = _load_test_files([tmp_path / "f.robot"])
+    assert result == []
+
+
+@pytest.mark.unit
+def test_get_analyzer_instances_passes_through_instance(tmp_path: Path) -> None:
+    from robot_optimizer_core.api import _get_analyzer_instances
+    from robot_optimizer_core.config import Settings
+
+    class FakeAnalyzer:
+        name = "fake"
+
+        def safe_analyze(self, tf: object) -> list:
+            return []
+
+    fake = FakeAnalyzer()
+    result = _get_analyzer_instances([fake], Settings())
+    assert fake in result
+
+
+@pytest.mark.unit
+def test_analyze_directory_with_metrics_passed(tmp_path: Path) -> None:
+    from robot_optimizer_core.metrics import MetricsCollector
+
+    f = tmp_path / "t.robot"
+    f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+    m = MetricsCollector(enabled=True)
+    try:
+        analyze_directory(tmp_path, metrics=m)
+    finally:
+        m.stop()

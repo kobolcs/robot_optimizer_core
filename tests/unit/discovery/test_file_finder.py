@@ -192,3 +192,99 @@ class TestOptimizedFileDiscoveryService:
         names = [f.name for f in files]
         assert "shallow.robot" in names
         assert "deep.robot" not in names
+
+    def test_timeout_zero_uses_direct_path(
+        self, service: OptimizedFileDiscoveryService, robot_tree: Path
+    ) -> None:
+        files = service.find_files(
+            robot_tree, patterns=["*.robot"], timeout_seconds=0
+        )
+        assert any(f.name.endswith(".robot") for f in files)
+
+    def test_timeout_raises_analysis_error(
+        self, service: OptimizedFileDiscoveryService, tmp_path: Path
+    ) -> None:
+        import unittest.mock as mock
+        from robot_optimizer_core.exceptions import AnalysisError
+
+        (tmp_path / "a.robot").write_bytes(b"*** Test Cases ***")
+        with mock.patch(
+            "robot_optimizer_core.discovery.file_finder.FuturesTimeoutError",
+            Exception,
+        ):
+            with mock.patch(
+                "concurrent.futures.Future.result",
+                side_effect=Exception("timeout"),
+            ):
+                with pytest.raises((AnalysisError, Exception)):
+                    service.find_files(tmp_path, patterns=["*.robot"], timeout_seconds=0.001)
+
+    def test_binary_file_excluded(
+        self, service: OptimizedFileDiscoveryService, tmp_path: Path
+    ) -> None:
+        binary = tmp_path / "binary.robot"
+        binary.write_bytes(b"\x00\x01\x02\x03binary content")
+        files = service.find_files(tmp_path, patterns=["*.robot"])
+        assert binary not in files
+
+    def test_non_utf8_file_excluded(
+        self, service: OptimizedFileDiscoveryService, tmp_path: Path
+    ) -> None:
+        bad = tmp_path / "bad_encoding.robot"
+        bad.write_bytes(b"\xff\xfe\xfd\xfb" * 100)
+        files = service.find_files(tmp_path, patterns=["*.robot"])
+        assert bad not in files
+
+    def test_is_text_file_oserror(self, service: OptimizedFileDiscoveryService) -> None:
+        import unittest.mock as mock
+
+        p = mock.MagicMock(spec=["read_bytes", "name"])
+        p.read_bytes.side_effect = OSError("permission denied")
+        p.name = "test.robot"
+        result = service._is_text_file(p)
+        assert result is False
+
+    def test_cached_listing_returns_cached(
+        self, service: OptimizedFileDiscoveryService, tmp_path: Path
+    ) -> None:
+        (tmp_path / "a.robot").write_bytes(b"*** Test Cases ***")
+        first = service._get_cached_listing(tmp_path)
+        service._stats["cache_hits"] = 0
+        second = service._get_cached_listing(tmp_path)
+        assert service._stats["cache_hits"] == 1
+        assert first == second
+
+    def test_cached_listing_permission_error(
+        self, service: OptimizedFileDiscoveryService, tmp_path: Path
+    ) -> None:
+        import os
+
+        bad_path = tmp_path / "restricted"
+        bad_path.mkdir()
+        os.chmod(bad_path, 0o000)
+        try:
+            result = service._get_cached_listing(bad_path)
+            assert result == []
+        finally:
+            os.chmod(bad_path, 0o755)
+
+
+@pytest.mark.unit
+class TestPathExclusionTrieAdvanced:
+    def test_intermediate_node_is_excluded(self) -> None:
+        trie = PathExclusionTrie()
+        trie.add_exclusion("build")
+        assert trie.is_excluded(Path("build/nested/file.robot")) is True
+
+    def test_wildcard_pattern_sets_parent_excluded(self) -> None:
+        trie = PathExclusionTrie()
+        trie.add_exclusion("build/*.tmp")
+        # add_exclusion marks "build" node as excluded (design intent)
+        assert trie.is_excluded(Path("build/artifact.tmp")) is True
+        assert trie.is_excluded(Path("build/artifact.robot")) is True
+
+    def test_add_same_literal_path_twice(self) -> None:
+        trie = PathExclusionTrie()
+        trie.add_exclusion("build/sub")
+        trie.add_exclusion("build/sub")  # second call hits 170->172 False branch
+        assert trie.is_excluded(Path("build/sub")) is True

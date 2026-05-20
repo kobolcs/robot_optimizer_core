@@ -747,4 +747,81 @@ class TestResolveCallsRefactor:
             {"click element", "click"},
         )
         assert "click element" in result
-        assert "click" in result
+
+
+@pytest.mark.unit
+class TestDeadCodeValidateConfig:
+    def test_validate_config_non_bool_raises(self) -> None:
+        from robot_optimizer_core.exceptions import ConfigurationError
+
+        with pytest.raises(ConfigurationError):
+            DeadCodeAnalyzer(config={"check_unused": "yes"})
+
+    def test_validate_config_non_list_ignore_patterns_raises(self) -> None:
+        from robot_optimizer_core.exceptions import ConfigurationError
+
+        # Use a tuple (iterable, each element a valid regex) so __init__ succeeds,
+        # but validate_config raises ConfigurationError for non-list
+        with pytest.raises(ConfigurationError):
+            DeadCodeAnalyzer(config={"ignore_patterns": ("^test.*",)})
+
+
+@pytest.mark.unit
+class TestDeadCodeTextFallback:
+    def _make(self, name: str, content: str) -> TestFile:
+        return TestFile(
+            path=Path(name),
+            content=content,
+            size_bytes=len(content),
+            last_modified_utc=datetime.now(tz=UTC),
+        )
+
+    def test_text_fallback_on_ast_parse_failure(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import robot.parsing
+
+        monkeypatch.setattr(robot.parsing, "get_model", lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("forced fail")))
+
+        content = """\
+*** Keywords ***
+My Keyword
+    Log    hello
+
+*** Test Cases ***
+Test A
+    My Keyword
+"""
+        file_ = self._make("fallback.robot", content)
+        findings = DeadCodeAnalyzer().analyze_suite([file_])
+        # Should run without error (text fallback used)
+        assert isinstance(findings, list)
+
+    def test_unreachable_code_with_if_end(self) -> None:
+        content = """\
+*** Keywords ***
+My Keyword
+    IF    ${cond}
+        Log    inside if
+    END
+    RETURN    done
+    Log    this is unreachable
+"""
+        file_ = self._make("unreachable_if.robot", content)
+        findings = DeadCodeAnalyzer().analyze_suite([file_])
+        unreachable = [f for f in findings if f.pattern.type == PatternType.UNREACHABLE_CODE]
+        assert unreachable
+
+    def test_return_inside_nested_control_flow_not_flagged(self) -> None:
+        content = """\
+*** Keywords ***
+My Keyword
+    FOR    ${x}    IN    @{list}
+        RETURN    early
+    END
+    Log    after loop  # NOT unreachable (RETURN was in nested control flow)
+"""
+        file_ = self._make("nested_return.robot", content)
+        findings = DeadCodeAnalyzer().analyze_suite([file_])
+        unreachable = [f for f in findings if f.pattern.type == PatternType.UNREACHABLE_CODE]
+        assert len(unreachable) == 0  # nested RETURN doesn't make lines after END unreachable

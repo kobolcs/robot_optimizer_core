@@ -177,6 +177,62 @@ class TestBuiltinAnalyzerRegistration:
         "test_documentation",
     })
 
+
+class TestApplicationContextLazyProperties:
+    EXPECTED_BUILTINS: frozenset[str] = frozenset({
+        "dead_code",
+        "sleep_detector",
+        "flakiness",
+        "hardcoded_value",
+        "naming_convention",
+        "setup_teardown",
+        "tag_consistency",
+        "test_documentation",
+    })
+
+    def test_metrics_lazy_initializes(self) -> None:
+        config = ApplicationConfig(
+            enable_plugins=False, enable_metrics=True, enable_logging=False
+        )
+        ctx = ApplicationContext(config)
+        assert not ctx._initialized
+        m = ctx.metrics
+        assert m is not None
+        ctx.shutdown()
+
+    def test_analyzer_registry_lazy_initializes(self) -> None:
+        ctx = create_test_application()
+        assert not ctx._initialized
+        registry = ctx.analyzer_registry
+        assert registry is not None
+        ctx.shutdown()
+
+    def test_request_scope_second_call_uses_existing_context(self) -> None:
+        with create_test_application() as ctx:
+            # Manually set context to simulate it already existing (skips hasattr branch)
+            ctx._local.context = {}
+            with ctx.request_scope(b="2"):
+                assert ctx._local.context.get("b") == "2"
+
+    def test_initialize_with_logging_enabled(self) -> None:
+        config = ApplicationConfig(
+            enable_plugins=False,
+            enable_metrics=False,
+            enable_logging=True,
+            log_level="WARNING",
+        )
+        with ApplicationContext(config) as ctx:
+            assert ctx._initialized
+
+    def test_initialize_with_plugins_enabled(self) -> None:
+        config = ApplicationConfig(
+            enable_plugins=True,
+            enable_metrics=False,
+            enable_logging=False,
+        )
+        with ApplicationContext(config) as ctx:
+            assert ctx._plugin_manager is not None
+
     def test_all_builtin_analyzers_registered(self) -> None:
         ctx = create_test_application()
         ctx.initialize()

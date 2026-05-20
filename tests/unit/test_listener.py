@@ -163,3 +163,52 @@ class TestFlakinessListenerStartSuite:
         listener = FlakinessListener(repository=repo)
         suite_data = MagicMock(spec=[])  # no attributes
         listener.start_suite(suite_data, MagicMock())  # must not raise
+
+
+@pytest.mark.unit
+class TestFlakinessListenerResolveFilePath:
+    def test_unknown_robot_returned_when_no_source(self) -> None:
+        repo = _FakeRepo()
+        listener = FlakinessListener(repository=repo)
+
+        test_data = MagicMock()
+        test_data.name = "T"
+        test_data.source = None
+        test_data.parent = MagicMock()
+        test_data.parent.source = None
+        listener._current_source = None
+
+        listener.end_test(test_data, _fake_result())
+        assert repo.saved[0].file_path == Path("unknown.robot")
+
+    def test_execution_time_zero_for_none_elapsed(self) -> None:
+        repo = _FakeRepo()
+        listener = FlakinessListener(repository=repo)
+        result = _fake_result()
+        result.elapsed_time = None
+        listener.end_test(_fake_test_data(), result)
+        assert repo.saved[0].execution_time == 0.0
+
+
+@pytest.mark.unit
+class TestFlakinessListenerResolveRepository:
+    def test_creates_json_repo_when_no_di(self, tmp_path: Path) -> None:
+        from robot_optimizer_core.di import reset_container
+
+        reset_container()
+        results_path = tmp_path / "results.json"
+        listener = FlakinessListener(results_path=str(results_path))
+        assert listener.repository is not None
+
+    def test_uses_di_container_repo_when_registered(self, tmp_path: Path) -> None:
+        from robot_optimizer_core.di import get_container, reset_container
+
+        reset_container()
+        container = get_container()
+        fake_repo = _FakeRepo()
+        container.register_instance("test_result_repository", fake_repo)
+        try:
+            listener = FlakinessListener()
+            assert listener.repository is fake_repo
+        finally:
+            reset_container()

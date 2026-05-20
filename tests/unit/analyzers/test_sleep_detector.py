@@ -103,3 +103,84 @@ class TestSleepDetectorHelpers:
     def test_enclosing_block_name_found(self) -> None:
         lines = ["*** Test Cases ***", "My Test", "    Sleep    1"]
         assert self._d()._enclosing_block_name(lines, 3) == "My Test"
+
+    def test_classify_context_network(self) -> None:
+        assert self._d()._classify_context(["GET    https://api.example.com/request"]) == "network"
+
+    def test_detect_library_non_library_setting_line(self) -> None:
+        lines = ["*** Settings ***", "Resource    common.robot", "Library    SeleniumLibrary"]
+        assert self._d()._detect_library(lines) == "seleniumlibrary"
+
+    def test_detect_library_unknown_library(self) -> None:
+        lines = ["*** Settings ***", "Library    SomeCustomLibrary"]
+        assert self._d()._detect_library(lines) is None
+
+    def test_enclosing_block_name_scans_over_blank_line(self) -> None:
+        lines = ["*** Test Cases ***", "My Test", "", "    Sleep    1"]
+        assert self._d()._enclosing_block_name(lines, 4) == "My Test"
+
+    def test_enclosing_block_name_hits_section_header_returns_none(self) -> None:
+        lines = ["*** Test Cases ***", "    Sleep    1"]
+        assert self._d()._enclosing_block_name(lines, 2) is None
+
+    def test_enclosing_block_name_first_line_returns_none(self) -> None:
+        lines = ["    Sleep    1"]
+        assert self._d()._enclosing_block_name(lines, 1) is None
+
+
+@pytest.mark.unit
+class TestSleepDetectorAnalyzerExtra:
+    def _make(self, content: str) -> TestFile:
+        return TestFile(
+            path=Path("test.robot"),
+            content=content,
+            size_bytes=len(content),
+            last_modified_utc=datetime.now(),
+        )
+
+    def test_evaluate_sleep_detected(self) -> None:
+        content = "*** Test Cases ***\nT\n    Evaluate    time.sleep(3)\n"
+        findings = SleepDetector().analyze(self._make(content))
+        assert findings
+        assert any("sleep" in f.message.lower() or f.context.get("sleep_type") == "evaluate_sleep" for f in findings)
+
+    def test_variable_sleep_detected(self) -> None:
+        content = "*** Test Cases ***\nT\n    Sleep    ${TIMEOUT}\n"
+        findings = SleepDetector().analyze(self._make(content))
+        assert findings
+        assert any(f.context.get("sleep_type") == "variable" for f in findings)
+
+    def test_suggest_alternatives_false_skips_suggestion(self) -> None:
+        content = "*** Test Cases ***\nT\n    Sleep    2\n"
+        analyzer = SleepDetector(config={"suggest_alternatives": False})
+        findings = analyzer.analyze(self._make(content))
+        assert findings
+        assert not any(". " in f.message and "Replace" in f.message for f in findings)
+
+    def test_suggest_alternative_no_ctx(self) -> None:
+        from robot_optimizer_core.domain.value_objects.sleep_pattern import SleepPattern
+        from decimal import Decimal
+
+        d = SleepDetector()
+        tf = self._make("*** Test Cases ***\nT\n    Sleep    2\n")
+        sp = SleepPattern(duration=Decimal("2"), unit="s", line_number=3, original_text="    Sleep    2")
+        result = d._suggest_alternative(sp, tf, 3, ctx=None)
+        assert result is not None
+
+    def test_validate_config_not_dict_raises(self) -> None:
+        from robot_optimizer_core.exceptions import ConfigurationError
+
+        with pytest.raises(ConfigurationError, match="dictionary"):
+            SleepDetector(config={"severity_thresholds": "not_a_dict"})
+
+    def test_validate_config_missing_keys_raises(self) -> None:
+        from robot_optimizer_core.exceptions import ConfigurationError
+
+        with pytest.raises(ConfigurationError, match="Missing"):
+            SleepDetector(config={"severity_thresholds": {"info": 1.0}})
+
+    def test_validate_config_non_numeric_raises(self) -> None:
+        from robot_optimizer_core.exceptions import ConfigurationError
+
+        with pytest.raises(ConfigurationError, match="numeric"):
+            SleepDetector(config={"severity_thresholds": {"info": 1.0, "warning": 3.0, "error": "high"}})

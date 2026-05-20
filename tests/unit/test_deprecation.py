@@ -148,3 +148,69 @@ class TestRenamedParameter:
             result = fn(old_name="hello")
             assert result == "hello"
             assert len(w) == 1
+
+    def test_old_and_new_both_provided_drops_old(self) -> None:
+        @renamed_parameter(old_name="new_name")
+        def fn(*, new_name: str = "") -> str:
+            return new_name
+
+        with warnings.catch_warnings(record=True):
+            warnings.simplefilter("always")
+            result = fn(old_name="ignored", new_name="kept")
+        assert result == "kept"
+
+
+@pytest.mark.unit
+class TestDeprecatedParameterWithRemovedIn:
+    def test_message_includes_removed_in(self) -> None:
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            deprecated_parameter(
+                "old_param", since="1.0.0", removed_in="2.0.0"
+            )
+            assert "2.0.0" in str(w[0].message)
+
+
+@pytest.mark.unit
+class TestDeprecatedWithDetails:
+    def test_message_includes_details(self) -> None:
+        from robot_optimizer_core.deprecation import deprecated
+
+        @deprecated(since="1.0.0", details="See migration guide.")
+        def old_fn() -> None:
+            pass
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            old_fn()
+            assert "migration guide" in str(w[0].message)
+
+
+@pytest.mark.unit
+class TestDeprecatedMixin:
+    def test_warns_on_instantiation(self) -> None:
+        from robot_optimizer_core.deprecation import DeprecatedMixin
+
+        class OldClass(DeprecatedMixin):
+            _deprecated_since = "1.0.0"
+            _deprecated_replacement = "NewClass"
+            _deprecated_removed_in = "2.0.0"
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            OldClass()
+            assert len(w) == 1
+            assert "OldClass" in str(w[0].message)
+            assert "NewClass" in str(w[0].message)
+
+    def test_mixin_with_details(self) -> None:
+        from robot_optimizer_core.deprecation import DeprecatedMixin
+
+        class OldThing(DeprecatedMixin):
+            _deprecated_since = "1.2.0"
+            _deprecated_details = "Use the new API."
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            OldThing()
+            assert "new API" in str(w[0].message)

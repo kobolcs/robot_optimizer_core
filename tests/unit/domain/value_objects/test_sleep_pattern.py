@@ -421,3 +421,11 @@ class TestSleepPattern:
             original_text="Sleep    1 SECONDS",
         )
         assert pattern2.unit == "seconds"
+
+    def test_duration_in_seconds_hours(self) -> None:
+        pattern = SleepPattern(duration=Decimal("1"), unit="h", line_number=1, original_text="Sleep    1h")
+        assert pattern.duration_in_seconds == pytest.approx(3600.0)
+
+    def test_duration_in_seconds_days(self) -> None:
+        pattern = SleepPattern(duration=Decimal("1"), unit="d", line_number=1, original_text="Sleep    1d")
+        assert pattern.duration_in_seconds == pytest.approx(86400.0)

@@ -175,3 +175,100 @@ class TestMetricsCollector:
             assert m1 is m2
         finally:
             m1.stop()
+
+    def test_stop_when_already_stopped_is_safe(self) -> None:
+        m = MetricsCollector(enabled=True)
+        m.stop()
+        m.stop()  # second stop must not raise
+
+    def test_timing_updates_existing_key(self, collector: MetricsCollector) -> None:
+        collector.timing("op", 0.1)
+        collector.timing("op", 0.2)
+        data = collector.get_metrics()
+        assert data["timings"]["op"]["count"] == 2
+
+    def test_cleanup_removes_zero_access_keys(self) -> None:
+        m = MetricsCollector(enabled=True)
+        try:
+            m.increment("ephemeral")
+            # Force cleanup with zero access counts by decaying them manually
+            with m._lock:
+                m._access_counts["ephemeral"] = 0
+                m._cleanup()
+            data = m.get_metrics()
+            assert "ephemeral" not in data["counters"]
+        finally:
+            m.stop()
+
+    def test_evict_least_used_noop_for_empty_store(self) -> None:
+        m = MetricsCollector(enabled=True)
+        try:
+            m._evict_least_used({})  # must not raise
+        finally:
+            m.stop()
+
+    def test_configure_metrics_stops_old_collector(self) -> None:
+        from robot_optimizer_core.metrics import configure_metrics
+
+        m1 = configure_metrics(enabled=True)
+        m2 = configure_metrics(enabled=True)
+        try:
+            assert m1 is not m2
+        finally:
+            m2.stop()
+
+    def test_get_metrics_triggers_cleanup_when_overdue(self) -> None:
+        import time
+
+        m = MetricsCollector(enabled=True, cleanup_interval=1)
+        try:
+            m.increment("x")
+            # Force cleanup to be overdue
+            m._last_cleanup = time.time() - 1000
+            data = m.get_metrics()  # triggers _cleanup() via line 246
+            assert "counters" in data
+        finally:
+            m.stop()
+
+    def test_cleanup_with_active_metrics_decays_counts(self) -> None:
+        m = MetricsCollector(enabled=True)
+        try:
+            m.increment("active")
+            # _cleanup with non-zero access counts only decays, doesn't remove
+            with m._lock:
+                m._cleanup()
+            data = m.get_metrics()
+            # active should still be present (was not zero_access)
+            assert "active" in data["counters"]
+        finally:
+            m.stop()
+
+    def test_del_does_not_raise(self) -> None:
+        m = MetricsCollector(enabled=True)
+        m.stop()
+        m.__del__()  # explicitly call __del__ on stopped collector
+
+    def test_cleanup_processes_timing_samples(self) -> None:
+        m = MetricsCollector(enabled=True)
+        try:
+            m.timing("latency", 0.1)
+            m.timing("latency", 0.2)
+            with m._lock:
+                m._cleanup()
+            data = m.get_metrics()
+            assert "latency" in data["timings"]
+        finally:
+            m.stop()
+
+    def test_get_metrics_creates_when_none(self) -> None:
+        import robot_optimizer_core.metrics as metrics_mod
+
+        old = metrics_mod._global_metrics
+        metrics_mod._global_metrics = None
+        try:
+            result = metrics_mod.get_metrics()
+            assert result is not None
+        finally:
+            if metrics_mod._global_metrics is not None:
+                metrics_mod._global_metrics.stop()
+            metrics_mod._global_metrics = old

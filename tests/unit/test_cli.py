@@ -661,3 +661,222 @@ class TestHtmlCategoryMetadata:
         assert category in html
         assert impact in html
         assert action in html
+
+
+# ---------------------------------------------------------------------------
+# subcommands: list-analyzers, upgrade
+# ---------------------------------------------------------------------------
+
+
+class TestListAnalyzers:
+    def test_list_analyzers_exits_zero(self) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main(["list-analyzers"])
+        assert exc.value.code == 0
+
+    def test_list_analyzers_json_format(self, capsys: pytest.CaptureFixture[str]) -> None:
+        with pytest.raises(SystemExit):
+            main(["list-analyzers", "--format", "json"])
+        out = capsys.readouterr().out
+        records = json.loads(out)
+        assert isinstance(records, list)
+        assert len(records) > 0
+
+    def test_list_analyzers_text_format(self, capsys: pytest.CaptureFixture[str]) -> None:
+        with pytest.raises(SystemExit):
+            main(["list-analyzers"])
+        out = capsys.readouterr().out
+        assert "analyzers" in out.lower()
+
+
+class TestUpgrade:
+    def test_upgrade_exits_zero(self) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main(["upgrade"])
+        assert exc.value.code == 0
+
+    def test_upgrade_output_contains_feature_table(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        with pytest.raises(SystemExit):
+            main(["upgrade"])
+        out = capsys.readouterr().out
+        assert "Feature" in out
+
+
+# ---------------------------------------------------------------------------
+# --debug and --verbose flags
+# ---------------------------------------------------------------------------
+
+
+class TestVerboseDebugFlags:
+    def test_verbose_flag_accepted(self, tmp_path: Path) -> None:
+        f = tmp_path / "t.robot"
+        f.write_bytes(b"*** Test Cases ***\n")
+        with patch("robot_optimizer_core.cli.analyze_file", return_value=[]):
+            with pytest.raises(SystemExit) as exc:
+                main(["--verbose", "analyze", str(f)])
+        assert exc.value.code == 0
+
+    def test_debug_flag_accepted(self, tmp_path: Path) -> None:
+        f = tmp_path / "t.robot"
+        f.write_bytes(b"*** Test Cases ***\n")
+        with patch("robot_optimizer_core.cli.analyze_file", return_value=[]):
+            with pytest.raises(SystemExit) as exc:
+                main(["--debug", "analyze", str(f)])
+        assert exc.value.code == 0
+
+
+# ---------------------------------------------------------------------------
+# --min-severity invalid value
+# ---------------------------------------------------------------------------
+
+
+class TestMinSeverityInvalid:
+    def test_invalid_severity_exits_error(self, tmp_path: Path) -> None:
+        f = tmp_path / "t.robot"
+        f.write_bytes(b"*** Test Cases ***\n")
+        with pytest.raises(SystemExit) as exc:
+            main(["analyze", str(f), "--min-severity", "BADVAL"])
+        assert exc.value.code == 2
+
+
+# ---------------------------------------------------------------------------
+# --config flag errors
+# ---------------------------------------------------------------------------
+
+
+class TestConfigFlag:
+    def test_nonexistent_config_exits_error(self, tmp_path: Path) -> None:
+        f = tmp_path / "t.robot"
+        f.write_bytes(b"*** Test Cases ***\n")
+        with pytest.raises(SystemExit) as exc:
+            main(["analyze", str(f), "--config", str(tmp_path / "nope.toml")])
+        assert exc.value.code == 2
+
+    def test_invalid_config_settings_exits_error(self, tmp_path: Path) -> None:
+        f = tmp_path / "t.robot"
+        f.write_bytes(b"*** Test Cases ***\n")
+        # TOML with conflicting settings causes ConfigurationError in Settings
+        bad_toml = tmp_path / "bad.toml"
+        bad_toml.write_text(
+            "[tool.robot-optimizer]\n"
+            'file_patterns = ["*.robot"]\n'
+            'exclude_patterns = ["*.robot"]\n'
+        )
+        with pytest.raises(SystemExit) as exc:
+            main(["analyze", str(f), "--config", str(bad_toml)])
+        assert exc.value.code == 2
+
+
+# ---------------------------------------------------------------------------
+# --output-file errors
+# ---------------------------------------------------------------------------
+
+
+class TestOutputFileError:
+    def test_unwritable_output_file_exits_error(self, tmp_path: Path) -> None:
+        f = tmp_path / "t.robot"
+        f.write_bytes(b"*** Test Cases ***\n")
+        findings = [_make_finding(f)]
+        bad_out = tmp_path / "nonexistent_dir" / "out.txt"
+        with patch("robot_optimizer_core.cli.analyze_file", return_value=findings):
+            with pytest.raises(SystemExit) as exc:
+                main(
+                    ["analyze", str(f), "--output-file", str(bad_out)]
+                )
+        assert exc.value.code == 2
+
+
+# ---------------------------------------------------------------------------
+# sarif format via CLI
+# ---------------------------------------------------------------------------
+
+
+class TestSarifFormat:
+    def test_sarif_format_valid_json(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        f = tmp_path / "t.robot"
+        f.write_bytes(b"*** Test Cases ***\n")
+        findings = [_make_finding(f)]
+        with patch("robot_optimizer_core.cli.analyze_file", return_value=findings):
+            with pytest.raises(SystemExit):
+                main(["analyze", str(f), "--format", "sarif"])
+        out = capsys.readouterr().out
+        sarif = json.loads(out)
+        assert sarif["version"] == "2.1.0"
+
+    def test_sarif_finding_with_documentation_url(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        pattern = Pattern(
+            type=PatternType.SLEEP_IN_TEST,
+            name="Sleep in Test",
+            description="Sleep used",
+            recommendation="Use wait",
+            documentation_url="https://example.com/docs",
+        )
+        from uuid import uuid4
+
+        finding = Finding.create(
+            pattern=pattern,
+            severity=Severity.WARNING,
+            location=Location(file_path=tmp_path / "t.robot", line=5),
+            message="Sleep found",
+        )
+        sarif = json.loads(_format_sarif([finding], tmp_path))
+        rules = sarif["runs"][0]["tool"]["driver"]["rules"]
+        assert any("helpUri" in r for r in rules)
+
+
+# ---------------------------------------------------------------------------
+# html format via CLI
+# ---------------------------------------------------------------------------
+
+
+class TestHtmlFormatViaCLI:
+    def test_html_format_via_main(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        f = tmp_path / "t.robot"
+        f.write_bytes(b"*** Test Cases ***\n")
+        findings = [_make_finding(f)]
+        with patch("robot_optimizer_core.cli.analyze_file", return_value=findings):
+            with pytest.raises(SystemExit):
+                main(["analyze", str(f), "--format", "html"])
+        out = capsys.readouterr().out
+        assert "Robot Framework" in out
+
+
+# ---------------------------------------------------------------------------
+# partial failure (directory with errors)
+# ---------------------------------------------------------------------------
+
+
+class TestPartialFailure:
+    def test_partial_failure_exits_three(self, tmp_path: Path) -> None:
+        from robot_optimizer_core.api import DirectoryResults
+
+        results = DirectoryResults()
+        results.errors = [(tmp_path / "bad.robot", Exception("parse fail"))]
+
+        with patch("robot_optimizer_core.cli.analyze_directory", return_value=results):
+            with pytest.raises(SystemExit) as exc:
+                main(["analyze", str(tmp_path)])
+        assert exc.value.code == 3
+
+
+# ---------------------------------------------------------------------------
+# _colour helper (tty path)
+# ---------------------------------------------------------------------------
+
+
+class TestColour:
+    def test_colour_applied_when_tty(self) -> None:
+        from robot_optimizer_core.cli import _colour
+
+        with patch("sys.stdout") as mock_stdout:
+            mock_stdout.isatty.return_value = True
+            result = _colour("WARN", Severity.WARNING)
+        assert "WARN" in result
