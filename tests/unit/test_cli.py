@@ -161,18 +161,22 @@ class TestAnalyzeFindings:
 
 class TestAnalyzeDirectory:
     def test_directory_aggregates_findings(self, tmp_path: Path) -> None:
+        from robot_optimizer_core.api import DirectoryResults
+
         f1 = tmp_path / "a.robot"
         f2 = tmp_path / "b.robot"
         f1.write_bytes(b"*** Test Cases ***\n")
         f2.write_bytes(b"*** Test Cases ***\n")
-        findings = {f1: [_make_finding(f1)], f2: []}
+        findings = DirectoryResults(findings={f1: [_make_finding(f1)], f2: []})
         with patch("robot_optimizer_core.cli.analyze_directory", return_value=findings):
             with pytest.raises(SystemExit) as exc:
                 main(["analyze", str(tmp_path)])
         assert exc.value.code == 1
 
     def test_directory_no_findings_exits_zero(self, tmp_path: Path) -> None:
-        with patch("robot_optimizer_core.cli.analyze_directory", return_value={}):
+        from robot_optimizer_core.api import DirectoryResults
+
+        with patch("robot_optimizer_core.cli.analyze_directory", return_value=DirectoryResults()):
             with pytest.raises(SystemExit) as exc:
                 main(["analyze", str(tmp_path)])
         assert exc.value.code == 0

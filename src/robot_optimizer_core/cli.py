@@ -856,8 +856,8 @@ def _analyze_path(
                 severity_filter=severity_filter,
                 error_handling="warn",
             )
-            partial_failure = bool(getattr(results, "errors", []))
-            all_findings: list[Finding] = [f for fs in results.values() for f in fs]
+            partial_failure = bool(results.errors)
+            all_findings: list[Finding] = [f for fs in results.findings.values() for f in fs]
         elif path.is_file():
             all_findings = analyze_file(
                 path,

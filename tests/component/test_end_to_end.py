@@ -119,7 +119,7 @@ class TestDirectoryAnalysisPipeline:
             )
 
         results = analyze_directory(tmp_path, analyzers=["sleep_detector"])
-        all_findings = [f for fs in results.values() for f in fs]
+        all_findings = [f for fs in results.findings.values() for f in fs]
         assert len(all_findings) == 3
 
     def test_directory_analysis_ignores_non_robot_files(self, tmp_path: Path) -> None:
@@ -130,11 +130,11 @@ class TestDirectoryAnalysisPipeline:
         (tmp_path / "data.json").write_bytes(b'{"key": "value"}\n')
 
         results = analyze_directory(tmp_path, analyzers=["sleep_detector"])
-        assert all(p.suffix == ".robot" for p in results.keys())
+        assert all(p.suffix == ".robot" for p in results.findings.keys())
 
     def test_empty_directory_returns_no_findings(self, tmp_path: Path) -> None:
         results = analyze_directory(tmp_path)
-        assert len(results) == 0
+        assert len(results.findings) == 0
 
 
 @pytest.mark.component

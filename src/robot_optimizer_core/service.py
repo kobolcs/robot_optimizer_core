@@ -185,12 +185,13 @@ class AnalysisService:
             severity_filter=severity_filter,
         )
 
-        # Extract errors from DirectoryResults
-        errors = list(getattr(results_dict, "errors", []))
+        # Extract findings and errors from DirectoryResults
+        findings = results_dict.findings
+        errors = results_dict.errors
 
         return DirectoryAnalysisResult(
             directory=directory,
-            results=dict(results_dict),  # Convert DirectoryResults to plain dict
+            results=findings,
             errors=errors,
         )
 
