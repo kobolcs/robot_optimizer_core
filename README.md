@@ -114,11 +114,16 @@ sleep_findings = sleep_detector.analyze(test_file)
 ```python
 from robot_optimizer_core import Settings, analyze_file
 
-# Configure settings
+# Configure settings — validated at construction time
 settings = Settings(
     max_file_size_mb=20.0,
     max_acceptable_sleep_seconds=0.5,
-    exclude_patterns=["**/generated/*", "**/temp/*"]
+    exclude_patterns=["**/generated/*", "**/temp/*"],
+    # Per-analyzer config injected automatically by the API
+    analyzer_config={
+        "sleep_detector": {"max_acceptable_sleep_seconds": 0.5},
+        "dead_code": {"ignore_patterns": ["^Helper.*"]},
+    },
 )
 
 # Use custom settings
@@ -204,6 +209,17 @@ finding = Finding.create(
     unit="seconds"
 )
 ```
+
+## 🚦 CLI Exit Codes
+
+| Code | Name | Meaning |
+|------|------|---------|
+| `0` | OK | No findings, or `--no-fail` was passed |
+| `1` | FINDINGS | One or more findings at or above `--min-severity` |
+| `2` | ERROR | Fatal error — file not found, I/O failure, bad config |
+| `3` | PARTIAL | Analysis completed but some files could not be analysed (`error_handling="warn"` mode; partial results are still written) |
+
+Use `--no-fail` to always return `0` in CI pipelines that track findings separately.
 
 ## ⚙️ Configuration
 

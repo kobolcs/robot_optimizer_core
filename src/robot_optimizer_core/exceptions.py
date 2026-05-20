@@ -1,11 +1,23 @@
 # src/robot_optimizer_core/exceptions.py
 """Custom exception hierarchy for Robot Framework Optimizer Core.
 
-This module defines the exception hierarchy used throughout the Core package.
-All exceptions inherit from RobotOptimizerError for easy catching.
+All exceptions in this package inherit from :class:`RobotOptimizerError`,
+making it easy to catch every optimizer-related error with a single clause.
+The hierarchy is:
+
+.. code-block:: text
+
+    RobotOptimizerError
+    ├── AnalysisError
+    │   ├── ParsingError
+    │   └── RobotFileNotFoundError
+    ├── ConfigurationError
+    ├── PluginError
+    ├── RepositoryError
+    └── ValidationError
 
 Example:
-    Catching specific exceptions::
+    Catching analysis errors with file context::
 
         from robot_optimizer_core import analyze_file, AnalysisError
 

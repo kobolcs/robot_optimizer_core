@@ -1,16 +1,31 @@
 # src/robot_optimizer_core/cli.py
 """Command-line interface for robot-optimizer.
 
-Usage::
+Provides the ``robot-optimizer`` entry-point with the following subcommands:
 
-    robot-optimizer analyze path/to/suite/
-    robot-optimizer analyze tests/login.robot --format json
-    robot-optimizer analyze tests/ --analyzers dead_code,sleep_detector
-    robot-optimizer analyze tests/ --no-fail           # always exit 0
-    robot-optimizer analyze tests/ --min-severity WARNING
-    robot-optimizer analyze tests/ --config robot.toml
-    robot-optimizer list-analyzers
-    robot-optimizer list-analyzers --format json
+- ``analyze``        — analyse a ``.robot`` / ``.resource`` file or directory
+- ``list-analyzers`` — list available analyzers with descriptions and tags
+- ``upgrade``        — show free-vs-Pro feature comparison and upgrade info
+
+Example:
+    Basic usage::
+
+        robot-optimizer analyze path/to/suite/
+        robot-optimizer analyze tests/login.robot --format json
+        robot-optimizer analyze tests/ --analyzers dead_code,sleep_detector
+        robot-optimizer analyze tests/ --no-fail
+        robot-optimizer analyze tests/ --min-severity WARNING
+        robot-optimizer analyze tests/ --config robot.toml
+        robot-optimizer list-analyzers
+        robot-optimizer list-analyzers --format json
+
+Exit codes:
+    0 (OK):       No findings, or ``--no-fail`` was passed.
+    1 (FINDINGS): One or more findings at or above the minimum severity.
+    2 (ERROR):    Fatal error — file not found, I/O failure, bad config, etc.
+    3 (PARTIAL):  Analysis completed but some files could not be analysed
+                  (``error_handling="warn"`` mode; partial results are still
+                  written to the output).
 """
 
 from __future__ import annotations
@@ -34,11 +49,11 @@ if TYPE_CHECKING:
 
 __all__ = ["main"]
 
-# Exit codes
-_EXIT_OK = 0
-_EXIT_FINDINGS = 1
-_EXIT_ERROR = 2
-_EXIT_PARTIAL = 3  # Partial failure (some files could not be analysed).
+# Exit codes — keep in sync with the module docstring above.
+_EXIT_OK = 0       # No findings (or --no-fail passed)
+_EXIT_FINDINGS = 1  # One or more findings at/above min-severity
+_EXIT_ERROR = 2    # Fatal error (missing file, bad config, I/O failure)
+_EXIT_PARTIAL = 3  # Completed with some unanalysable files (error_handling="warn")
 
 # Severity names (for JSON and HTML reports)
 _SEV_ERROR = "ERROR"
@@ -1020,7 +1035,7 @@ def _run_list_analyzers(args: argparse.Namespace) -> int:
                 if tags:
                     print(f"    Tags: {tags}")
                 print()
-            except Exception as exc:
+            except (KeyError, TypeError, AttributeError) as exc:
                 print(f"  {name}  (error loading info: {exc})")
 
     return _EXIT_OK
@@ -1124,6 +1139,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _get_version() -> str:
+    """Return the installed package version string, or ``"unknown"`` if not found."""
     try:
         from importlib.metadata import PackageNotFoundError, version
 

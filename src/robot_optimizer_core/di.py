@@ -1,5 +1,24 @@
 # src/robot_optimizer_core/di.py
-"""Thread-safe dependency injection container."""
+"""Thread-safe dependency injection container.
+
+Provides a lightweight DI container used by the analysis engine to wire
+services (settings, metrics, parsers, analyzers, file discovery) without
+creating hard import-time dependencies between modules.
+
+The global container is initialised lazily on first access via
+:func:`get_container` and populated by :func:`_register_defaults`.
+Tests and plugins can call :func:`reset_container` to start with a clean
+slate.
+
+Example:
+    Resolving services from the default container::
+
+        from robot_optimizer_core.di import get_container
+
+        container = get_container()
+        settings = container.resolve("settings")
+        metrics = container.resolve("metrics")
+"""
 
 from __future__ import annotations
 
@@ -33,16 +52,30 @@ _CONFIG_KEY_SERVICE = "di.service"
 
 
 class ServiceLifetime(StrEnum):
-    """Service lifetime options for dependency injection."""
+    """Controls how many instances of a service the container creates.
 
-    TRANSIENT = auto()  # New instance each time
-    SINGLETON = auto()  # Single instance for container lifetime
-    SCOPED = auto()  # Single instance per scope
+    Attributes:
+        TRANSIENT: A new instance is returned on every ``resolve()`` call.
+        SINGLETON: One instance is created and reused for the container's
+            lifetime.
+        SCOPED: One instance per active scope (created via
+            ``container.create_scope()``).
+    """
+
+    TRANSIENT = auto()
+    SINGLETON = auto()
+    SCOPED = auto()
 
 
 @dataclass
 class ServiceDescriptor:
-    """Thread-safe service descriptor."""
+    """Metadata record that describes how a service should be constructed.
+
+    Attributes:
+        service_type: Logical name used to look up the service.
+        implementation: Factory callable or class to construct the service.
+        lifetime: Controls how many instances are created.
+    """
 
     service_type: str
     implementation: ServiceFactory
@@ -51,7 +84,17 @@ class ServiceDescriptor:
     _lock: threading.RLock = field(default_factory=threading.RLock, init=False)
 
     def get_or_create_instance(self, factory: Callable[[], Any]) -> Any:
-        """Thread-safe instance creation for singletons."""
+        """Return the singleton instance, creating it with *factory* if needed.
+
+        Uses double-checked locking so concurrent callers never create more
+        than one instance.
+
+        Args:
+            factory: Zero-argument callable that creates the service instance.
+
+        Returns:
+            The singleton instance for this descriptor.
+        """
         if self.lifetime != ServiceLifetime.SINGLETON:
             return factory()
 

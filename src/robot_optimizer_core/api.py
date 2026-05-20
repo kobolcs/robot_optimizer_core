@@ -664,28 +664,47 @@ def _execute_directory_analysis(
     return dir_results, file_errors
 
 
-def _create_analyzer_instance(name: str) -> BaseAnalyzer:
-    """Create a fresh analyzer instance for each analysis execution."""
-    return cast(
-        "BaseAnalyzer", get_container().resolve("analyzer_registry").create(name)
-    )
+def _create_analyzer_instance(
+    name: str, config: dict[str, object] | None = None
+) -> BaseAnalyzer:
+    """Create a fresh analyzer instance, injecting per-analyzer config when provided.
+
+    Args:
+        name: Registered analyzer name (e.g. ``"dead_code"``).
+        config: Optional config dict to pass to the analyzer constructor.
+
+    Returns:
+        A new ``BaseAnalyzer`` instance.
+    """
+    registry = get_container().resolve("analyzer_registry")
+    cls = registry.analyzers.get(name)
+    if cls is None:
+        # Fall back to the registry's create() which will raise with a clear message
+        return cast("BaseAnalyzer", registry.create(name))
+    return cast("BaseAnalyzer", cls(config=config or {}))
 
 
 def _get_analyzer_instances(
-    analyzers: list[str | BaseAnalyzer] | None, _settings: Settings
+    analyzers: list[str | BaseAnalyzer] | None, settings: Settings
 ) -> list[BaseAnalyzer]:
-    """Get analyzer instances from names or objects.
+    """Resolve a list of analyzer names/instances into concrete ``BaseAnalyzer`` objects.
+
+    Per-analyzer configuration from ``Settings.analyzer_config`` is passed to
+    each named analyzer at construction time.
 
     Args:
-        analyzers: List of analyzer names or instances.
-        _settings: Configuration settings (reserved for future use).
+        analyzers: List of analyzer names or pre-constructed instances.
+            Pass ``None`` to use all registered analyzers that do not require
+            an external repository.
+        settings: Configuration settings. ``settings.analyzer_config`` is
+            consulted for per-analyzer overrides.
 
     Returns:
-        List of analyzer instances.
+        List of ready-to-use ``BaseAnalyzer`` instances.
     """
+    analyzer_config = settings.analyzer_config
+
     if analyzers is None:
-        # Check requires_external_repo at the class level before instantiation;
-        # analyzers that need an external repo raise on construction without one.
         registry = get_container().resolve("analyzer_registry")
         names = [
             name
@@ -694,16 +713,19 @@ def _get_analyzer_instances(
                 registry.analyzers.get(name), "requires_external_repo", False
             )
         ]
-        return [_create_analyzer_instance(name) for name in names]
+        return [
+            _create_analyzer_instance(name, analyzer_config.get(name))
+            for name in names
+        ]
 
     instances = []
     for analyzer in analyzers:
         match analyzer:
             case str():
-                # Get by name
-                instances.append(_create_analyzer_instance(analyzer))
+                instances.append(
+                    _create_analyzer_instance(analyzer, analyzer_config.get(analyzer))
+                )
             case _:
-                # Already an instance
                 instances.append(analyzer)
 
     return instances

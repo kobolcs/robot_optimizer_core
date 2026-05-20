@@ -1,13 +1,27 @@
 # src/robot_optimizer_core/domain/entities/test_file.py
-"""Timezone-aware test file entity with proper datetime handling."""
+"""Timezone-aware test file entity with proper datetime handling.
+
+This module provides the core test file domain entity used throughout the
+analysis engine. All datetime fields are stored in UTC with timezone info.
+
+Example:
+    Loading and inspecting a test file::
+
+        from robot_optimizer_core.domain.entities import TestFile
+
+        test_file = TestFile.from_path("tests/login.robot")
+        print(test_file.line_count)
+        print(test_file.is_resource_file)
+"""
 
 from __future__ import annotations
 
+import threading
 from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
-from zoneinfo import ZoneInfo  # Python 3.9+ for timezone support
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError  # Python 3.9+
 
 from pydantic import Field, computed_field, field_validator
 
@@ -18,18 +32,31 @@ from ..value_objects.test_result import TestResult as BaseTestResult
 
 logger = get_logger(__name__)
 
-# Task 28: per-run file cache keyed by (resolved_path, mtime)
-# This avoids double-reading the same unchanged file in analyze_suite / analyze_directory.
+# Per-run file cache keyed by (resolved_path, mtime).
+# Avoids double-reading the same unchanged file in analyze_suite / analyze_directory.
+# Protected by _cache_lock for thread safety.
 _from_path_cache: dict[tuple[Path, float], TZAwareTestFile] = {}
+_cache_lock = threading.Lock()
 
 
 def utc_now() -> datetime:
-    """Get current UTC time with timezone info."""
+    """Return the current UTC time with timezone info attached.
+
+    Returns:
+        Current datetime in UTC with timezone info.
+    """
     return datetime.now(UTC)
 
 
 def ensure_utc(dt: datetime) -> datetime:
-    """Ensure datetime is in UTC timezone."""
+    """Convert a datetime to UTC, attaching local timezone if naive.
+
+    Args:
+        dt: The datetime to convert.
+
+    Returns:
+        The datetime expressed in UTC with timezone info.
+    """
     if dt.tzinfo is None:
         dt = dt.astimezone()  # attaches local system timezone
     return dt.astimezone(UTC)
@@ -98,36 +125,57 @@ class TZAwareTestFile(Entity[UUID]):
     @field_validator("display_timezone")
     @classmethod
     def validate_timezone(cls, v: str) -> str:
-        """Validate timezone string."""
+        """Validate timezone string, falling back to UTC for unknown zones.
+
+        Args:
+            v: IANA timezone name to validate.
+
+        Returns:
+            The validated timezone name, or ``"UTC"`` if the zone is unknown.
+        """
         try:
-            ZoneInfo(v)  # Validate timezone exists
+            ZoneInfo(v)
             return v
-        except Exception:
+        except (ZoneInfoNotFoundError, KeyError):
             logger.warning(f"Invalid timezone '{v}', using UTC")
             return "UTC"
 
     @classmethod
     def from_path(cls, file_path: Path, content: str | None = None) -> TZAwareTestFile:
-        """Create TestFile from path with UTC timestamps.
+        """Create a TestFile from a path, using a thread-safe mtime-keyed cache.
 
-        Task 28: Results are cached by ``(resolved_path, mtime)`` so that a
-        single analysis run never reads the same unchanged file twice.
-        The cache is only populated when content is read from disk.
+        Results are cached by ``(resolved_path, mtime)`` so that a single
+        analysis run never reads the same unchanged file twice. The cache is
+        only populated when content is read from disk (not when content is
+        provided by the caller).
+
+        Args:
+            file_path: Path to the Robot Framework ``.robot`` or ``.resource`` file.
+            content: Pre-loaded file content. When provided, bypasses disk I/O
+                and the cache entirely.
+
+        Returns:
+            A ``TZAwareTestFile`` instance for the given path.
+
+        Raises:
+            FileNotFoundError: If the file does not exist on disk.
+            ValueError: If the file is binary, contains too many control
+                characters, or uses an unsupported encoding.
         """
         path = Path(file_path)
 
         if not path.exists():
             raise FileNotFoundError(f"File not found: {path}")
 
-        # Track whether content was provided by the caller
         content_provided = content is not None
         resolved = path.resolve()
 
-        # Check cache first — only valid when reading from disk (Task 28)
         if not content_provided:
             stats = path.stat()
             cache_key = (resolved, stats.st_mtime)
-            cached = _from_path_cache.get(cache_key)
+
+            with _cache_lock:
+                cached = _from_path_cache.get(cache_key)
             if cached is not None:
                 return cached
 
@@ -147,8 +195,6 @@ class TZAwareTestFile(Entity[UUID]):
                 raise ValueError(f"File contains too many control characters: {path}")
 
         stats = path.stat()
-
-        # Convert to UTC timestamps
         last_modified = datetime.fromtimestamp(stats.st_mtime, tz=UTC)
 
         result = cls.model_validate(
@@ -161,10 +207,10 @@ class TZAwareTestFile(Entity[UUID]):
             }
         )
 
-        # Populate cache only when content was read from disk (Task 28)
         if not content_provided:
             cache_key = (resolved, stats.st_mtime)
-            _from_path_cache[cache_key] = result
+            with _cache_lock:
+                _from_path_cache[cache_key] = result
 
         return result
 
@@ -229,13 +275,18 @@ class TZAwareTestFile(Entity[UUID]):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def last_modified_local(self) -> datetime:
-        """Get last modified time in display timezone."""
+        """Return last-modified time expressed in the entity's display timezone.
+
+        Returns:
+            The last-modified UTC datetime converted to the display timezone,
+            falling back to UTC if the timezone is unavailable.
+        """
         if self.display_timezone == "UTC":
             return self.last_modified_utc.astimezone(UTC)
         try:
             tz = ZoneInfo(self.display_timezone)
             return self.last_modified_utc.astimezone(tz)
-        except Exception:
+        except (ZoneInfoNotFoundError, KeyError):
             return self.last_modified_utc.astimezone(UTC)
 
     @computed_field  # type: ignore[prop-decorator]
@@ -348,14 +399,26 @@ _NON_ISO_FORMATS: tuple[str, ...] = (
 
 # Utility functions for timezone handling
 def parse_datetime_safe(dt_str: str, default_tz: timezone = UTC) -> datetime:
-    """Safely parse datetime string with timezone handling."""
+    """Parse a datetime string, attaching *default_tz* when the string is naive.
+
+    Attempts ISO 8601 first, then falls back to the common non-ISO formats in
+    ``_NON_ISO_FORMATS`` using stdlib only (no extra dependencies).
+
+    Args:
+        dt_str: Datetime string to parse.
+        default_tz: Timezone to attach when the string contains no offset.
+            Defaults to UTC.
+
+    Returns:
+        A timezone-aware datetime.
+
+    Raises:
+        ValueError: If *dt_str* does not match any supported format.
+    """
     try:
-        # Try parsing with timezone
         if "T" in dt_str:
-            # ISO format
             dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
         else:
-            # Other formats – try common non-ISO patterns using stdlib only
             for fmt in _NON_ISO_FORMATS:
                 try:
                     dt = datetime.strptime(dt_str, fmt)
@@ -365,24 +428,30 @@ def parse_datetime_safe(dt_str: str, default_tz: timezone = UTC) -> datetime:
             else:
                 raise ValueError(f"Unrecognized datetime format: {dt_str!r}")
 
-        # Ensure timezone
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=default_tz)
 
         return dt
-
     except Exception as e:
         raise ValueError(f"Invalid datetime string: {dt_str}") from e
 
 
 def format_datetime_local(dt: datetime, tz_name: str = "UTC") -> str:
-    """Format datetime in specified timezone."""
+    """Format *dt* in the given IANA timezone, falling back to UTC on error.
+
+    Args:
+        dt: A timezone-aware datetime to format.
+        tz_name: IANA timezone name (e.g. ``"Europe/Budapest"``).
+
+    Returns:
+        Formatted string like ``"2026-05-20 14:30:00 CEST"``, or the UTC
+        equivalent when *tz_name* is unrecognised.
+    """
     try:
         tz = ZoneInfo(tz_name)
         local_dt = dt.astimezone(tz)
         return local_dt.strftime("%Y-%m-%d %H:%M:%S %Z")
-    except Exception:
-        # Fallback to UTC
+    except (ZoneInfoNotFoundError, KeyError):
         return dt.strftime("%Y-%m-%d %H:%M:%S UTC")
 
 

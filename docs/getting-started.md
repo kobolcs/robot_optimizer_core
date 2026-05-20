@@ -195,6 +195,38 @@ settings = Settings(
 findings = analyze_file("test.robot", settings=settings)
 ```
 
+> **Note:** `Settings` validates all field constraints and cross-field rules
+> at construction time. Invalid values (e.g. negative `max_file_size_mb`,
+> overlapping include/exclude patterns) raise `ConfigurationError` immediately
+> rather than at analysis time.
+
+### Per-Analyzer Configuration
+
+Use `analyzer_config` to pass options to individual analyzers without
+constructing instances manually. Keys are analyzer names; values are config
+dicts forwarded to each analyzer's `__init__`:
+
+```python
+from robot_optimizer_core import Settings, analyze_directory
+
+settings = Settings(
+    analyzer_config={
+        "sleep_detector": {
+            "max_acceptable_sleep_seconds": 0.5,  # stricter than default 1.0
+        },
+        "dead_code": {
+            "check_unreachable": False,  # disable unreachable-code checks
+            "ignore_patterns": ["^Helper.*"],  # skip helper keywords
+        },
+        "naming_convention": {
+            "check_variable_names": False,  # only check test/keyword names
+        },
+    }
+)
+
+results = analyze_directory("tests/", settings=settings)
+```
+
 ### Environment Variables
 
 Set configuration via environment variables:
@@ -283,6 +315,30 @@ for file_path, file_findings in by_file.items():
     for f in file_findings:
         print(f"  Line {f.location.line_number}: {f.message}")
 ```
+
+## File Discovery
+
+### Timeout protection
+
+`analyze_directory` delegates file discovery to `OptimizedFileDiscoveryService`,
+which has a built-in 60-second timeout by default. This prevents hangs on
+network mounts, broken symlinks, or slow file-systems. You can adjust it:
+
+```python
+from robot_optimizer_core import analyze_directory
+from robot_optimizer_core.discovery import OptimizedFileDiscoveryService
+from robot_optimizer_core.di import get_container
+
+# Analyze with a shorter discovery timeout (e.g. CI environments)
+service = OptimizedFileDiscoveryService()
+files = service.find_files(
+    root_path=Path("tests/"),
+    timeout_seconds=15,
+)
+```
+
+If discovery does not complete within the timeout an `AnalysisError` is raised
+with a message explaining which root path exceeded the limit.
 
 ## Next Steps
 

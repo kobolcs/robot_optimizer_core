@@ -1,5 +1,22 @@
 # src/robot_optimizer_core/metrics.py
-"""Modern memory-safe metrics collection with GDPR compliance."""
+"""Memory-safe metrics collection with GDPR compliance.
+
+Provides ``MetricsCollector``, a thread-safe, bounded metrics store with
+automatic LRU eviction and background cleanup. Metric keys that match
+known personal-data prefixes (``user.``, ``email.``, etc.) are silently
+dropped to comply with GDPR constraints.
+
+Example:
+    Recording analysis metrics::
+
+        from robot_optimizer_core.metrics import get_metrics
+
+        metrics = get_metrics()
+        metrics.increment("analysis.completed")
+        with metrics.timer("analysis.duration"):
+            do_analysis()
+        report = metrics.get_metrics()
+"""
 
 from __future__ import annotations
 
@@ -25,7 +42,15 @@ logger = _stdlib_logging.getLogger(__name__)
 
 @dataclass
 class TimingStats:
-    """Statistics for timing metrics with bounded memory."""
+    """Running statistics for a single timing metric, with bounded sample storage.
+
+    Attributes:
+        count: Total number of observations recorded.
+        total: Sum of all observed values (seconds).
+        min: Minimum observed value.
+        max: Maximum observed value.
+        samples: Bounded deque of ``(value, timestamp)`` pairs (max 100 entries).
+    """
 
     count: int = 0
     total: float = 0.0
@@ -37,16 +62,28 @@ class TimingStats:
 
     @property
     def mean(self) -> float:
-        """Calculate mean timing."""
+        """Mean of all recorded values, or ``0.0`` when no samples exist.
+
+        Returns:
+            Arithmetic mean in seconds.
+        """
         return self.total / self.count if self.count > 0 else 0.0
 
     @property
     def last(self) -> float | None:
-        """Get the last recorded value."""
+        """Most recently recorded value, or ``None`` when no samples exist.
+
+        Returns:
+            Last timing value in seconds, or ``None``.
+        """
         return self.samples[-1][0] if self.samples else None
 
     def add(self, value: float) -> None:
-        """Add a timing value."""
+        """Record a new timing observation.
+
+        Args:
+            value: Duration in seconds to record.
+        """
         self.count += 1
         self.total += value
         self.min = min(self.min, value)
@@ -54,20 +91,34 @@ class TimingStats:
         self.samples.append((value, datetime.now(UTC)))
 
     def cleanup_old_samples(self, max_age: timedelta) -> None:
-        """Remove samples at least max_age old."""
+        """Discard samples older than *max_age*.
+
+        Args:
+            max_age: Samples with a timestamp older than ``now - max_age`` are
+                removed from the left of the deque.
+        """
         cutoff = datetime.now(UTC) - max_age
         while self.samples and self.samples[0][1] <= cutoff:
             self.samples.popleft()
 
 
 class MetricsCollector:
-    """Modern metrics collector with memory safety and GDPR compliance.
+    """Thread-safe metrics collector with bounded memory and GDPR compliance.
 
-    Features:
-    - Bounded memory usage with automatic cleanup
-    - GDPR-compliant filtering of personal data
-    - Thread-safe operations
-    - Efficient storage with automatic eviction
+    Metric stores are bounded by ``max_counters``, ``max_gauges``, and
+    ``max_timings``; the least-recently-used entry is evicted when a store is
+    full. A background daemon thread decays access counts and removes idle
+    metrics every ``cleanup_interval`` seconds.
+
+    Metric keys that match known personal-data prefixes (e.g. ``"user."``,
+    ``"email."``) are silently dropped so no PII is ever stored.
+
+    Attributes:
+        enabled: When ``False``, all recording methods are no-ops.
+        max_counters: Maximum number of counter keys before LRU eviction.
+        max_gauges: Maximum number of gauge keys before LRU eviction.
+        max_timings: Maximum number of timing keys before LRU eviction.
+        cleanup_interval: Background cleanup period in seconds.
     """
 
     def __init__(
@@ -76,9 +127,18 @@ class MetricsCollector:
         max_counters: int = 10000,
         max_gauges: int = 5000,
         max_timings: int = 1000,
-        cleanup_interval: int = 300,  # 5 minutes
-    ):
-        """Initialize metrics collector."""
+        cleanup_interval: int = 300,
+    ) -> None:
+        """Create a metrics collector with configurable bounds and cleanup cadence.
+
+        Args:
+            enabled: When ``False``, all recording methods become no-ops and no
+                background thread is started.
+            max_counters: Maximum distinct counter keys to keep in memory.
+            max_gauges: Maximum distinct gauge keys to keep in memory.
+            max_timings: Maximum distinct timing keys to keep in memory.
+            cleanup_interval: Seconds between background cleanup runs.
+        """
         self.enabled = enabled
         self.max_counters = max_counters
         self.max_gauges = max_gauges
@@ -240,7 +300,7 @@ class MetricsCollector:
     def __del__(self) -> None:
         try:
             self.stop()
-        except Exception:
+        except Exception:  # noqa: BLE001 — __del__ must never propagate
             pass
 
     def _cleanup_loop(self) -> None:

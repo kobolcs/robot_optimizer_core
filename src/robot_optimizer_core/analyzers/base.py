@@ -1,14 +1,18 @@
 # src/robot_optimizer_core/analyzers/base.py
-"""Base analyzer class with plugin support for Robot Framework analysis.
+"""Base analyzer class with metrics integration and plugin support.
 
-This module provides the enhanced base analyzer that all analyzers must
-inherit from, including support for the plugin system and metrics.
+All built-in and third-party analyzers must subclass :class:`BaseAnalyzer` and
+implement :meth:`~BaseAnalyzer.analyze`. The base class handles metrics
+recording, error wrapping, finding validation, and lifecycle hooks
+(``pre_analyze`` / ``post_analyze``) so that individual analyzers stay focused
+on their detection logic.
 
 Example:
-    Creating a custom analyzer::
+    Implementing a minimal custom analyzer::
 
         from robot_optimizer_core.analyzers import BaseAnalyzer
-        from robot_optimizer_core import Finding, Pattern, Severity
+        from robot_optimizer_core.domain.entities import TestFile
+        from robot_optimizer_core.domain.value_objects import Finding
 
         class MyAnalyzer(BaseAnalyzer):
             @property
@@ -17,12 +21,10 @@ Example:
 
             @property
             def description(self) -> str:
-                return "My custom analyzer"
+                return "My custom analysis rules"
 
             def analyze(self, test_file: TestFile) -> list[Finding]:
-                findings = []
-                # Analysis logic here
-                return findings
+                return []  # detection logic here
 """
 
 from __future__ import annotations

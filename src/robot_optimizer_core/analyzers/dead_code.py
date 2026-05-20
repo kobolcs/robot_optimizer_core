@@ -87,14 +87,31 @@ def _match_prefixes(call: str, keyword_names: set[str], calls: set[str]) -> None
 class DeadCodeAnalyzer(BaseAnalyzer):
     """Analyzer for detecting dead code in Robot Framework files.
 
-    Detects:
-    - Unused keywords
-    - Duplicate keyword definitions
-    - Unreachable code after RETURN statements
+    Detects three categories of dead code:
+
+    - **Unused keywords** — keywords defined but never called within the
+      analysed scope (per-file or suite-level).
+    - **Duplicate keyword definitions** — the same keyword name defined more
+      than once in the same file.
+    - **Unreachable code** — statements after a top-level ``RETURN`` inside a
+      keyword body that will never execute.
+
+    Configuration keys (passed via the ``config`` dict):
+        check_unused (bool): Enable unused-keyword detection. Default: ``True``.
+        check_duplicates (bool): Enable duplicate-keyword detection. Default: ``True``.
+        check_unreachable (bool): Enable unreachable-code detection. Default: ``True``.
+        ignore_patterns (list[str]): Regex patterns; matching keyword names are
+            excluded from unused-keyword reports. Default: ``[]``.
     """
 
     def __init__(self, config: dict[str, ConfigValue] | None = None) -> None:
-        """Initialize the analyzer."""
+        """Initialize the analyzer with optional configuration overrides.
+
+        Args:
+            config: Per-analyzer configuration dict. Recognised keys are
+                ``check_unused``, ``check_duplicates``, ``check_unreachable``,
+                and ``ignore_patterns``.
+        """
         super().__init__(config)
         self._check_unused = self.get_config_value("check_unused", True)
         self._check_duplicates = self.get_config_value("check_duplicates", True)

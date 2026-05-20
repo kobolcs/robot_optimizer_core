@@ -112,12 +112,12 @@ def is_premium_installed() -> bool:
         ``True`` when ``robot-framework-optimizer-pro`` is installed,
         ``False`` otherwise.
     """
-    try:
-        from importlib.metadata import distribution
+    from importlib.metadata import PackageNotFoundError, distribution
 
+    try:
         distribution(PREMIUM_PACKAGE_NAME)
         return True
-    except Exception:  # PackageNotFoundError or anything unexpected
+    except PackageNotFoundError:
         return False
 
 

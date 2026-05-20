@@ -97,12 +97,33 @@ class ConfigurableAnalyzer(BaseAnalyzer):
         if self.max_length < 1:
             raise ConfigurationError("max_length must be positive")
 
-# Use with custom config
+# Instantiate directly with config
 analyzer = ConfigurableAnalyzer(config={
     "max_length": 120,
     "check_keywords": False
 })
 ```
+
+Alternatively, drive per-analyzer config through `Settings.analyzer_config` so
+the API layer injects it automatically — no manual instantiation needed:
+
+```python
+from robot_optimizer_core import Settings, analyze_directory
+
+settings = Settings(
+    analyzer_config={
+        "configurable_analyzer": {
+            "max_length": 120,
+            "check_keywords": False,
+        }
+    }
+)
+results = analyze_directory("tests/", settings=settings)
+```
+
+Config dicts in `analyzer_config` are passed verbatim to the analyzer's
+`__init__(config=...)` argument on each call. The registered name (the key)
+must match the string returned by the analyzer's `name` property.
 
 ### Auto-Fixable Patterns
 

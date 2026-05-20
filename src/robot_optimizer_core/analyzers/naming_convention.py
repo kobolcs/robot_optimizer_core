@@ -38,10 +38,17 @@ _VAR_CAMEL_RE = re.compile(r"[a-z][A-Z]|[A-Z][a-z]")
 
 
 def _is_camel_case_name(name: str) -> bool:
-    """Return True if *name* looks like a CamelCase identifier.
+    """Return ``True`` when *name* looks like a CamelCase identifier.
 
-    A CamelCase name has NO spaces and contains a lowercase-to-uppercase
-    transition (e.g. ``LoginPage``, ``myKeyword``).
+    A CamelCase name has no spaces and contains a lowercase-to-uppercase
+    boundary (e.g. ``LoginPage``, ``myKeyword``).  Names with spaces are
+    Title-Case words and are never flagged.
+
+    Args:
+        name: Raw test-case or keyword name from the Robot file.
+
+    Returns:
+        ``True`` if the name uses CamelCase.
     """
     if " " in name:
         return False
@@ -49,8 +56,18 @@ def _is_camel_case_name(name: str) -> bool:
 
 
 def _variable_is_camel(inner: str) -> bool:
-    """Return True when the variable inner name uses CamelCase."""
-    # Ignore index expressions like "LIST[0]"
+    """Return ``True`` when a variable's inner name uses CamelCase.
+
+    Index expressions (e.g. ``LIST[0]``) are stripped before checking.
+    Names containing underscores are considered snake_case and not flagged.
+
+    Args:
+        inner: The inner variable name without sigil and braces
+            (e.g. ``"MyVar"`` for ``${MyVar}``).
+
+    Returns:
+        ``True`` if the variable name is CamelCase.
+    """
     bare = inner.split("[", maxsplit=1)[0].strip()
     if "_" in bare:
         return False
@@ -60,21 +77,29 @@ def _variable_is_camel(inner: str) -> bool:
 class NamingConventionAnalyzer(BaseAnalyzer):
     """Detects naming convention violations in Robot Framework files.
 
-    Flags:
-    - CamelCase test case / keyword names (should use Title Case with spaces)
-    - CamelCase variable names (should use ALL_CAPS or lower_snake_case)
+    Flags CamelCase identifiers in test case names, keyword names, and
+    variable names where Robot Framework community conventions recommend
+    Title Case with spaces (for tests/keywords) or ``${ALL_CAPS}`` /
+    ``${lower_snake_case}`` (for variables).
 
-    Configuration:
-        check_test_names: Check test case naming (default: True).
-        check_keyword_names: Check keyword naming (default: True).
-        check_variable_names: Check variable naming (default: True).
-        ignore_patterns: List of regex patterns to ignore (matched against
-            the full name).
+    Configuration keys (passed via the ``config`` dict):
+        check_test_names (bool): Check test case name casing. Default: ``True``.
+        check_keyword_names (bool): Check keyword name casing. Default: ``True``.
+        check_variable_names (bool): Check variable name casing. Default: ``True``.
+        ignore_patterns (list[str]): Regex patterns matched against names;
+            matching names are not reported. Default: ``[]``.
     """
 
     _TEST_CASE_SECTION = "test case"
 
     def __init__(self, config: dict[str, ConfigValue] | None = None) -> None:
+        """Initialize the analyzer with optional configuration overrides.
+
+        Args:
+            config: Per-analyzer configuration dict. Recognised keys are
+                ``check_test_names``, ``check_keyword_names``,
+                ``check_variable_names``, and ``ignore_patterns``.
+        """
         super().__init__(config)
         self._check_tests: bool = bool(self.get_config_value("check_test_names", True))
         self._check_keywords: bool = bool(
@@ -247,7 +272,18 @@ class NamingConventionAnalyzer(BaseAnalyzer):
 
 
 def _camel_to_title(name: str) -> str:
-    """Best-effort CamelCase → Title Case conversion for suggestions."""
+    """Convert a CamelCase name to a Title Case suggestion for findings.
+
+    This is best-effort; it handles common patterns like ``LoginPage`` →
+    ``Login Page`` and ``MyHTTPRequest`` → ``My Http Request`` but may not
+    produce perfect output for all edge cases.
+
+    Args:
+        name: CamelCase string to convert.
+
+    Returns:
+        Title-cased string with spaces inserted at CamelCase boundaries.
+    """
     spaced = re.sub(r"([a-z])([A-Z])", r"\1 \2", name)
     spaced = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", spaced)
     return spaced.title()

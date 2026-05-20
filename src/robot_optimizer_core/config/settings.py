@@ -174,6 +174,22 @@ class Settings(BaseSettings):
         extra="forbid",  # Raise on unknown fields to surface typos and misconfigured keys
     )
 
+    def model_post_init(self, __context: Any) -> None:
+        """Run cross-field validation immediately after Pydantic construction.
+
+        Pydantic validates individual field constraints during ``__init__``,
+        but cross-field rules (e.g. pattern overlap) are checked here so that
+        invalid ``Settings(...)`` calls raise :class:`ConfigurationError` at
+        construction time rather than at first use.
+
+        Args:
+            __context: Pydantic internal context (passed by the framework).
+
+        Raises:
+            ConfigurationError: If any cross-field validation rule is violated.
+        """
+        self.validate_settings()
+
     @field_validator("file_patterns", "exclude_patterns")
     @classmethod
     def validate_patterns(cls, v: list[str]) -> list[str]:
