@@ -31,6 +31,7 @@ Example:
 
 from __future__ import annotations
 
+import dataclasses
 import functools
 import os
 import time
@@ -58,19 +59,17 @@ from .premium import PremiumFeatureError
 ErrorHandling = Literal["raise", "skip", "warn"]
 
 
-class DirectoryResults(dict):  # type: ignore[type-arg]
+@dataclasses.dataclass
+class DirectoryResults:
     """Mapping of file paths to findings returned by :func:`analyze_directory`.
 
-    Behaves exactly like a plain :class:`dict` but carries an ``errors`` field
-    that lists ``(path, exception)`` pairs for files that could not
-    be analysed.  This avoids dynamically patching a plain dict.
+    Attributes:
+        findings: Dictionary mapping file paths to their findings.
+        errors: List of (path, exception) pairs for files that could not be analysed.
     """
 
-    errors: list[tuple[Path, Exception]]
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        self.errors = []
+    findings: dict[Path, list[Finding]] = dataclasses.field(default_factory=dict)
+    errors: list[tuple[Path, Exception]] = dataclasses.field(default_factory=list)
 
 
 class SuiteInfo(TypedDict):
@@ -378,12 +377,12 @@ def analyze_directory(
     )
 
     # Log and track metrics
-    total_findings = sum(len(findings) for findings in dir_results.values())
+    total_findings = sum(len(findings) for findings in dir_results.findings.values())
     logger.info(
         "Directory analysis complete",
         extra={
             "directory": str(path),
-            "files_analyzed": len(dir_results),
+            "files_analyzed": len(dir_results.findings),
             "files_failed": len(file_errors),
             "total_findings": total_findings,
         },
@@ -391,7 +390,7 @@ def analyze_directory(
 
     if metrics is None:
         metrics = container.resolve("metrics")
-    metrics.gauge("batch.files_analyzed", len(dir_results))
+    metrics.gauge("batch.files_analyzed", len(dir_results.findings))
     metrics.gauge("batch.files_failed", len(file_errors))
     metrics.gauge("batch.total_findings", total_findings)
 
@@ -612,7 +611,7 @@ def _run_sequential(
     for file_path in files:
         try:
             _, file_findings = analyze_fn(file_path)
-            dir_results[file_path] = file_findings
+            dir_results.findings[file_path] = file_findings
         except Exception as e:
             if fail_fast:
                 raise
@@ -637,7 +636,7 @@ def _run_parallel(
             fp = future_to_path[future]
             try:
                 _, file_findings = future.result()
-                dir_results[fp] = file_findings
+                dir_results.findings[fp] = file_findings
             except Exception as e:
                 file_errors.append((fp, e))
                 logger.exception(

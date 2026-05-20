@@ -152,11 +152,11 @@ def test_analyze_directory_parallel_is_deterministic(tmp_path: Path) -> None:
 
     first_messages = {
         str(path): sorted(f.message for f in findings)
-        for path, findings in first.items()
+        for path, findings in first.findings.items()
     }
     second_messages = {
         str(path): sorted(f.message for f in findings)
-        for path, findings in second.items()
+        for path, findings in second.findings.items()
     }
 
     assert first_messages == second_messages
@@ -224,7 +224,7 @@ def test_fail_fast_false_processes_all_files_and_collects_errors(
 
     result = analyze_directory(tmp_path, max_workers=1, error_handling="warn")
     assert call_count == 3
-    assert len(result.errors) == 3  # type: ignore[attr-defined]
+    assert len(result.errors) == 3
 
 
 # ---------------------------------------------------------------------------
@@ -269,20 +269,20 @@ class TestExecuteDirectoryAnalysis:
     def test_sequential_returns_all_results(self, tmp_path: Path) -> None:
         files = [tmp_path / f"f{i}.robot" for i in range(3)]
         results, errors = _execute_directory_analysis(files, self._ok_fn, 1, fail_fast=False)
-        assert len(results) == 3
+        assert len(results.findings) == 3
         assert errors == []
 
     def test_parallel_returns_all_results(self, tmp_path: Path) -> None:
         files = [tmp_path / f"f{i}.robot" for i in range(4)]
         results, errors = _execute_directory_analysis(files, self._ok_fn, 4, fail_fast=False)
-        assert len(results) == 4
+        assert len(results.findings) == 4
         assert errors == []
 
     def test_sequential_error_collected_not_raised(self, tmp_path: Path) -> None:
         files = [tmp_path / "f.robot"]
         results, errors = _execute_directory_analysis(files, self._fail_fn, 1, fail_fast=False)
         assert len(errors) == 1
-        assert len(results) == 0
+        assert len(results.findings) == 0
 
     def test_fail_fast_sequential_raises_immediately(self, tmp_path: Path) -> None:
         files = [tmp_path / f"f{i}.robot" for i in range(3)]
@@ -301,7 +301,7 @@ class TestExecuteDirectoryAnalysis:
         files = [tmp_path / f"f{i}.robot" for i in range(3)]
         results, errors = _execute_directory_analysis(files, self._fail_fn, 4, fail_fast=False)
         assert len(errors) == 3
-        assert len(results) == 0
+        assert len(results.findings) == 0
 
 
 # ---------------------------------------------------------------------------
