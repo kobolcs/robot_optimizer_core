@@ -9,11 +9,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from robot_optimizer_core.cli import (
+from robot_optimizer_core.cli import main
+from robot_optimizer_core.cli._formatters import _format_sarif
+from robot_optimizer_core.cli._html import (
     _PATTERN_CATEGORY_DEFAULT,
     _PATTERN_CATEGORY_MAP,
     _format_html,
-    _format_sarif,
     _html_category_metadata,
     _html_display_path,
     _html_health_status,
@@ -21,7 +22,6 @@ from robot_optimizer_core.cli import (
     _html_render_category_cards,
     _html_render_findings_table,
     _html_render_grouped_findings,
-    main,
 )
 from robot_optimizer_core.domain.value_objects import Finding, Severity
 from robot_optimizer_core.domain.value_objects.location import Location
@@ -105,7 +105,7 @@ class TestAnalyzePath:
 
         with (
             patch(
-                "robot_optimizer_core.cli.analyze_file",
+                "robot_optimizer_core.cli._commands.analyze_file",
                 side_effect=AnalysisError("boom"),
             ),
             pytest.raises(SystemExit) as exc,
@@ -123,7 +123,7 @@ class TestAnalyzeClean:
     def test_no_findings_exits_zero(self, tmp_path: Path) -> None:
         rf_file = tmp_path / "t.robot"
         rf_file.write_bytes(b"*** Test Cases ***\n")
-        with patch("robot_optimizer_core.cli.analyze_file", return_value=[]):
+        with patch("robot_optimizer_core.cli._commands.analyze_file", return_value=[]):
             with pytest.raises(SystemExit) as exc:
                 main(["analyze", str(rf_file)])
         assert exc.value.code == 0
@@ -132,7 +132,7 @@ class TestAnalyzeClean:
         rf_file = tmp_path / "t.robot"
         rf_file.write_bytes(b"*** Test Cases ***\n")
         findings = [_make_finding(rf_file)]
-        with patch("robot_optimizer_core.cli.analyze_file", return_value=findings):
+        with patch("robot_optimizer_core.cli._commands.analyze_file", return_value=findings):
             with pytest.raises(SystemExit) as exc:
                 main(["analyze", str(rf_file), "--no-fail"])
         assert exc.value.code == 0
@@ -148,7 +148,7 @@ class TestAnalyzeFindings:
         rf_file = tmp_path / "t.robot"
         rf_file.write_bytes(b"*** Test Cases ***\n")
         findings = [_make_finding(rf_file)]
-        with patch("robot_optimizer_core.cli.analyze_file", return_value=findings):
+        with patch("robot_optimizer_core.cli._commands.analyze_file", return_value=findings):
             with pytest.raises(SystemExit) as exc:
                 main(["analyze", str(rf_file)])
         assert exc.value.code == 1
@@ -168,7 +168,7 @@ class TestAnalyzeDirectory:
         f1.write_bytes(b"*** Test Cases ***\n")
         f2.write_bytes(b"*** Test Cases ***\n")
         findings = DirectoryResults(findings={f1: [_make_finding(f1)], f2: []})
-        with patch("robot_optimizer_core.cli.analyze_directory", return_value=findings):
+        with patch("robot_optimizer_core.cli._commands.analyze_directory", return_value=findings):
             with pytest.raises(SystemExit) as exc:
                 main(["analyze", str(tmp_path)])
         assert exc.value.code == 1
@@ -176,7 +176,7 @@ class TestAnalyzeDirectory:
     def test_directory_no_findings_exits_zero(self, tmp_path: Path) -> None:
         from robot_optimizer_core.api import DirectoryResults
 
-        with patch("robot_optimizer_core.cli.analyze_directory", return_value=DirectoryResults()):
+        with patch("robot_optimizer_core.cli._commands.analyze_directory", return_value=DirectoryResults()):
             with pytest.raises(SystemExit) as exc:
                 main(["analyze", str(tmp_path)])
         assert exc.value.code == 0
@@ -194,7 +194,7 @@ class TestJsonFormat:
         rf_file = tmp_path / "t.robot"
         rf_file.write_bytes(b"*** Test Cases ***\n")
         findings = [_make_finding(rf_file)]
-        with patch("robot_optimizer_core.cli.analyze_file", return_value=findings):
+        with patch("robot_optimizer_core.cli._commands.analyze_file", return_value=findings):
             with pytest.raises(SystemExit):
                 main(["analyze", str(rf_file), "--format", "json"])
         out = capsys.readouterr().out
@@ -210,7 +210,7 @@ class TestJsonFormat:
         rf_file = tmp_path / "t.robot"
         rf_file.write_bytes(b"*** Test Cases ***\n")
         findings = [_make_finding(rf_file, severity=Severity.WARNING)]
-        with patch("robot_optimizer_core.cli.analyze_file", return_value=findings):
+        with patch("robot_optimizer_core.cli._commands.analyze_file", return_value=findings):
             with pytest.raises(SystemExit):
                 main(["analyze", str(rf_file), "--format", "json"])
         out = capsys.readouterr().out
@@ -222,7 +222,7 @@ class TestJsonFormat:
     ) -> None:
         rf_file = tmp_path / "t.robot"
         rf_file.write_bytes(b"*** Test Cases ***\n")
-        with patch("robot_optimizer_core.cli.analyze_file", return_value=[]):
+        with patch("robot_optimizer_core.cli._commands.analyze_file", return_value=[]):
             with pytest.raises(SystemExit):
                 main(["analyze", str(rf_file), "--format", "json"])
         out = capsys.readouterr().out
@@ -240,7 +240,7 @@ class TestOutputFile:
         rf_file.write_bytes(b"*** Test Cases ***\n")
         out_file = tmp_path / "out.txt"
         findings = [_make_finding(rf_file)]
-        with patch("robot_optimizer_core.cli.analyze_file", return_value=findings):
+        with patch("robot_optimizer_core.cli._commands.analyze_file", return_value=findings):
             with pytest.raises(SystemExit):
                 main(["analyze", str(rf_file), "--output-file", str(out_file)])
         assert out_file.exists()
@@ -257,7 +257,7 @@ class TestAnalyzerSelection:
         rf_file = tmp_path / "t.robot"
         rf_file.write_bytes(b"*** Test Cases ***\n")
         mock = MagicMock(return_value=[])
-        with patch("robot_optimizer_core.cli.analyze_file", mock):
+        with patch("robot_optimizer_core.cli._commands.analyze_file", mock):
             with pytest.raises(SystemExit):
                 main(
                     ["analyze", str(rf_file), "--analyzers", "dead_code,sleep_detector"]
@@ -717,7 +717,7 @@ class TestVerboseDebugFlags:
     def test_verbose_flag_accepted(self, tmp_path: Path) -> None:
         f = tmp_path / "t.robot"
         f.write_bytes(b"*** Test Cases ***\n")
-        with patch("robot_optimizer_core.cli.analyze_file", return_value=[]):
+        with patch("robot_optimizer_core.cli._commands.analyze_file", return_value=[]):
             with pytest.raises(SystemExit) as exc:
                 main(["--verbose", "analyze", str(f)])
         assert exc.value.code == 0
@@ -725,7 +725,7 @@ class TestVerboseDebugFlags:
     def test_debug_flag_accepted(self, tmp_path: Path) -> None:
         f = tmp_path / "t.robot"
         f.write_bytes(b"*** Test Cases ***\n")
-        with patch("robot_optimizer_core.cli.analyze_file", return_value=[]):
+        with patch("robot_optimizer_core.cli._commands.analyze_file", return_value=[]):
             with pytest.raises(SystemExit) as exc:
                 main(["--debug", "analyze", str(f)])
         assert exc.value.code == 0
@@ -784,7 +784,7 @@ class TestOutputFileError:
         f.write_bytes(b"*** Test Cases ***\n")
         findings = [_make_finding(f)]
         bad_out = tmp_path / "nonexistent_dir" / "out.txt"
-        with patch("robot_optimizer_core.cli.analyze_file", return_value=findings):
+        with patch("robot_optimizer_core.cli._commands.analyze_file", return_value=findings):
             with pytest.raises(SystemExit) as exc:
                 main(
                     ["analyze", str(f), "--output-file", str(bad_out)]
@@ -804,7 +804,7 @@ class TestSarifFormat:
         f = tmp_path / "t.robot"
         f.write_bytes(b"*** Test Cases ***\n")
         findings = [_make_finding(f)]
-        with patch("robot_optimizer_core.cli.analyze_file", return_value=findings):
+        with patch("robot_optimizer_core.cli._commands.analyze_file", return_value=findings):
             with pytest.raises(SystemExit):
                 main(["analyze", str(f), "--format", "sarif"])
         out = capsys.readouterr().out
@@ -846,7 +846,7 @@ class TestHtmlFormatViaCLI:
         f = tmp_path / "t.robot"
         f.write_bytes(b"*** Test Cases ***\n")
         findings = [_make_finding(f)]
-        with patch("robot_optimizer_core.cli.analyze_file", return_value=findings):
+        with patch("robot_optimizer_core.cli._commands.analyze_file", return_value=findings):
             with pytest.raises(SystemExit):
                 main(["analyze", str(f), "--format", "html"])
         out = capsys.readouterr().out
@@ -865,7 +865,7 @@ class TestPartialFailure:
         results = DirectoryResults()
         results.errors = [(tmp_path / "bad.robot", Exception("parse fail"))]
 
-        with patch("robot_optimizer_core.cli.analyze_directory", return_value=results):
+        with patch("robot_optimizer_core.cli._commands.analyze_directory", return_value=results):
             with pytest.raises(SystemExit) as exc:
                 main(["analyze", str(tmp_path)])
         assert exc.value.code == 3
@@ -878,7 +878,7 @@ class TestPartialFailure:
 
 class TestColour:
     def test_colour_applied_when_tty(self) -> None:
-        from robot_optimizer_core.cli import _colour
+        from robot_optimizer_core.cli._formatters import _colour
 
         with patch("sys.stdout") as mock_stdout:
             mock_stdout.isatty.return_value = True
