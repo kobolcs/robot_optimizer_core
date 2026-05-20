@@ -55,16 +55,6 @@ class TestSleepPattern:
             )
         assert "must be positive" in str(exc_info.value)
 
-        # Excessive duration (> 1 hour)
-        with pytest.raises(ValidationError) as exc_info:
-            SleepPattern(
-                duration=Decimal("3601"),
-                unit="s",
-                line_number=10,
-                original_text="Sleep    3601 s",
-            )
-        assert "unreasonably long" in str(exc_info.value)
-
     def test_unit_validation(self) -> None:
         """Test time unit validation."""
         # Valid units - seconds

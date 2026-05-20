@@ -41,8 +41,6 @@ class SleepPattern(ValueObject):
         """
         if v <= 0:
             raise ValueError("Sleep duration must be positive")
-        if v > 3600:  # More than 1 hour
-            raise ValueError("Sleep duration seems unreasonably long (>1 hour)")
         return v
 
     @field_validator("unit")
