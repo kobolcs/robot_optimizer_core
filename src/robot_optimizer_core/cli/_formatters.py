@@ -1,15 +1,17 @@
 # src/robot_optimizer_core/cli/_formatters.py
-"""Plain-text, JSON, and SARIF output formatters."""
+"""Plain-text, JSON, SARIF, and JUnit XML output formatters."""
 
 from __future__ import annotations
 
 import json
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..domain.value_objects import Finding, Severity
+    from ..domain.value_objects.pattern import PatternType
 
 # ANSI colour helpers (disabled when not a tty)
 _COLOURS: dict[int, str] = {}  # populated lazily to avoid circular import at module load
@@ -116,3 +118,47 @@ def _format_sarif(findings: list[Finding], path: Path) -> str:
         ],
     }
     return json.dumps(sarif, indent=2, default=str)
+
+
+def _format_junit(findings: list[Finding], path: Path) -> str:
+    """Produce a JUnit XML report from a list of findings.
+
+    Each finding becomes a testcase with a failure element.
+    Suite name is the analyzed path.
+    """
+    testsuite = ET.Element("testsuite")
+    testsuite.set("name", str(path))
+    testsuite.set("tests", str(len(findings)))
+
+    failures_count = sum(
+        1 for f in findings if f.severity.name == "ERROR"
+    )
+    testsuite.set("failures", str(failures_count))
+
+    for finding in sorted(
+        findings,
+        key=lambda x: (
+            str(x.location.file_path),
+            x.location.line,
+            x.pattern.name,
+        ),
+    ):
+        testcase = ET.SubElement(testsuite, "testcase")
+        pattern_type = finding.pattern.type
+        assert pattern_type is not None
+        testcase.set(
+            "name",
+            f"{pattern_type.name} at line {finding.location.line}",
+        )
+        testcase.set("classname", str(finding.location.file_path))
+
+        failure = ET.SubElement(testcase, "failure")
+        failure.set("message", finding.pattern.name)
+        failure.set("type", finding.severity.name)
+        failure.text = finding.message
+
+    # Convert to string with XML declaration
+    tree = ET.ElementTree(testsuite)
+    result = ET.tostring(testsuite, encoding="unicode")
+    xml_str = '<?xml version="1.0" encoding="UTF-8"?>\n' + result
+    return xml_str

@@ -50,7 +50,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     analyze_cmd.add_argument(
         "--format",
-        choices=["text", "json", "sarif", "html"],
+        choices=["text", "json", "sarif", "html", "junit"],
         default="text",
         help="Output format (default: text)",
     )

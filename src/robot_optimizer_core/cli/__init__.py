@@ -12,6 +12,7 @@ Example:
 
         robot-optimizer analyze path/to/suite/
         robot-optimizer analyze tests/login.robot --format json
+        robot-optimizer analyze tests/login.robot --format junit --output-file results.xml
         robot-optimizer analyze tests/ --analyzers dead_code,sleep_detector
         robot-optimizer analyze tests/ --no-fail
         robot-optimizer analyze tests/ --min-severity WARNING

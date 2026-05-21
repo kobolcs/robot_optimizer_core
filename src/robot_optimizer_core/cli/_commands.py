@@ -16,7 +16,7 @@ from ..cache import AnalysisCache
 from ..config.settings import Settings
 from ..domain.value_objects import Finding, Severity
 from ..exceptions import AnalysisError
-from ._formatters import _format_json, _format_sarif, _format_text
+from ._formatters import _format_json, _format_junit, _format_sarif, _format_text
 from ._html import _format_html
 
 if TYPE_CHECKING:
@@ -116,6 +116,8 @@ def _write_output(all_findings: list[Finding], args: argparse.Namespace) -> int:
         output = _format_sarif(all_findings, path)
     elif args.format == "html":
         output = _format_html(all_findings, path)
+    elif args.format == "junit":
+        output = _format_junit(all_findings, path)
     else:
         output = _format_text(all_findings, path)
 

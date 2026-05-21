@@ -4,13 +4,14 @@
 from __future__ import annotations
 
 import json
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from robot_optimizer_core.cli import main
-from robot_optimizer_core.cli._formatters import _format_sarif
+from robot_optimizer_core.cli._formatters import _format_junit, _format_sarif
 from robot_optimizer_core.cli._html import (
     _PATTERN_CATEGORY_DEFAULT,
     _PATTERN_CATEGORY_MAP,
@@ -851,6 +852,152 @@ class TestHtmlFormatViaCLI:
                 main(["analyze", str(f), "--format", "html"])
         out = capsys.readouterr().out
         assert "Robot Framework" in out
+
+
+# ---------------------------------------------------------------------------
+# --format junit
+# ---------------------------------------------------------------------------
+
+
+class TestJunitFormat:
+    def test_junit_is_valid_xml(self, tmp_path: Path) -> None:
+        """JUnit output must be valid XML."""
+        finding = _make_finding(file_path=tmp_path / "suite.robot")
+        output = _format_junit([finding], tmp_path)
+        # Should not raise an exception
+        root = ET.fromstring(output)
+        assert root is not None
+
+    def test_junit_has_testsuite_root(self, tmp_path: Path) -> None:
+        """JUnit output must have a testsuite root element."""
+        finding = _make_finding(file_path=tmp_path / "suite.robot")
+        output = _format_junit([finding], tmp_path)
+        root = ET.fromstring(output)
+        assert root.tag == "testsuite"
+
+    def test_junit_testsuite_name_is_path(self, tmp_path: Path) -> None:
+        """testsuite name attribute must be the analyzed path."""
+        finding = _make_finding(file_path=tmp_path / "suite.robot")
+        output = _format_junit([finding], tmp_path)
+        root = ET.fromstring(output)
+        assert root.get("name") == str(tmp_path)
+
+    def test_junit_tests_count(self, tmp_path: Path) -> None:
+        """testsuite tests attribute must match finding count."""
+        f1 = _make_finding(file_path=tmp_path / "a.robot")
+        f2 = _make_finding(file_path=tmp_path / "b.robot")
+        output = _format_junit([f1, f2], tmp_path)
+        root = ET.fromstring(output)
+        assert root.get("tests") == "2"
+
+    def test_junit_empty_findings(self, tmp_path: Path) -> None:
+        """Empty findings should produce a valid testsuite with 0 tests."""
+        output = _format_junit([], tmp_path)
+        root = ET.fromstring(output)
+        assert root.get("tests") == "0"
+        assert len(root) == 0
+
+    def test_junit_testcase_name_includes_pattern_type_and_line(
+        self, tmp_path: Path
+    ) -> None:
+        """testcase name must be '{pattern_type} at line {line}'."""
+        finding = _make_finding(
+            file_path=tmp_path / "suite.robot", line=42
+        )
+        output = _format_junit([finding], tmp_path)
+        root = ET.fromstring(output)
+        testcase = root.find("testcase")
+        assert testcase is not None
+        name = testcase.get("name")
+        assert "SLEEP_IN_TEST" in name
+        assert "at line 42" in name
+
+    def test_junit_testcase_classname_is_file_path(self, tmp_path: Path) -> None:
+        """testcase classname must be the file path."""
+        robot_file = tmp_path / "suite.robot"
+        finding = _make_finding(file_path=robot_file)
+        output = _format_junit([finding], tmp_path)
+        root = ET.fromstring(output)
+        testcase = root.find("testcase")
+        assert testcase is not None
+        assert testcase.get("classname") == str(robot_file)
+
+    def test_junit_failure_element_present(self, tmp_path: Path) -> None:
+        """Each testcase must have a failure element."""
+        finding = _make_finding(file_path=tmp_path / "suite.robot")
+        output = _format_junit([finding], tmp_path)
+        root = ET.fromstring(output)
+        testcase = root.find("testcase")
+        failure = testcase.find("failure")
+        assert failure is not None
+
+    def test_junit_failure_message_is_pattern_name(self, tmp_path: Path) -> None:
+        """failure message attribute must be the pattern name."""
+        finding = _make_finding(file_path=tmp_path / "suite.robot")
+        output = _format_junit([finding], tmp_path)
+        root = ET.fromstring(output)
+        failure = root.find("testcase/failure")
+        assert failure.get("message") == "Sleep in Test Case"
+
+    def test_junit_failure_type_is_severity(self, tmp_path: Path) -> None:
+        """failure type attribute must be the severity."""
+        finding = _make_finding(
+            file_path=tmp_path / "suite.robot", severity=Severity.ERROR
+        )
+        output = _format_junit([finding], tmp_path)
+        root = ET.fromstring(output)
+        failure = root.find("testcase/failure")
+        assert failure.get("type") == "ERROR"
+
+    def test_junit_failure_text_is_finding_message(self, tmp_path: Path) -> None:
+        """failure text content must be the finding message."""
+        finding = _make_finding(
+            file_path=tmp_path / "suite.robot",
+            message="Custom finding message",
+        )
+        output = _format_junit([finding], tmp_path)
+        root = ET.fromstring(output)
+        failure = root.find("testcase/failure")
+        assert failure.text == "Custom finding message"
+
+    def test_junit_failures_count_is_error_severity(self, tmp_path: Path) -> None:
+        """failures attribute must count ERROR severity findings only."""
+        f1 = _make_finding(
+            file_path=tmp_path / "a.robot", severity=Severity.ERROR
+        )
+        f2 = _make_finding(
+            file_path=tmp_path / "b.robot", severity=Severity.WARNING
+        )
+        f3 = _make_finding(
+            file_path=tmp_path / "c.robot", severity=Severity.ERROR
+        )
+        output = _format_junit([f1, f2, f3], tmp_path)
+        root = ET.fromstring(output)
+        assert root.get("failures") == "2"
+
+    def test_junit_deterministic_ordering(self, tmp_path: Path) -> None:
+        """testcases must be in deterministic order (file, then line)."""
+        f1 = _make_finding(file_path=tmp_path / "b.robot", line=5)
+        f2 = _make_finding(file_path=tmp_path / "a.robot", line=10)
+        f3 = _make_finding(file_path=tmp_path / "a.robot", line=3)
+
+        output1 = _format_junit([f1, f2, f3], tmp_path)
+        output2 = _format_junit([f3, f1, f2], tmp_path)
+        assert output1 == output2
+
+        root = ET.fromstring(output1)
+        testcases = root.findall("testcase")
+        names = [tc.get("name") for tc in testcases]
+        # a.robot:3, a.robot:10, b.robot:5
+        assert "3" in names[0]
+        assert "10" in names[1]
+        assert "5" in names[2]
+
+    def test_junit_has_xml_declaration(self, tmp_path: Path) -> None:
+        """Output must start with XML declaration."""
+        finding = _make_finding(file_path=tmp_path / "suite.robot")
+        output = _format_junit([finding], tmp_path)
+        assert output.startswith('<?xml version="1.0"')
 
 
 # ---------------------------------------------------------------------------
