@@ -16,6 +16,7 @@ Example:
         robot-optimizer analyze tests/ --no-fail
         robot-optimizer analyze tests/ --min-severity WARNING
         robot-optimizer analyze tests/ --config robot.toml
+        robot-optimizer analyze tests/ --watch
         robot-optimizer list-analyzers
         robot-optimizer list-analyzers --format json
 

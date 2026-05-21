@@ -98,6 +98,12 @@ def _build_parser() -> argparse.ArgumentParser:
         default=False,
         help="Clear the result cache before analysing.",
     )
+    analyze_cmd.add_argument(
+        "--watch",
+        action="store_true",
+        default=False,
+        help="Watch mode: re-analyze on file save and show diff (requires watchdog library)",
+    )
 
     # -- list-analyzers subcommand ---------------------------------
     list_cmd = sub.add_parser(

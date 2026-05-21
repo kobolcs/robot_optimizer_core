@@ -5,17 +5,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import signal
 import sys
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from ._formatters import _format_json, _format_sarif, _format_text
-from ._html import _format_html
 from ..api import analyze_directory, analyze_file
 from ..cache import AnalysisCache
 from ..config.settings import Settings
 from ..domain.value_objects import Finding, Severity
 from ..exceptions import AnalysisError
+from ._formatters import _format_json, _format_sarif, _format_text
+from ._html import _format_html
 
 if TYPE_CHECKING:
     from ..analyzers import BaseAnalyzer
@@ -133,6 +135,118 @@ def _write_output(all_findings: list[Finding], args: argparse.Namespace) -> int:
     return _EXIT_OK
 
 
+def _compute_finding_diff(
+    prev_findings: list[Finding], curr_findings: list[Finding]
+) -> tuple[list[Finding], list[Finding]]:
+    """Compute new and resolved findings between two analysis runs.
+
+    Returns a tuple of (new_findings, resolved_findings).
+    """
+    prev_set = {(f.location.file_path, f.location.line, f.pattern.type) for f in prev_findings}
+    curr_set = {(f.location.file_path, f.location.line, f.pattern.type) for f in curr_findings}
+
+    new_keys = curr_set - prev_set
+    resolved_keys = prev_set - curr_set
+
+    new_findings = [f for f in curr_findings if (f.location.file_path, f.location.line, f.pattern.type) in new_keys]
+    resolved_findings = [f for f in prev_findings if (f.location.file_path, f.location.line, f.pattern.type) in resolved_keys]
+
+    return new_findings, resolved_findings
+
+
+def _print_watch_diff(new_findings: list[Finding], resolved_findings: list[Finding]) -> None:
+    """Print a summary of new and resolved findings."""
+    if not new_findings and not resolved_findings:
+        print("[✓] No changes", file=sys.stderr)
+        return
+
+    if new_findings:
+        print(f"\n[+] New findings ({len(new_findings)}):", file=sys.stderr)
+        for f in new_findings:
+            severity_mark = "!" if f.severity == Severity.ERROR else "·"
+            print(f"  {severity_mark} {f.location.file_path}:{f.location.line} - {f.pattern.name}", file=sys.stderr)
+
+    if resolved_findings:
+        print(f"\n[✓] Resolved findings ({len(resolved_findings)}):", file=sys.stderr)
+        for f in resolved_findings:
+            print(f"  ✓ {f.location.file_path}:{f.location.line} - {f.pattern.name}", file=sys.stderr)
+
+
+def _run_watch_mode(
+    path: Path,
+    analyzer_names: list[str | BaseAnalyzer] | None,
+    settings: Settings | None,
+    severity_filter: Severity | None,
+    args: argparse.Namespace,
+) -> int:
+    """Run in watch mode: monitor files and re-analyze on changes."""
+    try:
+        from watchdog.events import DirModifiedEvent, FileModifiedEvent, FileSystemEventHandler
+        from watchdog.observers import Observer
+    except ImportError:
+        print(
+            "error: watch mode requires watchdog library. Install with: pip install robot-framework-optimizer-core[watch]",
+            file=sys.stderr,
+        )
+        return _EXIT_ERROR
+
+    # Initial analysis
+    print(f"[*] Watching {path} for changes (Ctrl+C to exit)...", file=sys.stderr)
+    prev_findings, _ = _analyze_path(path, analyzer_names, settings, severity_filter, use_cache=True)
+    if prev_findings is None:
+        return _EXIT_ERROR
+
+    current_findings = prev_findings.copy()
+    should_exit = False
+
+    class FileChangeHandler(FileSystemEventHandler):
+        def on_modified(self, event: FileModifiedEvent | DirModifiedEvent) -> None:
+            nonlocal current_findings, prev_findings, should_exit
+            if event.is_directory:
+                return
+
+            src_path = event.src_path
+            if isinstance(src_path, bytes):
+                src_path = src_path.decode("utf-8")
+            file_path = Path(src_path)
+            if file_path.suffix not in (".robot", ".resource"):
+                return
+
+            # Debounce: skip if file was just written (wait for stable state)
+            time.sleep(0.1)
+
+            # Re-analyze the changed file
+            print(f"\n[*] File changed: {file_path}", file=sys.stderr)
+            findings, _ = _analyze_path(file_path, analyzer_names, settings, severity_filter, use_cache=False)
+            if findings is not None:
+                new_findings, resolved_findings = _compute_finding_diff(current_findings, findings)
+                _print_watch_diff(new_findings, resolved_findings)
+                current_findings = findings
+
+    def handle_signal(signum: int, frame: object) -> None:
+        nonlocal should_exit
+        should_exit = True
+
+    # Set up signal handler for Ctrl+C
+    signal.signal(signal.SIGINT, handle_signal)
+
+    # Set up file system observer
+    observer = Observer()
+    event_handler = FileChangeHandler()
+    observer.schedule(event_handler, str(path), recursive=True)
+    observer.start()
+
+    try:
+        while not should_exit:
+            time.sleep(0.5)
+    finally:
+        observer.stop()
+        observer.join()
+        print("\n[*] Watch mode exited", file=sys.stderr)
+
+    return _EXIT_OK
+
+
 def _run_analyze(args: argparse.Namespace) -> int:
     path = Path(args.path)
 
@@ -148,6 +262,10 @@ def _run_analyze(args: argparse.Namespace) -> int:
 
     if getattr(args, "clear_cache", False):
         AnalysisCache().clear()
+
+    # Handle watch mode
+    if getattr(args, "watch", False):
+        return _run_watch_mode(path, analyzer_names, settings, severity_filter, args)
 
     use_cache = not getattr(args, "no_cache", False)
     all_findings, partial_failure = _analyze_path(
