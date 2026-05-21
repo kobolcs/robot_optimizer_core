@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..domain.value_objects import Finding, Severity
-    from ..domain.value_objects.pattern import PatternType
 
 # ANSI colour helpers (disabled when not a tty)
 _COLOURS: dict[int, str] = {}  # populated lazily to avoid circular import at module load
