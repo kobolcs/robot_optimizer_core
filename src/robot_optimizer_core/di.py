@@ -38,6 +38,7 @@ __all__ = [
     "ServiceDescriptor",
     "ServiceLifetime",
     "ThreadSafeContainer",
+    "_set_global_container",
     "get_container",
     "reset_container",
 ]
@@ -376,6 +377,13 @@ def get_thread_safe_container() -> ThreadSafeContainer:
 
 # Alias for backward compatibility
 get_container = get_thread_safe_container
+
+
+def _set_global_container(container: ThreadSafeContainer) -> None:
+    """Set the global container explicitly (called by ApplicationContext.initialize)."""
+    global _global_container
+    with _global_container_lock:
+        _global_container = container
 
 
 def reset_container() -> None:

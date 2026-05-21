@@ -42,9 +42,25 @@ else:
 
 E = TypeVar("E", bound="RobotOptimizerError")
 
+# Stable machine-readable error codes
+ERROR_ANALYSIS_FAILED = "ANALYSIS_FAILED"
+ERROR_FILE_NOT_FOUND = "FILE_NOT_FOUND"
+ERROR_PARSE_ERROR = "PARSE_ERROR"
+ERROR_PLUGIN_LOAD_FAILED = "PLUGIN_LOAD_FAILED"
+ERROR_CONFIG_INVALID = "CONFIG_INVALID"
+ERROR_VALIDATION_FAILED = "VALIDATION_FAILED"
+ERROR_REPOSITORY_FAILED = "REPOSITORY_FAILED"
+
 __all__ = [
     "AnalysisError",
     "ConfigurationError",
+    "ERROR_ANALYSIS_FAILED",
+    "ERROR_CONFIG_INVALID",
+    "ERROR_FILE_NOT_FOUND",
+    "ERROR_PARSE_ERROR",
+    "ERROR_PLUGIN_LOAD_FAILED",
+    "ERROR_REPOSITORY_FAILED",
+    "ERROR_VALIDATION_FAILED",
     "ParsingError",
     "PluginError",
     "RepositoryError",
@@ -63,20 +79,28 @@ class RobotOptimizerError(Exception):
     Attributes:
         message: Human-readable error message.
         details: Additional error details as key-value pairs.
+        error_code: Optional stable machine-readable error code.
     """
 
-    __slots__ = ("details", "message")
+    __slots__ = ("details", "error_code", "message")
 
-    def __init__(self, message: str, details: dict[str, object] | None = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        details: dict[str, object] | None = None,
+        error_code: str | None = None,
+    ) -> None:
         """Initialize the exception.
 
         Args:
             message: Human-readable error message.
             details: Additional error details.
+            error_code: Optional stable machine-readable error code.
         """
         super().__init__(message)
         self.message = message
         self.details = details or {}
+        self.error_code = error_code
 
     @override
     def __str__(self) -> str:
@@ -85,10 +109,11 @@ class RobotOptimizerError(Exception):
         Returns:
             Error message with details if available.
         """
+        base = f"[{self.error_code}] {self.message}" if self.error_code else self.message
         if self.details:
             details_str = ", ".join(f"{k}={v}" for k, v in self.details.items())
-            return f"{self.message} ({details_str})"
-        return self.message
+            return f"{base} ({details_str})"
+        return base
 
 
 class AnalysisError(RobotOptimizerError):
@@ -110,6 +135,7 @@ class AnalysisError(RobotOptimizerError):
         file_path: Path | None = None,
         analyzer: str | None = None,
         details: dict[str, object] | None = None,
+        error_code: str | None = None,
     ) -> None:
         """Initialize the analysis error.
 
@@ -118,8 +144,9 @@ class AnalysisError(RobotOptimizerError):
             file_path: Path to the problematic file.
             analyzer: Name of the analyzer that failed.
             details: Additional error details.
+            error_code: Optional stable machine-readable error code.
         """
-        super().__init__(message, details)
+        super().__init__(message, details, error_code=error_code)
         self.file_path = file_path
         self.analyzer = analyzer
 
@@ -278,7 +305,7 @@ class RobotFileNotFoundError(AnalysisError):
             details: Additional error details.
         """
         message = f"File not found: {file_path}"
-        super().__init__(message, file_path, details=details)
+        super().__init__(message, file_path, details=details, error_code=ERROR_FILE_NOT_FOUND)
 
 
 class RepositoryError(RobotOptimizerError):

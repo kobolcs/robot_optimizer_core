@@ -419,6 +419,27 @@ def _run_upgrade(_args: argparse.Namespace) -> int:
     return _EXIT_OK
 
 
+def _run_diagnose(args: argparse.Namespace) -> int:
+    """Print diagnostic information as JSON and exit 0."""
+    import json
+
+    from ..context import ApplicationConfig, ApplicationContext
+
+    ctx = ApplicationContext(ApplicationConfig(
+        enable_plugins=False,
+        enable_metrics=False,
+        enable_logging=False,
+    ))
+    ctx.initialize()
+    try:
+        report = ctx.get_diagnostic_report()
+    finally:
+        ctx.shutdown()
+
+    print(json.dumps(report, indent=2, default=str))
+    return _EXIT_OK
+
+
 def _run_list_analyzers(args: argparse.Namespace) -> int:
     from ..analyzers import get_analyzer_registry
 

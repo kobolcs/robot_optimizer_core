@@ -11,6 +11,7 @@ from robot_optimizer_core.context import (
     create_application,
     create_test_application,
 )
+from robot_optimizer_core.exceptions import ConfigurationError
 
 
 class TestApplicationConfig:
@@ -20,12 +21,12 @@ class TestApplicationConfig:
 
     def test_low_memory_mb_raises(self) -> None:
         config = ApplicationConfig(max_memory_mb=50)
-        with pytest.raises(ValueError, match="max_memory_mb"):
+        with pytest.raises(ConfigurationError, match="max_memory_mb"):
             config.validate()
 
     def test_zero_thread_pool_raises(self) -> None:
         config = ApplicationConfig(thread_pool_size=0)
-        with pytest.raises(ValueError, match="thread_pool_size"):
+        with pytest.raises(ConfigurationError, match="thread_pool_size"):
             config.validate()
 
 
@@ -71,13 +72,11 @@ class TestApplicationContextLifecycle:
 
 
 class TestApplicationContextProperties:
-    def test_container_lazy_initializes(self) -> None:
+    def test_container_raises_if_not_initialized(self) -> None:
         ctx = create_test_application()
         assert not ctx._initialized
-        container = ctx.container
-        assert ctx._initialized
-        assert container is not None
-        ctx.shutdown()
+        with pytest.raises(RuntimeError, match="not initialized"):
+            _ = ctx.container
 
     def test_settings_returns_config_settings(self) -> None:
         ctx = create_test_application()
@@ -190,21 +189,21 @@ class TestApplicationContextLazyProperties:
         "test_documentation",
     })
 
-    def test_metrics_lazy_initializes(self) -> None:
+    def test_metrics_raises_if_not_initialized(self) -> None:
         config = ApplicationConfig(
             enable_plugins=False, enable_metrics=True, enable_logging=False
         )
         ctx = ApplicationContext(config)
         assert not ctx._initialized
-        m = ctx.metrics
-        assert m is not None
+        with pytest.raises(RuntimeError, match="not initialized"):
+            _ = ctx.metrics
         ctx.shutdown()
 
-    def test_analyzer_registry_lazy_initializes(self) -> None:
+    def test_analyzer_registry_raises_if_not_initialized(self) -> None:
         ctx = create_test_application()
         assert not ctx._initialized
-        registry = ctx.analyzer_registry
-        assert registry is not None
+        with pytest.raises(RuntimeError, match="not initialized"):
+            _ = ctx.analyzer_registry
         ctx.shutdown()
 
     def test_request_scope_second_call_uses_existing_context(self) -> None:

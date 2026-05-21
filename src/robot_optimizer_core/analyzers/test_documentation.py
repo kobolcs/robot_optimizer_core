@@ -16,6 +16,7 @@ else:
 
 from ..domain.entities import TestFile
 from ..domain.value_objects import Finding, Location, Pattern, PatternType
+from ..parsers.robot_ast_parser import RobotASTParser
 from .base import BaseAnalyzer, ConfigValue
 
 __all__ = ["TestDocumentationAnalyzer"]
@@ -60,12 +61,6 @@ class TestDocumentationAnalyzer(BaseAnalyzer):
     def tags(self) -> list[str]:
         return ["documentation", "style", "readability"]
 
-    def _should_check_entity(self, entity: str) -> bool:
-        """Return True if the entity type should be checked."""
-        if entity == "test case":
-            return self._check_tests
-        return self._check_keywords
-
     def _create_finding(
         self,
         test_file: TestFile,
@@ -106,76 +101,39 @@ class TestDocumentationAnalyzer(BaseAnalyzer):
             entity_name=name,
         )
 
-    def _flush_entity(
-        self,
-        findings: list[Finding],
-        test_file: TestFile,
-        current_name: str | None,
-        current_line: int,
-        current_entity: str,
-        has_doc: bool,
-        doc_text: str,
-    ) -> None:
-        if current_name and self._should_check_entity(current_entity):
-            finding = self._create_finding(
-                test_file, current_name, current_line, current_entity,
-                has_doc=has_doc, doc_text=doc_text,
-            )
-            if finding:
-                findings.append(finding)
-
-    def _section_flags(self, stripped: str) -> tuple[bool, bool]:
-        lower = stripped.lower()
-        return "test case" in lower, "keyword" in lower and "test case" not in lower
-
     @override
     def analyze(self, test_file: TestFile) -> list[Finding]:
         findings: list[Finding] = []
-        in_test_cases = False
-        in_keywords = False
-        current_name: str | None = None
-        current_line: int = 1
-        current_entity: str = "test case"
-        has_doc = False
-        doc_text = ""
+        suite = RobotASTParser().parse_suite(test_file)
 
-        for line_num, line in enumerate(test_file.content.splitlines(), 1):
-            stripped = line.strip()
-            if not stripped:
-                continue
-
-            if stripped.startswith("***"):
-                self._flush_entity(
-                    findings, test_file, current_name, current_line,
-                    current_entity, has_doc, doc_text,
+        if self._check_tests:
+            for tc in suite.test_cases:
+                doc_text = tc.documentation or ""
+                has_doc = bool(doc_text.strip())
+                finding = self._create_finding(
+                    test_file,
+                    tc.name,
+                    tc.location.line,
+                    "test case",
+                    has_doc=has_doc,
+                    doc_text=doc_text,
                 )
-                current_name = None
-                has_doc = False
-                doc_text = ""
-                in_test_cases, in_keywords = self._section_flags(stripped)
-                continue
+                if finding:
+                    findings.append(finding)
 
-            if not line.startswith((" ", "\t")):
-                if in_test_cases or in_keywords:
-                    self._flush_entity(
-                        findings, test_file, current_name, current_line,
-                        current_entity, has_doc, doc_text,
-                    )
-                    if not stripped.startswith("#"):
-                        current_name = stripped
-                        current_line = line_num
-                        current_entity = "test case" if in_test_cases else "keyword"
-                        has_doc = False
-                        doc_text = ""
-                continue
+        if self._check_keywords:
+            for kw in suite.keywords:
+                doc_text = kw.documentation or ""
+                has_doc = bool(doc_text.strip())
+                finding = self._create_finding(
+                    test_file,
+                    kw.name,
+                    kw.location.line,
+                    "keyword",
+                    has_doc=has_doc,
+                    doc_text=doc_text,
+                )
+                if finding:
+                    findings.append(finding)
 
-            if current_name and stripped.lower().startswith("[documentation]"):
-                has_doc = True
-                parts = stripped.split(None, 1)
-                doc_text = parts[1] if len(parts) > 1 else ""
-
-        self._flush_entity(
-            findings, test_file, current_name, current_line,
-            current_entity, has_doc, doc_text,
-        )
         return findings

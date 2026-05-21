@@ -39,11 +39,10 @@ import warnings
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import (  # TypedDict kept for SuiteInfo/SuiteStatistics
+from typing import (
     TYPE_CHECKING,
     Any,
     Literal,
-    TypedDict,
     cast,
 )
 
@@ -79,24 +78,26 @@ class DirectoryResults:
     errors: list[tuple[Path, Exception]] = dataclasses.field(default_factory=list)
 
 
-class SuiteInfo(TypedDict):
+@dataclasses.dataclass
+class SuiteInfo:
     """Suite-level aggregate info returned inside :class:`SuiteAnalysisResult`."""
 
-    files: int
-    keywords: list[RobotKeyword]
-    test_cases: list[RobotTestCase]
-    imports: list[RobotImport]
+    files: int = 0
+    keywords: list[RobotKeyword] = dataclasses.field(default_factory=list)
+    test_cases: list[RobotTestCase] = dataclasses.field(default_factory=list)
+    imports: list[RobotImport] = dataclasses.field(default_factory=list)
 
 
-class SuiteStatistics(TypedDict):
+@dataclasses.dataclass
+class SuiteStatistics:
     """Finding statistics returned inside :class:`SuiteAnalysisResult`."""
 
-    total_findings: int
-    findings_by_severity: dict[str, int]
-    findings_by_type: dict[str, int]
-    keyword_count: int
-    test_count: int
-    import_count: int
+    total_findings: int = 0
+    findings_by_severity: dict[str, int] = dataclasses.field(default_factory=dict)
+    findings_by_type: dict[str, int] = dataclasses.field(default_factory=dict)
+    keyword_count: int = 0
+    test_count: int = 0
+    import_count: int = 0
 
 
 @dataclasses.dataclass
@@ -116,19 +117,10 @@ class SuiteAnalysisResult:
     findings: list[Finding] = dataclasses.field(default_factory=list)
     file_findings: dict[Path, list[Finding]] = dataclasses.field(default_factory=dict)
     suite_info: SuiteInfo = dataclasses.field(
-        default_factory=lambda: SuiteInfo(
-            files=0, keywords=[], test_cases=[], imports=[]
-        )
+        default_factory=lambda: SuiteInfo()
     )
     statistics: SuiteStatistics = dataclasses.field(
-        default_factory=lambda: SuiteStatistics(
-            total_findings=0,
-            findings_by_severity={},
-            findings_by_type={},
-            keyword_count=0,
-            test_count=0,
-            import_count=0,
-        )
+        default_factory=lambda: SuiteStatistics()
     )
     errors: list[tuple[Path, Exception]] = dataclasses.field(default_factory=list)
 
@@ -146,6 +138,14 @@ __all__ = [
 ]
 
 logger = get_logger(__name__)
+
+
+def _warn_deprecated_param(old: str, new: str, since: str, stacklevel: int = 3) -> None:
+    warnings.warn(
+        f"The '{old}' parameter is deprecated since {since}. Use '{new}' instead.",
+        DeprecationWarning,
+        stacklevel=stacklevel,
+    )
 
 
 def analyze_file(
@@ -190,12 +190,7 @@ def analyze_file(
         ...     print(f"{finding.severity.name}: {finding.message}")
     """
     if severity_filter is not None:
-        warnings.warn(
-            "The 'severity_filter' parameter is deprecated since 1.0.0b1. "
-            "Use 'min_severity' instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
+        _warn_deprecated_param("severity_filter", "min_severity", "1.0.0b1", stacklevel=2)
         if min_severity is None:
             min_severity = severity_filter
     # Convert to Path
@@ -205,13 +200,13 @@ def analyze_file(
     if not path.exists():
         raise RobotFileNotFoundError(path)
 
-    # Resolve services through the DI container
-    container = get_container()
-    if settings is None:
-        settings = container.resolve("settings")
-
-    if metrics is None:
-        metrics = container.resolve("metrics")
+    # Resolve services through the DI container (only if needed)
+    if settings is None or metrics is None:
+        container = get_container()
+        if settings is None:
+            settings = container.resolve("settings")
+        if metrics is None:
+            metrics = container.resolve("metrics")
 
     # Enforce max file size before reading content and load file
     try:
@@ -397,12 +392,7 @@ def analyze_directory(
             stacklevel=2,
         )
     if severity_filter is not None:
-        warnings.warn(
-            "The 'severity_filter' parameter is deprecated since 1.0.0b1. "
-            "Use 'min_severity' instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
+        _warn_deprecated_param("severity_filter", "min_severity", "1.0.0b1", stacklevel=2)
         if min_severity is None:
             min_severity = severity_filter
 
@@ -555,19 +545,14 @@ def _gather_suite_structure(
     that could not be parsed.  Callers should exclude those files from
     suite-level analysis to avoid false-positive dead-code findings.
     """
-    suite_info: SuiteInfo = {
-        "files": len(test_files),
-        "keywords": [],
-        "test_cases": [],
-        "imports": [],
-    }
+    suite_info = SuiteInfo(files=len(test_files))
     failed_paths: list[Path] = []
     for tf in test_files:
         try:
             robot_suite = parser.parse_suite(tf)
-            suite_info["keywords"].extend(robot_suite.keywords)
-            suite_info["test_cases"].extend(robot_suite.test_cases)
-            suite_info["imports"].extend(robot_suite.imports)
+            suite_info.keywords.extend(robot_suite.keywords)
+            suite_info.test_cases.extend(robot_suite.test_cases)
+            suite_info.imports.extend(robot_suite.imports)
         except Exception as e:
             logger.warning(
                 f"Failed to parse suite structure: {tf.path}", extra={"error": str(e)}
@@ -606,7 +591,7 @@ def _analyze_with_other_analyzers(
     return all_findings, file_findings, errors
 
 
-def _run_dead_code_analysis(
+def _run_suite_analysis(
     dead_code_analyzer: SuiteAwareAnalyzer | None,
     test_files: list[TestFile],
     all_findings: list[Finding],
@@ -637,14 +622,14 @@ def _calculate_suite_statistics(
         pt = finding.pattern.type.name
         findings_by_type[pt] = findings_by_type.get(pt, 0) + 1
 
-    return {
-        "total_findings": len(all_findings),
-        "findings_by_severity": findings_by_severity,
-        "findings_by_type": findings_by_type,
-        "keyword_count": len(suite_info["keywords"]),
-        "test_count": len(suite_info["test_cases"]),
-        "import_count": len(suite_info["imports"]),
-    }
+    return SuiteStatistics(
+        total_findings=len(all_findings),
+        findings_by_severity=findings_by_severity,
+        findings_by_type=findings_by_type,
+        keyword_count=len(suite_info.keywords),
+        test_count=len(suite_info.test_cases),
+        import_count=len(suite_info.imports),
+    )
 
 
 def analyze_suite(
@@ -675,8 +660,8 @@ def analyze_suite(
 
     Example:
         >>> results = analyze_suite("tests/")
-        >>> print(f"Total findings: {len(results['findings'])}")
-        >>> print(f"Keywords: {results['suite_info']['keyword_count']}")
+        >>> print(f"Total findings: {len(results.findings)}")
+        >>> print(f"Keywords: {len(results.suite_info.keywords)}")
     """
     path = Path(suite_path)
     container = get_container()
@@ -718,12 +703,13 @@ def analyze_suite(
         else:
             other_analyzers.append(a)
 
-    # Run analyzers
+    # Run per-file analyzers on ALL test files (not just parse-succeeded ones)
     all_findings, file_findings, suite_errors = _analyze_with_other_analyzers(
-        test_files_for_suite, other_analyzers
+        test_files, other_analyzers
     )
+    # Run suite-aware analyzers only on files that parsed successfully
     for _suite_analyzer in suite_aware_analyzers:
-        _run_dead_code_analysis(_suite_analyzer, test_files_for_suite, all_findings, file_findings)
+        _run_suite_analysis(_suite_analyzer, test_files_for_suite, all_findings, file_findings)
 
     # Calculate statistics
     statistics = _calculate_suite_statistics(all_findings, suite_info)

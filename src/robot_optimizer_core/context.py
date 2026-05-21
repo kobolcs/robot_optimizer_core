@@ -11,8 +11,9 @@ from typing import Any, Protocol, runtime_checkable
 
 from .analyzers.registry import AnalyzerRegistry
 from .config.settings import Settings
-from .di import ThreadSafeContainer, get_container, reset_container
+from .di import ThreadSafeContainer, _register_defaults, _set_global_container, get_container, reset_container
 from .discovery import FileDiscoveryService
+from .exceptions import ConfigurationError
 from .logging import LoggerAdapter, configure_logging
 from .metrics import MetricsCollector
 from .plugin import ValidatedPluginManager
@@ -62,10 +63,10 @@ class ApplicationConfig:
     def validate(self) -> None:
         """Validate configuration."""
         if self.max_memory_mb < 100:
-            raise ValueError("max_memory_mb must be at least 100")
+            raise ConfigurationError("max_memory_mb must be at least 100")
 
         if self.thread_pool_size < 1:
-            raise ValueError("thread_pool_size must be at least 1")
+            raise ConfigurationError("thread_pool_size must be at least 1")
 
         # Validate settings
         self.settings.validate_settings()
@@ -132,7 +133,9 @@ class ApplicationContext:
             # get_container() calls see the settings and services this context
             # was constructed with — both paths converge on the same container.
             reset_container()
-            self._container = get_container()
+            self._container = ThreadSafeContainer()
+            _register_defaults(self._container)
+            _set_global_container(self._container)
 
             self._container.register_instance(
                 "settings", self.config.settings, override=True
@@ -188,14 +191,20 @@ class ApplicationContext:
     def container(self) -> ScopedContainer:
         """Return the DI container managed by this context."""
         if not self._initialized:
-            self.initialize()
-        return get_container()
+            raise RuntimeError(
+                "ApplicationContext not initialized — call .initialize() first "
+                "or use it as a context manager: `with ApplicationContext() as ctx:`"
+            )
+        return self._container  # type: ignore[return-value]
 
     @property
     def metrics(self) -> MetricsCollector:
         """Get the metrics collector."""
         if not self._initialized:
-            self.initialize()
+            raise RuntimeError(
+                "ApplicationContext not initialized — call .initialize() first "
+                "or use it as a context manager: `with ApplicationContext() as ctx:`"
+            )
 
         if not self._metrics:
             raise RuntimeError("Metrics not enabled")
@@ -211,7 +220,10 @@ class ApplicationContext:
     def analyzer_registry(self) -> AnalyzerRegistry:
         """Get the analyzer registry."""
         if not self._initialized:
-            self.initialize()
+            raise RuntimeError(
+                "ApplicationContext not initialized — call .initialize() first "
+                "or use it as a context manager: `with ApplicationContext() as ctx:`"
+            )
 
         if not self._analyzer_registry:
             raise RuntimeError("Analyzer registry not available")

@@ -94,10 +94,15 @@ ALLOWED_IMPORTS = {
     "robot_optimizer_core",
     "pathlib",
     "typing",
+    "typing_extensions",
     "dataclasses",
     "enum",
     "abc",
     "collections",
+    "pydantic",
+    "functools",
+    "itertools",
+    "re",
 }
 
 # Whitelist of allowed builtins
@@ -130,16 +135,13 @@ ALLOWED_BUILTINS = {
 class PluginSecurityValidator:
     """Validates plugin code for security issues before loading."""
 
-    def __init__(self) -> None:
-        self.violations: list[str] = []
-
     def validate_file(self, file_path: Path) -> tuple[bool, list[str]]:
         """Validate a plugin file for security issues.
 
         Returns:
             Tuple of (is_safe, violations)
         """
-        self.violations = []
+        violations: list[str] = []
 
         try:
             content = file_path.read_text(encoding="utf-8")
@@ -151,7 +153,7 @@ class PluginSecurityValidator:
             validator = SecurityVisitor()
             validator.visit(tree)
 
-            self.violations.extend(validator.violations)
+            violations.extend(validator.violations)
 
             # Check file permissions on POSIX only.
             # Windows does not track group/other write bits (st_mode & 0o022
@@ -159,13 +161,13 @@ class PluginSecurityValidator:
             if sys.platform != "win32":
                 stat = file_path.stat()
                 if stat.st_mode & 0o022:
-                    self.violations.append("Plugin file is writable by group/others")
+                    violations.append("Plugin file is writable by group/others")
 
-            return len(self.violations) == 0, self.violations
+            return len(violations) == 0, violations
 
         except Exception as e:
-            self.violations.append(f"Failed to parse plugin: {e}")
-            return False, self.violations
+            violations.append(f"Failed to parse plugin: {e}")
+            return False, violations
 
 
 class SecurityVisitor(ast.NodeVisitor):

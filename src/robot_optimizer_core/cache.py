@@ -140,9 +140,8 @@ class AnalysisCache:
     @staticmethod
     def file_hash(file_path: Path) -> str:
         """Return the SHA-256 hex digest of *file_path*'s contents."""
-        h = hashlib.sha256()
-        h.update(file_path.read_bytes())
-        return h.hexdigest()
+        with file_path.open("rb") as f:
+            return hashlib.file_digest(f, "sha256").hexdigest()
 
     def get(self, file_path: Path, file_hash: str) -> list[Finding] | None:
         """Return cached findings for *file_path* or ``None`` on a miss.

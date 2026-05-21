@@ -36,7 +36,7 @@ import sys
 from typing import NoReturn
 
 from ..logging import configure_logging
-from ._commands import _EXIT_ERROR, _run_analyze, _run_list_analyzers, _run_upgrade
+from ._commands import _EXIT_ERROR, _run_analyze, _run_diagnose, _run_list_analyzers, _run_upgrade
 from ._parser import _build_parser
 
 __all__ = ["main"]
@@ -82,6 +82,8 @@ def main(argv: list[str] | None = None) -> NoReturn:
             code = _run_list_analyzers(args)
         case "upgrade":
             code = _run_upgrade(args)
+        case "diagnose":
+            code = _run_diagnose(args)
         case _:
             parser.print_help()
             code = _EXIT_ERROR

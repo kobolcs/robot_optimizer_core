@@ -48,6 +48,7 @@ classifiers = [
 
 # Minimal core dependencies only
 dependencies = [
+    "jinja2>=3.1",
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.1",
     "robotframework>=7.4.2",

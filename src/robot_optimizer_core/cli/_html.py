@@ -442,16 +442,13 @@ def _get_template_path() -> Path:
 
 
 def _render_html_template(context: dict[str, Any]) -> str:
-    """Render HTML report using Jinja2 template, falling back to legacy renderer."""
-    try:
-        from jinja2 import Environment, FileSystemLoader
-        from markupsafe import Markup
-    except ImportError:
-        return _format_html_legacy(context)
+    """Render HTML report using Jinja2 template."""
+    from jinja2 import Environment, FileSystemLoader
+    from markupsafe import Markup
 
     template_path = _get_template_path()
     if not template_path.exists():
-        return _format_html_legacy(context)
+        raise FileNotFoundError(f"HTML report template not found: {template_path}")
 
     env = Environment(
         loader=FileSystemLoader(str(template_path.parent)),
@@ -540,85 +537,3 @@ def _format_html(findings: list[Finding], path: Path) -> str:
     return _render_html_template(context)
 
 
-def _format_html_legacy(context: dict[str, Any]) -> str:
-    """Legacy HTML rendering (fallback if Jinja2 template not available)."""
-    return f"""<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Robot Framework Suite Health Report</title>
-  <style>
-    :root {{
-      --health-color: {context["health_color"]};
-      --health-color-bg: {context["health_color_bg"]};
-      --health-color-border: {context["health_color_border"]};
-      --health-color-glow: {context["health_color_glow"]};
-    }}
-{context["styles"]}
-  </style>
-</head>
-<body>
-<main>
-  <section class="cover">
-    <div class="cover-eyebrow">Robot Framework Optimizer</div>
-    <h1>Suite Health Report</h1>
-    <h2>Static analysis · maintainability &amp; stability</h2>
-    <div class="cover-meta">
-      Analyzed: {escape(context["analyzed_path"])}<br>
-      Generated: {escape(context["timestamp"])}
-    </div>
-  </section>
-
-  <section class="panel">
-    <h2>Health status</h2>
-    <span class="health-badge"><span class="health-dot"></span>{escape(context["health_status"])}</span>
-  </section>
-
-  <section class="panel">
-    <h2>Executive summary</h2>
-    <p>Total findings: <strong>{context["total_findings"]}</strong> &nbsp;·&nbsp; Warnings/Errors: <strong>{context["warning_error_count"]}</strong> &nbsp;·&nbsp; Main risk categories: <strong>{escape(context["top_categories_str"])}</strong></p>
-    <p>{escape(context["summary_paragraph"])}</p>
-  </section>
-
-  <section class="panel">
-    <h2>Key metrics</h2>
-    <div class="bento">
-      <div class="metric-card"><div class="metric-label">Total findings</div><div class="metric-value">{context["total_findings"]}</div></div>
-      <div class="metric-card"><div class="metric-label">ERROR</div><div class="metric-value">{context["error_count"]}</div></div>
-      <div class="metric-card"><div class="metric-label">WARNING</div><div class="metric-value">{context["warning_count"]}</div></div>
-      <div class="metric-card"><div class="metric-label">INFO</div><div class="metric-value">{context["info_count"]}</div></div>
-      <div class="metric-card"><div class="metric-label">Affected files</div><div class="metric-value">{context["affected_files_count"]}</div></div>
-      <div class="metric-card accent"><div class="metric-label">Auto-fixable findings</div><div class="metric-value">{context["auto_fixable_count"]}</div></div>
-    </div>
-  </section>
-
-  <section class="panel">
-    <h2>Risk categories</h2>
-    <div class="category-grid">
-      {_html_render_category_cards(context["top_categories"]) or "<p>No risk categories detected.</p>"}
-    </div>
-  </section>
-
-  <section class="panel">
-    <h2>Recommended actions</h2>
-    <ol>
-      {"".join(context["action_items"]) or "<li>Maintain current standards and monitor new findings.</li>"}
-    </ol>
-  </section>
-
-  <section class="panel">
-    <h2>Findings by category</h2>
-    {context["no_findings_html"]}
-    {"".join(context["grouped_findings"])}
-  </section>
-
-  <section class="panel">
-    <h2>Appendix — Detailed Findings</h2>
-    {context["no_findings_html"]}
-    <div class="table-wrap">{context["findings_table"]}</div>
-  </section>
-</main>
-</body>
-</html>
-"""

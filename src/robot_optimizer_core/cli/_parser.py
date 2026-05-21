@@ -140,4 +140,10 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Show feature comparison and upgrade information",
     )
 
+    # -- diagnose subcommand -------------------------------------------------
+    sub.add_parser(
+        "diagnose",
+        help="Print a JSON diagnostic report of the current environment",
+    )
+
     return parser

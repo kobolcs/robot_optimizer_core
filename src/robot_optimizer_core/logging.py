@@ -25,8 +25,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from .metrics import get_metrics
-
 __all__ = [
     "LoggerAdapter",
     "MetricsHandler",
@@ -128,6 +126,7 @@ class MetricsHandler(logging.Handler):
         Args:
             record: The log record to emit.
         """
+        from .metrics import get_metrics  # deferred to avoid import cycle
         metrics = get_metrics()
 
         # Track log levels
@@ -269,7 +268,13 @@ def configure_logging(
 
     # File handler if specified
     if log_file:
-        file_handler = logging.FileHandler(log_file)
+        from logging.handlers import RotatingFileHandler
+        file_handler = RotatingFileHandler(
+            log_file,
+            maxBytes=10 * 1024 * 1024,  # 10 MB
+            backupCount=3,
+            encoding="utf-8",
+        )
         if format_json:
             file_handler.setFormatter(StructuredFormatter())
         else:
@@ -319,6 +324,13 @@ def get_logger(name: str, context: dict[str, Any] | None = None) -> LoggerAdapte
     return adapter
 
 
+def _safe_file_size(path: Path) -> int:
+    try:
+        return path.stat().st_size
+    except OSError:
+        return 0
+
+
 def log_analysis_start(
     file_path: Path, analyzer: str, logger: LoggerAdapter | None = None
 ) -> None:
@@ -340,7 +352,7 @@ def log_analysis_start(
             "event": "analysis_start",
             "file": str(file_path),
             "analyzer": analyzer,
-            "file_size": file_path.stat().st_size if file_path.exists() else 0,
+            "file_size": _safe_file_size(file_path),
         },
     )
 
