@@ -207,6 +207,8 @@ class TestCliOutputFormats:
         args.clear_cache = False
         args.watch = False
         args.no_fail = True
+        args.baseline = None
+        args.update_baseline = False
 
         exit_code = _run_analyze(args)
         # Should succeed (exit 0 due to no_fail=True)
@@ -232,6 +234,8 @@ class TestCliOutputFormats:
         args.clear_cache = False
         args.watch = False
         args.no_fail = True
+        args.baseline = None
+        args.update_baseline = False
 
         exit_code = _run_analyze(args)
         assert exit_code == 0

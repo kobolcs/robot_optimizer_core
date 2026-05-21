@@ -11,6 +11,7 @@ from robot_optimizer_core.config import Settings, load_settings_from_toml
 from robot_optimizer_core.config.toml_loader import (
     _find_toml_root,
     _read_optimizer_section,
+    load_settings_from_toml_file,
 )
 from robot_optimizer_core.domain.value_objects import Severity
 
@@ -144,3 +145,49 @@ class TestSettingsValidation:
             plugins_enabled=False,
         )
         assert s.max_file_size_mb == pytest.approx(5.0)
+
+
+@pytest.mark.unit
+class TestLoadSettingsFromTomlFile:
+    """Tests for load_settings_from_toml_file (explicit file path variant)."""
+
+    def test_loads_settings_from_explicit_file(self, tmp_path: Path) -> None:
+        cfg = tmp_path / "myconfig.toml"
+        cfg.write_bytes(
+            b"[tool.robot-optimizer]\nmax_acceptable_sleep_seconds = 3.0\n"
+        )
+        settings = load_settings_from_toml_file(cfg)
+        assert settings.max_acceptable_sleep_seconds == pytest.approx(3.0)
+
+    def test_loads_defaults_when_section_missing(self, tmp_path: Path) -> None:
+        cfg = tmp_path / "other.toml"
+        cfg.write_bytes(b"[project]\nname = 'foo'\n")
+        settings = load_settings_from_toml_file(cfg)
+        assert isinstance(settings, Settings)
+
+    def test_overrides_take_precedence(self, tmp_path: Path) -> None:
+        cfg = tmp_path / "config.toml"
+        cfg.write_bytes(
+            b"[tool.robot-optimizer]\nmax_acceptable_sleep_seconds = 1.0\n"
+        )
+        settings = load_settings_from_toml_file(cfg, max_acceptable_sleep_seconds=9.0)
+        assert settings.max_acceptable_sleep_seconds == pytest.approx(9.0)
+
+    def test_raises_for_missing_file(self, tmp_path: Path) -> None:
+        with pytest.raises(FileNotFoundError):
+            load_settings_from_toml_file(tmp_path / "nonexistent.toml")
+
+    def test_accepts_string_path(self, tmp_path: Path) -> None:
+        cfg = tmp_path / "c.toml"
+        cfg.write_bytes(b"[tool.robot-optimizer]\nmax_file_size_mb = 2.0\n")
+        settings = load_settings_from_toml_file(str(cfg))
+        assert settings.max_file_size_mb == pytest.approx(2.0)
+
+
+@pytest.mark.unit
+class TestTomlLoaderStringProjectRoot:
+    """Test that load_settings_from_toml accepts string project_root."""
+
+    def test_string_project_root_is_accepted(self, tmp_path: Path) -> None:
+        settings = load_settings_from_toml(str(tmp_path))
+        assert isinstance(settings, Settings)

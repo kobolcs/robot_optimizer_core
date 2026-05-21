@@ -28,9 +28,9 @@ class ScopedContainer(Protocol):
 
     def register_instance(
         self, service_type: str, instance: Any, override: bool = False
-    ) -> None: ...
+    ) -> None: ...  # pragma: no cover
 
-    def resolve(self, service_type: str) -> Any: ...
+    def resolve(self, service_type: str) -> Any: ...  # pragma: no cover
 
 
 @runtime_checkable
@@ -39,11 +39,11 @@ class Service(Protocol):
 
     def initialize(self, context: ApplicationContext) -> None:
         """Initialize the service with context."""
-        ...
+        ...  # pragma: no cover
 
     def shutdown(self) -> None:
         """Shutdown the service cleanly."""
-        ...
+        ...  # pragma: no cover
 
 
 @dataclass

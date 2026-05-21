@@ -272,3 +272,94 @@ class TestCacheResilience:
 
         cache = AnalysisCache(cache_dir=cache_dir)
         assert cache.get(fp, h) is None
+
+
+# ---------------------------------------------------------------------------
+# max_entries eviction
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestCacheEviction:
+    def test_put_respects_max_entries_cap(self, tmp_path: Path) -> None:
+        """Adding beyond max_entries evicts the oldest entry."""
+        cache = AnalysisCache(cache_dir=tmp_path / "cache", max_entries=2)
+
+        fp1 = tmp_path / "a.robot"
+        fp2 = tmp_path / "b.robot"
+        fp3 = tmp_path / "c.robot"
+        for fp in (fp1, fp2, fp3):
+            fp.write_bytes(b"x")
+
+        h1, h2, h3 = "aaa", "bbb", "ccc"
+        cache.put(fp1, h1, [])
+        cache.put(fp2, h2, [])
+        # Third put exceeds cap — fp1 should be evicted
+        cache.put(fp3, h3, [])
+
+        assert cache.get(fp1, h1) is None  # evicted
+        assert cache.get(fp2, h2) is not None
+        assert cache.get(fp3, h3) is not None
+
+    def test_put_updates_existing_key_without_eviction(self, tmp_path: Path) -> None:
+        """Updating an existing key does not cause spurious eviction."""
+        cache = AnalysisCache(cache_dir=tmp_path / "cache", max_entries=2)
+
+        fp = tmp_path / "a.robot"
+        fp.write_bytes(b"x")
+        h = "aaa"
+
+        cache.put(fp, h, [])
+        cache.put(fp, h, [])  # update — no new key, no eviction
+
+        data = cache._load()
+        assert len(data) == 1
+
+    def test_get_returns_none_on_deserialize_error(self, tmp_path: Path) -> None:
+        """An invalid cache entry (bad data) is treated as a miss."""
+        cache = AnalysisCache(cache_dir=tmp_path / "cache")
+        fp = tmp_path / "f.robot"
+        fp.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+
+        h = AnalysisCache.file_hash(fp)
+        # Write a correctly-keyed but unparseable entry
+        cache_dir = tmp_path / "cache"
+        cache_dir.mkdir(exist_ok=True)
+        key = cache._cache_key(fp, h)
+        bad_data = {key: [{"broken_field": True}]}
+        (cache_dir / "cache.json").write_text(json.dumps(bad_data), encoding="utf-8")
+
+        # Reload the cache so it reads from disk
+        fresh = AnalysisCache(cache_dir=cache_dir)
+        result = fresh.get(fp, h)
+        assert result is None
+
+
+@pytest.mark.unit
+class TestCacheOsErrors:
+    """Tests that OSError paths in flush/clear are handled gracefully."""
+
+    def test_flush_oserror_is_swallowed(self, tmp_path: Path) -> None:
+        """An OSError while writing the cache file is silently swallowed."""
+        from unittest.mock import patch
+
+        cache = AnalysisCache(cache_dir=tmp_path / "cache")
+        fp = tmp_path / "x.robot"
+        fp.write_bytes(b"x")
+        cache.put(fp, "abc", [])
+
+        with patch("pathlib.Path.write_text", side_effect=OSError("disk full")):
+            cache.flush()  # must not raise
+
+    def test_clear_oserror_is_swallowed(self, tmp_path: Path) -> None:
+        """An OSError while removing the cache file is silently swallowed."""
+        from unittest.mock import patch
+
+        cache = AnalysisCache(cache_dir=tmp_path / "cache")
+        fp = tmp_path / "x.robot"
+        fp.write_bytes(b"x")
+        cache.put(fp, "abc", [])
+        cache.flush()
+
+        with patch("pathlib.Path.unlink", side_effect=OSError("permission denied")):
+            cache.clear()  # must not raise

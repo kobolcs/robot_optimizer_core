@@ -96,6 +96,60 @@ class TestNamingConventionAnalyzer:
         findings = analyzer.analyze(_make_file(""))
         assert findings == []
 
+    def test_check_tests_disabled_skips_test_names(self) -> None:
+        content = "*** Test Cases ***\ncamelCaseName\n    Log    ok\n"
+        analyzer = NamingConventionAnalyzer(
+            config={"check_test_names": False, "check_keyword_names": False}
+        )
+        findings = analyzer.analyze(_make_file(content))
+        assert findings == []
+
+    def test_variable_check_detects_camel_case_var(self) -> None:
+        content = "*** Test Cases ***\nTest A\n    ${myVar}=    Set Variable    x\n"
+        analyzer = NamingConventionAnalyzer(config={"check_variable_names": True})
+        findings = analyzer.analyze(_make_file(content))
+        assert any("myVar" in f.message for f in findings)
+
+    def test_variable_check_disabled_returns_empty(self) -> None:
+        content = "*** Test Cases ***\nTest A\n    ${myVar}=    Set Variable    x\n"
+        analyzer = NamingConventionAnalyzer(
+            config={"check_variable_names": False, "check_test_names": False}
+        )
+        findings = analyzer.analyze(_make_file(content))
+        assert findings == []
+
+    def test_check_definition_name_in_test_section(self) -> None:
+        """Directly exercises _check_definition_name for test case branch."""
+        from robot_optimizer_core.domain.entities import TestFile
+
+        analyzer = NamingConventionAnalyzer()
+        tf = _make_file("*** Test Cases ***\ncamelCase\n    Log    ok\n")
+        result = analyzer._check_definition_name(
+            "camelCase", 2, tf, in_test_cases=True, in_keywords=False
+        )
+        assert result is not None
+        assert "camelCase" in result.message
+
+    def test_check_definition_name_in_keyword_section(self) -> None:
+        """Directly exercises _check_definition_name for keyword branch."""
+        analyzer = NamingConventionAnalyzer()
+        tf = _make_file("*** Keywords ***\ncamelCase\n    Log    ok\n")
+        result = analyzer._check_definition_name(
+            "camelCase", 2, tf, in_test_cases=False, in_keywords=True
+        )
+        assert result is not None
+
+    def test_check_definition_name_returns_none_when_both_disabled(self) -> None:
+        """_check_definition_name returns None when both check flags are off."""
+        analyzer = NamingConventionAnalyzer(
+            config={"check_test_names": False, "check_keyword_names": False}
+        )
+        tf = _make_file("*** Test Cases ***\ncamelCase\n    Log    ok\n")
+        result = analyzer._check_definition_name(
+            "camelCase", 2, tf, in_test_cases=True, in_keywords=False
+        )
+        assert result is None
+
 
 # ---------------------------------------------------------------------------
 # HardcodedValueAnalyzer

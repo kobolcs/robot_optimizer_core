@@ -194,6 +194,7 @@ parallel = true
 omit = [
     "*/tests/*",
     "*/__pycache__/*",
+    "*/__main__.py",
 ]
 
 [tool.coverage.report]

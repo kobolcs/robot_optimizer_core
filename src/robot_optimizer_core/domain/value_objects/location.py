@@ -406,7 +406,7 @@ class Location(ValueObject):
         new_end_line = None
         if self.end_line is not None:
             new_end_line = self.end_line + lines
-            if new_end_line < 1:
+            if new_end_line < 1:  # pragma: no cover
                 raise ValueError(
                     f"Offset would create invalid end line: {new_end_line}"
                 )

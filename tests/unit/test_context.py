@@ -272,3 +272,64 @@ class TestShutdownCleanup:
         ctx.metrics.increment("test.counter")
         ctx.shutdown()
         assert ctx._shutdown
+
+
+@pytest.mark.unit
+class TestDiagnosticReport:
+    def test_report_before_init_shows_uninitialized(self) -> None:
+        ctx = create_test_application()
+        report = ctx.get_diagnostic_report()
+        assert report["initialized"] is False
+        assert report["shutdown"] is False
+
+    def test_report_after_init_lists_services_and_analyzers(self) -> None:
+        ctx = create_test_application()
+        ctx.initialize()
+        try:
+            report = ctx.get_diagnostic_report()
+            assert report["initialized"] is True
+            assert isinstance(report["services"], list)
+            assert len(report["services"]) > 0
+            assert isinstance(report["analyzers"], list)
+            assert len(report["analyzers"]) > 0
+        finally:
+            ctx.shutdown()
+
+    def test_report_after_shutdown_shows_shutdown(self) -> None:
+        ctx = create_test_application()
+        ctx.initialize()
+        ctx.shutdown()
+        report = ctx.get_diagnostic_report()
+        assert report["shutdown"] is True
+
+    def test_report_with_metrics_enabled_includes_metrics_summary(self) -> None:
+        from robot_optimizer_core.context import ApplicationConfig, ApplicationContext
+        config = ApplicationConfig(
+            enable_plugins=False,
+            enable_metrics=True,
+            enable_logging=False,
+        )
+        ctx = ApplicationContext(config)
+        ctx.initialize()
+        try:
+            ctx.metrics.increment("test.hits")
+            report = ctx.get_diagnostic_report()
+            assert report["metrics"] is not None
+            assert "total_metrics" in report["metrics"]
+        finally:
+            ctx.shutdown()
+
+    def test_report_with_plugins_enabled_lists_plugins(self) -> None:
+        from robot_optimizer_core.context import ApplicationConfig, ApplicationContext
+        config = ApplicationConfig(
+            enable_plugins=True,
+            enable_metrics=False,
+            enable_logging=False,
+        )
+        ctx = ApplicationContext(config)
+        ctx.initialize()
+        try:
+            report = ctx.get_diagnostic_report()
+            assert isinstance(report["plugins"], list)
+        finally:
+            ctx.shutdown()

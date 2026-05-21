@@ -410,3 +410,23 @@ class TestGetPluginRegistry:
         r1 = get_plugin_registry()
         r2 = get_plugin_registry()
         assert r1 is r2
+
+
+@pytest.mark.unit
+class TestDeprecatedForceShim:
+    def test_load_plugin_from_file_force_emits_deprecation_warning(
+        self, tmp_path: Path
+    ) -> None:
+        plugin_file = tmp_path / "shim_test.py"
+        plugin_file.write_bytes(b"import os\n")
+        plugin_file.chmod(0o644)
+
+        manager = ValidatedPluginManager()
+        import warnings
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            with pytest.raises(PluginError):
+                manager.load_plugin_from_file_force(plugin_file)
+
+        assert any(issubclass(w.category, DeprecationWarning) for w in caught)
+        assert any("deprecated" in str(w.message).lower() for w in caught)
