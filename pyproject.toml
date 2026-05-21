@@ -80,6 +80,9 @@ dev = [
 
     # Pre-commit
     "pre-commit>=4.6.0",
+
+    # Changelog generation
+    "git-cliff>=2.13.1",
 ]
 
 # Minimal test dependencies

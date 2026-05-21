@@ -8,7 +8,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- _No unreleased changes yet._
+- `--baseline` and `--update-baseline` flags on the `analyze` subcommand for persisting and
+  comparing findings across runs
+- Watch mode for the CLI: re-runs analysis automatically on file changes
+- JUnit XML output format (`--format junit` / `--output-file`)
+- SHA-256 file-hash cache for `analyze_directory` to skip unchanged files
+- Hypothesis property-based tests for all core value objects
+- Integration tests for `FlakinessListener` V3 callback sequences
+- Direct unit tests for the `__main__` entry point (no subprocess)
+- Mutation testing (mutmut) wired into CI with a 20% survival-rate gate
+- Dedicated SonarCloud scan workflow
+
+### Changed
+- `repositories/` package renamed to `infrastructure/` to make DDD layering explicit;
+  `domain/repositories/` (interfaces/protocols) is unchanged
+- `ApplicationContext` is now the sole public context API; `ThreadSafeContainer` is
+  internal and no longer re-exported
+- All dev and runtime dependencies bumped to 2026 latest stable versions
+- `DeadCodeAnalyzer` split into explicit AST and regex strategy classes
+- CLI refactored from a single `cli.py` into `_parser`, `_commands`, `_formatters`,
+  and `_html` submodules
+- All analyzers migrated from line-by-line regex to `RobotASTParser`
+- `DirectoryResults` changed from a `dict` subclass to a proper dataclass
+- `Pattern.type` field renamed to `pattern_type` to avoid shadowing the Python built-in
+- `SleepPattern` serialisation replaced manual `model_dump` override with
+  Pydantic `field_serializer`
+- `SleepPattern` hard max-cap of 3600 s removed; threshold ownership moved to analyzer
+  config
+- Service layer extracted from the API module for improved testability
+- Significant cognitive-complexity reduction across analyzers, `Location`, and
+  `RobotASTParser`
+
+### Fixed
+- Removed all `type: ignore` suppressions in `src/`; underlying type errors corrected
+- Resolved all open SonarCloud code-quality, reliability, and security issues
+- Plugin loader: restored `__import__` and `__build_class__` in the restricted
+  `exec()` environment so third-party plugins can import standard-library modules
 
 ## [1.0.0b1] - 2026-04-29
 

@@ -1,0 +1,78 @@
+# git-cliff configuration — https://git-cliff.org/docs/configuration
+# Run: uv run git-cliff --output CHANGELOG.md
+# Append unreleased only: uv run git-cliff --unreleased --prepend CHANGELOG.md
+
+[changelog]
+header = """
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+"""
+body = """
+{% if version %}\
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+## [Unreleased]
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}\
+### {{ group | upper_first }}
+
+{% for commit in commits %}\
+- {{ commit.message | upper_first }}{% if commit.remote.pr_number %} \
+([#{{ commit.remote.pr_number }}](https://github.com/kobolcs/robot_optimizer_core/pull/{{ commit.remote.pr_number }})){% endif %}
+
+{% endfor %}\
+{% endfor %}\
+"""
+footer = """
+{% for release in releases -%}
+{% if release.previous.version %}\
+[{{ release.version | trim_start_matches(pat="v") }}]: \
+https://github.com/kobolcs/robot_optimizer_core/compare/{{ release.previous.version }}...{{ release.version }}
+{% else %}\
+[{{ release.version | trim_start_matches(pat="v") }}]: \
+https://github.com/kobolcs/robot_optimizer_core/releases/tag/{{ release.version }}
+{% endif %}\
+{% endfor %}\
+[Unreleased]: https://github.com/kobolcs/robot_optimizer_core/compare/v{{ releases | first | get(key="version") | trim_start_matches(pat="v") }}...HEAD
+"""
+trim = true
+postprocessors = []
+
+[git]
+conventional_commits = true
+filter_unconventional = false
+split_commits = false
+
+# Normalise PR-reference suffixes to linked GitHub URLs
+commit_preprocessors = [
+    { pattern = '\(#(\d+)\)', replace = "(#${1})" },
+]
+
+# Map conventional-commit types and free-form prefixes to changelog groups.
+# Merge commits and bare chores are skipped to reduce noise.
+commit_parsers = [
+    { message = "^feat|^add", group = "Added" },
+    { message = "^fix",       group = "Fixed" },
+    { message = "^refactor",  group = "Changed" },
+    { message = "^perf",      group = "Changed" },
+    { message = "^chore",     group = "Changed" },
+    { message = "^docs",      group = "Changed" },
+    { message = "^style",     skip = true },
+    { message = "^test",      group = "Tests" },
+    { message = "^ci",        group = "CI" },
+    { body = ".*security",    group = "Security" },
+    { message = "^Merge",     skip = true },
+    { message = ".*",         group = "Changed" },
+]
+
+protect_breaking_commits = true
+filter_commits = false
+tag_pattern = "v[0-9].*"
+skip_tags = ""
+ignore_tags = ""
+topo_order = false
+sort_commits = "oldest"
