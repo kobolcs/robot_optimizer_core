@@ -18,6 +18,21 @@ from .metrics import MetricsCollector
 from .plugin import ValidatedPluginManager
 
 
+class ScopedContainer(Protocol):
+    """Minimal interface for a request-scoped DI container.
+
+    Returned by :meth:`ApplicationContext.request_scope`.  Callers only need
+    :meth:`register_instance` and :meth:`resolve`; the concrete implementation
+    (``ThreadSafeContainer``) remains a private detail of the ``di`` module.
+    """
+
+    def register_instance(
+        self, service_type: str, instance: Any, override: bool = False
+    ) -> None: ...
+
+    def resolve(self, service_type: str) -> Any: ...
+
+
 @runtime_checkable
 class Service(Protocol):
     """Protocol for services that can be managed by context."""
@@ -170,8 +185,8 @@ class ApplicationContext:
             self._initialized = False
 
     @property
-    def container(self) -> ThreadSafeContainer:
-        """Get the DI container (the global container configured by this context)."""
+    def container(self) -> ScopedContainer:
+        """Return the DI container managed by this context."""
         if not self._initialized:
             self.initialize()
         return get_container()
@@ -231,7 +246,7 @@ class ApplicationContext:
         return self._loggers[name]
 
     @contextmanager
-    def request_scope(self, **context: Any) -> Iterator[ThreadSafeContainer]:
+    def request_scope(self, **context: Any) -> Iterator[ScopedContainer]:
         """Create a request-scoped context.
 
         Args:

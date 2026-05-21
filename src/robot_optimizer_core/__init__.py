@@ -68,9 +68,13 @@ from .api import (
 # Configuration
 from .config import Settings, get_settings, reset_settings
 
-# Dependency injection — not part of the public API; importable for advanced use
-from .di import ThreadSafeContainer as ThreadSafeContainer
-from .di import get_container as get_container
+# Application context — primary entry point for wiring services
+from .context import (
+    ApplicationConfig as ApplicationConfig,
+    ApplicationContext as ApplicationContext,
+    create_application as create_application,
+    create_test_application as create_test_application,
+)
 
 # Core services — not part of the public API; importable for advanced use
 from .discovery import FileDiscoveryService as FileDiscoveryService
@@ -157,19 +161,18 @@ from .service import (
     DirectoryAnalysisResult,
 )
 
-# Deprecated alias — use ThreadSafeContainer directly; will be removed in a future release
-Container = ThreadSafeContainer
-
 __all__ = [
     "AnalysisError",
     # Service layer (recommended for most uses)
     "AnalysisResult",
     "AnalysisService",
     "DirectoryAnalysisResult",
+    # Application context — primary entry point for wiring services
+    "ApplicationConfig",
+    "ApplicationContext",
     # Analyzer classes
     "BaseAnalyzer",
     "ConfigurationError",
-    "Container",  # deprecated alias for ThreadSafeContainer
     "DeadCodeAnalyzer",
     # Domain value objects used in findings
     "DiskFileProvider",
@@ -200,7 +203,6 @@ __all__ = [
     "TagConsistencyAnalyzer",
     "TestDocumentationAnalyzer",
     "TestFile",
-    "ThreadSafeContainer",
     # Version
     "__version__",
     "__version_info__",
@@ -208,6 +210,8 @@ __all__ = [
     # High-level API — primary entry points
     "analyze_file",
     "analyze_suite",
+    "create_application",
+    "create_test_application",
     "get_analyzer",
     "get_settings",
     # Premium detection (useful for plugin authors)

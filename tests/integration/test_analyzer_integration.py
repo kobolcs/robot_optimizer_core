@@ -13,7 +13,6 @@ from pathlib import Path
 import pytest
 
 from robot_optimizer_core import (
-    Container,
     DeadCodeAnalyzer,
     FileDiscoveryService,
     Finding,
@@ -26,6 +25,7 @@ from robot_optimizer_core import (
     get_analyzer_registry,
     register_analyzer,
 )
+from robot_optimizer_core.di import ThreadSafeContainer as Container
 from robot_optimizer_core.analyzers import BaseAnalyzer
 from robot_optimizer_core.domain.repositories import TestResultRepository
 from robot_optimizer_core.domain.value_objects import (
