@@ -6,6 +6,7 @@
 [![Coverage](https://img.shields.io/codecov/c/github/kobolcs/robot_optimizer_core)](https://codecov.io/gh/kobolcs/robot_optimizer_core)
 [![Documentation](https://img.shields.io/badge/docs-mkdocs-blue)](https://kobolcs.github.io/robot_optimizer_core)
 [![CI](https://github.com/kobolcs/robot_optimizer_core/actions/workflows/ci.yml/badge.svg)](https://github.com/kobolcs/robot_optimizer_core/actions/workflows/ci.yml)
+[![Mutation Testing](https://github.com/kobolcs/robot_optimizer_core/actions/workflows/mutation.yml/badge.svg)](https://github.com/kobolcs/robot_optimizer_core/actions/workflows/mutation.yml)
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/kobolcs/robot_optimizer_core/master.svg)](https://results.pre-commit.ci/latest/github/kobolcs/robot_optimizer_core/master)
 
 Beta-quality static analysis engine for Robot Framework suite health auditing. Find dead keywords, unsafe sleeps, and broken tag conventions across your Robot Framework suite in seconds.

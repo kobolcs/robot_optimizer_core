@@ -1,0 +1,70 @@
+name: Mutation Testing
+
+on:
+  push:
+    branches: [ master, main ]
+    paths:
+      - 'src/robot_optimizer_core/analyzers/**'
+      - 'tests/unit/analyzers/**'
+      - 'mutmut_config.py'
+  pull_request:
+    paths:
+      - 'src/robot_optimizer_core/analyzers/**'
+      - 'tests/unit/analyzers/**'
+      - 'mutmut_config.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mutation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mutmut:
+    name: Mutation testing (analyzers)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install mutmut
+
+      - name: Run mutmut
+        # Always succeed here so we can report results even on high survival rate.
+        run: mutmut run || true
+
+      - name: Check survival rate (≤ 20%)
+        run: python ci/check_mutation_rate.py --max-rate 0.20
+
+      - name: Upload mutmut cache
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutmut-cache
+          path: .mutmut-cache
+          retention-days: 7
+
+      - name: Generate HTML report
+        if: always()
+        run: mutmut html || true
+
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutmut-html-report
+          path: html/
+          retention-days: 7

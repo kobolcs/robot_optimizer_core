@@ -64,6 +64,7 @@ dev = [
     "pytest-timeout>=2.3.0",
     "pytest-mock>=3.14.0",
     "hypothesis>=6.112.0",
+    "mutmut>=2.4.0",  # Mutation testing
     "watchdog>=4.0.0",  # For watch mode CLI testing
 
     # Code quality - Latest 2025 versions
