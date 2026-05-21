@@ -16,6 +16,7 @@ from ..cache import AnalysisCache
 from ..config.settings import Settings
 from ..domain.value_objects import Finding, Severity
 from ..exceptions import AnalysisError
+from ._baseline import filter_baseline, load_baseline, save_baseline
 from ._formatters import _format_json, _format_junit, _format_sarif, _format_text
 from ._html import _format_html
 
@@ -276,6 +277,15 @@ def _run_analyze(args: argparse.Namespace) -> int:
     if all_findings is None:
         return _EXIT_ERROR
 
+    # --baseline / --update-baseline handling
+    baseline_path = getattr(args, "baseline", None)
+    update_baseline = getattr(args, "update_baseline", False)
+    if baseline_path is not None:
+        baseline_file = Path(baseline_path)
+        return _run_with_baseline(
+            all_findings, baseline_file, update_baseline, partial_failure, args
+        )
+
     if _write_output(all_findings, args) == _EXIT_ERROR:
         return _EXIT_ERROR
 
@@ -286,6 +296,61 @@ def _run_analyze(args: argparse.Namespace) -> int:
     if all_findings and not args.no_fail:
         return _EXIT_FINDINGS
     return _EXIT_OK
+
+
+def _run_with_baseline(
+    all_findings: list[Finding],
+    baseline_file: Path,
+    update_baseline: bool,
+    partial_failure: bool,
+    args: argparse.Namespace,
+) -> int:
+    """Apply baseline logic: write, update, or filter findings."""
+    # First run or forced update: write baseline and exit clean.
+    if not baseline_file.exists() or update_baseline:
+        try:
+            save_baseline(all_findings, baseline_file)
+        except OSError as exc:
+            print(f"error: could not write baseline '{baseline_file}': {exc}", file=sys.stderr)
+            return _EXIT_ERROR
+        action = "Updated" if baseline_file.exists() and update_baseline else "Created"
+        print(
+            f"Baseline {action.lower()}: {baseline_file} ({len(all_findings)} finding(s))",
+            file=sys.stderr,
+        )
+        return _EXIT_OK
+
+    # Subsequent runs: load baseline and suppress matching findings.
+    try:
+        baseline_keys = load_baseline(baseline_file)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return _EXIT_ERROR
+
+    new_findings, suppressed = filter_baseline(all_findings, baseline_keys)
+
+    # Only report new findings.
+    if _write_output(new_findings, args) == _EXIT_ERROR:
+        return _EXIT_ERROR
+
+    _print_baseline_summary(new_findings, suppressed)
+
+    if partial_failure:
+        return _EXIT_PARTIAL
+    if new_findings and not args.no_fail:
+        return _EXIT_FINDINGS
+    return _EXIT_OK
+
+
+def _print_baseline_summary(
+    new_findings: list[Finding], suppressed: list[Finding]
+) -> None:
+    total = len(new_findings) + len(suppressed)
+    print(
+        f"Baseline: {len(new_findings)} new, {len(suppressed)} suppressed "
+        f"(of {total} total finding(s))",
+        file=sys.stderr,
+    )
 
 
 def _print_summary(findings: list[Finding]) -> None:

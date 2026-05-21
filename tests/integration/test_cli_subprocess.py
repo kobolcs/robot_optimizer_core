@@ -203,3 +203,117 @@ class TestHtmlFormatSubprocess:
         assert "<html" in out.read_text(encoding="utf-8").lower()
         assert "Results written to" in result.stdout
         assert "Robot Framework Suite Health Report" not in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# --baseline / --update-baseline
+# ---------------------------------------------------------------------------
+
+_SLEEP_ROBOT = """\
+*** Settings ***
+Library    BuiltIn
+
+*** Test Cases ***
+My Slow Test
+    Sleep    2s
+    Log    done
+"""
+
+
+@pytest.mark.integration
+class TestBaselineSubprocess:
+    def test_first_run_creates_baseline_file(self, tmp_path: Path) -> None:
+        robot_file = tmp_path / "suite.robot"
+        robot_file.write_text(_SLEEP_ROBOT, encoding="utf-8")
+        baseline = tmp_path / "baseline.json"
+
+        result = _run("analyze", str(robot_file), "--baseline", str(baseline), "--no-fail")
+
+        assert result.returncode == 0
+        assert baseline.exists()
+        assert "baseline" in result.stderr.lower()
+
+    def test_first_run_writes_findings_to_baseline(self, tmp_path: Path) -> None:
+        robot_file = tmp_path / "suite.robot"
+        robot_file.write_text(_SLEEP_ROBOT, encoding="utf-8")
+        baseline = tmp_path / "baseline.json"
+
+        _run("analyze", str(robot_file), "--baseline", str(baseline), "--no-fail")
+
+        import json as _json
+        data = _json.loads(baseline.read_text(encoding="utf-8"))
+        assert isinstance(data, list)
+
+    def test_second_run_suppresses_baseline_findings(self, tmp_path: Path) -> None:
+        robot_file = tmp_path / "suite.robot"
+        robot_file.write_text(_SLEEP_ROBOT, encoding="utf-8")
+        baseline = tmp_path / "baseline.json"
+
+        # First run: create baseline
+        _run("analyze", str(robot_file), "--baseline", str(baseline), "--no-fail")
+
+        # Second run: all findings should be suppressed → exit 0, no new findings
+        result = _run("analyze", str(robot_file), "--baseline", str(baseline))
+
+        assert result.returncode == 0
+        assert "suppressed" in result.stderr
+
+    def test_second_run_summary_shows_counts(self, tmp_path: Path) -> None:
+        robot_file = tmp_path / "suite.robot"
+        robot_file.write_text(_SLEEP_ROBOT, encoding="utf-8")
+        baseline = tmp_path / "baseline.json"
+
+        _run("analyze", str(robot_file), "--baseline", str(baseline), "--no-fail")
+        result = _run("analyze", str(robot_file), "--baseline", str(baseline), "--no-fail")
+
+        assert "new" in result.stderr
+        assert "suppressed" in result.stderr
+
+    def test_update_baseline_refreshes_file(self, tmp_path: Path) -> None:
+        robot_file = tmp_path / "suite.robot"
+        robot_file.write_text(_SLEEP_ROBOT, encoding="utf-8")
+        baseline = tmp_path / "baseline.json"
+
+        # First run: create baseline
+        _run("analyze", str(robot_file), "--baseline", str(baseline), "--no-fail")
+
+        # Modify the robot file to introduce a different finding set
+        robot_file.write_text(
+            _SLEEP_ROBOT + "\nAnother Test\n    Sleep    5s\n", encoding="utf-8"
+        )
+
+        result = _run(
+            "analyze", str(robot_file), "--baseline", str(baseline), "--update-baseline", "--no-fail"
+        )
+
+        assert result.returncode == 0
+        assert "baseline" in result.stderr.lower()
+
+    def test_new_finding_not_in_baseline_exits_one(self, tmp_path: Path) -> None:
+        robot_file = tmp_path / "suite.robot"
+        robot_file.write_text(_SLEEP_ROBOT, encoding="utf-8")
+        baseline = tmp_path / "baseline.json"
+
+        # First run: create baseline with current findings
+        _run("analyze", str(robot_file), "--baseline", str(baseline), "--no-fail")
+
+        # Add a new sleep on a different line → new finding not in baseline
+        robot_file.write_text(
+            _SLEEP_ROBOT + "\nNew Test\n    Sleep    3s\n", encoding="utf-8"
+        )
+
+        result = _run("analyze", str(robot_file), "--baseline", str(baseline))
+
+        # Has new findings → exit 1
+        assert result.returncode == 1
+
+    def test_invalid_baseline_file_exits_error(self, tmp_path: Path) -> None:
+        robot_file = tmp_path / "suite.robot"
+        robot_file.write_text(_SLEEP_ROBOT, encoding="utf-8")
+        baseline = tmp_path / "baseline.json"
+        baseline.write_text("{invalid json", encoding="utf-8")
+
+        result = _run("analyze", str(robot_file), "--baseline", str(baseline))
+
+        assert result.returncode == 2
+        assert "error" in result.stderr.lower()

@@ -104,6 +104,23 @@ def _build_parser() -> argparse.ArgumentParser:
         default=False,
         help="Watch mode: re-analyze on file save and show diff (requires watchdog library)",
     )
+    analyze_cmd.add_argument(
+        "--baseline",
+        metavar="FILE",
+        default=None,
+        help=(
+            "Path to a baseline JSON file.  On first run (or when the file "
+            "does not exist) all findings are written to the file and the "
+            "command exits 0.  On subsequent runs, findings that match a "
+            "baseline entry are suppressed; only new findings are reported."
+        ),
+    )
+    analyze_cmd.add_argument(
+        "--update-baseline",
+        action="store_true",
+        default=False,
+        help="Refresh the baseline file with the current run's findings.",
+    )
 
     # -- list-analyzers subcommand ---------------------------------
     list_cmd = sub.add_parser(
