@@ -305,19 +305,20 @@ class TestValidatedPluginManager:
             manager.load_plugin_from_file(plugin_file)
 
     def test_force_true_emits_warning_and_skips_validation(
-        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+        self,
+        tmp_path: Path,
+        caplog: pytest.LogCaptureFixture,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         plugin_file = tmp_path / "forced.py"
         plugin_file.write_bytes(b"import os\n")  # would be rejected by validator
         plugin_file.chmod(0o644)
 
+        monkeypatch.setenv("ROBOT_OPTIMIZER_ALLOW_UNSAFE_PLUGINS", "1")
         manager = ValidatedPluginManager()
         with caplog.at_level(logging.WARNING, logger="robot_optimizer_core.plugin"):
             with pytest.raises(PluginError):
-                manager.load_plugin_from_file(
-                    plugin_file,
-                    bypass_security=ValidatedPluginManager._BYPASS_SENTINEL,
-                )
+                manager.load_plugin_from_file(plugin_file, bypass_validation=True)
 
         warning_messages = [
             r.message for r in caplog.records if r.levelno >= logging.WARNING
@@ -328,19 +329,20 @@ class TestValidatedPluginManager:
         ), f"Expected bypass warning, got: {warning_messages}"
 
     def test_force_true_warning_includes_path(
-        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+        self,
+        tmp_path: Path,
+        caplog: pytest.LogCaptureFixture,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         plugin_file = tmp_path / "forced.py"
         plugin_file.write_bytes(b"import os\n")
         plugin_file.chmod(0o644)
 
+        monkeypatch.setenv("ROBOT_OPTIMIZER_ALLOW_UNSAFE_PLUGINS", "1")
         manager = ValidatedPluginManager()
         with caplog.at_level(logging.WARNING, logger="robot_optimizer_core.plugin"):
             with pytest.raises(PluginError):
-                manager.load_plugin_from_file(
-                    plugin_file,
-                    bypass_security=ValidatedPluginManager._BYPASS_SENTINEL,
-                )
+                manager.load_plugin_from_file(plugin_file, bypass_validation=True)
 
         warning_texts = " ".join(
             r.message for r in caplog.records if r.levelno >= logging.WARNING

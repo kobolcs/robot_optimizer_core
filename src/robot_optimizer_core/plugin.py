@@ -6,6 +6,7 @@ from __future__ import annotations
 import ast
 import builtins as _builtins_module
 import hashlib
+import os
 import sys
 from abc import ABC, abstractmethod
 from collections.abc import Callable
@@ -185,6 +186,12 @@ class SecurityVisitor(ast.NodeVisitor):
         "execfile",
         "file",
         "reload",
+        # Introspection builtins that can expose internals not caught by
+        # _DANGEROUS_ATTRS (e.g. vars(obj) bypasses the __dict__ attr check).
+        "vars",
+        "dir",
+        "locals",
+        "globals",
     })
 
     # Dangerous attributes that can be used with getattr/setattr (immutable)
@@ -332,24 +339,20 @@ class ValidatedPluginManager:
         """Compute SHA-256 hash of a file."""
         return hashlib.sha256(file_path.read_bytes()).hexdigest()
 
-    #: Sentinel string required to bypass security validation.
-    _BYPASS_SENTINEL = "I understand this bypasses security validation"
+    def _validate_and_check_plugin(self, file_path: Path, bypass_validation: bool = False) -> str:
+        """Validate plugin file and return its hash. Raises PluginError if validation fails.
 
-    def _validate_and_check_plugin(self, file_path: Path, bypass_security: str = "") -> str:
-        """Validate plugin file and return its hash. Raises PluginError if validation fails."""
+        bypass_validation is only honoured when the environment variable
+        ROBOT_OPTIMIZER_ALLOW_UNSAFE_PLUGINS=1 is set, so bypasses require an
+        explicit deployment-level opt-in rather than a call-site string match.
+        """
         file_hash = self._compute_file_hash(file_path)
         if file_hash in self.trusted_hashes:
             logger.info(f"Loading trusted plugin: {file_path}")
             return file_hash
 
-        if bypass_security != self._BYPASS_SENTINEL:
-            is_safe, violations = self.validator.validate_file(file_path)
-            if not is_safe:
-                raise PluginError(
-                    f"Plugin failed security validation: {file_path}",
-                    details={"violations": violations, "file_hash": file_hash},
-                )
-        else:
+        allow_unsafe = os.environ.get("ROBOT_OPTIMIZER_ALLOW_UNSAFE_PLUGINS") == "1"
+        if bypass_validation and allow_unsafe:
             msg = (
                 f"SECURITY WARNING: Plugin security validation bypassed: "
                 f"{file_path} (hash: {file_hash})"
@@ -358,6 +361,13 @@ class ValidatedPluginManager:
             # application logging is disabled or redirected.
             print(msg, file=sys.stderr, flush=True)
             logger.warning(msg)
+        else:
+            is_safe, violations = self.validator.validate_file(file_path)
+            if not is_safe:
+                raise PluginError(
+                    f"Plugin failed security validation: {file_path}",
+                    details={"violations": violations, "file_hash": file_hash},
+                )
 
         return file_hash
 
@@ -426,17 +436,17 @@ class ValidatedPluginManager:
     def load_plugin_from_file(
         self,
         file_path: Path,
-        bypass_security: str = "",
+        bypass_validation: bool = False,
     ) -> None:
         """Securely load a plugin from a file.
 
         Args:
             file_path: Path to the plugin file.
-            bypass_security: Pass
-                ``ValidatedPluginManager._BYPASS_SENTINEL`` to skip AST
-                validation.  **Not recommended** — only for development use.
-                Any other value (including the default empty string) leaves
-                validation enabled.
+            bypass_validation: When ``True`` **and** the environment variable
+                ``ROBOT_OPTIMIZER_ALLOW_UNSAFE_PLUGINS=1`` is set, AST
+                validation is skipped.  Both conditions must be satisfied so
+                that bypasses require an explicit deployment-level opt-in.
+                **Not recommended** — only for development use.
 
         Raises:
             PluginError: If plugin fails security validation or cannot be loaded.
@@ -445,7 +455,7 @@ class ValidatedPluginManager:
             raise PluginError(f"Plugin file not found: {file_path}")
 
         try:
-            file_hash = self._validate_and_check_plugin(file_path, bypass_security)
+            file_hash = self._validate_and_check_plugin(file_path, bypass_validation)
             restricted_globals = self._create_restricted_globals(file_path)
 
             # Execute in restricted environment with layered security:
@@ -472,15 +482,15 @@ class ValidatedPluginManager:
     # Keep force= as a deprecated shim so existing callers get a clear error
     # rather than silently bypassing validation with a wrong signature.
     def load_plugin_from_file_force(self, file_path: Path) -> None:
-        """Deprecated: use load_plugin_from_file with bypass_security sentinel."""
+        """Deprecated: use load_plugin_from_file with bypass_validation=True."""
         import warnings
         warnings.warn(
             "load_plugin_from_file_force is deprecated. Use load_plugin_from_file "
-            f"with bypass_security={self._BYPASS_SENTINEL!r}.",
+            "with bypass_validation=True (and set ROBOT_OPTIMIZER_ALLOW_UNSAFE_PLUGINS=1).",
             DeprecationWarning,
             stacklevel=2,
         )
-        self.load_plugin_from_file(file_path, bypass_security=self._BYPASS_SENTINEL)
+        self.load_plugin_from_file(file_path, bypass_validation=True)
 
     def unload_plugin(self, name: str) -> None:
         """Unload a plugin."""

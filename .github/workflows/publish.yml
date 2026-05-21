@@ -37,8 +37,29 @@ jobs:
           name: dist
           path: dist/
 
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install tox
+        run: python -m pip install --upgrade pip tox  # NOSONAR
+
+      - name: Run tests
+        run: tox -e py312
+
   publish-pypi:
-    needs: build
+    needs: [build, test]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')

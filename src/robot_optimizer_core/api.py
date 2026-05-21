@@ -711,6 +711,14 @@ def analyze_suite(
     for _suite_analyzer in suite_aware_analyzers:
         _run_suite_analysis(_suite_analyzer, test_files_for_suite, all_findings, file_findings)
 
+    # Apply min_severity filter before computing statistics and returning.
+    if min_severity is not None:
+        all_findings = [f for f in all_findings if f.severity <= min_severity]
+        file_findings = {
+            p: [f for f in fs if f.severity <= min_severity]
+            for p, fs in file_findings.items()
+        }
+
     # Calculate statistics
     statistics = _calculate_suite_statistics(all_findings, suite_info)
 

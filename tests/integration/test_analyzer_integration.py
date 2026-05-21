@@ -485,7 +485,7 @@ class TestAnalyzerPerformance:
         load_time = time() - start
 
         assert load_time < 1.0  # Should load in under 1 second
-        assert test_file.line_count == len(test_file.content.split("\n"))
+        assert test_file.line_count == len(test_file.content.splitlines())
 
         # Time analysis
         analyzer = SleepDetector()

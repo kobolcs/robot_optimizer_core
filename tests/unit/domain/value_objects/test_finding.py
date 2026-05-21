@@ -154,7 +154,7 @@ class TestFinding:
                 location=sample_location,
                 message="",
             )
-        assert "at least 1 character" in str(exc_info.value)
+        assert "Finding message cannot be empty" in str(exc_info.value)
 
         # Whitespace-only message
         with pytest.raises(ValidationError) as exc_info:

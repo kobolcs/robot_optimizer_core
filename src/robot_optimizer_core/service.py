@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple
 
+from .api import ErrorHandling
 from .api import analyze_directory as _api_analyze_directory
 from .api import analyze_file as _api_analyze_file
 from .config import Settings
@@ -72,7 +73,7 @@ class DirectoryAnalysisResult(NamedTuple):
         return len(self.results)
 
     @property
-    def error_count(self) -> int:
+    def failed_file_count(self) -> int:
         """Number of files that failed analysis."""
         return len(self.errors)
 
@@ -86,7 +87,7 @@ class DirectoryAnalysisResult(NamedTuple):
         return {
             "directory": str(self.directory),
             "success_count": self.success_count,
-            "error_count": self.error_count,
+            "failed_file_count": self.failed_file_count,
             "total_findings": self.total_findings,
             "errors": [(str(path), str(exc)) for path, exc in self.errors],
         }
@@ -159,6 +160,7 @@ class AnalysisService:
         recursive: bool = True,
         analyzers: list[str | BaseAnalyzer] | None = None,
         min_severity: Severity | None = None,
+        error_handling: ErrorHandling = "warn",
     ) -> DirectoryAnalysisResult:
         """Analyze all Robot Framework files in a directory.
 
@@ -169,6 +171,8 @@ class AnalysisService:
             recursive: Whether to search subdirectories (default: True)
             analyzers: Optional list of analyzer names to run (default: all)
             min_severity: Optional minimum severity to return
+            error_handling: How to handle per-file errors (default: "warn").
+                Pass "raise" to get exception propagation instead of partial results.
 
         Returns:
             DirectoryAnalysisResult with all findings and any errors
@@ -181,7 +185,7 @@ class AnalysisService:
             recursive=recursive,
             analyzers=analyzers,
             settings=self.settings,
-            error_handling="warn",  # Return partial results on error
+            error_handling=error_handling,
             min_severity=min_severity,
         )
 

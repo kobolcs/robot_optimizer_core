@@ -38,7 +38,6 @@ __all__ = [
     "ServiceDescriptor",
     "ServiceLifetime",
     "ThreadSafeContainer",
-    "_set_global_container",
     "get_container",
     "reset_container",
 ]
@@ -404,12 +403,18 @@ def reset_container() -> None:
     # Reset co-located globals so all singletons are torn down together,
     # preventing metric/cache bleed between test runs.
     from .analyzers.registry import reset_registry
+    from .domain.entities.test_file import _cache_lock, _from_path_cache
     from .metrics import reset_metrics
     from .plugin import reset_plugin_registry
 
     reset_registry()
     reset_plugin_registry()
     reset_metrics()
+
+    # Clear the module-level TestFile path cache so stale content cannot leak
+    # across test runs or repeated reset_container() calls.
+    with _cache_lock:
+        _from_path_cache.clear()
 
 
 def _register_defaults(container: ThreadSafeContainer) -> None:

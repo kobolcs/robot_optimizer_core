@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import re as _re
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -47,7 +48,12 @@ class Finding(ValueObject):
     )
 
     def __eq__(self, other: object) -> bool:
-        """Compare findings by content, excluding the auto-generated id."""
+        """Compare findings by content, excluding the auto-generated id and context.
+
+        context is additional metadata, not identity — two findings that describe
+        the same problem at the same location are equal regardless of context.
+        This keeps __eq__ consistent with __hash__.
+        """
         if not isinstance(other, Finding):
             return NotImplemented
         return (
@@ -55,11 +61,10 @@ class Finding(ValueObject):
             and self.severity == other.severity
             and self.location == other.location
             and self.message == other.message
-            and self.context == other.context
         )
 
     def __hash__(self) -> int:
-        """Hash by content fields only (id excluded)."""
+        """Hash by content fields only (id and context excluded)."""
         return hash((self.pattern, self.severity, self.location, self.message))
 
     @field_validator("message", mode="before")
@@ -76,8 +81,6 @@ class Finding(ValueObject):
         Raises:
             ValueError: If message is empty or only whitespace
         """
-        if v == "":
-            return v
         if not v.strip():
             raise ValueError("Finding message cannot be empty")
         return v.strip()
@@ -290,10 +293,8 @@ class Finding(ValueObject):
         Returns:
             True when the line carries a suppression that covers this finding.
         """
-        import re
-
         pattern_str = r"#\s*robot-optimizer\s*:\s*ignore(?:\[([^\]]*)\])?"
-        m = re.search(pattern_str, source_line, re.IGNORECASE)
+        m = _re.search(pattern_str, source_line, _re.IGNORECASE)
         if not m:
             return False
 

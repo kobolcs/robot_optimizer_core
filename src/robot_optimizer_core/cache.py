@@ -14,14 +14,15 @@ from __future__ import annotations
 import hashlib
 import importlib.metadata
 import json
-import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+from .logging import get_logger
 
 if TYPE_CHECKING:
     from .domain.value_objects import Finding
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 _DEFAULT_CACHE_DIR = Path.home() / ".cache" / "robot-optimizer"
 _CACHE_FILENAME = "cache.json"

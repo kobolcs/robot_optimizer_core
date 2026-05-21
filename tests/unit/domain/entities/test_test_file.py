@@ -204,7 +204,7 @@ class TestTestFile:
         assert test_file.is_resource_file is False
 
         # line_count property
-        assert test_file.line_count == 4  # 3 lines + empty line at end
+        assert test_file.line_count == 3  # splitlines() does not count trailing newline
 
         # has_content property
         assert test_file.has_content is True

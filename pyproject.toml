@@ -52,7 +52,6 @@ dependencies = [
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.1",
     "robotframework>=7.0",
-    "typing-extensions>=4.15.0",
     "typing-extensions>=4.15.0; python_version < '3.12'",
 ]
 
@@ -153,6 +152,8 @@ include = [
 exclude = [
     "src/robot_optimizer_core/AGENTS.md",
     "src/robot_optimizer_core/CLAUDE.md",
+    "AGENTS.md",
+    "CLAUDE.md",
 ]
 
 # Testing configuration

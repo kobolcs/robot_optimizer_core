@@ -173,6 +173,8 @@ class TZAwareTestFile(Entity[UUID]):
         resolved = path.resolve()
 
         if not content_provided:
+            # Capture stat once; re-using the same stat for the cache key and
+            # entity fields eliminates the TOCTOU window from a second stat().
             stats = path.stat()
             cache_key = (resolved, stats.st_mtime)
 
@@ -195,8 +197,9 @@ class TZAwareTestFile(Entity[UUID]):
             )
             if control_chars > max(1, len(content) // 20):
                 raise ValueError(f"File contains too many control characters: {path}")
+        else:
+            stats = path.stat()
 
-        stats = path.stat()
         last_modified = datetime.fromtimestamp(stats.st_mtime, tz=UTC)
 
         result = cls.model_validate(
@@ -255,7 +258,7 @@ class TZAwareTestFile(Entity[UUID]):
     @property
     def line_count(self) -> int:
         """Return the number of logical lines in the file content."""
-        return len(self.content.split("\n"))
+        return len(self.content.splitlines()) or 1
 
     def get_lines(self, start_line: int = 1, end_line: int | None = None) -> list[str]:
         """Return 1-based inclusive line range from content."""

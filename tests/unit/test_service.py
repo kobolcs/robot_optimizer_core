@@ -104,9 +104,9 @@ class TestDirectoryAnalysisResult:
         r = self._make_result()
         assert r.success_count == 2
 
-    def test_error_count(self) -> None:
+    def test_failed_file_count(self) -> None:
         r = self._make_result()
-        assert r.error_count == 1
+        assert r.failed_file_count == 1
 
     def test_total_findings(self) -> None:
         r = self._make_result()
@@ -117,7 +117,7 @@ class TestDirectoryAnalysisResult:
         d = r.to_dict()
         assert "directory" in d
         assert "success_count" in d
-        assert "error_count" in d
+        assert "failed_file_count" in d
         assert "total_findings" in d
         assert "errors" in d
 
