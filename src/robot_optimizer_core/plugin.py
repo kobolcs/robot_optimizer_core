@@ -159,7 +159,7 @@ class PluginSecurityValidator:
             # Check file permissions on POSIX only.
             # Windows does not track group/other write bits (st_mode & 0o022
             # is always 0 there), so this check is meaningless on Windows.
-            if sys.platform != "win32":
+            if sys.platform != "win32":  # pragma: no cover
                 stat = file_path.stat()
                 if stat.st_mode & 0o022:
                     violations.append("Plugin file is writable by group/others")
