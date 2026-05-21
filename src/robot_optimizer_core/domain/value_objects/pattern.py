@@ -3,7 +3,7 @@
 
 import builtins
 from enum import Enum, auto
-from typing import ClassVar
+from typing import ClassVar, TypeAlias
 
 from pydantic import ConfigDict, Field, field_validator
 
@@ -51,15 +51,22 @@ class PatternType(Enum):
     CIRCULAR_IMPORT = auto()
 
 
+# Module-level alias used inside Pattern's class body.
+# The ClassVar named `PatternType` in Pattern would shadow the enum name in
+# class-body annotations, causing mypy [valid-type].  Using a distinct alias
+# (_PatternTypeT) avoids the collision without changing the public API.
+_PatternTypeT: TypeAlias = PatternType
+
+
 class Pattern(ValueObject):
     """Represents an optimization pattern that was matched."""
 
     model_config = ConfigDict(use_enum_values=False, populate_by_name=True)
 
     # Backward-compatible nested enum access: Pattern.PatternType.X
-    PatternType: ClassVar[builtins.type[PatternType]] = PatternType
+    PatternType: ClassVar[builtins.type[_PatternTypeT]] = PatternType
 
-    pattern_type: PatternType = Field(..., alias="type", description="Type of pattern")
+    pattern_type: _PatternTypeT = Field(..., alias="type", description="Type of pattern")
     name: str = Field(..., min_length=1, description="Pattern name")
     description: str = Field(..., min_length=1, description="Pattern description")
     recommendation: str = Field(
@@ -69,7 +76,7 @@ class Pattern(ValueObject):
     auto_fixable: bool = Field(False, description="Whether this can be auto-fixed")
 
     @property
-    def type(self) -> PatternType:
+    def type(self) -> _PatternTypeT:
         """Backwards-compatible alias for pattern_type."""
         return self.pattern_type
 

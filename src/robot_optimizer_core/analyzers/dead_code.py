@@ -12,6 +12,7 @@ import re
 import sys
 from collections import defaultdict
 from collections.abc import Generator, Sequence
+from typing import Any
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -269,7 +270,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
             if any(p.match(display_name) for p in self._ignore_patterns):
                 continue
             pattern = Pattern(
-                type=PatternType.UNUSED_KEYWORD,
+                pattern_type=PatternType.UNUSED_KEYWORD,
                 name="Unused Keyword",
                 description=f"Keyword '{display_name}' is never called in the suite",
                 recommendation="Remove this keyword or use it in your tests",
@@ -345,10 +346,10 @@ class DeadCodeAnalyzer(BaseAnalyzer):
 
         return dict(keywords), calls, keyword_display_names, candidate_calls
 
-    def _collect_ast_calls(self, model: object) -> list[str]:
+    def _collect_ast_calls(self, model: Any) -> list[str]:
         """Recursively collect all keyword call names from a robot model."""
         calls: list[str] = []
-        for section in model.sections:  # type: ignore[attr-defined]
+        for section in model.sections:
             section_body = getattr(section, "body", None)
             if section_body:
                 self._walk_body(section_body, calls)
@@ -568,7 +569,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                     continue
 
                 pattern = Pattern(
-                    type=PatternType.UNUSED_KEYWORD,
+                    pattern_type=PatternType.UNUSED_KEYWORD,
                     name="Unused Keyword",
                     description=f"Keyword '{display_name}' is never called",
                     recommendation="Remove this keyword or use it in your tests",
@@ -615,7 +616,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         self, test_file: TestFile, line_num: int, keyword_name: str
     ) -> Finding:
         pattern = Pattern(
-            type=PatternType.UNREACHABLE_CODE,
+            pattern_type=PatternType.UNREACHABLE_CODE,
             name="Unreachable Code",
             description="Code after RETURN statement will never execute",
             recommendation="Remove the unreachable code or move it before RETURN",

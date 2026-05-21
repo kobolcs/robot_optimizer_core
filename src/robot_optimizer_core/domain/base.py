@@ -274,7 +274,7 @@ class AggregateRoot(Entity[T], ABC):
         self._events.clear()
         return events
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # pydantic/mypy: computed_field+property pattern not yet suppressed by plugin
     @property
     def has_events(self) -> bool:
         """Check if there are pending events.
@@ -284,7 +284,7 @@ class AggregateRoot(Entity[T], ABC):
         """
         return len(self._events) > 0
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # pydantic/mypy: computed_field+property pattern not yet suppressed by plugin
     @property
     def event_count(self) -> int:
         """Get the count of pending events.
@@ -368,7 +368,7 @@ class DomainEvent(BaseModel, ABC):
         default_factory=create_timestamp, description="When the event occurred (UTC)"
     )
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # pydantic/mypy: computed_field+property pattern not yet suppressed by plugin
     @property
     def event_name(self) -> str:
         """Get the event name derived from class name.
@@ -392,7 +392,7 @@ class DomainEvent(BaseModel, ABC):
 
         return name
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # pydantic/mypy: computed_field+property pattern not yet suppressed by plugin
     @property
     def event_version(self) -> str:
         """Get the event version.

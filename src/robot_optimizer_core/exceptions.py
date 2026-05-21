@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import TypeVar
+from typing import Any, TypeVar
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -313,7 +313,7 @@ class RepositoryError(RobotOptimizerError):
         self.operation = operation
 
 
-def create_error(error_class: type[E], message: str, **kwargs: object) -> E:
+def create_error(error_class: type[E], message: str, **kwargs: Any) -> E:
     """Factory function to create errors with consistent formatting.
 
     Args:
@@ -332,4 +332,4 @@ def create_error(error_class: type[E], message: str, **kwargs: object) -> E:
         ...     analyzer="DeadCodeAnalyzer"
         ... )
     """
-    return error_class(message, **kwargs)  # type: ignore[arg-type]
+    return error_class(message, **kwargs)

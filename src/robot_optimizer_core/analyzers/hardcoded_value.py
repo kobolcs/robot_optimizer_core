@@ -253,7 +253,7 @@ class HardcodedValueAnalyzer(BaseAnalyzer):
         severity: Severity = Severity.WARNING,
     ) -> Finding:
         pattern = Pattern(
-            type=PatternType.HARDCODED_VALUE,
+            pattern_type=PatternType.HARDCODED_VALUE,
             name="Hardcoded Value",
             description=description,
             recommendation=recommendation,

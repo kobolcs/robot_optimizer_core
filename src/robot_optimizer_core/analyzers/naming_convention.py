@@ -211,7 +211,7 @@ class NamingConventionAnalyzer(BaseAnalyzer):
             return None
 
         pattern = Pattern(
-            type=PatternType.CAMEL_CASE_NAME,
+            pattern_type=PatternType.CAMEL_CASE_NAME,
             name="CamelCase Name",
             description=(
                 f"{entity_type.title()} '{name}' uses CamelCase instead of "
@@ -240,7 +240,7 @@ class NamingConventionAnalyzer(BaseAnalyzer):
         self, inner: str, line_num: int, test_file: TestFile
     ) -> Finding:
         pattern = Pattern(
-            type=PatternType.HARDCODED_VALUE,
+            pattern_type=PatternType.HARDCODED_VALUE,
             name="CamelCase Variable",
             description=f"Variable '${{{inner}}}' uses CamelCase",
             recommendation=(

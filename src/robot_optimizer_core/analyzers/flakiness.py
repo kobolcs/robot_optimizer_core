@@ -258,7 +258,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
 
         # Create pattern
         pattern = Pattern(
-            type=PatternType.INEFFICIENT_WAIT,  # Often the cause
+            pattern_type=PatternType.INEFFICIENT_WAIT,  # Often the cause
             name="Flaky Test",
             description=f"Test '{stats.test_name}' fails inconsistently",
             recommendation=self._get_recommendation(stats),

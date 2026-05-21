@@ -40,7 +40,7 @@ from __future__ import annotations
 
 import functools
 from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from ..exceptions import RobotOptimizerError
 
@@ -155,7 +155,7 @@ def requires_premium(feature_name: str) -> Callable[[F], F]:
                 raise PremiumFeatureError(feature_name)
             return func(*args, **kwargs)
 
-        return wrapper  # type: ignore[return-value]
+        return cast(F, wrapper)
 
     return decorator
 

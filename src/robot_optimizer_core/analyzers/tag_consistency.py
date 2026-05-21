@@ -186,7 +186,7 @@ class TagConsistencyAnalyzer(BaseAnalyzer):
         self, test_name: str, line_num: int, test_file: TestFile
     ) -> Finding:
         pattern = Pattern(
-            type=PatternType.NO_TAGS,
+            pattern_type=PatternType.NO_TAGS,
             name="Missing Tags",
             description=f"Test case '{test_name}' has no [Tags]",
             recommendation=(
@@ -208,7 +208,7 @@ class TagConsistencyAnalyzer(BaseAnalyzer):
         self, tag: str, test_name: str, line_num: int, test_file: TestFile
     ) -> Finding:
         pattern = Pattern(
-            type=PatternType.SINGLETON_TAG,
+            pattern_type=PatternType.SINGLETON_TAG,
             name="Singleton Tag",
             description=(f"Tag '{tag}' is only used in '{test_name}' — possible typo"),
             recommendation=(
@@ -231,7 +231,7 @@ class TagConsistencyAnalyzer(BaseAnalyzer):
         self, tag: str, test_name: str, line_num: int, test_file: TestFile
     ) -> Finding:
         pattern = Pattern(
-            type=PatternType.RESERVED_TAG,
+            pattern_type=PatternType.RESERVED_TAG,
             name="Reserved Tag Conflict",
             description=(
                 f"Tag '{tag}' looks like a Robot Framework reserved tag "

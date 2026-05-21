@@ -141,7 +141,7 @@ class SleepDetectorAnalyzer(BaseAnalyzer):
                 "error": float("inf"),
             }
         else:
-            self._severity_thresholds = self.config["severity_thresholds"]  # type: ignore[assignment]
+            self._severity_thresholds = cast(dict[str, float], self.config["severity_thresholds"])
 
         # Configuration
         self._suggest_alternatives = self.get_config_value("suggest_alternatives", True)
@@ -473,7 +473,7 @@ class SleepDetectorAnalyzer(BaseAnalyzer):
         # Handle variable sleep
         if sleep_info["duration"] is None:
             pattern = Pattern(
-                type=PatternType.SLEEP_IN_TEST,
+                pattern_type=PatternType.SLEEP_IN_TEST,
                 name="Variable Sleep",
                 description=f"Sleep with variable duration: ${{{sleep_info['variable']}}}",
                 recommendation="Replace with explicit wait condition",

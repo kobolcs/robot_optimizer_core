@@ -88,7 +88,7 @@ class TestDocumentationAnalyzer(BaseAnalyzer):
             else f"[Documentation] is too short (< {self._min_len} chars)"
         )
         pattern = Pattern(
-            type=PatternType.MISSING_DOCUMENTATION,
+            pattern_type=PatternType.MISSING_DOCUMENTATION,
             name="Missing Documentation",
             description=f"{entity.title()} '{name}' has {reason}",
             recommendation=(

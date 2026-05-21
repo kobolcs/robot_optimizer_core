@@ -43,7 +43,7 @@ class FlakinessStats(ValueObject):
         description="Total runs in the older half of the window",
     )
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # pydantic/mypy: computed_field+property pattern not yet suppressed by plugin
     @property
     def failure_rate(self) -> float:
         """Calculate failure rate as percentage."""
@@ -51,13 +51,13 @@ class FlakinessStats(ValueObject):
             return 0.0
         return self.failures / self.total_runs
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # pydantic/mypy: computed_field+property pattern not yet suppressed by plugin
     @property
     def is_flaky(self) -> bool:
         """Determine if test is considered flaky."""
         return 0 < self.failure_rate < 1.0 and self.total_runs >= 4
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # pydantic/mypy: computed_field+property pattern not yet suppressed by plugin
     @property
     def severity_level(self) -> str:
         """Determine severity level based on failure rate."""
@@ -67,7 +67,7 @@ class FlakinessStats(ValueObject):
             return "WARNING"
         return "INFO"
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # pydantic/mypy: computed_field+property pattern not yet suppressed by plugin
     @property
     def trend(self) -> FlakinessTrend:
         """Determine whether flakiness is improving, stable, or worsening.

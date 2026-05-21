@@ -272,7 +272,7 @@ class TZAwareTestFile(Entity[UUID]):
         )
         return schema
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # pydantic/mypy: computed_field+property pattern not yet suppressed by plugin
     @property
     def last_modified_local(self) -> datetime:
         """Return last-modified time expressed in the entity's display timezone.
@@ -289,14 +289,14 @@ class TZAwareTestFile(Entity[UUID]):
         except (ZoneInfoNotFoundError, KeyError):
             return self.last_modified_utc.astimezone(UTC)
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # pydantic/mypy: computed_field+property pattern not yet suppressed by plugin
     @property
     def age_hours(self) -> float:
         """Get file age in hours."""
         age = utc_now() - self.last_modified_utc
         return age.total_seconds() / 3600
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # pydantic/mypy: computed_field+property pattern not yet suppressed by plugin
     @property
     def is_recently_modified(self) -> bool:
         """Check if file was modified in last 24 hours."""
@@ -329,13 +329,13 @@ class TimezoneAwareDomainEvent(BaseDomainEvent):
 
     @field_validator("occurred_at", mode="before")
     @classmethod
-    def ensure_utc(cls, v: Any) -> datetime:
+    def ensure_utc(cls, v: Any) -> Any:
         """Ensure occurred_at is in UTC."""
         if isinstance(v, datetime):
             return ensure_utc(v)
-        return v  # type: ignore[no-any-return]
+        return v
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # pydantic/mypy: computed_field+property pattern not yet suppressed by plugin
     @property
     def occurred_at_iso(self) -> str:
         """Get ISO format timestamp with timezone."""
@@ -371,14 +371,14 @@ class TimezoneAwareTestResult(BaseTestResult):
             return ensure_utc(dt)
         raise ValueError(f"Cannot convert {type(v)} to datetime")
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # pydantic/mypy: computed_field+property pattern not yet suppressed by plugin
     @property
     def age_days(self) -> float:
         """Get result age in days."""
         age = datetime.now(UTC) - self.timestamp
         return age.total_seconds() / 86400
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # pydantic/mypy: computed_field+property pattern not yet suppressed by plugin
     @property
     def timestamp_iso(self) -> str:
         """Get ISO format timestamp."""

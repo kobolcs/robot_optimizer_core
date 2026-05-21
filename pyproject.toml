@@ -68,7 +68,7 @@ dev = [
 
     # Code quality - Latest 2025 versions
     "ruff>=0.7.0",  # Fast Python linter
-    "mypy>=1.13.0",
+    "mypy>=1.14.0",
 
     # Documentation
     "mkdocs>=1.6.0",

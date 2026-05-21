@@ -108,25 +108,25 @@ class Finding(ValueObject):
         )
 
     # Pydantic v2: computed fields for derived properties
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # pydantic/mypy: computed_field+property pattern not yet suppressed by plugin
     @property
     def file_path(self) -> str:
         """Get the file path as a forward-slash string (cross-platform)."""
         return self.location.file_path.as_posix()
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # pydantic/mypy: computed_field+property pattern not yet suppressed by plugin
     @property
     def line_number(self) -> int:
         """Get the line number."""
         return self.location.line
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # pydantic/mypy: computed_field+property pattern not yet suppressed by plugin
     @property
     def is_auto_fixable(self) -> bool:
         """Check if this finding can be automatically fixed."""
         return self.pattern.auto_fixable
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  # type: ignore[prop-decorator]  # pydantic/mypy: computed_field+property pattern not yet suppressed by plugin
     @property
     def has_context(self) -> bool:
         """Check if finding has additional context."""

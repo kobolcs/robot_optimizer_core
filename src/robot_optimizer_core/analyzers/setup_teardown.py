@@ -317,7 +317,7 @@ class SetupTeardownAnalyzer(BaseAnalyzer):
     ) -> Finding:
         hook = "[Setup]" if kind == "setup" else "[Teardown]"
         pattern = Pattern(
-            type=PatternType.MISSING_SETUP_TEARDOWN,
+            pattern_type=PatternType.MISSING_SETUP_TEARDOWN,
             name=f"Inline {kind.title()} Step",
             description=(
                 f"Test case '{test_name}' contains inline {kind} step "
