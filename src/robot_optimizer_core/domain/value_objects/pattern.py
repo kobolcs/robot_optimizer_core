@@ -54,12 +54,12 @@ class PatternType(Enum):
 class Pattern(ValueObject):
     """Represents an optimization pattern that was matched."""
 
-    model_config = ConfigDict(use_enum_values=False)
+    model_config = ConfigDict(use_enum_values=False, populate_by_name=True)
 
     # Backward-compatible nested enum access: Pattern.PatternType.X
     PatternType: ClassVar[builtins.type[PatternType]] = PatternType
 
-    type: PatternType = Field(..., description="Type of pattern")  # type: ignore[valid-type]
+    pattern_type: PatternType = Field(..., alias="type", description="Type of pattern")
     name: str = Field(..., min_length=1, description="Pattern name")
     description: str = Field(..., min_length=1, description="Pattern description")
     recommendation: str = Field(
@@ -67,6 +67,11 @@ class Pattern(ValueObject):
     )
     documentation_url: str | None = Field(None, description="URL to documentation")
     auto_fixable: bool = Field(False, description="Whether this can be auto-fixed")
+
+    @property
+    def type(self) -> PatternType:
+        """Backwards-compatible alias for pattern_type."""
+        return self.pattern_type
 
     @field_validator("name", "description", "recommendation", mode="before")
     @classmethod
@@ -82,7 +87,7 @@ class Pattern(ValueObject):
     def duplicate_keyword(cls, keyword_name: str) -> "Pattern":
         """Create a pattern for duplicate keyword detection."""
         return cls(
-            type=PatternType.DUPLICATE_KEYWORD,
+            pattern_type=PatternType.DUPLICATE_KEYWORD,
             name="Duplicate Keyword Definition",
             description=(f"Keyword '{keyword_name}' is defined multiple times"),
             recommendation=(
@@ -96,7 +101,7 @@ class Pattern(ValueObject):
     def sleep_in_test(cls, sleep_duration: str) -> "Pattern":
         """Create a pattern for sleep usage in tests."""
         return cls(
-            type=PatternType.SLEEP_IN_TEST,
+            pattern_type=PatternType.SLEEP_IN_TEST,
             name="Sleep in Test Case",
             description=(
                 f"Test uses 'Sleep {sleep_duration}' which makes tests slow and fragile"
@@ -115,7 +120,7 @@ class Pattern(ValueObject):
     def fragile_xpath(cls, xpath: str) -> "Pattern":
         """Create a pattern for fragile XPath detection."""
         return cls(
-            type=PatternType.FRAGILE_XPATH,
+            pattern_type=PatternType.FRAGILE_XPATH,
             name="Fragile XPath Selector",
             description=(f"XPath '{xpath}' uses positional indices which break easily"),
             recommendation=(
@@ -129,7 +134,7 @@ class Pattern(ValueObject):
     def long_test_case(cls, line_count: int, threshold: int = 50) -> "Pattern":
         """Create a pattern for overly long test cases."""
         return cls(
-            type=PatternType.LONG_TEST_CASE,
+            pattern_type=PatternType.LONG_TEST_CASE,
             name="Long Test Case",
             description=(f"Test case has {line_count} lines (threshold: {threshold})"),
             recommendation=(
@@ -170,4 +175,4 @@ class Pattern(ValueObject):
             PatternType.WILDCARD_IMPORT: "Imports",
             PatternType.CIRCULAR_IMPORT: "Imports",
         }
-        return categories.get(self.type, "Other")
+        return categories.get(self.pattern_type, "Other")

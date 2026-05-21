@@ -553,7 +553,7 @@ def _calculate_suite_statistics(
     for finding in all_findings:
         sev = finding.severity.name
         findings_by_severity[sev] = findings_by_severity.get(sev, 0) + 1
-        pt = finding.pattern.type.name  # type: ignore[attr-defined]
+        pt = finding.pattern.type.name
         findings_by_type[pt] = findings_by_type.get(pt, 0) + 1
 
     return {

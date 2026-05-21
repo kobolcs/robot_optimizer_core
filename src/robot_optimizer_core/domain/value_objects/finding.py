@@ -185,7 +185,7 @@ class Finding(ValueObject):
             "severity": self.severity.name,
             "message": self.message,
             "pattern": self.pattern.model_dump() | {"type": self.pattern.type},
-            "pattern_type": self.pattern.type.name,  # type: ignore[attr-defined]
+            "pattern_type": self.pattern.type.name,
             "pattern_name": self.pattern.name,
             "recommendation": self.pattern.recommendation,
             "is_auto_fixable": self.is_auto_fixable,
@@ -215,7 +215,7 @@ class Finding(ValueObject):
         }
         pattern_type = self.pattern.type
         if hasattr(pattern_type, "name"):
-            rule_id: str = pattern_type.name  # type: ignore[attr-defined]
+            rule_id: str = pattern_type.name
         else:
             rule_id = str(pattern_type)
 
@@ -280,7 +280,7 @@ class Finding(ValueObject):
 
         tags = {t.strip().lower() for t in tags_str.split(",")}
         rule_id = (
-            self.pattern.type.name.lower()  # type: ignore[attr-defined]
+            self.pattern.type.name.lower()
             if hasattr(self.pattern.type, "name")
             else str(self.pattern.type).lower()
         )
