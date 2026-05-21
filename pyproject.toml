@@ -64,18 +64,19 @@ dev = [
     "pytest-timeout>=2.3.0",
     "pytest-mock>=3.14.0",
     "hypothesis>=6.112.0",
-    
+    "watchdog>=4.0.0",  # For watch mode CLI testing
+
     # Code quality - Latest 2025 versions
     "ruff>=0.7.0",  # Fast Python linter
     "mypy>=1.13.0",
-    
+
     # Documentation
     "mkdocs>=1.6.0",
     "mkdocs-material>=9.5.0",
     "mkdocstrings[python]>=0.26.0",
     "mkdocs-git-revision-date-localized-plugin>=1.2.0",
     "mkdocs-minify-plugin>=0.8.0",
-    
+
     # Pre-commit
     "pre-commit>=3.8.0",
 ]
