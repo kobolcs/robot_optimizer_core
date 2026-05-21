@@ -5,9 +5,7 @@
 """
 
 from decimal import Decimal
-from typing import Any
-
-from pydantic import Field, computed_field, field_validator, model_validator
+from pydantic import Field, computed_field, field_serializer, field_validator, model_validator
 
 from ..base import ValueObject
 from .pattern import Pattern
@@ -24,6 +22,10 @@ class SleepPattern(ValueObject):
     unit: str = Field(..., description="Time unit (s, seconds, m, minutes, etc.)")
     line_number: int = Field(..., ge=1, description="Line number where sleep found")
     original_text: str = Field(..., description="Original sleep command text")
+
+    @field_serializer("duration", when_used="json")
+    def serialize_duration(self, v: Decimal) -> float:
+        return float(v)
 
     @field_validator("duration")
     @classmethod
@@ -158,22 +160,3 @@ class SleepPattern(ValueObject):
         """Generate hash for the sleep pattern."""
         return hash((self.duration, self.unit, self.line_number))
 
-    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
-        """Override to include computed fields in JSON mode.
-
-        Pydantic v2 method.
-        """
-        data = super().model_dump(**kwargs)
-        if kwargs.get("mode") == "json":
-            # Convert Decimal to float for JSON
-            data["duration"] = float(data["duration"])
-            # Add computed fields
-            data.update(
-                {
-                    "duration_in_seconds": self.duration_in_seconds,
-                    "is_excessive": self.is_excessive,
-                    "normalized_unit": self.normalized_unit,
-                    "severity_hint": self.severity_hint,
-                }
-            )
-        return data
