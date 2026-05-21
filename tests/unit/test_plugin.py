@@ -314,13 +314,16 @@ class TestValidatedPluginManager:
         manager = ValidatedPluginManager()
         with caplog.at_level(logging.WARNING, logger="robot_optimizer_core.plugin"):
             with pytest.raises(PluginError):
-                manager.load_plugin_from_file(plugin_file, force=True)
+                manager.load_plugin_from_file(
+                    plugin_file,
+                    bypass_security=ValidatedPluginManager._BYPASS_SENTINEL,
+                )
 
         warning_messages = [
             r.message for r in caplog.records if r.levelno >= logging.WARNING
         ]
         assert any(
-            "force" in msg.lower() or "bypass" in msg.lower()
+            "bypass" in msg.lower() or "security" in msg.lower()
             for msg in warning_messages
         ), f"Expected bypass warning, got: {warning_messages}"
 
@@ -334,7 +337,10 @@ class TestValidatedPluginManager:
         manager = ValidatedPluginManager()
         with caplog.at_level(logging.WARNING, logger="robot_optimizer_core.plugin"):
             with pytest.raises(PluginError):
-                manager.load_plugin_from_file(plugin_file, force=True)
+                manager.load_plugin_from_file(
+                    plugin_file,
+                    bypass_security=ValidatedPluginManager._BYPASS_SENTINEL,
+                )
 
         warning_texts = " ".join(
             r.message for r in caplog.records if r.levelno >= logging.WARNING

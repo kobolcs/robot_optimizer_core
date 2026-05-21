@@ -77,38 +77,49 @@ class ValueObject(BaseModel, ABC):
 
     @override
     def __eq__(self, other: Any) -> bool:
-        """Compare value objects by their attributes.
+        """Compare value objects by their field values (not identity).
 
         Args:
             other: Object to compare with.
 
         Returns:
-            True if all attributes are equal.
+            True if all fields are equal.
         """
         if not isinstance(other, self.__class__):
             return False
-        return self.model_dump() == other.model_dump()
+        # Use __dict__ comparison on Pydantic's underlying field storage.
+        # Pydantic v2 frozen models store all validated field values in
+        # __pydantic_fields_set__ + model_fields_set; the canonical fast
+        # comparison is model_fields_set equality followed by per-field check.
+        # Accessing __dict__ directly is O(1) per field and avoids the O(n)
+        # full serialization cost of model_dump().
+        return self.__dict__ == other.__dict__
 
     @override
     def __hash__(self) -> int:
-        """Generate hash based on all attributes.
+        """Generate hash based on field values.
+
+        Uses Pydantic v2's frozen-model hash (derived from the model's
+        __dict__) to avoid the O(n) serialization cost of model_dump().
 
         Returns:
             Hash value for the object.
         """
-        # Create a hashable representation of the model data
-        data = self.model_dump()
-        hashable_items = []
+        # Pydantic v2 with frozen=True sets __hash__ = BaseModel.__hash__
+        # which hashes the model's field tuple.  We re-implement it here so
+        # the explicit override in ValueObject stays consistent with __eq__.
+        try:
+            return hash(tuple(sorted(self.__dict__.items())))
+        except TypeError:
+            # Fallback for unhashable nested values (e.g. dicts, lists).
+            def _make_hashable(v: Any) -> Any:
+                if isinstance(v, dict):
+                    return tuple(sorted((_make_hashable(k), _make_hashable(val)) for k, val in v.items()))
+                if isinstance(v, list):
+                    return tuple(_make_hashable(i) for i in v)
+                return v
 
-        for key, value in sorted(data.items()):
-            if isinstance(value, list):
-                hashable_items.append((key, tuple(value)))
-            elif isinstance(value, dict):
-                hashable_items.append((key, tuple(sorted(value.items()))))
-            else:
-                hashable_items.append((key, value))
-
-        return hash(tuple(hashable_items))
+            return hash(tuple(sorted((k, _make_hashable(v)) for k, v in self.__dict__.items())))
 
     @override
     def __repr__(self) -> str:

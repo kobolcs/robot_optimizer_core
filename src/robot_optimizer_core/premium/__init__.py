@@ -155,7 +155,7 @@ def requires_premium(feature_name: str) -> Callable[[F], F]:
                 raise PremiumFeatureError(feature_name)
             return func(*args, **kwargs)
 
-        return cast(F, wrapper)
+        return cast("F", wrapper)
 
     return decorator
 

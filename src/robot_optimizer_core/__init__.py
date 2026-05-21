@@ -71,8 +71,14 @@ from .config import Settings, get_settings, reset_settings
 # Application context — primary entry point for wiring services
 from .context import (
     ApplicationConfig as ApplicationConfig,
+)
+from .context import (
     ApplicationContext as ApplicationContext,
+)
+from .context import (
     create_application as create_application,
+)
+from .context import (
     create_test_application as create_test_application,
 )
 

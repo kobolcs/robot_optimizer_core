@@ -343,13 +343,14 @@ class TestFinding:
             message="Test",
         )
 
-        # Same ID and content
+        # Same content (id is excluded from equality — two findings with the same
+        # pattern/location/severity/message are semantically identical duplicates)
         assert finding1 == finding2
         assert hash(finding1) == hash(finding2)
 
-        # Different ID
-        assert finding1 != finding3
-        assert hash(finding1) != hash(finding3)
+        # Different ID but same content → still equal (content-based equality)
+        assert finding1 == finding3
+        assert hash(finding1) == hash(finding3)
 
         # Different type
         assert finding1 != "finding"
@@ -411,7 +412,6 @@ _REQUIRED_KEYS = {
     "pattern_name",
     "recommendation",
     "is_auto_fixable",
-    "auto_fixable",
     "context",
 }
 

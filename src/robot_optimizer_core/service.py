@@ -120,14 +120,14 @@ class AnalysisService:
         self,
         file_path: str | Path,
         analyzers: list[str | BaseAnalyzer] | None = None,
-        severity_filter: Severity | None = None,
+        min_severity: Severity | None = None,
     ) -> AnalysisResult:
         """Analyze a single Robot Framework file.
 
         Args:
             file_path: Path to the .robot or .resource file
             analyzers: Optional list of analyzer names to run (default: all)
-            severity_filter: Optional minimum severity to return
+            min_severity: Optional minimum severity to return
 
         Returns:
             AnalysisResult with findings and any errors
@@ -138,7 +138,7 @@ class AnalysisService:
                 file_path,
                 analyzers=analyzers,
                 settings=self.settings,
-                severity_filter=severity_filter,
+                min_severity=min_severity,
             )
             return AnalysisResult(
                 file_path=file_path,
@@ -158,7 +158,7 @@ class AnalysisService:
         exclude_patterns: list[str] | None = None,
         recursive: bool = True,
         analyzers: list[str | BaseAnalyzer] | None = None,
-        severity_filter: Severity | None = None,
+        min_severity: Severity | None = None,
     ) -> DirectoryAnalysisResult:
         """Analyze all Robot Framework files in a directory.
 
@@ -168,7 +168,7 @@ class AnalysisService:
             exclude_patterns: Optional patterns to exclude
             recursive: Whether to search subdirectories (default: True)
             analyzers: Optional list of analyzer names to run (default: all)
-            severity_filter: Optional minimum severity to return
+            min_severity: Optional minimum severity to return
 
         Returns:
             DirectoryAnalysisResult with all findings and any errors
@@ -182,7 +182,7 @@ class AnalysisService:
             analyzers=analyzers,
             settings=self.settings,
             error_handling="warn",  # Return partial results on error
-            severity_filter=severity_filter,
+            min_severity=min_severity,
         )
 
         # Extract findings and errors from DirectoryResults

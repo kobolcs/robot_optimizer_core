@@ -79,7 +79,7 @@ def _analyze_path(
                 path,
                 analyzers=analyzer_names,
                 settings=settings,
-                severity_filter=severity_filter,
+                min_severity=severity_filter,
                 error_handling="warn",
                 use_cache=use_cache,
             )
@@ -92,7 +92,7 @@ def _analyze_path(
                 path,
                 analyzers=analyzer_names,
                 settings=settings,
-                severity_filter=severity_filter,
+                min_severity=severity_filter,
             )
         else:
             print(f"error: path does not exist: {path}", file=sys.stderr)
@@ -184,7 +184,11 @@ def _run_watch_mode(
 ) -> int:
     """Run in watch mode: monitor files and re-analyze on changes."""
     try:
-        from watchdog.events import DirModifiedEvent, FileModifiedEvent, FileSystemEventHandler
+        from watchdog.events import (
+            DirModifiedEvent,
+            FileModifiedEvent,
+            FileSystemEventHandler,
+        )
         from watchdog.observers import Observer
     except ImportError:
         print(

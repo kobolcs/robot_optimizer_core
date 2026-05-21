@@ -245,6 +245,53 @@ class ApplicationContext:
 
         return self._loggers[name]
 
+    def get_diagnostic_report(self) -> dict[str, Any]:
+        """Return a snapshot of key runtime state for debugging and support.
+
+        Returns:
+            Dictionary containing initialization state, registered services,
+            analyzer list, active plugins, and metrics summary.
+        """
+        report: dict[str, Any] = {
+            "initialized": self._initialized,
+            "shutdown": self._shutdown,
+            "services": [],
+            "analyzers": [],
+            "plugins": [],
+            "metrics": None,
+        }
+
+        if self._initialized and self._container is not None:
+            try:
+                from .di import get_container as _get_container
+                report["services"] = _get_container()._list_all_services()
+            except Exception:
+                pass
+
+        if self._analyzer_registry is not None:
+            try:
+                report["analyzers"] = self._analyzer_registry.list()
+            except Exception:
+                pass
+
+        if self._plugin_manager is not None:
+            try:
+                report["plugins"] = list(self._plugin_manager.plugins.keys())
+            except Exception:
+                pass
+
+        if self._metrics is not None:
+            try:
+                m = self._metrics.get_metrics()
+                report["metrics"] = {
+                    "total_metrics": m["system"]["total_metrics"],
+                    "uptime_seconds": m["system"]["uptime_seconds"],
+                }
+            except Exception:
+                pass
+
+        return report
+
     @contextmanager
     def request_scope(self, **context: Any) -> Iterator[ScopedContainer]:
         """Create a request-scoped context.

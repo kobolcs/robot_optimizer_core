@@ -415,7 +415,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
             )
 
         if self._check_duplicates:
-            findings.extend(self._find_duplicate_keywords(keywords, test_file))
+            findings.extend(self._find_duplicate_keywords(keywords, test_file, keyword_display_names))
 
         if self._check_unreachable:
             findings.extend(self._find_unreachable_code(test_file))
@@ -448,7 +448,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                 self._find_suite_unused_keywords(all_definitions, all_calls, per_file_display)
             )
         if self._check_duplicates:
-            findings.extend(self._find_all_duplicate_keywords(file_keywords))
+            findings.extend(self._find_all_duplicate_keywords(file_keywords, per_file_display))
         if self._check_unreachable:
             findings.extend(self._find_all_unreachable_code(files))
 
@@ -521,12 +521,14 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         return findings
 
     def _find_all_duplicate_keywords(
-        self, file_keywords: list[tuple[TestFile, dict[str, list[int]]]]
+        self,
+        file_keywords: list[tuple[TestFile, dict[str, list[int]]]],
+        per_file_display: dict[str, str] | None = None,
     ) -> list[Finding]:
         """Find duplicate keywords across all files."""
         findings: list[Finding] = []
         for test_file, keywords in file_keywords:
-            findings.extend(self._find_duplicate_keywords(keywords, test_file))
+            findings.extend(self._find_duplicate_keywords(keywords, test_file, per_file_display))
         return findings
 
     def _find_all_unreachable_code(self, files: Sequence[TestFile]) -> list[Finding]:
@@ -596,14 +598,20 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         return findings
 
     def _find_duplicate_keywords(
-        self, keywords: dict[str, list[int]], test_file: TestFile
+        self,
+        keywords: dict[str, list[int]],
+        test_file: TestFile,
+        display_names: dict[str, str] | None = None,
     ) -> list[Finding]:
         """Find keywords defined multiple times."""
         findings = []
 
         for keyword_name, line_numbers in keywords.items():
             if len(line_numbers) > 1:
-                pattern = Pattern.duplicate_keyword(keyword_name)
+                # Use the original-case display name so user-facing messages
+                # match the actual keyword casing rather than the normalised key.
+                display = (display_names or {}).get(keyword_name, keyword_name)
+                pattern = Pattern.duplicate_keyword(display)
 
                 # Create findings for all duplicates after the first
                 for line_num in line_numbers[1:]:
@@ -611,7 +619,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                         pattern=pattern,
                         severity=Severity.ERROR,
                         location=Location(file_path=test_file.path, line=line_num),
-                        message=f"Keyword '{keyword_name}' is already defined at line {line_numbers[0]}",
+                        message=f"Keyword '{display}' is already defined at line {line_numbers[0]}",
                         first_definition_line=line_numbers[0],
                         duplicate_count=len(line_numbers),
                     )

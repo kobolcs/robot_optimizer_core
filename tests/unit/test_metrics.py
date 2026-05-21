@@ -7,6 +7,7 @@ from collections.abc import Iterator
 
 import pytest
 
+from robot_optimizer_core.exceptions import ValidationError
 from robot_optimizer_core.metrics import MetricsCollector, TimingStats, get_metrics
 
 
@@ -124,13 +125,13 @@ class TestMetricsCollector:
     def test_validate_tags_raises_for_blocked_key(
         self, collector: MetricsCollector
     ) -> None:
-        with pytest.raises(ValueError, match="personal data"):
+        with pytest.raises(ValidationError, match="personal data"):
             collector.increment("hits", tags={"user": "alice"})
 
     def test_validate_tags_raises_for_email_key(
         self, collector: MetricsCollector
     ) -> None:
-        with pytest.raises(ValueError, match="personal data"):
+        with pytest.raises(ValidationError, match="personal data"):
             collector.gauge("score", 1.0, tags={"email": "x@y.com"})
 
     def test_evict_on_counter_overflow(self) -> None:

@@ -5,7 +5,14 @@
 """
 
 from decimal import Decimal
-from pydantic import Field, computed_field, field_serializer, field_validator, model_validator
+
+from pydantic import (
+    Field,
+    computed_field,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 
 from ..base import ValueObject
 from .pattern import Pattern

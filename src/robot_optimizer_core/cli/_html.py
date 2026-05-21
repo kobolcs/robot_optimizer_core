@@ -472,10 +472,10 @@ def _render_html_template(context: dict[str, Any]) -> str:
             value = safe_context[key]
             if isinstance(value, list):
                 safe_context[key] = [
-                    Markup(v) if isinstance(v, str) else v for v in value  # noqa: S704
+                    Markup(v) if isinstance(v, str) else v for v in value
                 ]
             elif isinstance(value, str):
-                safe_context[key] = Markup(value)  # noqa: S704
+                safe_context[key] = Markup(value)
     template = env.get_template(template_path.name)
     return template.render(**safe_context)
 
