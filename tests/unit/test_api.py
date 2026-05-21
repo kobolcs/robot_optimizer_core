@@ -435,9 +435,9 @@ def test_analyze_suite_single_file(tmp_path: Path) -> None:
     f = tmp_path / "suite.robot"
     f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
     result = analyze_suite(f)
-    assert "findings" in result
-    assert "suite_info" in result
-    assert "statistics" in result
+    assert isinstance(result.findings, list)
+    assert hasattr(result, "suite_info")
+    assert hasattr(result, "statistics")
 
 
 @pytest.mark.unit
@@ -446,7 +446,7 @@ def test_analyze_suite_directory(tmp_path: Path) -> None:
 
     (tmp_path / "a.robot").write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
     result = analyze_suite(tmp_path)
-    assert isinstance(result["findings"], list)
+    assert isinstance(result.findings, list)
 
 
 @pytest.mark.unit
@@ -460,7 +460,7 @@ def test_analyze_suite_with_dead_code_analyzer(tmp_path: Path) -> None:
         b"*** Test Cases ***\nT\n    Used KW\n"
     )
     result = analyze_suite(f, analyzers=["dead_code"])
-    assert "findings" in result
+    assert isinstance(result.findings, list)
 
 
 @pytest.mark.unit

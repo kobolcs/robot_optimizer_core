@@ -39,9 +39,15 @@ import warnings
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
+from typing import (  # TypedDict kept for SuiteInfo/SuiteStatistics
+    TYPE_CHECKING,
+    Any,
+    Literal,
+    TypedDict,
+    cast,
+)
 
-from .analyzers import BaseAnalyzer
+from .analyzers import BaseAnalyzer, SuiteAwareAnalyzer
 from .cache import AnalysisCache
 from .di import get_container
 from .domain.entities import TestFile
@@ -93,13 +99,34 @@ class SuiteStatistics(TypedDict):
     import_count: int
 
 
-class SuiteAnalysisResult(TypedDict):
-    """Typed result returned by :func:`analyze_suite`."""
+@dataclasses.dataclass
+class SuiteAnalysisResult:
+    """Result returned by :func:`analyze_suite`.
 
-    findings: list[Finding]
-    file_findings: dict[Path, list[Finding]]
-    suite_info: SuiteInfo
-    statistics: SuiteStatistics
+    Attributes:
+        findings: All findings across every file in the suite.
+        file_findings: Per-file breakdown of findings.
+        suite_info: Aggregate suite structure (keywords, tests, imports).
+        statistics: Finding counts grouped by severity and type.
+    """
+
+    findings: list[Finding] = dataclasses.field(default_factory=list)
+    file_findings: dict[Path, list[Finding]] = dataclasses.field(default_factory=dict)
+    suite_info: SuiteInfo = dataclasses.field(
+        default_factory=lambda: SuiteInfo(
+            files=0, keywords=[], test_cases=[], imports=[]
+        )
+    )
+    statistics: SuiteStatistics = dataclasses.field(
+        default_factory=lambda: SuiteStatistics(
+            total_findings=0,
+            findings_by_severity={},
+            findings_by_type={},
+            keyword_count=0,
+            test_count=0,
+            import_count=0,
+        )
+    )
 
 
 __all__ = [
@@ -212,15 +239,20 @@ def analyze_file(
             log_analysis_complete(path, analyzer_name, len(findings), duration, logger)
 
             metrics.increment("analysis.completed")
-            metrics.increment(f"analysis.{analyzer_name}.completed")
-            metrics.timing(f"analysis.{analyzer_name}.duration", duration)
-            metrics.gauge(f"analysis.{analyzer_name}.findings", len(findings))
+            metrics.timing(f"analyzer.{analyzer_name}.duration", duration)
+            metrics.gauge(f"analyzer.{analyzer_name}.findings", len(findings))
+
+        except AnalysisError:
+            # safe_analyze already wrapped and recorded the error; re-raise as-is
+            # to avoid double-wrapping the message and __cause__ chain.
+            metrics.increment("analysis.failed")
+            metrics.increment(f"analyzer.{analyzer_name}.failed")
+            raise
 
         except Exception as e:
-            # Track failure
+            # Unexpected error outside safe_analyze (e.g. metrics/logging failure).
             metrics.increment("analysis.failed")
-            metrics.increment(f"analysis.{analyzer_name}.failed")
-
+            metrics.increment(f"analyzer.{analyzer_name}.failed")
             raise AnalysisError(
                 f"Analysis failed: {e}", file_path=path, analyzer=analyzer_name
             ) from e
@@ -376,15 +408,22 @@ def analyze_directory(
     file_hashes: dict[Path, str] = {}
     files_to_analyze = files
 
+    if metrics is None:
+        metrics = container.resolve("metrics")
+
     if use_cache:
         cache = AnalysisCache()
         files_to_analyze, cache_hits, file_hashes = _resolve_cache(files, cache)
-        if cache_hits:
+        hit_count = len(cache_hits)
+        miss_count = len(files_to_analyze)
+        if hit_count or miss_count:
             logger.debug(
-                "Cache: %d hit(s), %d miss(es)",
-                len(cache_hits),
-                len(files_to_analyze),
+                "Cache: %d hit(s), %d miss(es)", hit_count, miss_count
             )
+            metrics.gauge("cache.hits", hit_count)
+            metrics.gauge("cache.misses", miss_count)
+            if files:
+                metrics.gauge("cache.hit_rate", hit_count / len(files))
 
     # Execute analysis on cache misses only.
     _default_workers = min(4, (os.cpu_count() or 1))
@@ -421,8 +460,6 @@ def analyze_directory(
         },
     )
 
-    if metrics is None:
-        metrics = container.resolve("metrics")
     metrics.gauge("batch.files_analyzed", len(dir_results.findings))
     metrics.gauge("batch.files_failed", len(file_errors))
     metrics.gauge("batch.total_findings", total_findings)
@@ -481,14 +518,20 @@ def _load_test_files(files: list[Path]) -> list[TestFile]:
 
 def _gather_suite_structure(
     test_files: list[TestFile], parser: Any
-) -> SuiteInfo:
-    """Parse and gather suite structure information."""
+) -> tuple[SuiteInfo, list[Path]]:
+    """Parse and gather suite structure information.
+
+    Returns ``(suite_info, failed_paths)`` where *failed_paths* lists files
+    that could not be parsed.  Callers should exclude those files from
+    suite-level analysis to avoid false-positive dead-code findings.
+    """
     suite_info: SuiteInfo = {
         "files": len(test_files),
         "keywords": [],
         "test_cases": [],
         "imports": [],
     }
+    failed_paths: list[Path] = []
     for tf in test_files:
         try:
             robot_suite = parser.parse_suite(tf)
@@ -499,7 +542,8 @@ def _gather_suite_structure(
             logger.warning(
                 f"Failed to parse suite structure: {tf.path}", extra={"error": str(e)}
             )
-    return suite_info
+            failed_paths.append(tf.path)
+    return suite_info, failed_paths
 
 
 def _analyze_with_other_analyzers(
@@ -526,12 +570,12 @@ def _analyze_with_other_analyzers(
 
 
 def _run_dead_code_analysis(
-    dead_code_analyzer: Any,
+    dead_code_analyzer: SuiteAwareAnalyzer | None,
     test_files: list[TestFile],
     all_findings: list[Finding],
     file_findings: dict[Path, list[Finding]],
 ) -> None:
-    """Run dead code analyzer at suite level and integrate findings."""
+    """Run suite-aware analyzer at suite level and integrate findings."""
     if dead_code_analyzer is None or not test_files:
         return
     dc_findings = dead_code_analyzer.analyze_suite(test_files)
@@ -609,29 +653,38 @@ def analyze_suite(
     # Load test files and gather suite structure
     parser: Any = container.resolve("parser")
     test_files = _load_test_files(files)
-    suite_info = _gather_suite_structure(test_files, parser)
+    suite_info, parse_failed_paths = _gather_suite_structure(test_files, parser)
+
+    # Exclude files whose suite structure could not be parsed from suite-level
+    # analysis.  Passing them to a SuiteAwareAnalyzer would produce false-positive
+    # findings for symbols that are only defined in the unparseable files.
+    if parse_failed_paths:
+        failed_set = set(parse_failed_paths)
+        test_files_for_suite = [tf for tf in test_files if tf.path not in failed_set]
+    else:
+        test_files_for_suite = test_files
 
     # Resolve settings and analyzer instances
     if settings is None:
         settings = container.resolve("settings")
     analyzer_instances = _get_analyzer_instances(analyzers, settings)
 
-    # Separate dead_code analyzer
-    from .analyzers import DeadCodeAnalyzer
-
-    dead_code_analyzer: DeadCodeAnalyzer | None = None
+    # Separate suite-aware analyzers (those implementing SuiteAwareAnalyzer protocol)
+    # from per-file analyzers.  Any analyzer that provides analyze_suite() participates
+    # in cross-file detection; third-party analyzers can join without touching api.py.
+    suite_aware_analyzer: SuiteAwareAnalyzer | None = None
     other_analyzers: list[BaseAnalyzer] = []
     for a in analyzer_instances:
-        if isinstance(a, DeadCodeAnalyzer):
-            dead_code_analyzer = a
+        if isinstance(a, SuiteAwareAnalyzer):
+            suite_aware_analyzer = a  # use the first suite-aware analyzer found
         else:
             other_analyzers.append(a)
 
     # Run analyzers
     all_findings, file_findings = _analyze_with_other_analyzers(
-        test_files, other_analyzers
+        test_files_for_suite, other_analyzers
     )
-    _run_dead_code_analysis(dead_code_analyzer, test_files, all_findings, file_findings)
+    _run_dead_code_analysis(suite_aware_analyzer, test_files_for_suite, all_findings, file_findings)
 
     # Calculate statistics
     statistics = _calculate_suite_statistics(all_findings, suite_info)

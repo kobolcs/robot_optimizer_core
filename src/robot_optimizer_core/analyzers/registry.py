@@ -25,7 +25,6 @@ import builtins
 from importlib.metadata import EntryPoint, entry_points
 from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
-from ..di import get_container
 from ..exceptions import PluginError
 from ..logging import get_logger
 from .base import BaseAnalyzer
@@ -176,11 +175,7 @@ class AnalyzerRegistry:
                 details={"available": self.list()},
             )
 
-        analyzer_class = self.analyzers[name]
-        container = get_container()
-        if container.has_service(f"analyzer.{name}"):
-            return cast("BaseAnalyzer", container.resolve(f"analyzer.{name}"))
-        return analyzer_class()
+        return cast("BaseAnalyzer", self.analyzers[name]())
 
     def list(self) -> list[str]:
         """List all registered analyzer names.
@@ -310,8 +305,37 @@ def _register_built_in_analyzers(registry: AnalyzerRegistry) -> None:
 
 
 def _register_entry_point_analyzers(registry: AnalyzerRegistry) -> None:
-    """Register third-party analyzers from Python entry points."""
+    """Register third-party analyzers from Python entry points.
+
+    Entry-point-loaded analyzers execute arbitrary package code on load.
+    When ``settings.trusted_analyzer_packages`` is non-empty, only entry
+    points declared by those distribution packages are loaded; all others
+    are skipped with a warning.  When the list is empty (the default)
+    every installed entry point is loaded with an info-level notice.
+    """
+    from ..config import get_settings
+
+    try:
+        trusted = set(get_settings().trusted_analyzer_packages)
+    except Exception:
+        trusted = set()
+
     for ep in _iter_analyzer_entry_points():
+        dist_name: str = getattr(getattr(ep, "dist", None), "name", "") or ""
+        if trusted and dist_name not in trusted:
+            logger.warning(
+                "Skipping untrusted entry-point analyzer (not in trusted_analyzer_packages)",
+                extra={"entry_point": ep.name, "distribution": dist_name},
+            )
+            continue
+
+        if not trusted:
+            logger.info(
+                "Loading entry-point analyzer — package code will execute on import. "
+                "Set trusted_analyzer_packages to restrict to known-safe packages.",
+                extra={"entry_point": ep.name, "distribution": dist_name},
+            )
+
         try:
             analyzer_class = ep.load()
             registry.register(ep.name, analyzer_class, override=True)

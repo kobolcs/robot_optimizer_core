@@ -33,7 +33,7 @@ Example:
 from __future__ import annotations
 
 # Base classes
-from .base import BaseAnalyzer
+from .base import BaseAnalyzer, SuiteAwareAnalyzer
 
 # Built-in analyzers
 from .dead_code import DeadCodeAnalyzer
@@ -60,6 +60,7 @@ __all__ = [
     "AnalyzerRegistry",
     # Base
     "BaseAnalyzer",
+    "SuiteAwareAnalyzer",
     # Built-in analyzers
     "DeadCodeAnalyzer",
     "FlakinessAnalyzer",

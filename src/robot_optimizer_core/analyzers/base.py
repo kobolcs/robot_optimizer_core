@@ -30,7 +30,15 @@ Example:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import ClassVar, TypeAlias, TypeVar, overload
+from typing import (
+    TYPE_CHECKING,
+    ClassVar,
+    Protocol,
+    TypeAlias,
+    TypeVar,
+    overload,
+    runtime_checkable,
+)
 
 from ..domain.entities import TestFile
 from ..domain.value_objects import Finding, Severity
@@ -38,8 +46,11 @@ from ..exceptions import AnalysisError
 from ..logging import get_logger
 from ..metrics import MetricsCollector, get_metrics
 
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
 # Type alias for analyzer configuration values
-__all__ = ["BaseAnalyzer", "ConfigValue"]
+__all__ = ["BaseAnalyzer", "ConfigValue", "SuiteAwareAnalyzer"]
 
 ConfigValue: TypeAlias = (
     str | int | float | bool | dict[str, object] | list[object] | None
@@ -47,6 +58,31 @@ ConfigValue: TypeAlias = (
 
 # Type variable for generic config value retrieval
 T = TypeVar("T")
+
+
+@runtime_checkable
+class SuiteAwareAnalyzer(Protocol):
+    """Protocol for analyzers that support cross-file suite-level analysis.
+
+    Analyzers that implement this protocol receive the full list of
+    :class:`~robot_optimizer_core.domain.entities.TestFile` objects in
+    a suite, enabling cross-file detection (e.g. unused keywords that are
+    only called from other files).
+
+    Third-party analyzers can participate in :func:`analyze_suite` by
+    implementing this method alongside :class:`BaseAnalyzer`.
+    """
+
+    def analyze_suite(self, files: Sequence[TestFile]) -> list[Finding]:
+        """Analyze an entire suite of test files as a single unit.
+
+        Args:
+            files: All test files that belong to the suite.
+
+        Returns:
+            List of findings discovered across the suite.
+        """
+        ...
 
 logger = get_logger(__name__)
 
@@ -349,10 +385,12 @@ class BaseAnalyzer(ABC):
     def get_config_value(
         self, key: str, default: T | None = None, required: bool = False
     ) -> T | ConfigValue:
-        """Get a configuration value with type safety.
+        """Get a configuration value.
 
-        Convenience method for accessing configuration with
-        defaults and validation.
+        When *default* is provided and the key is absent, *default* is returned.
+        When the key is present, the stored ``ConfigValue`` is returned — it may
+        differ from the type of *default*, so callers should validate the value
+        at runtime when type correctness matters.
 
         Args:
             key: Configuration key.
@@ -360,7 +398,7 @@ class BaseAnalyzer(ABC):
             required: Whether the key is required.
 
         Returns:
-            Configuration value.
+            Configuration value (``ConfigValue``), or *default* when absent.
 
         Raises:
             ConfigurationError: If required key is missing.
@@ -373,7 +411,7 @@ class BaseAnalyzer(ABC):
                 config_key=f"{self.name}.{key}",
             )
 
-        return self.config.get(key, default)
+        return self.config.get(key, default)  # type: ignore[return-value]
 
     def determine_severity_by_threshold(
         self, value: float, thresholds: dict[str, float]

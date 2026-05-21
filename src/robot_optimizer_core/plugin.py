@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import ast
+import builtins as _builtins_module
 import hashlib
 import sys
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -24,6 +26,7 @@ __all__ = [
     "SecurityVisitor",
     "ValidatedPluginManager",
     "get_plugin_registry",
+    "reset_plugin_registry",
 ]
 
 logger = get_logger(__name__)
@@ -276,6 +279,33 @@ class SecurityVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
 
+def _make_restricted_import(allowed: frozenset[str]) -> Callable[..., Any]:
+    """Return a restricted __import__ that only permits modules in *allowed*.
+
+    Wrapping the real ``__import__`` prevents plugin code from calling
+    ``__builtins__['__import__']('os')`` at runtime, even when the AST-level
+    import whitelist blocked the ``import os`` statement.
+    """
+    real_import = _builtins_module.__import__
+
+    def _restricted_import(
+        name: str,
+        globals: dict[str, Any] | None = None,
+        locals: dict[str, Any] | None = None,
+        fromlist: tuple[str, ...] = (),
+        level: int = 0,
+    ) -> Any:
+        top_level = name.split(".", maxsplit=1)[0]
+        if top_level not in allowed:
+            raise ImportError(
+                f"Import of '{name}' is not permitted in plugins. "
+                f"Allowed packages: {sorted(allowed)}"
+            )
+        return real_import(name, globals, locals, fromlist, level)
+
+    return _restricted_import
+
+
 class ValidatedPluginManager:
     """Plugin manager that validates plugins via AST analysis before loading.
 
@@ -315,24 +345,33 @@ class ValidatedPluginManager:
                     details={"violations": violations, "file_hash": file_hash},
                 )
         else:
-            logger.warning(
-                f"Plugin security validation bypassed via force=True: {file_path} "
-                f"(hash: {file_hash})"
+            msg = (
+                f"SECURITY WARNING: Plugin security validation bypassed via "
+                f"force=True: {file_path} (hash: {file_hash})"
             )
+            # Always write to stderr so the bypass is auditable even when
+            # application logging is disabled or redirected.
+            print(msg, file=sys.stderr, flush=True)
+            logger.warning(msg)
 
         return file_hash
 
     def _create_restricted_globals(self, file_path: Path) -> dict[str, Any]:
         """Create restricted globals environment for plugin execution."""
-        builtin_dict = (
-            __builtins__ if isinstance(__builtins__, dict) else vars(__builtins__)
+        builtin_dict: dict[str, Any] = (
+            __builtins__ if isinstance(__builtins__, dict) else vars(__builtins__)  # type: ignore[assignment]
         )
-        restricted_builtins = {
+        restricted_builtins: dict[str, Any] = {
             k: builtin_dict[k] for k in ALLOWED_BUILTINS if k in builtin_dict
         }
-        for _name in ("__import__", "__build_class__"):
-            if _name in builtin_dict:
-                restricted_builtins[_name] = builtin_dict[_name]
+        # __build_class__ is needed for class definitions.
+        if "__build_class__" in builtin_dict:
+            restricted_builtins["__build_class__"] = builtin_dict["__build_class__"]
+        # Replace __import__ with a wrapper that enforces ALLOWED_IMPORTS at
+        # runtime, preventing __builtins__['__import__']('os')-style bypasses.
+        restricted_builtins["__import__"] = _make_restricted_import(
+            frozenset(ALLOWED_IMPORTS)
+        )
         return {
             "__builtins__": restricted_builtins,
             "__name__": f"plugin_{file_path.stem}",
@@ -438,3 +477,12 @@ def get_plugin_registry() -> PluginRegistry:
     if _plugin_registry is None:
         _plugin_registry = PluginRegistry()
     return _plugin_registry
+
+
+def reset_plugin_registry() -> None:
+    """Reset the global plugin registry to an uninitialised state.
+
+    Primarily useful for tests and plugin reload scenarios.
+    """
+    global _plugin_registry
+    _plugin_registry = None

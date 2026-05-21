@@ -194,9 +194,22 @@ class LoggerAdapter(logging.LoggerAdapter[Any]):
 _root_logger_configured = False
 
 
+def _default_format_json() -> bool:
+    """Return True when stdout is not a TTY (i.e. CI / containerised environment).
+
+    When running interactively, human-readable text is preferred.  In CI
+    pipelines or containers where stdout is redirected, JSON is the default
+    so log aggregators can parse the output without additional configuration.
+    """
+    try:
+        return not sys.stdout.isatty()
+    except Exception:
+        return True
+
+
 def configure_logging(
     level: str | int = logging.WARNING,
-    format_json: bool = True,
+    format_json: bool | None = None,
     log_file: Path | None = None,
     enable_metrics: bool = True,
     extra_handlers: list[logging.Handler] | None = None,
@@ -209,7 +222,10 @@ def configure_logging(
 
     Args:
         level: Logging level (name or constant).
-        format_json: Whether to use JSON formatting.
+        format_json: Whether to use JSON formatting.  Defaults to ``True``
+            when stdout is not a TTY (CI/containerised environments) and
+            ``False`` when running interactively.  Pass an explicit value to
+            override the auto-detection.
         log_file: Optional file to write logs to.
         enable_metrics: Whether to enable metrics collection.
         extra_handlers: Additional handlers to add.
@@ -222,6 +238,9 @@ def configure_logging(
         ... )
     """
     global _root_logger_configured
+
+    if format_json is None:
+        format_json = _default_format_json()
 
     # Configure root logger for the package
     root_logger = logging.getLogger("robot_optimizer_core")
