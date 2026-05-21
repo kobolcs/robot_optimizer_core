@@ -32,6 +32,11 @@ class Finding(ValueObject):
         use_enum_values=False,
     )
 
+    # id is excluded from __eq__ and __hash__ intentionally: Finding is a
+    # value object identified by its content (pattern + location + severity),
+    # not by UUID.  Two findings with identical content are equal regardless
+    # of when they were created.  id is kept for stable external referencing
+    # (SARIF result IDs, baseline keys) but must not participate in equality.
     id: UUID = Field(default_factory=uuid4, description="Unique finding ID")
     pattern: Pattern = Field(..., description="The pattern that was matched")
     severity: Severity = Field(..., description="Severity level")
@@ -40,6 +45,22 @@ class Finding(ValueObject):
     context: dict[str, Any] | None = Field(
         default=None, description="Additional context"
     )
+
+    def __eq__(self, other: object) -> bool:
+        """Compare findings by content, excluding the auto-generated id."""
+        if not isinstance(other, Finding):
+            return NotImplemented
+        return (
+            self.pattern == other.pattern
+            and self.severity == other.severity
+            and self.location == other.location
+            and self.message == other.message
+            and self.context == other.context
+        )
+
+    def __hash__(self) -> int:
+        """Hash by content fields only (id excluded)."""
+        return hash((self.pattern, self.severity, self.location, self.message))
 
     @field_validator("message", mode="before")
     @classmethod
@@ -160,7 +181,11 @@ class Finding(ValueObject):
         return "\n".join(lines)
 
     def model_dump(self, **kwargs: Any) -> dict[str, Any]:
-        """Dump model while preserving Python objects in default mode."""
+        # In non-JSON mode we return Python objects rather than serialized
+        # primitives so callers that need live Pattern/Location/Severity
+        # instances (e.g. formatters, analyzers) do not have to re-construct
+        # them.  JSON mode delegates to Pydantic's full serializer so that
+        # computed fields (file_path, line_number, …) are included.
         if kwargs.get("mode") == "json":
             return super().model_dump(**kwargs)
         return {
@@ -189,7 +214,6 @@ class Finding(ValueObject):
             "pattern_name": self.pattern.name,
             "recommendation": self.pattern.recommendation,
             "is_auto_fixable": self.is_auto_fixable,
-            "auto_fixable": self.is_auto_fixable,
             "context": self.context,
         }
 

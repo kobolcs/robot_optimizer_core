@@ -393,12 +393,15 @@ def reset_container() -> None:
     if old_container is not None:
         old_container.clear()
 
-    # Reset co-located globals so all three singletons are torn down together.
+    # Reset co-located globals so all singletons are torn down together,
+    # preventing metric/cache bleed between test runs.
     from .analyzers.registry import reset_registry
+    from .metrics import reset_metrics
     from .plugin import reset_plugin_registry
 
     reset_registry()
     reset_plugin_registry()
+    reset_metrics()
 
 
 def _register_defaults(container: ThreadSafeContainer) -> None:

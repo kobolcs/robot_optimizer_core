@@ -19,6 +19,7 @@ Example:
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +33,8 @@ from pydantic_settings import (
 from ..exceptions import ConfigurationError
 
 SettingsSourceCallable = PydanticBaseSettingsSource
+
+_logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -236,7 +239,7 @@ class Settings(BaseSettings):
         for p in v:
             path = Path(p)
             if not path.exists():
-                # Just log warning, don't fail
+                _logger.warning("Plugin directory does not exist and will be ignored: %s", path)
                 continue
             if not path.is_dir():
                 raise ValueError(f"Plugin path is not a directory: {path}")
@@ -309,14 +312,6 @@ class Settings(BaseSettings):
         Raises:
             ConfigurationError: If validation fails.
         """
-        # Validate file size
-        if self.max_file_size_mb <= 0:
-            raise ConfigurationError(
-                "Maximum file size must be positive",
-                config_key="max_file_size_mb",
-                provided_value=self.max_file_size_mb,
-            )
-
         # Validate patterns don't conflict
         pattern_overlap = set(self.file_patterns) & set(self.exclude_patterns)
         if pattern_overlap:

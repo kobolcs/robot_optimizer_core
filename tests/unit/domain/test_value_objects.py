@@ -468,7 +468,7 @@ class TestFinding:
         assert data["line"] == 25
         assert data["column"] == 10
         assert data["message"] == "Test message"
-        assert data["auto_fixable"] is True
+        assert data["is_auto_fixable"] is True
         assert data["context"]["extra_info"] == "test"
 
     def test_finding_immutability(self, sample_pattern, sample_location):

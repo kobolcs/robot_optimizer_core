@@ -36,7 +36,6 @@ from typing import (
     Protocol,
     TypeAlias,
     TypeVar,
-    overload,
     runtime_checkable,
 )
 
@@ -56,8 +55,7 @@ ConfigValue: TypeAlias = (
     str | int | float | bool | dict[str, object] | list[object] | None
 )
 
-# Type variable for generic config value retrieval
-T = TypeVar("T")
+T = TypeVar("T")  # kept for any remaining generic use in subclasses
 
 
 @runtime_checkable
@@ -329,8 +327,10 @@ class BaseAnalyzer(ABC):
         dropped = 0
 
         for finding in findings:
-            # Ensure file path matches
-            if finding.location.file_path != test_file.path:
+            # Normalise both paths to absolute before comparing so that a
+            # finding constructed with an absolute path is not wrongly dropped
+            # when test_file.path is relative (or vice-versa).
+            if finding.location.file_path.resolve() != test_file.path.resolve():
                 dropped += 1
                 self._logger.warning(
                     "Dropping finding: file path mismatch",
@@ -374,34 +374,28 @@ class BaseAnalyzer(ABC):
 
         return validated
 
-    @overload
-    def get_config_value(self, key: str, default: T, required: bool = ...) -> T: ...
-
-    @overload
     def get_config_value(
-        self, key: str, default: None = ..., required: bool = ...
-    ) -> ConfigValue: ...
-
-    def get_config_value(
-        self, key: str, default: T | None = None, required: bool = False
-    ) -> T | ConfigValue:
+        self, key: str, default: ConfigValue = None, required: bool = False
+    ) -> ConfigValue:
         """Get a configuration value.
 
-        When *default* is provided and the key is absent, *default* is returned.
-        When the key is present, the stored ``ConfigValue`` is returned — it may
-        differ from the type of *default*, so callers should validate the value
-        at runtime when type correctness matters.
+        Returns whatever is stored in ``self.config[key]``, which may be any
+        ``ConfigValue`` type regardless of the type of *default*.  Callers that
+        need type guarantees should use the typed helpers
+        :meth:`get_bool_config`, :meth:`get_int_config`, etc., which validate
+        the stored value at runtime.
 
         Args:
             key: Configuration key.
-            default: Default value if not found.
-            required: Whether the key is required.
+            default: Default value when the key is absent.
+            required: When ``True``, raise ``ConfigurationError`` if the key is
+                missing instead of returning *default*.
 
         Returns:
-            Configuration value (``ConfigValue``), or *default* when absent.
+            The stored ``ConfigValue``, or *default* when the key is absent.
 
         Raises:
-            ConfigurationError: If required key is missing.
+            ConfigurationError: If *required* is ``True`` and the key is missing.
         """
         if required and key not in self.config:
             from ..exceptions import ConfigurationError
@@ -411,7 +405,55 @@ class BaseAnalyzer(ABC):
                 config_key=f"{self.name}.{key}",
             )
 
-        return self.config.get(key, default)  # type: ignore[return-value]
+        return self.config.get(key, default)
+
+    def get_bool_config(self, key: str, default: bool) -> bool:
+        """Get a boolean configuration value, raising ConfigurationError on type mismatch."""
+        val = self.get_config_value(key, default)
+        if not isinstance(val, bool):
+            from ..exceptions import ConfigurationError
+            raise ConfigurationError(
+                f"Config key '{key}' must be a bool, got {type(val).__name__}",
+                config_key=f"{self.name}.{key}",
+                provided_value=val,
+            )
+        return val
+
+    def get_int_config(self, key: str, default: int) -> int:
+        """Get an integer configuration value, raising ConfigurationError on type mismatch."""
+        val = self.get_config_value(key, default)
+        if not isinstance(val, int) or isinstance(val, bool):
+            from ..exceptions import ConfigurationError
+            raise ConfigurationError(
+                f"Config key '{key}' must be an int, got {type(val).__name__}",
+                config_key=f"{self.name}.{key}",
+                provided_value=val,
+            )
+        return val
+
+    def get_float_config(self, key: str, default: float) -> float:
+        """Get a float configuration value, raising ConfigurationError on type mismatch."""
+        val = self.get_config_value(key, default)
+        if not isinstance(val, (int, float)) or isinstance(val, bool):
+            from ..exceptions import ConfigurationError
+            raise ConfigurationError(
+                f"Config key '{key}' must be a float, got {type(val).__name__}",
+                config_key=f"{self.name}.{key}",
+                provided_value=val,
+            )
+        return float(val)
+
+    def get_list_config(self, key: str, default: list[object]) -> list[object]:
+        """Get a list configuration value, raising ConfigurationError on type mismatch."""
+        val = self.get_config_value(key, default)
+        if not isinstance(val, list):
+            from ..exceptions import ConfigurationError
+            raise ConfigurationError(
+                f"Config key '{key}' must be a list, got {type(val).__name__}",
+                config_key=f"{self.name}.{key}",
+                provided_value=val,
+            )
+        return val
 
     def determine_severity_by_threshold(
         self, value: float, thresholds: dict[str, float]

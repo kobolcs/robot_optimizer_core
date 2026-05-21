@@ -15,7 +15,7 @@ This subtree is the **core analysis engine**. Treat it as stable library code, n
 - Package name: `robot-framework-optimizer-core`
 - Python: 3.11+
 - Package path: `src/robot_optimizer_core`
-- Entry-point group: `robot_optimizer.analyzers`
+- Entry-point group: `robot_optimizer_core.analyzers`
 - Current enforced coverage gate: `--cov-fail-under=95` (see `pyproject.toml`)
 - Ruff and Mypy are configured strictly
 

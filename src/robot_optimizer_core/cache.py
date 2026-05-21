@@ -74,6 +74,9 @@ def _finding_from_dict(d: dict[str, Any]) -> Finding:
     )
 
 
+_DEFAULT_MAX_CACHE_ENTRIES = 10_000
+
+
 class AnalysisCache:
     """Persistent SHA-256 content-addressed cache for per-file analysis results.
 
@@ -88,11 +91,16 @@ class AnalysisCache:
         cache.flush()       # write to disk once when done
     """
 
-    def __init__(self, cache_dir: Path | None = None) -> None:
+    def __init__(
+        self,
+        cache_dir: Path | None = None,
+        max_entries: int = _DEFAULT_MAX_CACHE_ENTRIES,
+    ) -> None:
         self._cache_dir = cache_dir or _DEFAULT_CACHE_DIR
         self._cache_path = self._cache_dir / _CACHE_FILENAME
         self._data: dict[str, list[dict[str, Any]]] | None = None
         self._dirty = False
+        self._max_entries = max_entries
         # Include the package version so cache entries are automatically
         # invalidated when the package is upgraded (new analyzer logic).
         self._version_key = _get_package_version()
@@ -159,10 +167,14 @@ class AnalysisCache:
     ) -> None:
         """Store *findings* for *file_path* in the in-memory cache.
 
+        Evicts the oldest entry when the in-memory cap is reached.
         Call :meth:`flush` once when the analysis run is complete to persist.
         """
         data = self._load()
         key = self._cache_key(file_path, file_hash)
+        if key not in data and len(data) >= self._max_entries:
+            # Remove the oldest key (insertion-order is preserved in Python 3.7+)
+            data.pop(next(iter(data)))
         data[key] = [_finding_to_dict(f) for f in findings]
         self._dirty = True
 

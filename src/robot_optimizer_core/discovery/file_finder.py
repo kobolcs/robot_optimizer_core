@@ -23,12 +23,14 @@ from __future__ import annotations
 import fnmatch
 import re
 from collections.abc import Iterator
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..config import Settings
-from ..exceptions import AnalysisError, RobotFileNotFoundError as RFFileNotFoundError
+from ..exceptions import AnalysisError
+from ..exceptions import RobotFileNotFoundError as RFFileNotFoundError
 from ..logging import get_logger
 
 logger = get_logger(__name__)

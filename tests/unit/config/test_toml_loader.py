@@ -106,7 +106,7 @@ class TestSeverityFilter:
 
         f = tmp_path / "t.robot"
         f.write_bytes(b"*** Test Cases ***\nMy Test\n    Sleep    2\n")
-        findings = analyze_file(str(f), severity_filter=Severity.ERROR)
+        findings = analyze_file(str(f), min_severity=Severity.ERROR)
         for finding in findings:
             assert finding.severity <= Severity.ERROR
 

@@ -108,6 +108,9 @@ class SuiteAnalysisResult:
         file_findings: Per-file breakdown of findings.
         suite_info: Aggregate suite structure (keywords, tests, imports).
         statistics: Finding counts grouped by severity and type.
+        errors: Per-file errors that occurred during analysis.  An entry here
+            means the file was partially analysed or skipped; findings for
+            that file may be missing.
     """
 
     findings: list[Finding] = dataclasses.field(default_factory=list)
@@ -127,6 +130,7 @@ class SuiteAnalysisResult:
             import_count=0,
         )
     )
+    errors: list[tuple[Path, Exception]] = dataclasses.field(default_factory=list)
 
 
 __all__ = [
@@ -148,9 +152,11 @@ def analyze_file(
     file_path: str | Path,
     analyzers: list[str | BaseAnalyzer] | None = None,
     settings: Settings | None = None,
-    severity_filter: Severity | None = None,
+    min_severity: Severity | None = None,
     pattern_filter: list[str] | None = None,
     metrics: MetricsCollector | None = None,
+    *,
+    severity_filter: Severity | None = None,
 ) -> list[Finding]:
     """Analyze a single Robot Framework file.
 
@@ -161,13 +167,15 @@ def analyze_file(
         file_path: Path to the Robot Framework file.
         analyzers: List of analyzer names or instances (default: all).
         settings: Configuration settings (default: global settings).
-        severity_filter: When given, only findings at or more severe than
-            this level are returned (e.g. ``Severity.WARNING`` drops INFO).
+        min_severity: When given, only findings at or more severe than this
+            level are returned (e.g. ``Severity.WARNING`` drops INFO findings).
         pattern_filter: When given, only findings whose analyzer name
             matches one of these strings are returned.
         metrics: Optional metrics collector for recording analysis metrics
             (default: global metrics instance). Pass a no-op implementation
             to disable metrics collection.
+        severity_filter: Deprecated alias for *min_severity*.  Will be
+            removed in a future release.
 
     Returns:
         List of findings from all analyzers.
@@ -181,6 +189,15 @@ def analyze_file(
         >>> for finding in findings:
         ...     print(f"{finding.severity.name}: {finding.message}")
     """
+    if severity_filter is not None:
+        warnings.warn(
+            "The 'severity_filter' parameter is deprecated since 1.0.0b1. "
+            "Use 'min_severity' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if min_severity is None:
+            min_severity = severity_filter
     # Convert to Path
     path = Path(file_path)
 
@@ -243,10 +260,10 @@ def analyze_file(
             metrics.gauge(f"analyzer.{analyzer_name}.findings", len(findings))
 
         except AnalysisError:
-            # safe_analyze already wrapped and recorded the error; re-raise as-is
-            # to avoid double-wrapping the message and __cause__ chain.
+            # safe_analyze already wrapped, logged, and recorded the per-analyzer
+            # failure metric; only record the top-level counter here to avoid
+            # double-counting the per-analyzer metric.
             metrics.increment("analysis.failed")
-            metrics.increment(f"analyzer.{analyzer_name}.failed")
             raise
 
         except Exception as e:
@@ -260,9 +277,9 @@ def analyze_file(
     # Track total findings
     metrics.gauge("findings.total", len(all_findings))
 
-    # Apply severity filter after all analyzers complete.
-    if severity_filter is not None:
-        all_findings = [f for f in all_findings if f.severity <= severity_filter]
+    # Apply min_severity filter after all analyzers complete.
+    if min_severity is not None:
+        all_findings = [f for f in all_findings if f.severity <= min_severity]
 
     return all_findings
 
@@ -309,11 +326,13 @@ def analyze_directory(
     settings: Settings | None = None,
     fail_fast: bool = False,
     error_handling: ErrorHandling = "raise",
-    severity_filter: Severity | None = None,
+    min_severity: Severity | None = None,
     pattern_filter: list[str] | None = None,
     max_workers: int | None = None,
     metrics: MetricsCollector | None = None,
     use_cache: bool = True,
+    *,
+    severity_filter: Severity | None = None,
 ) -> DirectoryResults:
     """Analyze all Robot Framework files in a directory.
 
@@ -341,8 +360,10 @@ def analyze_directory(
                 Pass ``error_handling="warn"`` explicitly if you want CLI-like
                 behaviour from the Python API.
 
-        severity_filter: Only return findings at or more severe than this level.
+        min_severity: Only return findings at or more severe than this level.
         pattern_filter: Only run/return findings from analyzers with these names.
+        severity_filter: Deprecated alias for *min_severity*.  Will be
+            removed in a future release.
         max_workers: Maximum number of threads for parallel file analysis
             Defaults to ``min(4, cpu_count)``. Pass ``1`` to
             force sequential behaviour.
@@ -367,7 +388,7 @@ def analyze_directory(
         >>> for file_path, findings in findings_map.items():
         ...     print(f"{file_path}: {len(findings)} findings")
     """
-    # Deprecation warning
+    # Deprecation warnings
     if fail_fast:
         warnings.warn(
             "The 'fail_fast' parameter is deprecated since 1.0.0b1 and will be "
@@ -375,6 +396,15 @@ def analyze_directory(
             DeprecationWarning,
             stacklevel=2,
         )
+    if severity_filter is not None:
+        warnings.warn(
+            "The 'severity_filter' parameter is deprecated since 1.0.0b1. "
+            "Use 'min_severity' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if min_severity is None:
+            min_severity = severity_filter
 
     # Validate directory and resolve settings
     path = _validate_directory_path(directory_path)
@@ -432,7 +462,7 @@ def analyze_directory(
         _analyze_one_file,
         analyzers=analyzers,
         settings=settings,
-        severity_filter=severity_filter,
+        min_severity=min_severity,
         pattern_filter=pattern_filter,
     )
     dir_results, file_errors = _execute_directory_analysis(
@@ -549,10 +579,16 @@ def _gather_suite_structure(
 def _analyze_with_other_analyzers(
     test_files: list[TestFile],
     other_analyzers: list[BaseAnalyzer],
-) -> tuple[list[Finding], dict[Path, list[Finding]]]:
-    """Run non-dead-code analyzers on each file."""
+) -> tuple[list[Finding], dict[Path, list[Finding]], list[tuple[Path, Exception]]]:
+    """Run non-suite-aware analyzers on each file.
+
+    Returns ``(all_findings, file_findings, errors)`` where *errors* lists
+    ``(path, exception)`` pairs for analyzer failures so callers can surface
+    partial-analysis conditions instead of silently swallowing them.
+    """
     all_findings: list[Finding] = []
     file_findings: dict[Path, list[Finding]] = {tf.path: [] for tf in test_files}
+    errors: list[tuple[Path, Exception]] = []
 
     for tf in test_files:
         for analyzer in other_analyzers:
@@ -565,8 +601,9 @@ def _analyze_with_other_analyzers(
                     f"Analyzer {analyzer.name} failed on {tf.path}: {e}",
                     exc_info=True,
                 )
+                errors.append((tf.path, e))
 
-    return all_findings, file_findings
+    return all_findings, file_findings, errors
 
 
 def _run_dead_code_analysis(
@@ -614,6 +651,7 @@ def analyze_suite(
     suite_path: str | Path,
     analyzers: list[str | BaseAnalyzer] | None = None,
     settings: Settings | None = None,
+    min_severity: Severity | None = None,
 ) -> SuiteAnalysisResult:
     """Analyze a Robot Framework test suite with AST parsing.
 
@@ -670,21 +708,22 @@ def analyze_suite(
     analyzer_instances = _get_analyzer_instances(analyzers, settings)
 
     # Separate suite-aware analyzers (those implementing SuiteAwareAnalyzer protocol)
-    # from per-file analyzers.  Any analyzer that provides analyze_suite() participates
+    # from per-file analyzers.  Every analyzer that provides analyze_suite() participates
     # in cross-file detection; third-party analyzers can join without touching api.py.
-    suite_aware_analyzer: SuiteAwareAnalyzer | None = None
+    suite_aware_analyzers: list[SuiteAwareAnalyzer] = []
     other_analyzers: list[BaseAnalyzer] = []
     for a in analyzer_instances:
         if isinstance(a, SuiteAwareAnalyzer):
-            suite_aware_analyzer = a  # use the first suite-aware analyzer found
+            suite_aware_analyzers.append(a)
         else:
             other_analyzers.append(a)
 
     # Run analyzers
-    all_findings, file_findings = _analyze_with_other_analyzers(
+    all_findings, file_findings, suite_errors = _analyze_with_other_analyzers(
         test_files_for_suite, other_analyzers
     )
-    _run_dead_code_analysis(suite_aware_analyzer, test_files_for_suite, all_findings, file_findings)
+    for _suite_analyzer in suite_aware_analyzers:
+        _run_dead_code_analysis(_suite_analyzer, test_files_for_suite, all_findings, file_findings)
 
     # Calculate statistics
     statistics = _calculate_suite_statistics(all_findings, suite_info)
@@ -694,6 +733,7 @@ def analyze_suite(
         file_findings=file_findings,
         suite_info=suite_info,
         statistics=statistics,
+        errors=suite_errors,
     )
 
 
@@ -701,7 +741,7 @@ def _analyze_one_file(
     file_path: Path,
     analyzers: list[str | BaseAnalyzer] | None,
     settings: Settings,
-    severity_filter: Severity | None,
+    min_severity: Severity | None,
     pattern_filter: list[str] | None,
 ) -> tuple[Path, list[Finding]]:
     """Analyze a single file and return (path, findings). Used by analyze_directory."""
@@ -709,7 +749,7 @@ def _analyze_one_file(
         file_path,
         analyzers,
         settings,
-        severity_filter=severity_filter,
+        min_severity=min_severity,
         pattern_filter=pattern_filter,
     )
     return file_path, findings

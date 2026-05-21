@@ -30,11 +30,14 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from .exceptions import ValidationError as _ValidationError
+
 __all__ = [
     "MetricsCollector",
     "TimingStats",
     "configure_metrics",
     "get_metrics",
+    "reset_metrics",
 ]
 
 logger = _stdlib_logging.getLogger(__name__)
@@ -300,7 +303,7 @@ class MetricsCollector:
     def __del__(self) -> None:
         try:
             self.stop()
-        except Exception:  # noqa: BLE001 — __del__ must never propagate
+        except Exception:
             pass
 
     def _cleanup_loop(self) -> None:
@@ -412,9 +415,11 @@ class MetricsCollector:
 
         for key in tags:
             if key.lower() in blocked_keys:
-                raise ValueError(
+                raise _ValidationError(
                     f"Tag '{key}' may contain personal data and is not allowed. "
-                    f"Use anonymized identifiers instead."
+                    "Use anonymized identifiers instead.",
+                    field_name=key,
+                    validation_rule="gdpr_tag_blocklist",
                 )
 
 
@@ -445,3 +450,16 @@ def configure_metrics(**kwargs: Any) -> MetricsCollector:
         _global_metrics = MetricsCollector(**kwargs)
 
     return _global_metrics
+
+
+def reset_metrics() -> None:
+    """Stop and discard the global metrics collector.
+
+    Primarily useful for tests and reset_container() so metric data
+    does not bleed between test runs.
+    """
+    global _global_metrics
+    with _metrics_lock:
+        if _global_metrics is not None:
+            _global_metrics.stop()
+            _global_metrics = None

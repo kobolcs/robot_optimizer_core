@@ -204,7 +204,7 @@ class TestAnalysisService:
         f = tmp_path / "t.robot"
         f.write_bytes(b"*** Test Cases ***\nT\n    Sleep    5s\n")
         svc = AnalysisService()
-        result = svc.analyze_file(f, severity_filter=Severity.ERROR)
+        result = svc.analyze_file(f, min_severity=Severity.ERROR)
         # Should succeed; findings filtered by severity
         assert result.is_success
 

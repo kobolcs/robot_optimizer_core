@@ -33,7 +33,6 @@ if sys.version_info >= (3, 12):
 else:
     from typing_extensions import override
 
-from ..config.settings import get_settings
 from ..domain.entities import TestFile
 from ..domain.value_objects import (
     Finding,
@@ -48,7 +47,14 @@ from ..exceptions import ConfigurationError
 from ..parsers.robot_ast_parser import RobotASTParser
 from .base import BaseAnalyzer, ConfigValue
 
-__all__ = ["SleepDetector", "SleepDetectorAnalyzer"]
+__all__ = ["SleepDetector", "SleepDetectorAnalyzer", "get_settings"]
+
+
+def get_settings() -> object:
+    """Resolve settings via DI container. Defined at module scope for test monkeypatching."""
+    from ..di import get_container
+    return get_container().resolve("settings")
+
 
 # ---------------------------------------------------------------------------
 # Unit normalisation helper
@@ -134,14 +140,27 @@ class SleepDetectorAnalyzer(BaseAnalyzer):
         super().__init__(config)
 
         if "severity_thresholds" not in self.config:
-            max_acceptable = get_settings().max_acceptable_sleep_seconds
+            # Resolve the max-acceptable-sleep threshold from the config dict
+            # (explicit key), falling back to the global Settings singleton only
+            # when neither explicit config nor the DI container provides a value.
+            # This keeps the analyzer testable without touching global state.
+            max_acceptable: float = cast(
+                "float",
+                self.config.get("max_acceptable_sleep_seconds", None),
+            )
+            if max_acceptable is None:
+                try:
+                    settings = get_settings()
+                    max_acceptable = settings.max_acceptable_sleep_seconds  # type: ignore[union-attr]
+                except Exception:
+                    max_acceptable = 1.0  # library default
             self._severity_thresholds: dict[str, float] = {
                 "info": max_acceptable,
                 "warning": max_acceptable * 5,
                 "error": float("inf"),
             }
         else:
-            self._severity_thresholds = cast(dict[str, float], self.config["severity_thresholds"])
+            self._severity_thresholds = cast("dict[str, float]", self.config["severity_thresholds"])
 
         # Configuration
         self._suggest_alternatives = self.get_config_value("suggest_alternatives", True)

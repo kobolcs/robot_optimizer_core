@@ -34,7 +34,9 @@ logger = get_logger(__name__)
 
 # Per-run file cache keyed by (resolved_path, mtime).
 # Avoids double-reading the same unchanged file in analyze_suite / analyze_directory.
-# Protected by _cache_lock for thread safety.
+# Protected by _cache_lock for thread safety.  Capped at 512 entries (LRU eviction)
+# so long-running processes that scan many directories do not grow without bound.
+_FROM_PATH_CACHE_MAX = 512
 _from_path_cache: dict[tuple[Path, float], TZAwareTestFile] = {}
 _cache_lock = threading.Lock()
 
@@ -210,6 +212,9 @@ class TZAwareTestFile(Entity[UUID]):
         if not content_provided:
             cache_key = (resolved, stats.st_mtime)
             with _cache_lock:
+                # Evict the oldest entry when the cap is reached.
+                if len(_from_path_cache) >= _FROM_PATH_CACHE_MAX:
+                    _from_path_cache.pop(next(iter(_from_path_cache)))
                 _from_path_cache[cache_key] = result
 
         return result

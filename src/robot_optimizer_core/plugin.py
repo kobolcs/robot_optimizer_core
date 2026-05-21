@@ -330,14 +330,17 @@ class ValidatedPluginManager:
         """Compute SHA-256 hash of a file."""
         return hashlib.sha256(file_path.read_bytes()).hexdigest()
 
-    def _validate_and_check_plugin(self, file_path: Path, force: bool = False) -> str:
+    #: Sentinel string required to bypass security validation.
+    _BYPASS_SENTINEL = "I understand this bypasses security validation"
+
+    def _validate_and_check_plugin(self, file_path: Path, bypass_security: str = "") -> str:
         """Validate plugin file and return its hash. Raises PluginError if validation fails."""
         file_hash = self._compute_file_hash(file_path)
         if file_hash in self.trusted_hashes:
             logger.info(f"Loading trusted plugin: {file_path}")
             return file_hash
 
-        if not force:
+        if bypass_security != self._BYPASS_SENTINEL:
             is_safe, violations = self.validator.validate_file(file_path)
             if not is_safe:
                 raise PluginError(
@@ -346,8 +349,8 @@ class ValidatedPluginManager:
                 )
         else:
             msg = (
-                f"SECURITY WARNING: Plugin security validation bypassed via "
-                f"force=True: {file_path} (hash: {file_hash})"
+                f"SECURITY WARNING: Plugin security validation bypassed: "
+                f"{file_path} (hash: {file_hash})"
             )
             # Always write to stderr so the bypass is auditable even when
             # application logging is disabled or redirected.
@@ -417,21 +420,29 @@ class ValidatedPluginManager:
             extra={"file_hash": file_hash},
         )
 
-    def load_plugin_from_file(self, file_path: Path, force: bool = False) -> None:
+    def load_plugin_from_file(
+        self,
+        file_path: Path,
+        bypass_security: str = "",
+    ) -> None:
         """Securely load a plugin from a file.
 
         Args:
-            file_path: Path to the plugin file
-            force: Skip security validation (NOT RECOMMENDED)
+            file_path: Path to the plugin file.
+            bypass_security: Pass
+                ``ValidatedPluginManager._BYPASS_SENTINEL`` to skip AST
+                validation.  **Not recommended** — only for development use.
+                Any other value (including the default empty string) leaves
+                validation enabled.
 
         Raises:
-            PluginError: If plugin fails security validation
+            PluginError: If plugin fails security validation or cannot be loaded.
         """
         if not file_path.exists():
             raise PluginError(f"Plugin file not found: {file_path}")
 
         try:
-            file_hash = self._validate_and_check_plugin(file_path, force)
+            file_hash = self._validate_and_check_plugin(file_path, bypass_security)
             restricted_globals = self._create_restricted_globals(file_path)
 
             # Execute in restricted environment with layered security:
@@ -454,6 +465,19 @@ class ValidatedPluginManager:
             raise PluginError(
                 f"Failed to load plugin: {file_path}", details={"error": str(e)}
             ) from e
+
+    # Keep force= as a deprecated shim so existing callers get a clear error
+    # rather than silently bypassing validation with a wrong signature.
+    def load_plugin_from_file_force(self, file_path: Path) -> None:
+        """Deprecated: use load_plugin_from_file with bypass_security sentinel."""
+        import warnings
+        warnings.warn(
+            "load_plugin_from_file_force is deprecated. Use load_plugin_from_file "
+            f"with bypass_security={self._BYPASS_SENTINEL!r}.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self.load_plugin_from_file(file_path, bypass_security=self._BYPASS_SENTINEL)
 
     def unload_plugin(self, name: str) -> None:
         """Unload a plugin."""

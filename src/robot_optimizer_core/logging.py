@@ -60,9 +60,10 @@ class StructuredFormatter(logging.Formatter):
         Returns:
             JSON-formatted log entry.
         """
-        # Base log entry
+        # Use the record's own creation time so timestamps are accurate even
+        # when log records pass through a queue before being formatted.
         log_entry = {
-            "timestamp": datetime.now(UTC).isoformat(),
+            "timestamp": datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -246,7 +247,14 @@ def configure_logging(
     root_logger = logging.getLogger("robot_optimizer_core")
     root_logger.setLevel(level)
 
-    # Remove existing handlers
+    # Flush and close existing handlers before replacing them to avoid
+    # file-descriptor leaks when configure_logging is called multiple times.
+    for _h in root_logger.handlers[:]:
+        try:
+            _h.flush()
+            _h.close()
+        except Exception:
+            pass
     root_logger.handlers.clear()
 
     # Console handler
