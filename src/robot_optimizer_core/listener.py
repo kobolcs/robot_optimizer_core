@@ -12,7 +12,7 @@ Usage (command line)::
 Usage (Python)::
 
     from robot_optimizer_core.listener import FlakinessListener
-    from robot_optimizer_core.repositories import JsonTestResultRepository
+    from robot_optimizer_core.infrastructure import JsonTestResultRepository
 
     repo = JsonTestResultRepository(Path("results.json"))
     listener = FlakinessListener(repository=repo)
@@ -57,7 +57,7 @@ class FlakinessListener:
         Args:
             repository: Repository instance to use.  When omitted the listener
                 looks in the DI container; if nothing is registered there it
-                falls back to :class:`~robot_optimizer_core.repositories.JsonTestResultRepository`
+                falls back to :class:`~robot_optimizer_core.infrastructure.JsonTestResultRepository`
                 writing to *results_path* (default: ``flakiness_results.json`` in cwd).
             results_path: Path for the fallback JSON repository.  Ignored when
                 *repository* is provided.
@@ -150,7 +150,7 @@ class FlakinessListener:
         except Exception as exc:
             logger.debug("DI container unavailable, falling back to JSON repo: %s", exc)
 
-        from .repositories import JsonTestResultRepository
+        from .infrastructure import JsonTestResultRepository
 
         path = Path(results_path) if results_path else Path("flakiness_results.json")
         return JsonTestResultRepository(path)

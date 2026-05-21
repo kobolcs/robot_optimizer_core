@@ -12,7 +12,7 @@ import pytest
 
 from robot_optimizer_core.domain.value_objects.test_result import TestResult
 from robot_optimizer_core.exceptions import RepositoryError
-from robot_optimizer_core.repositories import JsonTestResultRepository
+from robot_optimizer_core.infrastructure import JsonTestResultRepository
 
 
 def _ts(days_ago: float = 0) -> datetime:

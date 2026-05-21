@@ -9,7 +9,7 @@ Example:
 
         from robot_optimizer_core.analyzers import FlakinessAnalyzer
         from robot_optimizer_core import TestFile
-        from robot_optimizer_core.repositories import TestResultRepository
+        from robot_optimizer_core.domain.repositories import TestResultRepository
 
         repo = TestResultRepository()  # Your implementation
         analyzer = FlakinessAnalyzer(test_result_repository=repo)

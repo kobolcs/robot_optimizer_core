@@ -1,4 +1,4 @@
-# src/robot_optimizer_core/repositories/json_test_result_repository.py
+# src/robot_optimizer_core/infrastructure/json_test_result_repository.py
 """JSON file-backed TestResultRepository implementation."""
 
 from __future__ import annotations
