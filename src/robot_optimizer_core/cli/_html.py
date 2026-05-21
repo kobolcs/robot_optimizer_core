@@ -1,61 +1,17 @@
-# src/robot_optimizer_core/cli.py
-"""Command-line interface for robot-optimizer.
-
-Provides the ``robot-optimizer`` entry-point with the following subcommands:
-
-- ``analyze``        — analyse a ``.robot`` / ``.resource`` file or directory
-- ``list-analyzers`` — list available analyzers with descriptions and tags
-- ``upgrade``        — show free-vs-Pro feature comparison and upgrade info
-
-Example:
-    Basic usage::
-
-        robot-optimizer analyze path/to/suite/
-        robot-optimizer analyze tests/login.robot --format json
-        robot-optimizer analyze tests/ --analyzers dead_code,sleep_detector
-        robot-optimizer analyze tests/ --no-fail
-        robot-optimizer analyze tests/ --min-severity WARNING
-        robot-optimizer analyze tests/ --config robot.toml
-        robot-optimizer list-analyzers
-        robot-optimizer list-analyzers --format json
-
-Exit codes:
-    0 (OK):       No findings, or ``--no-fail`` was passed.
-    1 (FINDINGS): One or more findings at or above the minimum severity.
-    2 (ERROR):    Fatal error — file not found, I/O failure, bad config, etc.
-    3 (PARTIAL):  Analysis completed but some files could not be analysed
-                  (``error_handling="warn"`` mode; partial results are still
-                  written to the output).
-"""
+# src/robot_optimizer_core/cli/_html.py
+"""HTML report generation for the robot-optimizer CLI."""
 
 from __future__ import annotations
 
-import argparse
-import json
-import sys
 from datetime import UTC, datetime
 from html import escape
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NoReturn, TypedDict
-
-from .api import analyze_directory, analyze_file
-from .config.settings import Settings
-from .domain.value_objects import Finding, Severity
-from .exceptions import AnalysisError
-from .logging import configure_logging
+from typing import TYPE_CHECKING, Any, TypedDict
 
 if TYPE_CHECKING:
-    from .analyzers import BaseAnalyzer
+    from ..domain.value_objects import Finding
 
-__all__ = ["main"]
-
-# Exit codes — keep in sync with the module docstring above.
-_EXIT_OK = 0       # No findings (or --no-fail passed)
-_EXIT_FINDINGS = 1  # One or more findings at/above min-severity
-_EXIT_ERROR = 2    # Fatal error (missing file, bad config, I/O failure)
-_EXIT_PARTIAL = 3  # Completed with some unanalysable files (error_handling="warn")
-
-# Severity names (for JSON and HTML reports)
+# Severity label constants used in HTML stats
 _SEV_ERROR = "ERROR"
 _SEV_WARNING = "WARNING"
 _SEV_INFO = "INFO"
@@ -65,175 +21,6 @@ _HEALTH_HIGH_RISK = "High Risk"
 _HEALTH_MODERATE_RISK = "Moderate Risk"
 _HEALTH_LOW_RISK = "Low Risk"
 _HEALTH_HEALTHY = "Healthy"
-_PLACEHOLDER_COMING_SOON = "coming soon"
-
-# ANSI colour helpers (disabled when not a tty)
-_COLOURS = {
-    Severity.ERROR: "\033[31m",  # red
-    Severity.WARNING: "\033[33m",  # yellow
-    Severity.INFO: "\033[36m",  # cyan
-}
-_RESET = "\033[0m"
-
-
-def _colour(text: str, severity: Severity) -> str:
-    if not sys.stdout.isatty():
-        return text
-    return f"{_COLOURS.get(severity, '')}{text}{_RESET}"
-
-
-def _get_template_path() -> Path:
-    """Get path to the HTML report template."""
-    return Path(__file__).parent / "resources" / "report.html.j2"
-
-
-def _render_html_template(context: dict[str, Any]) -> str:
-    """Render HTML report using Jinja2 template.
-
-    Args:
-        context: Template variables
-
-    Returns:
-        Rendered HTML string
-    """
-    try:
-        from jinja2 import Environment, FileSystemLoader
-        from markupsafe import Markup
-    except ImportError:
-        # Fallback if jinja2 not available; use legacy rendering
-        return _format_html_legacy(context)
-
-    template_path = _get_template_path()
-    if not template_path.exists():
-        return _format_html_legacy(context)
-
-    env = Environment(
-        loader=FileSystemLoader(str(template_path.parent)),
-        autoescape=True,
-    )
-    # Mark HTML strings as safe so they don't get double-escaped
-    # SAFETY: All values for these keys are either pre-escaped via html.escape()
-    # in their respective _html_render_* functions, or are hardcoded constants
-    # (_HTML_STYLES, _compute_no_findings_html). No user input is included.
-    safe_context = context.copy()
-    for key in (
-        "action_items",
-        "grouped_findings",
-        "findings_table",
-        "styles",
-        "no_findings_html",
-    ):
-        if key in safe_context:
-            value = safe_context[key]
-            if isinstance(value, list):
-                safe_context[key] = [
-                    Markup(v) if isinstance(v, str) else v for v in value  # noqa: S704
-                ]
-            elif isinstance(value, str):
-                safe_context[key] = Markup(value)  # noqa: S704
-    template = env.get_template(template_path.name)
-    return template.render(**safe_context)
-
-
-# ---------------------------------------------------------------------------
-# Formatters
-# ---------------------------------------------------------------------------
-
-
-def _format_text(findings: list[Finding], path: Path) -> str:
-    if not findings:
-        return f"No findings in {path}\n"
-
-    lines: list[str] = [
-        f"\nAnalysis results for {path}  ({len(findings)} finding(s))\n"
-    ]
-    for f in sorted(
-        findings, key=lambda x: (str(x.location.file_path), x.location.line)
-    ):
-        sev_label = _colour(f.severity.name.upper(), f.severity)
-        loc = f"{f.location.file_path}:{f.location.line}"
-        lines.append(f"  {sev_label}  {loc}")
-        lines.append(f"    {f.pattern.name}: {f.message}")
-        if f.pattern.recommendation != f.message:
-            lines.append(f"    → {f.pattern.recommendation}")
-        lines.append("")
-    return "\n".join(lines)
-
-
-def _format_json(findings: list[Finding]) -> str:
-    records = [f.to_dict() for f in findings]
-    # Pydantic objects aren't JSON-serialisable by default; use a custom encoder
-    return json.dumps(records, indent=2, default=str)
-
-
-def _format_sarif(findings: list[Finding], path: Path) -> str:
-    """Produce a SARIF 2.1.0 JSON string from a list of findings.
-
-    ``path`` is the analysed file or directory.  It is used to rewrite absolute
-    artifact URIs to relative ones so SARIF output is portable across machines.
-    """
-    # Build unique rules list and deterministic result ordering from Finding helpers.
-    seen_rules: dict[str, dict[str, object]] = {}
-    results: list[dict[str, object]] = []
-
-    # Use the directory itself as root; for a single-file analysis use the parent
-    # directory so that relative artifact URIs remain meaningful (e.g. "suite.robot"
-    # instead of ".").
-    root = path.resolve() if path.is_dir() else path.parent.resolve()
-
-    for finding in sorted(
-        findings,
-        key=lambda x: (
-            str(x.location.file_path),
-            x.location.line,
-            x.pattern.name,
-            x.message,
-        ),
-    ):
-        result = finding.to_sarif()
-        # Rewrite artifact URIs to paths relative to the analysed root so that
-        # SARIF output is portable across machines.
-        try:
-            physical = result["locations"][0]["physicalLocation"]
-            artifact = physical["artifactLocation"]
-            file_uri = artifact.get("uri", "")
-            candidate = Path(str(file_uri))
-            artifact["uri"] = str(candidate.resolve().relative_to(root)).replace(
-                "\\", "/"
-            )
-        except (KeyError, IndexError, ValueError, OSError, TypeError):
-            # Keep the generated SARIF location untouched when path conversion
-            # fails (e.g. the finding is outside the analysed root).
-            pass
-
-        rule_id = str(result.get("ruleId", ""))
-        results.append(result)
-        if rule_id not in seen_rules:
-            rule: dict[str, object] = {
-                "id": rule_id,
-                "name": finding.pattern.name,
-                "shortDescription": {"text": finding.pattern.name},
-            }
-            if finding.pattern.documentation_url:
-                rule["helpUri"] = finding.pattern.documentation_url
-            seen_rules[rule_id] = rule
-
-    sarif = {
-        "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
-        "version": "2.1.0",
-        "runs": [
-            {
-                "tool": {
-                    "driver": {
-                        "name": "robot-optimizer",
-                        "rules": [seen_rules[key] for key in sorted(seen_rules)],
-                    }
-                },
-                "results": results,
-            }
-        ],
-    }
-    return json.dumps(sarif, indent=2, default=str)
 
 
 class _CategoryInfo(TypedDict):
@@ -461,7 +248,6 @@ def _html_render_findings_table(findings: list[Finding], root: Path) -> str:
 
 
 def _compute_severity_phrase(findings: list[Finding], health_status: str) -> str:
-    """Determine severity description based on findings and health status."""
     if not findings:
         return "no significant"
     if health_status == _HEALTH_HIGH_RISK:
@@ -474,7 +260,6 @@ def _compute_severity_phrase(findings: list[Finding], health_status: str) -> str
 def _compute_summary_paragraph(
     findings: list[Finding], severity_phrase: str, top_category_names: str
 ) -> str:
-    """Compute the summary paragraph text for the report."""
     if not findings:
         return (
             "The analyzed suite shows no significant maintainability or stability risk "
@@ -488,7 +273,6 @@ def _compute_summary_paragraph(
 
 
 def _compute_no_findings_html(findings: list[Finding]) -> str:
-    """Compute the HTML to display when no findings are present."""
     if not findings:
         return "<p class='no-findings'>No findings were detected for the selected analyzers.</p>"
     return ""
@@ -643,7 +427,6 @@ _HTML_STYLES = """\
 
 
 _HEALTH_COLORS: dict[str, tuple[str, str, str, str]] = {
-    # status: (base, bg-alpha, border-alpha, glow-alpha) as hex colours
     _HEALTH_HIGH_RISK: ("#ef4444", "#ef44441a", "#ef444455", "#ef444433"),
     _HEALTH_MODERATE_RISK: ("#f59e0b", "#f59e0b1a", "#f59e0b55", "#f59e0b33"),
     _HEALTH_HEALTHY: ("#0d9488", "#0d94881a", "#0d948855", "#0d948833"),
@@ -652,8 +435,53 @@ _HEALTH_COLORS: dict[str, tuple[str, str, str, str]] = {
 _HEALTH_COLOR_DEFAULT = ("#6b7280", "#6b72801a", "#6b728055", "#6b728033")
 
 
+def _get_template_path() -> Path:
+    """Get path to the HTML report template."""
+    # __file__ is cli/_html.py; resources/ lives one level up in cli/../resources/
+    return Path(__file__).parent.parent / "resources" / "report.html.j2"
+
+
+def _render_html_template(context: dict[str, Any]) -> str:
+    """Render HTML report using Jinja2 template, falling back to legacy renderer."""
+    try:
+        from jinja2 import Environment, FileSystemLoader
+        from markupsafe import Markup
+    except ImportError:
+        return _format_html_legacy(context)
+
+    template_path = _get_template_path()
+    if not template_path.exists():
+        return _format_html_legacy(context)
+
+    env = Environment(
+        loader=FileSystemLoader(str(template_path.parent)),
+        autoescape=True,
+    )
+    # SAFETY: All values for these keys are either pre-escaped via html.escape()
+    # in their respective _html_render_* functions, or are hardcoded constants.
+    # No user input is included.
+    safe_context = context.copy()
+    for key in (
+        "action_items",
+        "grouped_findings",
+        "findings_table",
+        "styles",
+        "no_findings_html",
+    ):
+        if key in safe_context:
+            value = safe_context[key]
+            if isinstance(value, list):
+                safe_context[key] = [
+                    Markup(v) if isinstance(v, str) else v for v in value  # noqa: S704
+                ]
+            elif isinstance(value, str):
+                safe_context[key] = Markup(value)  # noqa: S704
+    template = env.get_template(template_path.name)
+    return template.render(**safe_context)
+
+
 def _format_html(findings: list[Finding], path: Path) -> str:
-    """Format findings as HTML report using template-based rendering."""
+    """Format findings as an HTML health report."""
     root = path.resolve() if path.is_dir() else path.parent.resolve()
     timestamp, sev_counts, affected_files, category_summary, category_groups = (
         _html_compute_stats(findings, path)
@@ -683,7 +511,6 @@ def _format_html(findings: list[Finding], path: Path) -> str:
     )
     table = _html_render_findings_table(findings, root)
 
-    # Prepare template context
     context: dict[str, Any] = {
         "health_color": hc,
         "health_color_bg": hc_bg,
@@ -714,8 +541,7 @@ def _format_html(findings: list[Finding], path: Path) -> str:
 
 
 def _format_html_legacy(context: dict[str, Any]) -> str:
-    """Legacy HTML rendering (fallback if template not available)."""
-    # Use context dict to generate HTML the old way
+    """Legacy HTML rendering (fallback if Jinja2 template not available)."""
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -796,405 +622,3 @@ def _format_html_legacy(context: dict[str, Any]) -> str:
 </body>
 </html>
 """
-
-
-# ---------------------------------------------------------------------------
-# analyse subcommand
-# ---------------------------------------------------------------------------
-
-
-def _parse_analyzers(args: argparse.Namespace) -> list[str | BaseAnalyzer] | None:
-    """Parse analyzer names from arguments."""
-    if hasattr(args, "analyzers") and args.analyzers:
-        return [a.strip() for a in args.analyzers.split(",") if a.strip()]
-    return None
-
-
-def _parse_severity(args: argparse.Namespace) -> Severity | None:
-    """Parse and validate severity filter. Returns None on error or if not set."""
-    if not args.min_severity:
-        return None
-    try:
-        return Severity.from_string(args.min_severity)
-    except ValueError as exc:
-        print(f"error: invalid --min-severity value: {exc}", file=sys.stderr)
-        return None
-
-
-def _load_config(args: argparse.Namespace) -> Settings | None:
-    """Load config file. Returns None on error or if not set."""
-    if not getattr(args, "config", None):
-        return None
-    try:
-        from .config.toml_loader import load_settings_from_toml_file
-
-        return load_settings_from_toml_file(args.config)
-    except FileNotFoundError as exc:
-        print(f"error: {exc}", file=sys.stderr)
-        return None
-    except Exception as exc:
-        print(
-            f"error: failed to load config '{args.config}': {exc}", file=sys.stderr
-        )
-        return None
-
-
-def _analyze_path(
-    path: Path,
-    analyzer_names: list[str | BaseAnalyzer] | None,
-    settings: Settings | None,
-    severity_filter: Severity | None,
-) -> tuple[list[Finding] | None, bool]:
-    """Analyze a file or directory and return findings and partial failure status."""
-    partial_failure = False
-    try:
-        if path.is_dir():
-            results = analyze_directory(
-                path,
-                analyzers=analyzer_names,
-                settings=settings,
-                severity_filter=severity_filter,
-                error_handling="warn",
-            )
-            partial_failure = bool(results.errors)
-            all_findings: list[Finding] = [f for fs in results.findings.values() for f in fs]
-        elif path.is_file():
-            all_findings = analyze_file(
-                path,
-                analyzers=analyzer_names,
-                settings=settings,
-                severity_filter=severity_filter,
-            )
-        else:
-            print(f"error: path does not exist: {path}", file=sys.stderr)
-            return None, False
-
-    except AnalysisError as exc:
-        print(f"error: {exc}", file=sys.stderr)
-        return None, False
-    except ExceptionGroup as eg:
-        for sub_exc in eg.exceptions:
-            print(f"error: {sub_exc}", file=sys.stderr)
-        return None, False
-
-    return all_findings, partial_failure
-
-
-def _write_output(all_findings: list[Finding], args: argparse.Namespace) -> int:
-    """Format and write analysis results. Returns exit code."""
-    path = Path(args.path)
-    if args.format == "json":
-        output = _format_json(all_findings)
-    elif args.format == "sarif":
-        output = _format_sarif(all_findings, path)
-    elif args.format == "html":
-        output = _format_html(all_findings, path)
-    else:
-        output = _format_text(all_findings, path)
-
-    if args.output_file:
-        try:
-            Path(args.output_file).write_text(output, encoding="utf-8")
-        except OSError as exc:
-            print(
-                f"error: could not write output file {args.output_file}: {exc}",
-                file=sys.stderr,
-            )
-            return _EXIT_ERROR
-        print(f"Results written to {args.output_file}")
-    else:
-        print(output, end="")
-
-    return _EXIT_OK
-
-
-def _run_analyze(args: argparse.Namespace) -> int:
-    path = Path(args.path)
-
-    analyzer_names = _parse_analyzers(args)
-
-    severity_filter = _parse_severity(args)
-    if severity_filter is None and args.min_severity:
-        return _EXIT_ERROR
-
-    settings = _load_config(args)
-    if settings is None and getattr(args, "config", None):
-        return _EXIT_ERROR
-
-    all_findings, partial_failure = _analyze_path(
-        path, analyzer_names, settings, severity_filter
-    )
-    if all_findings is None:
-        return _EXIT_ERROR
-
-    if _write_output(all_findings, args) == _EXIT_ERROR:
-        return _EXIT_ERROR
-
-    _print_summary(all_findings)
-
-    if partial_failure:
-        return _EXIT_PARTIAL
-    if all_findings and not args.no_fail:
-        return _EXIT_FINDINGS
-    return _EXIT_OK
-
-
-def _print_summary(findings: list[Finding]) -> None:
-    if not findings:
-        return
-    counts: dict[str, int] = {}
-    for f in findings:
-        key = f.severity.name.upper()
-        counts[key] = counts.get(key, 0) + 1
-    parts = ", ".join(f"{v} {k}" for k, v in sorted(counts.items()))
-    print(f"Summary: {len(findings)} finding(s)  [{parts}]", file=sys.stderr)
-
-
-# ---------------------------------------------------------------------------
-# upgrade subcommand
-# ---------------------------------------------------------------------------
-
-
-def _run_upgrade(_args: argparse.Namespace) -> int:
-    from .premium import PREMIUM_PACKAGE_NAME, UPGRADE_URL, is_premium_installed
-
-    version = _get_version()
-
-    print(f"Robot Framework Optimizer  v{version}")
-    print("=" * 50)
-    print()
-    print("Feature Comparison:")
-    print()
-    print(f"{'Feature':<38} {'Free':<10} {'Pro'}")
-    print("-" * 55)
-    features = [
-        ("Dead code detection", True, True),
-        ("Sleep pattern analysis", True, True),
-        ("Flakiness detection", True, True),
-        ("Naming convention checks", True, True),
-        ("Hardcoded value detection", True, True),
-        ("Custom analyzer plugins", True, True),
-        ("SARIF output format", True, True),
-        ("Basic HTML report", True, True),
-        ("Auto-fix workflows", False, _PLACEHOLDER_COMING_SOON),
-        ("Advanced branded HTML reports", False, _PLACEHOLDER_COMING_SOON),
-        ("PDF export", False, _PLACEHOLDER_COMING_SOON),
-        ("Baseline diffing", False, _PLACEHOLDER_COMING_SOON),
-        ("Historical trend reports", False, _PLACEHOLDER_COMING_SOON),
-        ("Dashboards", False, _PLACEHOLDER_COMING_SOON),
-        ("Priority support", False, _PLACEHOLDER_COMING_SOON),
-    ]
-    for name, free, pro in features:
-        free_mark = "✓" if free else "—"
-        if isinstance(pro, str):
-            pro_mark = pro
-        elif pro:
-            pro_mark = "✓"
-        else:
-            pro_mark = "—"
-        print(f"  {name:<36} {free_mark:<10} {pro_mark}")
-    print()
-
-    if is_premium_installed():
-        print(f"✓ {PREMIUM_PACKAGE_NAME} is installed.")
-    else:
-        print("Interested in Pro features?")
-        print(f"  Join the waitlist: {UPGRADE_URL}")
-        print("  (Pro launch planned Q3 2026)")
-
-    return _EXIT_OK
-
-
-# ---------------------------------------------------------------------------
-# list-analyzers subcommand
-# ---------------------------------------------------------------------------
-
-
-def _run_list_analyzers(args: argparse.Namespace) -> int:
-    from .analyzers import get_analyzer_registry
-
-    registry = get_analyzer_registry()
-    names = registry.list()
-
-    if args.format == "json":
-        records = []
-        for name in names:
-            info = registry.get_info(name)
-            records.append(info)
-        print(json.dumps(records, indent=2))
-    else:
-        print(f"Available analyzers ({len(names)}):\n")
-        for name in names:
-            try:
-                info = registry.get_info(name)
-                tags = info.get("tags", "")
-                version = info.get("version", "?")
-                desc = info.get("description", "")
-                print(f"  {name}  [v{version}]")
-                print(f"    {desc}")
-                if tags:
-                    print(f"    Tags: {tags}")
-                print()
-            except (KeyError, TypeError, AttributeError) as exc:
-                print(f"  {name}  (error loading info: {exc})")
-
-    return _EXIT_OK
-
-
-# ---------------------------------------------------------------------------
-# Argument parser
-# ---------------------------------------------------------------------------
-
-
-def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="robot-optimizer",
-        description="Robot Framework test-suite analyser",
-    )
-    parser.add_argument(
-        "--version", action="version", version=f"%(prog)s {_get_version()}"
-    )
-    parser.add_argument(
-        "--verbose", action="store_true", help="Enable INFO logs to stderr"
-    )
-    parser.add_argument(
-        "--debug", action="store_true", help="Enable DEBUG logs to stderr"
-    )
-
-    sub = parser.add_subparsers(dest="command", required=True)
-
-    # -- analyze subcommand --------------------------------------------------
-    analyze_cmd = sub.add_parser(
-        "analyze",
-        help="Analyse a Robot Framework file or directory",
-    )
-    analyze_cmd.add_argument(
-        "path",
-        help="Path to a .robot file or directory to analyse",
-    )
-    analyze_cmd.add_argument(
-        "--analyzers",
-        metavar="NAMES",
-        help="Comma-separated list of analyser names (default: all built-in)",
-        default=None,
-    )
-    analyze_cmd.add_argument(
-        "--format",
-        choices=["text", "json", "sarif", "html"],
-        default="text",
-        help="Output format (default: text)",
-    )
-    analyze_cmd.add_argument(
-        "--output-file",
-        metavar="PATH",
-        default=None,
-        help="Write output to a file instead of stdout",
-    )
-    analyze_cmd.add_argument(
-        "--no-fail",
-        action="store_true",
-        default=False,
-        help="Always exit 0 even when findings are present",
-    )
-    # --min-severity flag
-    analyze_cmd.add_argument(
-        "--min-severity",
-        metavar="LEVEL",
-        default=None,
-        help=(
-            "Only report findings at or above this severity "
-            "(INFO, WARNING, ERROR). Default: all severities."
-        ),
-    )
-    # --config flag
-    analyze_cmd.add_argument(
-        "--config",
-        metavar="PATH",
-        default=None,
-        help=(
-            "Path to a TOML configuration file (robot.toml or pyproject.toml). "
-            "Overrides settings defaults."
-        ),
-    )
-
-    # -- list-analyzers subcommand ---------------------------------
-    list_cmd = sub.add_parser(
-        "list-analyzers",
-        help="List available analyzers with their description and tags",
-    )
-    list_cmd.add_argument(
-        "--format",
-        choices=["text", "json"],
-        default="text",
-        help="Output format (default: text)",
-    )
-
-    # -- upgrade subcommand --------------------------------------------------
-    sub.add_parser(
-        "upgrade",
-        help="Show feature comparison and upgrade information",
-    )
-
-    return parser
-
-
-def _get_version() -> str:
-    """Return the installed package version string, or ``"unknown"`` if not found."""
-    try:
-        from importlib.metadata import PackageNotFoundError, version
-
-        return version("robot-framework-optimizer-core")
-    except PackageNotFoundError:
-        return "unknown"
-
-
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
-
-
-def _ensure_utf8_streams() -> None:
-    """Reconfigure stdout/stderr to UTF-8 so non-ASCII output works on Windows.
-
-    The CLI emits Unicode characters such as em-dashes and arrows. On Windows
-    the default console encoding is cp1252, which raises ``UnicodeEncodeError``
-    when these are written. Python 3.7+ exposes ``reconfigure`` on TextIOWrapper
-    streams; use it defensively (the streams may have been replaced by a test
-    runner with an object that does not support reconfigure).
-    """
-    for stream in (sys.stdout, sys.stderr):
-        reconfigure = getattr(stream, "reconfigure", None)
-        if callable(reconfigure):
-            try:
-                reconfigure(encoding="utf-8", errors="replace")
-            except (ValueError, OSError):
-                # Stream is already detached or doesn't support encoding changes;
-                # fall back silently rather than crash before argument parsing.
-                pass
-
-
-def main(argv: list[str] | None = None) -> NoReturn:
-    """Entry point registered as ``robot-optimizer`` in pyproject.toml."""
-    _ensure_utf8_streams()
-    parser = _build_parser()
-    args = parser.parse_args(argv)
-
-    log_level = "WARNING"
-    if getattr(args, "debug", False):
-        log_level = "DEBUG"
-    elif getattr(args, "verbose", False):
-        log_level = "INFO"
-    configure_logging(level=log_level, format_json=False)
-
-    match args.command:
-        case "analyze":
-            code = _run_analyze(args)
-        case "list-analyzers":
-            code = _run_list_analyzers(args)
-        case "upgrade":
-            code = _run_upgrade(args)
-        case _:
-            parser.print_help()
-            code = _EXIT_ERROR
-
-    sys.exit(code)

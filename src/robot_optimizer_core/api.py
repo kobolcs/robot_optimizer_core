@@ -42,6 +42,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
 
 from .analyzers import BaseAnalyzer
+from .cache import AnalysisCache
 from .di import get_container
 from .domain.entities import TestFile
 from .domain.value_objects import Finding, Severity
@@ -102,6 +103,8 @@ class SuiteAnalysisResult(TypedDict):
 
 
 __all__ = [
+    "AnalysisCache",
+    "DirectoryResults",
     "PremiumFeatureError",
     "SuiteAnalysisResult",
     "SuiteInfo",
@@ -278,6 +281,7 @@ def analyze_directory(
     pattern_filter: list[str] | None = None,
     max_workers: int | None = None,
     metrics: MetricsCollector | None = None,
+    use_cache: bool = True,
 ) -> DirectoryResults:
     """Analyze all Robot Framework files in a directory.
 
@@ -313,6 +317,10 @@ def analyze_directory(
         metrics: Optional metrics collector for recording batch metrics
             (default: global metrics instance). Pass a no-op implementation
             to disable metrics collection.
+        use_cache: When ``True`` (default), unchanged files are skipped and
+            their findings are returned from ``~/.cache/robot-optimizer/cache.json``.
+            Pass ``False`` to force a full re-analysis (equivalent to
+            ``--no-cache`` on the CLI).
 
     Returns:
         Dictionary mapping file paths to findings.
@@ -362,7 +370,23 @@ def analyze_directory(
         },
     )
 
-    # Execute analysis
+    # Resolve cache hits before dispatching to the thread pool.
+    cache: AnalysisCache | None = None
+    cache_hits: dict[Path, list[Finding]] = {}
+    file_hashes: dict[Path, str] = {}
+    files_to_analyze = files
+
+    if use_cache:
+        cache = AnalysisCache()
+        files_to_analyze, cache_hits, file_hashes = _resolve_cache(files, cache)
+        if cache_hits:
+            logger.debug(
+                "Cache: %d hit(s), %d miss(es)",
+                len(cache_hits),
+                len(files_to_analyze),
+            )
+
+    # Execute analysis on cache misses only.
     _default_workers = min(4, (os.cpu_count() or 1))
     effective_workers = max_workers if max_workers is not None else _default_workers
     analyze_fn = functools.partial(
@@ -373,8 +397,17 @@ def analyze_directory(
         pattern_filter=pattern_filter,
     )
     dir_results, file_errors = _execute_directory_analysis(
-        files, analyze_fn, effective_workers, fail_fast
+        files_to_analyze, analyze_fn, effective_workers, fail_fast
     )
+
+    # Merge cache hits into results and persist new entries.
+    for fp, cached_findings in cache_hits.items():
+        dir_results.findings[fp] = cached_findings
+    if cache is not None:
+        for fp, new_findings in dir_results.findings.items():
+            if fp not in cache_hits and fp in file_hashes:
+                cache.put(fp, file_hashes[fp], new_findings)
+        cache.flush()
 
     # Log and track metrics
     total_findings = sum(len(findings) for findings in dir_results.findings.values())
@@ -400,6 +433,35 @@ def analyze_directory(
     )
 
     return dir_results
+
+
+def _resolve_cache(
+    files: list[Path], cache: AnalysisCache
+) -> tuple[list[Path], dict[Path, list[Finding]], dict[Path, str]]:
+    """Split *files* into cache hits and misses.
+
+    Returns ``(misses, hits_findings, hashes)`` where *misses* is the list of
+    files that must be analysed, *hits_findings* maps each cached file to its
+    findings, and *hashes* maps every file to its SHA-256 digest.
+    """
+    misses: list[Path] = []
+    hits: dict[Path, list[Finding]] = {}
+    hashes: dict[Path, str] = {}
+
+    for fp in files:
+        try:
+            h = cache.file_hash(fp)
+            hashes[fp] = h
+            cached = cache.get(fp, h)
+            if cached is not None:
+                hits[fp] = cached
+            else:
+                misses.append(fp)
+        except OSError:
+            # Unhashable file (e.g. permission error) → treat as miss.
+            misses.append(fp)
+
+    return misses, hits, hashes
 
 
 def _load_test_files(files: list[Path]) -> list[TestFile]:
