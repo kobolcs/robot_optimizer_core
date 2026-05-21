@@ -10,9 +10,33 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 from pydantic import ValidationError
 
 from robot_optimizer_core.domain.value_objects import Location
+
+
+# ---------------------------------------------------------------------------
+# Shared strategies
+# ---------------------------------------------------------------------------
+
+_line = st.integers(min_value=1, max_value=10_000)
+_path = st.just(Path("test.robot"))
+
+_point_location = st.builds(
+    Location,
+    file_path=_path,
+    line=_line,
+)
+
+
+@st.composite
+def _range_location(draw: st.DrawFn) -> Location:
+    """Draw a valid range Location (end_line >= line)."""
+    line = draw(_line)
+    end_line = draw(st.integers(min_value=line, max_value=line + 500))
+    return Location(file_path=Path("test.robot"), line=line, end_line=end_line)
 
 
 @pytest.mark.unit
@@ -317,3 +341,37 @@ class TestLocation:
 
         with pytest.raises(ValidationError):
             loc.file_path = Path("other.robot")
+
+
+@pytest.mark.unit
+class TestLocationProperties:
+    """Property-based tests for Location invariants."""
+
+    @given(_point_location)
+    @settings(max_examples=200)
+    def test_line_always_at_least_one(self, loc: Location) -> None:
+        assert loc.line >= 1
+
+    @given(_range_location())
+    @settings(max_examples=200)
+    def test_range_line_always_at_least_one(self, loc: Location) -> None:
+        assert loc.line >= 1
+        assert loc.end_line is not None
+        assert loc.end_line >= loc.line
+
+    @given(_point_location, _point_location, _point_location)
+    @settings(max_examples=200)
+    def test_contains_is_transitive(
+        self, a: Location, b: Location, c: Location
+    ) -> None:
+        """If a contains b and b contains c then a must contain c."""
+        if a.contains(b) and b.contains(c):
+            assert a.contains(c)
+
+    @given(_range_location(), _range_location(), _range_location())
+    @settings(max_examples=200)
+    def test_contains_is_transitive_ranges(
+        self, a: Location, b: Location, c: Location
+    ) -> None:
+        if a.contains(b) and b.contains(c):
+            assert a.contains(c)

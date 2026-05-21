@@ -11,6 +11,8 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 from pydantic import ValidationError
 
 from robot_optimizer_core.domain.value_objects import (
@@ -20,6 +22,31 @@ from robot_optimizer_core.domain.value_objects import (
     PatternType,
     Severity,
 )
+
+_severity_st = st.sampled_from(list(Severity))
+_pattern_type_st = st.sampled_from(list(PatternType))
+_message_st = st.text(min_size=1, max_size=200).filter(lambda s: s.strip())
+_line_st = st.integers(min_value=1, max_value=10_000)
+
+
+@st.composite
+def _finding(draw: st.DrawFn) -> Finding:
+    pattern_type = draw(_pattern_type_st)
+    pattern = Pattern(
+        pattern_type=pattern_type,
+        name="Test Pattern",
+        description="A test pattern",
+        recommendation="Fix it",
+    )
+    location = Location(file_path=Path("test.robot"), line=draw(_line_st))
+    message = draw(_message_st)
+    severity = draw(_severity_st)
+    return Finding(
+        pattern=pattern,
+        severity=severity,
+        location=location,
+        message=message,
+    )
 
 
 @pytest.mark.unit
@@ -367,3 +394,53 @@ class TestFinding:
             # Test console formatting includes correct emoji
             output = finding.format_for_console()
             assert severity.emoji in output
+
+
+_REQUIRED_KEYS = {
+    "id",
+    "file",
+    "file_path",
+    "line",
+    "line_number",
+    "column",
+    "location",
+    "severity",
+    "message",
+    "pattern",
+    "pattern_type",
+    "pattern_name",
+    "recommendation",
+    "is_auto_fixable",
+    "auto_fixable",
+    "context",
+}
+
+
+@pytest.mark.unit
+class TestFindingProperties:
+    """Property-based tests for Finding.to_dict() round-trip."""
+
+    @given(_finding())
+    @settings(max_examples=200)
+    def test_to_dict_has_all_required_keys(self, finding: Finding) -> None:
+        data = finding.to_dict()
+        assert _REQUIRED_KEYS <= data.keys()
+
+    @given(_finding())
+    @settings(max_examples=200)
+    def test_to_dict_id_is_string(self, finding: Finding) -> None:
+        data = finding.to_dict()
+        assert isinstance(data["id"], str)
+
+    @given(_finding())
+    @settings(max_examples=200)
+    def test_to_dict_severity_is_string_name(self, finding: Finding) -> None:
+        data = finding.to_dict()
+        assert data["severity"] in {"ERROR", "WARNING", "INFO"}
+
+    @given(_finding())
+    @settings(max_examples=200)
+    def test_to_dict_line_matches_location(self, finding: Finding) -> None:
+        data = finding.to_dict()
+        assert data["line"] == finding.location.line
+        assert data["line_number"] == finding.location.line

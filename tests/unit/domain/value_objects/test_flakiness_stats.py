@@ -7,9 +7,27 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 from pydantic import ValidationError
 
 from robot_optimizer_core.domain.value_objects import FlakinessStats
+
+_non_neg_int = st.integers(min_value=0, max_value=10_000)
+_test_name = st.text(min_size=1, max_size=50).filter(lambda s: s.strip())
+_path = st.just(Path("test.robot"))
+
+
+@st.composite
+def _valid_stats(draw: st.DrawFn) -> FlakinessStats:
+    total = draw(_non_neg_int)
+    failures = draw(st.integers(min_value=0, max_value=total))
+    return FlakinessStats(
+        test_name=draw(_test_name),
+        file_path=Path("test.robot"),
+        total_runs=total,
+        failures=failures,
+    )
 
 
 @pytest.mark.unit
@@ -243,3 +261,35 @@ class TestFlakinessStats:
 
         # But is_flaky should handle this gracefully
         assert stats.is_flaky is False  # Not flaky if rate >= 1
+
+
+@pytest.mark.unit
+class TestFlakinessStatsProperties:
+    """Property-based tests for FlakinessStats invariants."""
+
+    @given(_valid_stats())
+    @settings(max_examples=200)
+    def test_failure_rate_in_unit_interval(self, stats: FlakinessStats) -> None:
+        assert 0.0 <= stats.failure_rate <= 1.0
+
+    @given(_valid_stats())
+    @settings(max_examples=200)
+    def test_is_flaky_implies_rate_strictly_between_zero_and_one(
+        self, stats: FlakinessStats
+    ) -> None:
+        if stats.is_flaky:
+            assert 0.0 < stats.failure_rate < 1.0
+
+    @given(_valid_stats())
+    @settings(max_examples=200)
+    def test_is_flaky_implies_minimum_runs(self, stats: FlakinessStats) -> None:
+        if stats.is_flaky:
+            assert stats.total_runs >= 4
+
+    @given(_valid_stats())
+    @settings(max_examples=200)
+    def test_not_flaky_when_always_passes_or_always_fails(
+        self, stats: FlakinessStats
+    ) -> None:
+        if stats.failure_rate == 0.0 or stats.failure_rate == 1.0:
+            assert not stats.is_flaky

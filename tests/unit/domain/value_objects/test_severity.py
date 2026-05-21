@@ -8,8 +8,12 @@ complete coverage and mutation testing resilience.
 from __future__ import annotations
 
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from robot_optimizer_core.domain.value_objects import Severity
+
+_severity = st.sampled_from(list(Severity))
 
 
 @pytest.mark.unit
@@ -168,3 +172,28 @@ class TestSeverity:
         # These shouldn't be members
         assert Severity(1) is Severity.ERROR
         assert all(member.value != "ERROR" for member in Severity)
+
+
+@pytest.mark.unit
+class TestSeverityProperties:
+    """Property-based tests for Severity ordering invariants."""
+
+    @given(_severity, _severity)
+    @settings(max_examples=200)
+    def test_ordering_is_total(self, a: Severity, b: Severity) -> None:
+        """Every pair of severities satisfies exactly one of <, ==, >."""
+        assert (a < b) or (a == b) or (a > b)
+
+    @given(_severity, _severity, _severity)
+    @settings(max_examples=200)
+    def test_ordering_is_transitive(self, a: Severity, b: Severity, c: Severity) -> None:
+        """Transitivity: a <= b and b <= c implies a <= c."""
+        if a <= b and b <= c:
+            assert a <= c
+
+    @given(_severity, _severity)
+    @settings(max_examples=200)
+    def test_ordering_is_antisymmetric(self, a: Severity, b: Severity) -> None:
+        """Antisymmetry: a <= b and b <= a implies a == b."""
+        if a <= b and b <= a:
+            assert a == b
