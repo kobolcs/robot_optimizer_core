@@ -14,8 +14,9 @@ Welcome! This guide explains how to contribute to `robot_optimizer_core` — inc
    - [Security Requirements for Plugins](#security-requirements-for-plugins)
    - [Registering via Entry Points](#registering-via-entry-points)
 3. [Running Tests](#running-tests)
-4. [Coding Standards](#coding-standards)
-5. [Pull Request Checklist](#pull-request-checklist)
+4. [Coverage Policy](#coverage-policy)
+5. [Coding Standards](#coding-standards)
+6. [Pull Request Checklist](#pull-request-checklist)
 
 ---
 
@@ -198,14 +199,27 @@ findings = analyze_file("tests/login.robot", analyzers=["my_analyzer"])
 ## Running Tests
 
 ```bash
-# All tests
+# All tests (includes per-file coverage check)
 uv run pytest -q
 
-# Only unit tests (fast)
-uv run pytest -q -m unit
+# Fast iteration — no coverage overhead
+make test-fast
 
-# With coverage
-uv run pytest --cov=robot_optimizer_core --cov-report=term-missing
+# Only unit tests
+make test-unit
+
+# Only integration tests
+make test-integration
+
+# Full suite + HTML report
+make coverage                      # opens htmlcov/index.html
+
+# Per-file coverage check against coverage.xml (run after pytest)
+make coverage-check
+
+# Tier-specific coverage reports (no aggregate threshold — for investigation only)
+make coverage-unit                 # htmlcov-unit/index.html
+make coverage-integration          # htmlcov-integration/index.html
 
 # Property-based tests (Hypothesis)
 uv run pytest tests/unit/analyzers/test_dead_code_property.py -v
@@ -214,6 +228,44 @@ uv run pytest tests/unit/analyzers/test_dead_code_property.py -v
 uv run mutmut run
 uv run mutmut results
 ```
+
+---
+
+## Coverage Policy
+
+Coverage is enforced at two levels:
+
+### 1. Aggregate threshold (via `pytest --cov-fail-under`)
+
+The full test suite must achieve **≥ 95 % combined line + branch coverage**.
+This is checked by `pytest-cov` on every `pytest` run and on every CI matrix leg.
+
+### 2. Per-file floor (via `ci/check_per_file_coverage.py`)
+
+Every source file must also meet a per-file minimum to prevent the aggregate
+from masking under-tested modules.  The check runs automatically after `pytest`
+in the tox environment and in CI.
+
+| Scope | Minimum | Notes |
+|---|---|---|
+| Default (all files) | **80 %** | Catches regressions in any module |
+| `__main__.py` | exempt | Two-line entry-point shim |
+
+Per-file overrides live in `THRESHOLDS` inside `ci/check_per_file_coverage.py`.
+To raise the floor for a specific file, add or update its entry there.
+
+### Why two checks?
+
+The aggregate passes when a few small, fully-tested files (value objects,
+`__init__.py` stubs) pull the average up.  The per-file floor prevents a large
+module like `_commands.py` or `dead_code.py` from sliding to 20 % while the
+aggregate still shows green.
+
+### Tier visibility
+
+Running `make coverage-unit` and `make coverage-integration` separately shows
+which test tier covers which files.  These reports have no enforcement threshold
+and are intended for local investigation only.
 
 ---
 
@@ -230,7 +282,7 @@ uv run mutmut results
 
 ## Pull Request Checklist
 
-- [ ] `uv run pytest -q` passes with coverage ≥ 80 %
+- [ ] `uv run pytest -q` passes (aggregate coverage ≥ 95 %, all files ≥ 80 %)
 - [ ] New code is type-annotated and passes `mypy`
 - [ ] New analyzers are registered in `src/robot_optimizer_core/analyzers/__init__.py`
 - [ ] `CHANGELOG.md` updated with a short entry

@@ -4,7 +4,7 @@ PYTEST        := uv run pytest
 MYPY          := uv run mypy
 RUFF          := uv run ruff
 
-.PHONY: help install test test-fast test-unit test-integration lint lint-full type format clean coverage docs docs-serve build check publish-test publish-test-upload publish release-check release-check-testpypi
+.PHONY: help install test test-fast test-unit test-integration lint lint-full type format clean coverage coverage-check coverage-unit coverage-integration docs docs-serve build check publish-test publish-test-upload publish release-check release-check-testpypi
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -39,9 +39,20 @@ type: ## Static type check with mypy (strict)
 format: ## Format code with ruff
 	$(RUFF) format src tests
 
-coverage: ## Run tests and open HTML coverage report
+coverage: ## Run full test suite with HTML coverage report
 	$(PYTEST) tests/ --cov-report=html
 	@echo "Coverage report: htmlcov/index.html"
+
+coverage-check: ## Enforce per-file coverage minimums (reads coverage.xml)
+	$(PYTHON) ci/check_per_file_coverage.py
+
+coverage-unit: ## Unit-tier coverage report (no aggregate threshold enforced)
+	$(PYTEST) -m unit --cov-report=term-missing:skip-covered --cov-report=html:htmlcov-unit --no-cov-on-fail --override-ini="addopts=--cov=robot_optimizer_core --cov-branch --cov-report=term-missing:skip-covered --cov-report=html:htmlcov-unit --cov-report=xml:coverage-unit.xml" -q
+	@echo "Unit coverage report: htmlcov-unit/index.html"
+
+coverage-integration: ## Integration-tier coverage report (no aggregate threshold enforced)
+	$(PYTEST) -m integration --cov-report=term-missing:skip-covered --cov-report=html:htmlcov-integration --no-cov-on-fail --override-ini="addopts=--cov=robot_optimizer_core --cov-branch --cov-report=term-missing:skip-covered --cov-report=html:htmlcov-integration --cov-report=xml:coverage-integration.xml" -q
+	@echo "Integration coverage report: htmlcov-integration/index.html"
 
 clean: ## Remove build artefacts, caches, and coverage files
 	rm -rf build dist *.egg-info
