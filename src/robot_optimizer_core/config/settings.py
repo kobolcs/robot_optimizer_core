@@ -150,6 +150,17 @@ class Settings(BaseSettings):
         default_factory=list, description="Directories to search for plugins"
     )
 
+    trusted_analyzer_packages: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Allowlist of distribution package names whose entry-point analyzers "
+            "are trusted to load automatically.  When empty (the default) all "
+            "installed entry-point analyzers are loaded with a security warning. "
+            "Set to a non-empty list to restrict loading to specific packages "
+            '(e.g. ["robot-framework-optimizer-core"]).'
+        ),
+    )
+
     # Pro version extension point
     custom_settings: dict[str, Any] = Field(
         default_factory=dict, description="Custom settings for extensions"

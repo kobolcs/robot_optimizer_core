@@ -55,7 +55,7 @@ class ApplicationConfig:
     enable_metrics: bool = True
     enable_logging: bool = True
     log_level: str = "INFO"
-    log_format_json: bool = True
+    log_format_json: bool | None = None  # None = auto-detect from TTY
     max_memory_mb: int = 500
     thread_pool_size: int = 4
 

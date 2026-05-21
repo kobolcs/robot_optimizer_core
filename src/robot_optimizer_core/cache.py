@@ -12,6 +12,7 @@ locking is required.
 from __future__ import annotations
 
 import hashlib
+import importlib.metadata
 import json
 import logging
 from pathlib import Path
@@ -24,6 +25,14 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_CACHE_DIR = Path.home() / ".cache" / "robot-optimizer"
 _CACHE_FILENAME = "cache.json"
+
+
+def _get_package_version() -> str:
+    """Return the installed package version used as part of the cache key."""
+    try:
+        return importlib.metadata.version("robot-framework-optimizer-core")
+    except importlib.metadata.PackageNotFoundError:
+        return "dev"
 
 
 def _finding_to_dict(f: Finding) -> dict[str, Any]:
@@ -84,6 +93,9 @@ class AnalysisCache:
         self._cache_path = self._cache_dir / _CACHE_FILENAME
         self._data: dict[str, list[dict[str, Any]]] | None = None
         self._dirty = False
+        # Include the package version so cache entries are automatically
+        # invalidated when the package is upgraded (new analyzer logic).
+        self._version_key = _get_package_version()
 
     @property
     def path(self) -> Path:
@@ -110,9 +122,8 @@ class AnalysisCache:
                 self._data = {}
         return self._data
 
-    @staticmethod
-    def _cache_key(file_path: Path, file_hash: str) -> str:
-        return f"{file_path.resolve()}#{file_hash}"
+    def _cache_key(self, file_path: Path, file_hash: str) -> str:
+        return f"{file_path.resolve()}#{file_hash}#{self._version_key}"
 
     # ------------------------------------------------------------------
     # Public API

@@ -379,9 +379,11 @@ get_container = get_thread_safe_container
 
 
 def reset_container() -> None:
-    """Reset the global DI container to an uninitialised state.
+    """Reset the global DI container and all related global singletons.
 
-    Primarily useful for tests and plugin reload scenarios.
+    Clears the DI container, analyzer registry, and plugin registry so
+    that each test module starts from a fully clean state.  Primarily
+    useful for tests and plugin reload scenarios.
     """
     global _global_container
     with _global_container_lock:
@@ -390,6 +392,13 @@ def reset_container() -> None:
     # Clean up the old container outside the lock to avoid mutating live instances
     if old_container is not None:
         old_container.clear()
+
+    # Reset co-located globals so all three singletons are torn down together.
+    from .analyzers.registry import reset_registry
+    from .plugin import reset_plugin_registry
+
+    reset_registry()
+    reset_plugin_registry()
 
 
 def _register_defaults(container: ThreadSafeContainer) -> None:
