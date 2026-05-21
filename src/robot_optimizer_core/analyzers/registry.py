@@ -175,7 +175,7 @@ class AnalyzerRegistry:
                 details={"available": self.list()},
             )
 
-        return cast("BaseAnalyzer", self.analyzers[name]())
+        return self.analyzers[name]()
 
     def list(self) -> list[str]:
         """List all registered analyzer names.

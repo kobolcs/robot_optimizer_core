@@ -19,6 +19,7 @@ try:
     from uuid import uuid4
 
     from pydantic import ValidationError
+
     from robot_optimizer_core.domain.events import (
         AnalysisStartedEvent,
         BatchAnalysisCompletedEvent,

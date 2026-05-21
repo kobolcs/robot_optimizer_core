@@ -158,8 +158,9 @@ class TestSleepDetectorAnalyzerExtra:
         assert not any(". " in f.message and "Replace" in f.message for f in findings)
 
     def test_suggest_alternative_no_ctx(self) -> None:
-        from robot_optimizer_core.domain.value_objects.sleep_pattern import SleepPattern
         from decimal import Decimal
+
+        from robot_optimizer_core.domain.value_objects.sleep_pattern import SleepPattern
 
         d = SleepDetector()
         tf = self._make("*** Test Cases ***\nT\n    Sleep    2\n")

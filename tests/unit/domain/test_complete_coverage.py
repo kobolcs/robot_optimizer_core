@@ -111,7 +111,7 @@ class TestCompleteCoverage:
 
     def test_sleep_pattern_complete(self):
         """Test SleepPattern value object completely."""
-        units = ['s', 'seconds', 'second', 'm', 'minutes', 'minute', 'ms', 'milliseconds']
+        units = ["s", "seconds", "second", "m", "minutes", "minute", "ms", "milliseconds"]
         for unit in units:
             pattern = SleepPattern(
                 duration=Decimal("5"),
@@ -323,7 +323,7 @@ class TestCompleteCoverage:
                 encoding="invalid-encoding"
             )
 
-        for encoding in ['utf-8', 'utf-16', 'ascii', 'latin-1']:
+        for encoding in ["utf-8", "utf-16", "ascii", "latin-1"]:
             test_file = DomainTestFile(
                 path=Path("test.robot"),
                 content="content",
@@ -338,11 +338,11 @@ class TestCompleteCoverage:
         loc = Location(file_path=Path("test.robot"), line=10)
 
         data = loc.model_dump()
-        assert isinstance(data['file_path'], Path)
+        assert isinstance(data["file_path"], Path)
 
-        json_data = loc.model_dump(mode='json')
-        assert isinstance(json_data['file_path'], str)
-        assert json_data['file_path'] == "test.robot"
+        json_data = loc.model_dump(mode="json")
+        assert isinstance(json_data["file_path"], str)
+        assert json_data["file_path"] == "test.robot"
 
     def test_sleep_pattern_model_dump_json_mode(self):
         """Test SleepPattern model_dump with json mode."""
@@ -353,10 +353,10 @@ class TestCompleteCoverage:
             original_text="Sleep    5.5 s"
         )
 
-        json_data = pattern.model_dump(mode='json')
-        assert isinstance(json_data['duration'], float)
-        assert json_data['duration'] == 5.5
-        assert 'duration_in_seconds' in json_data
-        assert 'is_excessive' in json_data
-        assert 'normalized_unit' in json_data
-        assert 'severity_hint' in json_data
+        json_data = pattern.model_dump(mode="json")
+        assert isinstance(json_data["duration"], float)
+        assert json_data["duration"] == 5.5
+        assert "duration_in_seconds" in json_data
+        assert "is_excessive" in json_data
+        assert "normalized_unit" in json_data
+        assert "severity_hint" in json_data

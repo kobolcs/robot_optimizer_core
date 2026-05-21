@@ -8,11 +8,14 @@ from pathlib import Path
 
 import pytest
 
-from robot_optimizer_core.cache import AnalysisCache, _finding_from_dict, _finding_to_dict
+from robot_optimizer_core.cache import (
+    AnalysisCache,
+    _finding_from_dict,
+    _finding_to_dict,
+)
 from robot_optimizer_core.domain.value_objects import Finding, Severity
 from robot_optimizer_core.domain.value_objects.location import Location
 from robot_optimizer_core.domain.value_objects.pattern import Pattern, PatternType
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

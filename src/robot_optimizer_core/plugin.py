@@ -363,8 +363,9 @@ class ValidatedPluginManager:
 
     def _create_restricted_globals(self, file_path: Path) -> dict[str, Any]:
         """Create restricted globals environment for plugin execution."""
+        raw_builtins: Any = __builtins__
         builtin_dict: dict[str, Any] = (
-            __builtins__ if isinstance(__builtins__, dict) else vars(__builtins__)  # type: ignore[assignment]
+            raw_builtins if isinstance(raw_builtins, dict) else vars(raw_builtins)
         )
         restricted_builtins: dict[str, Any] = {
             k: builtin_dict[k] for k in ALLOWED_BUILTINS if k in builtin_dict

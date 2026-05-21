@@ -346,9 +346,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         self._check_unused = self.get_config_value("check_unused", True)
         self._check_duplicates = self.get_config_value("check_duplicates", True)
         self._check_unreachable = self.get_config_value("check_unreachable", True)
-        ignore_patterns: list[ConfigValue] = self.get_config_value(
-            "ignore_patterns", []
-        )
+        ignore_patterns = self.get_list_config("ignore_patterns", [])
         self._ignore_patterns = [
             re.compile(str(pattern), re.IGNORECASE) for pattern in ignore_patterns
         ]
@@ -389,7 +387,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                     config_key=f"{self.name}.{key}",
                     provided_value=value,
                 )
-        patterns: list[ConfigValue] = self.get_config_value("ignore_patterns", [])
+        patterns = self.get_list_config("ignore_patterns", [])
         if not isinstance(patterns, list):
             raise ConfigurationError(
                 "Config key 'ignore_patterns' must be a list",

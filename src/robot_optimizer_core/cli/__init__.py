@@ -36,7 +36,13 @@ import sys
 from typing import NoReturn
 
 from ..logging import configure_logging
-from ._commands import _EXIT_ERROR, _run_analyze, _run_diagnose, _run_list_analyzers, _run_upgrade
+from ._commands import (
+    _EXIT_ERROR,
+    _run_analyze,
+    _run_diagnose,
+    _run_list_analyzers,
+    _run_upgrade,
+)
 from ._parser import _build_parser
 
 __all__ = ["main"]

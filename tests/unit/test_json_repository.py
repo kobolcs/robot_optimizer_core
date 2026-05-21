@@ -4,9 +4,9 @@
 from __future__ import annotations
 
 import json
-import unittest.mock as mock
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from unittest import mock
 
 import pytest
 

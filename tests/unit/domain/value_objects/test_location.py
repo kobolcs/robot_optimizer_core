@@ -16,7 +16,6 @@ from pydantic import ValidationError
 
 from robot_optimizer_core.domain.value_objects import Location
 
-
 # ---------------------------------------------------------------------------
 # Shared strategies
 # ---------------------------------------------------------------------------

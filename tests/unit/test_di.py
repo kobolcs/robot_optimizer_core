@@ -49,7 +49,7 @@ class TestResetContainer:
 @pytest.mark.unit
 class TestThreadSafeContainerRegister:
     def test_register_duplicate_raises(self) -> None:
-        from robot_optimizer_core.di import ServiceLifetime, ThreadSafeContainer
+        from robot_optimizer_core.di import ThreadSafeContainer
         from robot_optimizer_core.exceptions import ConfigurationError
 
         c = ThreadSafeContainer()
@@ -147,7 +147,7 @@ class TestThreadSafeContainerRegister:
             c.register_instance("obj", object())
 
     def test_register_singleton_shortcut(self) -> None:
-        from robot_optimizer_core.di import ServiceLifetime, ThreadSafeContainer
+        from robot_optimizer_core.di import ThreadSafeContainer
 
         c = ThreadSafeContainer()
         c.register_singleton("svc", lambda: "val")
@@ -228,7 +228,11 @@ class TestThreadSafeContainerRegister:
         assert calls == 1
 
     def test_resolve_raw_non_callable_implementation(self) -> None:
-        from robot_optimizer_core.di import ServiceDescriptor, ServiceLifetime, ThreadSafeContainer
+        from robot_optimizer_core.di import (
+            ServiceDescriptor,
+            ServiceLifetime,
+            ThreadSafeContainer,
+        )
 
         c = ThreadSafeContainer()
         raw_value = {"key": "value"}

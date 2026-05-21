@@ -15,8 +15,13 @@ from robot_optimizer_core.cli._baseline import (
     load_baseline,
     save_baseline,
 )
-from robot_optimizer_core.domain.value_objects import Finding, Location, Pattern, PatternType, Severity
-
+from robot_optimizer_core.domain.value_objects import (
+    Finding,
+    Location,
+    Pattern,
+    PatternType,
+    Severity,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers

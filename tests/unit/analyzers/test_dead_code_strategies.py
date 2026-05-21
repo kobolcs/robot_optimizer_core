@@ -3,9 +3,9 @@
 
 from __future__ import annotations
 
-import unittest.mock as mock
 from datetime import UTC, datetime
 from pathlib import Path
+from unittest import mock
 
 import pytest
 
@@ -15,7 +15,6 @@ from robot_optimizer_core.analyzers.dead_code import (
     _RegexDeadCodeStrategy,
 )
 from robot_optimizer_core.domain.entities import TestFile
-
 
 _SIMPLE_ROBOT = """\
 *** Test Cases ***
@@ -82,9 +81,8 @@ class TestASTStrategy:
         with mock.patch(
             "robot_optimizer_core.analyzers.dead_code._ASTDeadCodeStrategy.extract",
             side_effect=Exception("parse failure"),
-        ):
-            with pytest.raises(Exception, match="parse failure"):
-                self.strategy.extract(_make_file("not robot content"))
+        ), pytest.raises(Exception, match="parse failure"):
+            self.strategy.extract(_make_file("not robot content"))
 
     def test_raw_candidates_include_call_names(self) -> None:
         _, _, _, candidates = self.strategy.extract(_make_file(_SIMPLE_ROBOT))
@@ -194,11 +192,10 @@ class TestStrategySelection:
         tf = _make_file(_SIMPLE_ROBOT)
         with mock.patch.object(
             analyzer._ast_strategy, "extract", side_effect=RuntimeError("bad parse")
-        ):
-            with mock.patch.object(
-                analyzer._regex_strategy, "extract", wraps=analyzer._regex_strategy.extract
-            ) as rx_spy:
-                analyzer._extract_keywords_and_calls(tf)
+        ), mock.patch.object(
+            analyzer._regex_strategy, "extract", wraps=analyzer._regex_strategy.extract
+        ) as rx_spy:
+            analyzer._extract_keywords_and_calls(tf)
         rx_spy.assert_called_once_with(tf)
 
     def test_regex_strategy_not_used_when_ast_succeeds(self) -> None:

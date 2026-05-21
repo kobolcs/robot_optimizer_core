@@ -11,7 +11,12 @@ from typing import Any, Protocol, runtime_checkable
 
 from .analyzers.registry import AnalyzerRegistry
 from .config.settings import Settings
-from .di import ThreadSafeContainer, _register_defaults, _set_global_container, get_container, reset_container
+from .di import (
+    ThreadSafeContainer,
+    _register_defaults,
+    _set_global_container,
+    reset_container,
+)
 from .discovery import FileDiscoveryService
 from .exceptions import ConfigurationError
 from .logging import LoggerAdapter, configure_logging
@@ -322,7 +327,11 @@ class ApplicationContext:
         self._local.context.update(context)
 
         # Create scoped container
-        with self.container.create_scope() as scoped_container:
+        if not self._initialized or self._container is None:
+            raise RuntimeError(
+                "ApplicationContext not initialized — call .initialize() first"
+            )
+        with self._container.create_scope() as scoped_container:
             # Register request-scoped services
             scoped_container.register_instance("request_context", self._local.context)
 

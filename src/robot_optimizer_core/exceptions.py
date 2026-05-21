@@ -52,8 +52,6 @@ ERROR_VALIDATION_FAILED = "VALIDATION_FAILED"
 ERROR_REPOSITORY_FAILED = "REPOSITORY_FAILED"
 
 __all__ = [
-    "AnalysisError",
-    "ConfigurationError",
     "ERROR_ANALYSIS_FAILED",
     "ERROR_CONFIG_INVALID",
     "ERROR_FILE_NOT_FOUND",
@@ -61,6 +59,8 @@ __all__ = [
     "ERROR_PLUGIN_LOAD_FAILED",
     "ERROR_REPOSITORY_FAILED",
     "ERROR_VALIDATION_FAILED",
+    "AnalysisError",
+    "ConfigurationError",
     "ParsingError",
     "PluginError",
     "RepositoryError",

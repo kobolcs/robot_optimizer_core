@@ -3,13 +3,10 @@
 
 from __future__ import annotations
 
-import time
+import xml.etree.ElementTree as ET
 from pathlib import Path
-from threading import Thread
-from unittest.mock import patch
 
 import pytest
-import xml.etree.ElementTree as ET
 
 
 @pytest.mark.integration
@@ -33,7 +30,10 @@ class TestWatchMode:
         from robot_optimizer_core.cli._commands import _compute_finding_diff
         from robot_optimizer_core.domain.value_objects import Finding, Severity
         from robot_optimizer_core.domain.value_objects.location import Location
-        from robot_optimizer_core.domain.value_objects.pattern import Pattern, PatternType
+        from robot_optimizer_core.domain.value_objects.pattern import (
+            Pattern,
+            PatternType,
+        )
 
         pattern = Pattern(
             type=PatternType.SLEEP_IN_TEST,
@@ -67,7 +67,10 @@ class TestWatchMode:
         from robot_optimizer_core.cli._commands import _compute_finding_diff
         from robot_optimizer_core.domain.value_objects import Finding, Severity
         from robot_optimizer_core.domain.value_objects.location import Location
-        from robot_optimizer_core.domain.value_objects.pattern import Pattern, PatternType
+        from robot_optimizer_core.domain.value_objects.pattern import (
+            Pattern,
+            PatternType,
+        )
 
         pattern = Pattern(
             type=PatternType.SLEEP_IN_TEST,
@@ -101,7 +104,10 @@ class TestWatchMode:
         from robot_optimizer_core.cli._commands import _compute_finding_diff
         from robot_optimizer_core.domain.value_objects import Finding, Severity
         from robot_optimizer_core.domain.value_objects.location import Location
-        from robot_optimizer_core.domain.value_objects.pattern import Pattern, PatternType
+        from robot_optimizer_core.domain.value_objects.pattern import (
+            Pattern,
+            PatternType,
+        )
 
         pattern = Pattern(
             type=PatternType.SLEEP_IN_TEST,
@@ -138,7 +144,10 @@ class TestWatchMode:
         from robot_optimizer_core.cli._commands import _print_watch_diff
         from robot_optimizer_core.domain.value_objects import Finding, Severity
         from robot_optimizer_core.domain.value_objects.location import Location
-        from robot_optimizer_core.domain.value_objects.pattern import Pattern, PatternType
+        from robot_optimizer_core.domain.value_objects.pattern import (
+            Pattern,
+            PatternType,
+        )
 
         test_file = tmp_path / "test.robot"
         pattern = Pattern(
@@ -164,7 +173,10 @@ class TestWatchMode:
         from robot_optimizer_core.cli._commands import _print_watch_diff
         from robot_optimizer_core.domain.value_objects import Finding, Severity
         from robot_optimizer_core.domain.value_objects.location import Location
-        from robot_optimizer_core.domain.value_objects.pattern import Pattern, PatternType
+        from robot_optimizer_core.domain.value_objects.pattern import (
+            Pattern,
+            PatternType,
+        )
 
         test_file = tmp_path / "test.robot"
         pattern = Pattern(
@@ -193,8 +205,9 @@ class TestCliOutputFormats:
         test_file = tmp_path / "test.robot"
         test_file.write_bytes(b"*** Test Cases ***\nMy Test\n    Sleep    5s\n")
 
-        from robot_optimizer_core.cli._commands import _run_analyze
         from unittest.mock import MagicMock
+
+        from robot_optimizer_core.cli._commands import _run_analyze
 
         args = MagicMock()
         args.path = str(test_file)
@@ -220,8 +233,9 @@ class TestCliOutputFormats:
         test_file.write_bytes(b"*** Test Cases ***\nMy Test\n    Sleep    5s\n")
         output_file = tmp_path / "output.xml"
 
-        from robot_optimizer_core.cli._commands import _run_analyze
         from unittest.mock import MagicMock
+
+        from robot_optimizer_core.cli._commands import _run_analyze
 
         args = MagicMock()
         args.path = str(test_file)

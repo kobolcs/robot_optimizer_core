@@ -151,7 +151,7 @@ class SleepDetectorAnalyzer(BaseAnalyzer):
             if max_acceptable is None:
                 try:
                     settings = get_settings()
-                    max_acceptable = settings.max_acceptable_sleep_seconds  # type: ignore[union-attr]
+                    max_acceptable = settings.max_acceptable_sleep_seconds
                 except Exception:
                     max_acceptable = 1.0  # library default
             self._severity_thresholds: dict[str, float] = {

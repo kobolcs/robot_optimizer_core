@@ -188,12 +188,12 @@ class TestSeverityProperties:
     @settings(max_examples=200)
     def test_ordering_is_transitive(self, a: Severity, b: Severity, c: Severity) -> None:
         """Transitivity: a <= b and b <= c implies a <= c."""
-        if a <= b and b <= c:
+        if a <= b <= c:
             assert a <= c
 
     @given(_severity, _severity)
     @settings(max_examples=200)
     def test_ordering_is_antisymmetric(self, a: Severity, b: Severity) -> None:
         """Antisymmetry: a <= b and b <= a implies a == b."""
-        if a <= b and b <= a:
+        if a <= b <= a:
             assert a == b

@@ -20,7 +20,6 @@ from robot_optimizer_core.analyzers.test_documentation import (
 from robot_optimizer_core.domain.entities import TestFile
 from robot_optimizer_core.domain.value_objects import Severity
 
-
 _TEST_IP_ADDRESS = "192.168.1.100"
 
 
@@ -120,7 +119,6 @@ class TestNamingConventionAnalyzer:
 
     def test_check_definition_name_in_test_section(self) -> None:
         """Directly exercises _check_definition_name for test case branch."""
-        from robot_optimizer_core.domain.entities import TestFile
 
         analyzer = NamingConventionAnalyzer()
         tf = _make_file("*** Test Cases ***\ncamelCase\n    Log    ok\n")
@@ -189,7 +187,7 @@ class TestHardcodedValueAnalyzer:
     def test_credential_flagged_as_error(
         self, analyzer: HardcodedValueAnalyzer
     ) -> None:
-        test_value = "test_credential_12345"  # noqa: S105  # Test fixture, not real credential
+        test_value = "test_credential_12345"  # Test fixture, not real credential
         content = f"*** Test Cases ***\nMy Test\n    Login    password={test_value}\n"
         findings = analyzer.analyze(_make_file(content))
         cred_findings = [f for f in findings if f.severity == Severity.ERROR]

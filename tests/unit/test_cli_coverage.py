@@ -11,7 +11,6 @@ import pytest
 
 from robot_optimizer_core.cli import main
 
-
 # ---------------------------------------------------------------------------
 # ExceptionGroup in _analyze_path
 # ---------------------------------------------------------------------------
@@ -63,9 +62,8 @@ class TestWatchModeDispatch:
         robot_file.write_text("*** Test Cases ***\nT\n    Log    hi\n")
         with patch(
             "robot_optimizer_core.cli._commands._run_watch_mode", return_value=0
-        ) as mock_watch:
-            with pytest.raises(SystemExit) as exc:
-                main(["analyze", "--watch", str(robot_file)])
+        ) as mock_watch, pytest.raises(SystemExit) as exc:
+            main(["analyze", "--watch", str(robot_file)])
         mock_watch.assert_called_once()
         assert exc.value.code == 0
 
@@ -83,9 +81,8 @@ class TestWatchModeWatchdogMissing:
         robot_file = tmp_path / "t.robot"
         robot_file.write_text("*** Test Cases ***\nT\n    Log    hi\n")
         broken = {"watchdog": None, "watchdog.events": None, "watchdog.observers": None}
-        with patch.dict(sys.modules, broken):
-            with pytest.raises(SystemExit) as exc:
-                main(["analyze", "--watch", str(robot_file)])
+        with patch.dict(sys.modules, broken), pytest.raises(SystemExit) as exc:
+            main(["analyze", "--watch", str(robot_file)])
         assert exc.value.code == 2
         err = capsys.readouterr().err
         assert "watchdog" in err.lower() or "watch" in err.lower()
@@ -189,9 +186,8 @@ class TestListAnalyzersErrorPath:
         with patch(
             "robot_optimizer_core.analyzers.get_analyzer_registry",
             return_value=mock_registry,
-        ):
-            with pytest.raises(SystemExit) as exc:
-                main(["list-analyzers"])
+        ), pytest.raises(SystemExit) as exc:
+            main(["list-analyzers"])
         assert exc.value.code == 0
         out = capsys.readouterr().out
         assert "error loading info" in out
@@ -213,9 +209,8 @@ class TestListAnalyzersNoTagsPath:
         with patch(
             "robot_optimizer_core.analyzers.get_analyzer_registry",
             return_value=mock_registry,
-        ):
-            with pytest.raises(SystemExit) as exc:
-                main(["list-analyzers"])
+        ), pytest.raises(SystemExit) as exc:
+            main(["list-analyzers"])
         assert exc.value.code == 0
         out = capsys.readouterr().out
         assert "A description" in out

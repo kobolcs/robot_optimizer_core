@@ -81,7 +81,7 @@ class HardcodedValueAnalyzer(BaseAnalyzer):
         self._check_creds = bool(self.get_config_value("check_credentials", True))
         self._check_localhost = bool(self.get_config_value("check_localhost", True))
         self._check_ports = bool(self.get_config_value("check_ports", False))
-        ignore_raw: list[ConfigValue] = self.get_config_value("ignore_patterns", [])
+        ignore_raw = self.get_list_config("ignore_patterns", [])
         self._ignore: list[re.Pattern[str]] = [
             re.compile(str(p), re.IGNORECASE) for p in ignore_raw
         ]

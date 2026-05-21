@@ -102,7 +102,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
 
         self._repository: TestResultRepository | None = test_result_repository
 
-        self._days_back = self.get_config_value("days_back", 30)
+        self._days_back: int = self.get_int_config("days_back", 30)
         _need_settings = (
             "failure_threshold" not in self.config or "min_runs" not in self.config
         )
@@ -113,20 +113,23 @@ class FlakinessAnalyzer(BaseAnalyzer):
         else:
             _default_failure = 0.05
             _default_runs = 4
-        self._failure_threshold = self.get_config_value(
+        self._failure_threshold: float = self.get_float_config(
             "failure_threshold", _default_failure
         )
-        self._min_runs = self.get_config_value("min_runs", _default_runs)
+        self._min_runs: int = self.get_int_config("min_runs", _default_runs)
 
         # Severity thresholds
-        self._severity_thresholds = self.get_config_value(
-            "severity_thresholds",
-            {
-                "info": 0.05,  # 5% failure rate
-                "warning": 0.15,  # 15% failure rate
-                "error": 0.30,  # 30% failure rate
-            },
-        )
+        _default_thresholds: dict[str, object] = {
+            "info": 0.05,
+            "warning": 0.15,
+            "error": 0.30,
+        }
+        raw_thresholds = self.get_config_value("severity_thresholds", _default_thresholds)
+        src = raw_thresholds if isinstance(raw_thresholds, dict) else _default_thresholds
+        self._severity_thresholds: dict[str, float] = {
+            k: float(v)  # type: ignore[arg-type]
+            for k, v in src.items()
+        }
         self.validate_config()
 
     @property

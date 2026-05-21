@@ -342,7 +342,7 @@ class OptimizedFileDiscoveryService:
                         "Check for network mounts or broken symlinks under "
                         f"{root_path}",
                         file_path=root_path,
-                    )
+                    ) from None
         else:
             files = sorted(
                 self._discover_optimized(root_path, root_path, recursive, max_depth, 0)

@@ -4,20 +4,17 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
 from robot_optimizer_core.config import Settings
 from robot_optimizer_core.di import reset_container
 from robot_optimizer_core.domain.value_objects import Finding, Severity
-from robot_optimizer_core.exceptions import AnalysisError
 from robot_optimizer_core.service import (
     AnalysisResult,
     AnalysisService,
     DirectoryAnalysisResult,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

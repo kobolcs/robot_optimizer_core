@@ -424,7 +424,7 @@ class TestFindingProperties:
     @settings(max_examples=200)
     def test_to_dict_has_all_required_keys(self, finding: Finding) -> None:
         data = finding.to_dict()
-        assert _REQUIRED_KEYS <= data.keys()
+        assert data.keys() >= _REQUIRED_KEYS
 
     @given(_finding())
     @settings(max_examples=200)

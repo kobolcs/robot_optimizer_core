@@ -119,7 +119,6 @@ class TestConfigureLogging:
             log_path.unlink(missing_ok=True)
 
     def test_configure_with_log_file_text_format(self, tmp_path) -> None:
-        from pathlib import Path
 
         log_path = tmp_path / "test.log"
         configure_logging(level="WARNING", log_file=log_path, format_json=False)
@@ -238,7 +237,6 @@ class TestLogContextVariable:
 @pytest.mark.unit
 class TestLogConvenienceFunctions:
     def test_log_analysis_start_no_logger(self, tmp_path) -> None:
-        from pathlib import Path
 
         from robot_optimizer_core.logging import log_analysis_start
 
@@ -247,14 +245,12 @@ class TestLogConvenienceFunctions:
         log_analysis_start(f, "dead_code")
 
     def test_log_analysis_start_with_nonexistent_file(self, tmp_path) -> None:
-        from pathlib import Path
 
         from robot_optimizer_core.logging import log_analysis_start
 
         log_analysis_start(tmp_path / "nope.robot", "dead_code")
 
     def test_log_analysis_complete_no_logger(self, tmp_path) -> None:
-        from pathlib import Path
 
         from robot_optimizer_core.logging import log_analysis_complete
 

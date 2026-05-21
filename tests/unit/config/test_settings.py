@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pydantic
 import pytest
 
 from robot_optimizer_core.config.settings import (
@@ -48,11 +49,11 @@ class TestSettingsDefaults:
 @pytest.mark.unit
 class TestSettingsValidators:
     def test_empty_file_patterns_raises(self) -> None:
-        with pytest.raises(Exception):
+        with pytest.raises(pydantic.ValidationError):
             Settings(file_patterns=[])
 
     def test_empty_exclude_patterns_raises(self) -> None:
-        with pytest.raises(Exception):
+        with pytest.raises(pydantic.ValidationError):
             Settings(exclude_patterns=[])
 
     def test_log_level_validator_runs(self) -> None:

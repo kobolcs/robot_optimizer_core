@@ -798,7 +798,7 @@ class TestOutputFileError:
 # ---------------------------------------------------------------------------
 
 
-class TestSarifFormat:
+class TestSarifFormatCli:
     def test_sarif_format_valid_json(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
@@ -822,7 +822,6 @@ class TestSarifFormat:
             recommendation="Use wait",
             documentation_url="https://example.com/docs",
         )
-        from uuid import uuid4
 
         finding = Finding.create(
             pattern=pattern,

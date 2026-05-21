@@ -181,13 +181,13 @@ class TestOptimizationSuggestionCoverage:
             prerequisites=["Import SeleniumLibrary"]
         )
 
-        json_data = suggestion.model_dump(mode='json')
-        assert json_data['is_high_confidence'] is True
-        assert json_data['requires_prerequisites'] is True
-        assert json_data['risk_level'] == "minimal"
+        json_data = suggestion.model_dump(mode="json")
+        assert json_data["is_high_confidence"] is True
+        assert json_data["requires_prerequisites"] is True
+        assert json_data["risk_level"] == "minimal"
 
         normal_data = suggestion.model_dump()
-        assert 'finding_id' in normal_data
+        assert "finding_id" in normal_data
 
 
 class TestPatternCoverage:
@@ -216,7 +216,9 @@ class TestFlakinessCoverage:
 
     def test_flakiness_stats_edge_cases(self):
         """Test FlakinessStats edge cases."""
-        from robot_optimizer_core.domain.value_objects.flakiness_stats import FlakinessStats
+        from robot_optimizer_core.domain.value_objects.flakiness_stats import (
+            FlakinessStats,
+        )
 
         stable = FlakinessStats(
             test_name="Stable Test",

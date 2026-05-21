@@ -109,7 +109,7 @@ class NamingConventionAnalyzer(BaseAnalyzer):
         self._check_variables: bool = bool(
             self.get_config_value("check_variable_names", True)
         )
-        ignore_raw: list[ConfigValue] = self.get_config_value("ignore_patterns", [])
+        ignore_raw = self.get_list_config("ignore_patterns", [])
         self._ignore: list[re.Pattern[str]] = [
             re.compile(str(p), re.IGNORECASE) for p in ignore_raw
         ]

@@ -386,7 +386,10 @@ def test_validate_directory_path_file_raises(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 def test_handle_errors_raise_mode(tmp_path: Path) -> None:
-    from robot_optimizer_core.api import DirectoryResults, _handle_directory_analysis_errors
+    from robot_optimizer_core.api import (
+        DirectoryResults,
+        _handle_directory_analysis_errors,
+    )
 
     errors = [(tmp_path / "f.robot", AnalysisError("bad"))]
     dr = DirectoryResults()
@@ -396,7 +399,10 @@ def test_handle_errors_raise_mode(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 def test_handle_errors_warn_mode_attaches_to_result(tmp_path: Path) -> None:
-    from robot_optimizer_core.api import DirectoryResults, _handle_directory_analysis_errors
+    from robot_optimizer_core.api import (
+        DirectoryResults,
+        _handle_directory_analysis_errors,
+    )
 
     errors = [(tmp_path / "f.robot", AnalysisError("bad"))]
     dr = DirectoryResults()
@@ -406,7 +412,10 @@ def test_handle_errors_warn_mode_attaches_to_result(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 def test_handle_errors_skip_mode_no_exception(tmp_path: Path) -> None:
-    from robot_optimizer_core.api import DirectoryResults, _handle_directory_analysis_errors
+    from robot_optimizer_core.api import (
+        DirectoryResults,
+        _handle_directory_analysis_errors,
+    )
 
     errors = [(tmp_path / "f.robot", AnalysisError("bad"))]
     dr = DirectoryResults()
@@ -417,7 +426,10 @@ def test_handle_errors_skip_mode_no_exception(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 def test_handle_errors_no_op_for_empty(tmp_path: Path) -> None:
-    from robot_optimizer_core.api import DirectoryResults, _handle_directory_analysis_errors
+    from robot_optimizer_core.api import (
+        DirectoryResults,
+        _handle_directory_analysis_errors,
+    )
 
     dr = DirectoryResults()
     _handle_directory_analysis_errors([], "raise", False, dr)  # must not raise

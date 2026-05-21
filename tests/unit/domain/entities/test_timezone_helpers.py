@@ -10,9 +10,9 @@ import pytest
 
 from robot_optimizer_core.domain.entities.test_file import (
     TestFile,
-    TZAwareTestFile,
     TimezoneAwareDomainEvent,
     TimezoneAwareTestResult,
+    TZAwareTestFile,
     format_datetime_local,
     parse_datetime_safe,
 )

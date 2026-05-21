@@ -204,7 +204,8 @@ class TestOptimizedFileDiscoveryService:
     def test_timeout_raises_analysis_error(
         self, service: OptimizedFileDiscoveryService, tmp_path: Path
     ) -> None:
-        import unittest.mock as mock
+        from unittest import mock
+
         from robot_optimizer_core.exceptions import AnalysisError
 
         (tmp_path / "a.robot").write_bytes(b"*** Test Cases ***")
@@ -236,7 +237,7 @@ class TestOptimizedFileDiscoveryService:
         assert bad not in files
 
     def test_is_text_file_oserror(self, service: OptimizedFileDiscoveryService) -> None:
-        import unittest.mock as mock
+        from unittest import mock
 
         p = mock.MagicMock(spec=["read_bytes", "name"])
         p.read_bytes.side_effect = OSError("permission denied")

@@ -25,8 +25,8 @@ from robot_optimizer_core import (
     get_analyzer_registry,
     register_analyzer,
 )
-from robot_optimizer_core.di import ThreadSafeContainer as Container
 from robot_optimizer_core.analyzers import BaseAnalyzer
+from robot_optimizer_core.di import ThreadSafeContainer as Container
 from robot_optimizer_core.domain.repositories import TestResultRepository
 from robot_optimizer_core.domain.value_objects import (
     FlakinessStats,
@@ -218,7 +218,7 @@ Unused Keyword {i}
         assert invalid_file not in files
 
         # Direct analysis should fail gracefully
-        with pytest.raises(Exception, match=r".+"):  # noqa: B017  # various exception types possible
+        with pytest.raises(Exception, match=r".+"):  # various exception types possible
             TestFile.from_path(invalid_file)
 
         # Create file with invalid encoding
