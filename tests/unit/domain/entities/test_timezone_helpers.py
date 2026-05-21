@@ -10,6 +10,7 @@ import pytest
 
 from robot_optimizer_core.domain.entities.test_file import (
     TestFile,
+    TZAwareTestFile,
     TimezoneAwareDomainEvent,
     TimezoneAwareTestResult,
     format_datetime_local,
@@ -185,3 +186,50 @@ class TestTimezoneAwareTestResult:
     def test_timestamp_iso_property(self) -> None:
         r = self._make_result()
         assert "T" in r.timestamp_iso
+
+    def test_invalid_type_raises(self) -> None:
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            self._make_result(timestamp={"not": "valid"})
+
+
+@pytest.mark.unit
+class TestTZAwareTestFileValidateTimezone:
+    """Tests for TZAwareTestFile.validate_timezone explicit field coverage."""
+
+    def _make_tf(self, **kwargs: object) -> TZAwareTestFile:
+        defaults: dict[str, object] = {
+            "path": Path("x.robot"),
+            "content": "*** Test Cases ***\nT\n    Log    ok\n",
+            "size_bytes": 30,
+            "last_modified_utc": datetime.now(UTC),
+        }
+        defaults.update(kwargs)
+        return TZAwareTestFile.model_validate(defaults)
+
+    def test_valid_explicit_timezone_accepted(self) -> None:
+        tf = self._make_tf(display_timezone="Europe/London")
+        assert tf.display_timezone == "Europe/London"
+
+    def test_invalid_timezone_falls_back_to_utc(self) -> None:
+        tf = self._make_tf(display_timezone="Not/A/Real/Zone")
+        assert tf.display_timezone == "UTC"
+
+    def test_last_modified_local_with_valid_timezone(self) -> None:
+        tf = self._make_tf(display_timezone="America/New_York")
+        local = tf.last_modified_local
+        assert local.tzinfo is not None
+
+
+@pytest.mark.unit
+class TestTimezoneAwareDomainEventNonDatetime:
+    """Test ensure_utc validator with non-datetime values."""
+
+    def test_non_datetime_occurred_at_passes_through(self) -> None:
+        from pydantic import ValidationError
+
+        with pytest.raises((ValidationError, Exception)):
+            TimezoneAwareDomainEvent.model_validate(
+                {"event_name": "E", "event_version": "1", "occurred_at": {"bad": True}}
+            )

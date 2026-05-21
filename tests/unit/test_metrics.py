@@ -273,3 +273,21 @@ class TestMetricsCollector:
             if metrics_mod._global_metrics is not None:
                 metrics_mod._global_metrics.stop()
             metrics_mod._global_metrics = old
+
+    def test_reset_metrics_stops_and_clears_global(self) -> None:
+        from robot_optimizer_core.metrics import get_metrics, reset_metrics
+
+        m = get_metrics()
+        m.increment("test.reset")
+        reset_metrics()
+
+        # After reset, get_metrics() returns a fresh collector
+        m2 = get_metrics()
+        data = m2.get_metrics()
+        assert data["counters"] == {}
+        m2.stop()
+
+    def test_reset_metrics_idempotent_when_none(self) -> None:
+        from robot_optimizer_core.metrics import reset_metrics
+        reset_metrics()
+        reset_metrics()  # should not raise

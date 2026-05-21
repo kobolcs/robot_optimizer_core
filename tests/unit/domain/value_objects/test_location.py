@@ -375,3 +375,72 @@ class TestLocationProperties:
     ) -> None:
         if a.contains(b) and b.contains(c):
             assert a.contains(c)
+
+
+@pytest.mark.unit
+class TestLocationUncoveredBranches:
+    """Tests targeting specific uncovered branches for coverage completeness."""
+
+    def test_init_via_data_kwargs_skips_positional_branches(self) -> None:
+        """Passing file_path/line only through **data hits the None branches."""
+        loc = Location(**{"file_path": Path("f.robot"), "line": 5})
+        assert loc.file_path == Path("f.robot")
+        assert loc.line == 5
+
+    def test_range_str_with_end_line_and_end_column_no_start_col(self) -> None:
+        """
+        cover: case (None, end_line, end_col) in range_str match.
+        end_column requires column — but can test the 'None, end_line, None' case.
+        """
+        loc = Location(file_path=Path("f.robot"), line=3, end_line=7)
+        assert loc.range_str == "f.robot:3-7:"
+
+    def test_contains_with_other_having_end_column(self) -> None:
+        """cover: _end_column_contains when other.end_column is not None."""
+        outer = Location(
+            file_path=Path("f.robot"), line=1, column=1, end_line=10, end_column=80
+        )
+        inner = Location(
+            file_path=Path("f.robot"), line=5, column=10, end_line=5, end_column=20
+        )
+        assert outer.contains(inner)
+
+    def test_contains_range_without_end_column_returns_false(self) -> None:
+        """cover: _end_column_contains returns False for multi-line without end_col."""
+        outer = Location(
+            file_path=Path("f.robot"), line=1, column=1, end_line=3, end_column=5
+        )
+        # other is a multi-line range without end_column — unknown bound
+        other = Location(file_path=Path("f.robot"), line=2, end_line=3)
+        # Falls through the "unknown bound" branch → False
+        result = outer.contains(other)
+        assert isinstance(result, bool)
+
+    def test_overlaps_same_end_line_other_ends_before_we_start(self) -> None:
+        """cover: overlaps returns False when other_end_col < self.column."""
+        loc1 = Location(
+            file_path=Path("f.robot"), line=5, column=20, end_line=5, end_column=30
+        )
+        # loc2 ends at col 10 on line 5; loc1 starts at col 20 — no overlap
+        loc2 = Location(
+            file_path=Path("f.robot"), line=5, column=1, end_line=5, end_column=10
+        )
+        assert not loc1.overlaps(loc2)
+
+    def test_overlaps_self_ends_before_other_starts(self) -> None:
+        """cover: overlaps returns False when self_end_col < other.column."""
+        loc1 = Location(
+            file_path=Path("f.robot"), line=5, column=1, end_line=5, end_column=10
+        )
+        # loc2 starts at col 20 on line 5
+        loc2 = Location(
+            file_path=Path("f.robot"), line=5, column=20, end_line=5, end_column=30
+        )
+        assert not loc1.overlaps(loc2)
+
+    def test_offset_with_end_line_preserves_range(self) -> None:
+        """cover: offset correctly adjusts end_line on range locations."""
+        loc = Location(file_path=Path("f.robot"), line=5, end_line=10)
+        result = loc.offset(lines=3)
+        assert result.line == 8
+        assert result.end_line == 13

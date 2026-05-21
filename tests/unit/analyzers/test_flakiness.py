@@ -22,7 +22,7 @@ from robot_optimizer_core.domain.value_objects import (
     PatternType,
     Severity,
 )
-from robot_optimizer_core.exceptions import ConfigurationError
+from robot_optimizer_core.exceptions import ConfigurationError, RepositoryError
 
 
 @pytest.mark.unit
@@ -436,3 +436,65 @@ Very Flaky Test
         assert len(findings) == 1
         assert findings[0].pattern.type == PatternType.INEFFICIENT_WAIT
         assert not findings[0].pattern.auto_fixable
+
+    def test_analyze_without_repository_returns_empty(
+        self, test_file: TestFile
+    ) -> None:
+        """FlakinessAnalyzer with no repository returns empty findings."""
+        from robot_optimizer_core.di import reset_container
+
+        reset_container()
+        analyzer = FlakinessAnalyzer()
+        findings = analyzer.analyze(test_file)
+        assert findings == []
+
+    def test_repository_error_raises_gracefully(
+        self, mock_repository: Mock, test_file: TestFile
+    ) -> None:
+        """RepositoryError is caught and empty list returned."""
+        mock_repository.get_flakiness_stats.side_effect = RepositoryError("DB down")
+        analyzer = FlakinessAnalyzer(test_result_repository=mock_repository)
+        findings = analyzer.analyze(test_file)
+        assert findings == []
+
+    def test_finding_message_includes_trend(
+        self, mock_repository: Mock, test_file: TestFile
+    ) -> None:
+        """Trend info is included in the finding message when available."""
+        mock_repository.get_flakiness_stats.return_value = [
+            FlakinessStats(
+                test_name="Flaky Login Test",
+                file_path=test_file.path,
+                total_runs=50,
+                failures=10,
+                # Force "worsening" trend: recent rate >> older rate
+                recent_runs=10,
+                older_runs=10,
+                recent_failures=8,
+                older_failures=1,
+                last_failure=datetime.now(),
+            )
+        ]
+        analyzer = FlakinessAnalyzer(test_result_repository=mock_repository)
+        findings = analyzer.analyze(test_file)
+        assert len(findings) == 1
+        assert "worsening" in findings[0].message
+
+    def test_find_test_line_leaves_test_section(
+        self, mock_repository: Mock
+    ) -> None:
+        """_find_test_line correctly resets in_test_cases when leaving the section."""
+        content = (
+            "*** Test Cases ***\nMy Test\n    Log    ok\n\n"
+            "*** Keywords ***\nKeyword Helper\n    Log    kw\n"
+        )
+        kw_file = TestFile(
+            path=Path("kw.robot"),
+            content=content,
+            size_bytes=len(content),
+            last_modified_utc=datetime.now(),
+        )
+        analyzer = FlakinessAnalyzer(test_result_repository=mock_repository)
+        # "Keyword Helper" appears after *** Keywords ***, not in test cases
+        result = analyzer._find_test_line(kw_file, "Keyword Helper")
+        assert result is None

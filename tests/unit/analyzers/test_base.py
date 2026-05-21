@@ -338,3 +338,48 @@ class TestBaseAnalyzer:
 
         # Logger should have analyzer name in context
         assert analyzer._logger.extra["analyzer"] == "test_analyzer"
+
+
+@pytest.mark.unit
+class TestTypedConfigHelpers:
+    """Tests for the typed config accessor methods on BaseAnalyzer."""
+
+    def test_get_bool_config_returns_default_when_absent(self) -> None:
+        a = ConcreteAnalyzer()
+        assert a.get_bool_config("missing_key", True) is True
+
+    def test_get_bool_config_raises_on_wrong_type(self) -> None:
+        from robot_optimizer_core.exceptions import ConfigurationError
+        a = ConcreteAnalyzer(config={"flag": "yes"})
+        with pytest.raises(ConfigurationError):
+            a.get_bool_config("flag", False)
+
+    def test_get_int_config_returns_default_when_absent(self) -> None:
+        a = ConcreteAnalyzer()
+        assert a.get_int_config("missing", 42) == 42
+
+    def test_get_int_config_raises_on_wrong_type(self) -> None:
+        from robot_optimizer_core.exceptions import ConfigurationError
+        a = ConcreteAnalyzer(config={"count": "ten"})
+        with pytest.raises(ConfigurationError):
+            a.get_int_config("count", 0)
+
+    def test_get_float_config_returns_value(self) -> None:
+        a = ConcreteAnalyzer(config={"threshold": 0.5})
+        assert a.get_float_config("threshold", 1.0) == pytest.approx(0.5)
+
+    def test_get_float_config_raises_on_wrong_type(self) -> None:
+        from robot_optimizer_core.exceptions import ConfigurationError
+        a = ConcreteAnalyzer(config={"threshold": "high"})
+        with pytest.raises(ConfigurationError):
+            a.get_float_config("threshold", 1.0)
+
+    def test_get_list_config_returns_value(self) -> None:
+        a = ConcreteAnalyzer(config={"items": ["a", "b"]})
+        assert a.get_list_config("items", []) == ["a", "b"]
+
+    def test_get_list_config_raises_on_wrong_type(self) -> None:
+        from robot_optimizer_core.exceptions import ConfigurationError
+        a = ConcreteAnalyzer(config={"items": "not-a-list"})
+        with pytest.raises(ConfigurationError):
+            a.get_list_config("items", [])
