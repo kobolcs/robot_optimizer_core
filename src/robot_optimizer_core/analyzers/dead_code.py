@@ -15,8 +15,10 @@ from collections.abc import Generator, Sequence
 from typing import Any
 
 if sys.version_info >= (3, 12):
-    from typing import override
+    from typing import Protocol, override
 else:
+    from typing import Protocol
+
     from typing_extensions import override
 
 from ..domain.entities import TestFile
@@ -85,6 +87,233 @@ def _match_prefixes(call: str, keyword_names: set[str], calls: set[str]) -> None
             calls.add(candidate)
 
 
+def _resolve_calls(candidates: list[str], keyword_names: set[str]) -> set[str]:
+    """Match raw candidate strings against a keyword set, returning matched names."""
+    calls: set[str] = set()
+    for call in candidates:
+        lowered = call.lower()
+        _match_prefixes(lowered, keyword_names, calls)
+
+        parts = lowered.split()
+        if parts and parts[0] in _BDD_PREFIXES:
+            _match_prefixes(" ".join(parts[1:]), keyword_names, calls)
+
+        if lowered.startswith("run keyword "):
+            _match_prefixes(
+                lowered.removeprefix("run keyword ").strip(), keyword_names, calls
+            )
+
+        if lowered.startswith("run keywords "):
+            for part in re.split(
+                r"\s+AND\s+",
+                lowered.removeprefix("run keywords "),
+                flags=re.IGNORECASE,
+            ):
+                _match_prefixes(part.strip(), keyword_names, calls)
+
+    return calls
+
+
+class _DeadCodeStrategy(Protocol):
+    """Protocol for keyword/call extraction strategies."""
+
+    def extract(
+        self, test_file: TestFile
+    ) -> tuple[dict[str, list[int]], set[str], dict[str, str], list[str]]:
+        """Extract keyword definitions and calls from *test_file*.
+
+        Returns:
+            4-tuple of (keywords, calls, display_names, raw_candidates).
+        """
+        ...  # pragma: no cover
+
+
+class _ASTDeadCodeStrategy:
+    """Extract keyword definitions and calls via the Robot Framework AST parser.
+
+    Raises any exception raised by ``robot.parsing.get_model`` so the caller
+    can decide whether to fall back to a different strategy.
+    """
+
+    def extract(
+        self, test_file: TestFile
+    ) -> tuple[dict[str, list[int]], set[str], dict[str, str], list[str]]:
+        from robot.parsing import get_model
+        from robot.parsing.model import KeywordSection
+
+        model = get_model(test_file.content)
+
+        keywords: dict[str, list[int]] = defaultdict(list)
+        keyword_display_names: dict[str, str] = {}
+
+        for section in model.sections:
+            if not isinstance(section, KeywordSection):
+                continue
+            for keyword_node in section.body:
+                name: str | None = getattr(keyword_node, "name", None)
+                if not name or not isinstance(name, str):
+                    continue
+                if name[0].isdigit():
+                    continue
+                normalized = name.lower()
+                line_number: int = getattr(keyword_node, "lineno", 0) or 0
+                keywords[normalized].append(line_number)
+                keyword_display_names.setdefault(normalized, name)
+
+        candidate_calls = self._collect_ast_calls(model)
+        keyword_names = set(keywords)
+        calls = _resolve_calls(candidate_calls, keyword_names)
+
+        return dict(keywords), calls, keyword_display_names, candidate_calls
+
+    def _collect_ast_calls(self, model: Any) -> list[str]:
+        """Recursively collect all keyword call names from a robot model."""
+        calls: list[str] = []
+        for section in model.sections:
+            section_body = getattr(section, "body", None)
+            if section_body:
+                self._walk_body(section_body, calls)
+        return calls
+
+    def _walk_body(self, items: object, calls: list[str]) -> None:
+        """Walk an iterable body, collecting keyword call names into *calls*."""
+        if not hasattr(items, "__iter__"):
+            return
+        from collections.abc import Iterable
+
+        for item in items if isinstance(items, Iterable) else []:
+            self._collect_item_calls(item, calls)
+
+    def _collect_item_calls(self, item: object, calls: list[str]) -> None:
+        """Collect call names from a single AST node and recurse into its bodies."""
+        item_type = getattr(item, "type", None)
+        if item_type == "KEYWORD":
+            name = self._resolve_keyword_call_name(item)
+            if name:
+                calls.append(name)
+        elif item_type in ("SETUP", "TEARDOWN"):
+            for token in getattr(item, "data_tokens", []):
+                if token.type == "NAME":
+                    calls.append(str(token.value))
+                    break
+        for body in self._iter_nested_bodies(item):
+            self._walk_body(body, calls)
+
+    def _resolve_keyword_call_name(self, item: object) -> str | None:
+        """Return the effective call name for a KEYWORD node, handling Run Keyword dispatch."""
+        name = getattr(item, "keyword", None)
+        if not name:
+            return None
+        name_str = str(name)
+        args = list(getattr(item, "args", ()))
+        name_lower = name_str.lower()
+        if name_lower == "run keyword" and args:
+            return f"Run Keyword {args[0]}"
+        if name_lower == "run keywords" and args:
+            return f"Run Keywords {' '.join(str(a) for a in args)}"
+        return name_str
+
+    def _iter_nested_bodies(self, item: object) -> Generator[object, None, None]:
+        """Yield each body list reachable from *item* via body, orelse, or Try.next chain."""
+        body = getattr(item, "body", None)
+        if body:
+            yield body
+        orelse = getattr(item, "orelse", None)
+        if orelse is not None:
+            orelse_body = getattr(orelse, "body", None)
+            if orelse_body:
+                yield orelse_body
+        # RF 7.1+ Try/EXCEPT/ELSE/FINALLY branches are linked via .next (not .handlers/.finally_item)
+        next_branch = getattr(item, "next", None)
+        while next_branch is not None:
+            branch_body = getattr(next_branch, "body", None)
+            if branch_body:
+                yield branch_body
+            finalbody = getattr(next_branch, "finalbody", None)
+            if finalbody:
+                yield finalbody
+            next_branch = getattr(next_branch, "next", None)
+
+
+class _RegexDeadCodeStrategy:
+    """Extract keyword definitions and calls via line-by-line text scanning.
+
+    Used as fallback when the Robot Framework AST parser cannot process a file.
+    """
+
+    def extract(
+        self, test_file: TestFile
+    ) -> tuple[dict[str, list[int]], set[str], dict[str, str], list[str]]:
+        keywords: dict[str, list[int]] = defaultdict(list)
+        keyword_display_names: dict[str, str] = {}
+        candidate_calls: list[str] = []
+
+        lines = test_file.content.splitlines()
+        self._process_text_lines(lines, keywords, keyword_display_names, candidate_calls)
+
+        keyword_names = set(keywords)
+        calls = _resolve_calls(candidate_calls, keyword_names)
+        return dict(keywords), calls, keyword_display_names, candidate_calls
+
+    def _process_text_lines(
+        self,
+        lines: list[str],
+        keywords: dict[str, list[int]],
+        keyword_display_names: dict[str, str],
+        candidate_calls: list[str],
+    ) -> None:
+        """Process lines from a text-based Robot Framework file."""
+        in_keywords_section = False
+        in_test_or_keyword = False
+
+        for line_num, line in enumerate(lines, 1):
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            if stripped.startswith("***"):
+                in_keywords_section, in_test_or_keyword = (
+                    self._update_section_state(stripped)
+                )
+                continue
+            self._process_content_line(
+                line,
+                stripped,
+                line_num,
+                in_keywords_section,
+                in_test_or_keyword,
+                keywords,
+                keyword_display_names,
+                candidate_calls,
+            )
+
+    def _update_section_state(self, section_line: str) -> tuple[bool, bool]:
+        """Update state based on section header."""
+        section = section_line.lower()
+        in_keywords = "keyword" in section
+        in_test_or_kw = "test case" in section or "keyword" in section
+        return in_keywords, in_test_or_kw
+
+    def _process_content_line(
+        self,
+        line: str,
+        stripped: str,
+        line_num: int,
+        in_keywords_section: bool,
+        in_test_or_keyword: bool,
+        keywords: dict[str, list[int]],
+        keyword_display_names: dict[str, str],
+        candidate_calls: list[str],
+    ) -> None:
+        """Process a non-empty, non-comment line."""
+        if in_keywords_section and not line.startswith((" ", "\t")):
+            if not stripped[0].isdigit():
+                normalized = stripped.lower()
+                keywords[normalized].append(line_num)
+                keyword_display_names.setdefault(normalized, stripped)
+        elif in_test_or_keyword and line.startswith((" ", "\t")):
+            candidate_calls.append(stripped)
+
+
 class DeadCodeAnalyzer(BaseAnalyzer):
     """Analyzer for detecting dead code in Robot Framework files.
 
@@ -123,6 +352,8 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         self._ignore_patterns = [
             re.compile(str(pattern), re.IGNORECASE) for pattern in ignore_patterns
         ]
+        self._ast_strategy: _DeadCodeStrategy = _ASTDeadCodeStrategy()
+        self._regex_strategy: _DeadCodeStrategy = _RegexDeadCodeStrategy()
         self.validate_config()
 
     @property
@@ -250,7 +481,7 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                 )
             raw_candidates.extend(candidates)
 
-        all_calls = self._resolve_calls(raw_candidates, set(all_definitions))
+        all_calls = _resolve_calls(raw_candidates, set(all_definitions))
         return all_definitions, file_keywords, all_calls, per_file_display
 
     def _find_suite_unused_keywords(
@@ -308,243 +539,19 @@ class DeadCodeAnalyzer(BaseAnalyzer):
     def _extract_keywords_and_calls(
         self, test_file: TestFile
     ) -> tuple[dict[str, list[int]], set[str], dict[str, str], list[str]]:
-        """Extract keyword definitions and resolved keyword calls via the RF AST."""
-        keywords: dict[str, list[int]] = defaultdict(list)
-        keyword_display_names: dict[str, str] = {}
+        """Extract keyword definitions and calls.
 
+        Tries the AST strategy first; falls back to the regex strategy if the
+        Robot Framework parser raises an exception.
+        """
         try:
-            from robot.parsing import get_model
-            from robot.parsing.model import KeywordSection
-
-            model = get_model(test_file.content)
+            return self._ast_strategy.extract(test_file)
         except Exception as e:
             self._logger.debug(
-                "AST parse failed, falling back to text extraction",
+                "AST parse failed, falling back to regex strategy",
                 extra={"file": str(test_file.path), "error": str(e)},
             )
-            return self._extract_keywords_and_calls_text(test_file)
-
-        # --- Keyword definitions (KeywordSection only) ---
-        for section in model.sections:
-            if not isinstance(section, KeywordSection):
-                continue
-            for keyword_node in section.body:
-                name: str | None = getattr(keyword_node, "name", None)
-                if not name or not isinstance(name, str):
-                    continue
-                if name[0].isdigit():
-                    continue
-                normalized = name.lower()
-                line_number: int = getattr(keyword_node, "lineno", 0) or 0
-                keywords[normalized].append(line_number)
-                keyword_display_names.setdefault(normalized, name)
-
-        # --- Keyword calls (all sections, recursively) ---
-        candidate_calls = self._collect_ast_calls(model)
-        keyword_names = set(keywords)
-        calls = self._resolve_calls(candidate_calls, keyword_names)
-
-        return dict(keywords), calls, keyword_display_names, candidate_calls
-
-    def _collect_ast_calls(self, model: Any) -> list[str]:
-        """Recursively collect all keyword call names from a robot model."""
-        calls: list[str] = []
-        for section in model.sections:
-            section_body = getattr(section, "body", None)
-            if section_body:
-                self._walk_body(section_body, calls)
-        return calls
-
-    def _walk_body(self, items: object, calls: list[str]) -> None:
-        """Walk an iterable body, collecting keyword call names into *calls*."""
-        if not hasattr(items, "__iter__"):
-            return
-        from collections.abc import Iterable
-
-        for item in items if isinstance(items, Iterable) else []:
-            self._collect_item_calls(item, calls)
-
-    def _collect_item_calls(self, item: object, calls: list[str]) -> None:
-        """Collect call names from a single AST node and recurse into its bodies."""
-        item_type = getattr(item, "type", None)
-        if item_type == "KEYWORD":
-            name = self._resolve_keyword_call_name(item)
-            if name:
-                calls.append(name)
-        elif item_type in ("SETUP", "TEARDOWN"):
-            for token in getattr(item, "data_tokens", []):
-                if token.type == "NAME":
-                    calls.append(str(token.value))
-                    break
-        for body in self._iter_nested_bodies(item):
-            self._walk_body(body, calls)
-
-    def _resolve_keyword_call_name(self, item: object) -> str | None:
-        """Return the effective call name for a KEYWORD node, handling Run Keyword dispatch."""
-        name = getattr(item, "keyword", None)
-        if not name:
-            return None
-        name_str = str(name)
-        args = list(getattr(item, "args", ()))
-        name_lower = name_str.lower()
-        if name_lower == "run keyword" and args:
-            return f"Run Keyword {args[0]}"
-        if name_lower == "run keywords" and args:
-            return f"Run Keywords {' '.join(str(a) for a in args)}"
-        return name_str
-
-    def _iter_nested_bodies(self, item: object) -> Generator[object, None, None]:
-        """Yield each body list reachable from *item* via body, orelse, or Try.next chain."""
-        body = getattr(item, "body", None)
-        if body:
-            yield body
-        orelse = getattr(item, "orelse", None)
-        if orelse is not None:
-            orelse_body = getattr(orelse, "body", None)
-            if orelse_body:
-                yield orelse_body
-        # RF 7.1+ Try/EXCEPT/ELSE/FINALLY branches are linked via .next (not .handlers/.finally_item)
-        next_branch = getattr(item, "next", None)
-        while next_branch is not None:
-            branch_body = getattr(next_branch, "body", None)
-            if branch_body:
-                yield branch_body
-            finalbody = getattr(next_branch, "finalbody", None)
-            if finalbody:
-                yield finalbody
-            next_branch = getattr(next_branch, "next", None)
-
-    def _extract_keywords_and_calls_text(
-        self, test_file: TestFile
-    ) -> tuple[dict[str, list[int]], set[str], dict[str, str], list[str]]:
-        """Text-based fallback for _extract_keywords_and_calls."""
-        keywords: dict[str, list[int]] = defaultdict(list)
-        keyword_display_names: dict[str, str] = {}
-        candidate_calls: list[str] = []
-
-        lines = test_file.content.splitlines()
-        self._process_text_lines(
-            lines, keywords, keyword_display_names, candidate_calls
-        )
-
-        keyword_names = set(keywords)
-        calls = self._resolve_calls(candidate_calls, keyword_names)
-        return dict(keywords), calls, keyword_display_names, candidate_calls
-
-    def _process_text_lines(
-        self,
-        lines: list[str],
-        keywords: dict[str, list[int]],
-        keyword_display_names: dict[str, str],
-        candidate_calls: list[str],
-    ) -> None:
-        """Process lines from a text-based Robot Framework file."""
-        in_keywords_section = False
-        in_test_or_keyword = False
-
-        for line_num, line in enumerate(lines, 1):
-            stripped = line.strip()
-            if not stripped or stripped.startswith("#"):
-                continue
-            if stripped.startswith("***"):
-                in_keywords_section, in_test_or_keyword = (
-                    self._update_section_state(stripped)
-                )
-                continue
-            self._process_content_line(
-                line,
-                stripped,
-                line_num,
-                in_keywords_section,
-                in_test_or_keyword,
-                keywords,
-                keyword_display_names,
-                candidate_calls,
-            )
-
-    def _update_section_state(self, section_line: str) -> tuple[bool, bool]:
-        """Update state based on section header."""
-        section = section_line.lower()
-        in_keywords = "keyword" in section
-        in_test_or_kw = "test case" in section or "keyword" in section
-        return in_keywords, in_test_or_kw
-
-    def _process_content_line(
-        self,
-        line: str,
-        stripped: str,
-        line_num: int,
-        in_keywords_section: bool,
-        in_test_or_keyword: bool,
-        keywords: dict[str, list[int]],
-        keyword_display_names: dict[str, str],
-        candidate_calls: list[str],
-    ) -> None:
-        """Process a non-empty, non-comment line."""
-        if in_keywords_section and not line.startswith((" ", "\t")):
-            if not stripped[0].isdigit():
-                normalized = stripped.lower()
-                keywords[normalized].append(line_num)
-                keyword_display_names.setdefault(normalized, stripped)
-        elif in_test_or_keyword and line.startswith((" ", "\t")):
-            candidate_calls.append(stripped)
-
-    def _extract_candidate_calls(self, test_file: TestFile) -> list[str]:
-        """Return all keyword call names from test/keyword sections via the RF AST."""
-        try:
-            from robot.parsing import get_model
-
-            model = get_model(test_file.content)
-            return self._collect_ast_calls(model)
-        except Exception as e:
-            self._logger.debug(
-                "AST parse failed, falling back to text extraction",
-                extra={"file": str(test_file.path), "error": str(e)},
-            )
-            # Fallback: indented lines from text
-            candidates: list[str] = []
-            lines = test_file.content.splitlines()
-            in_test_or_keyword = False
-            for line in lines:
-                stripped = line.strip()
-                if not stripped or stripped.startswith("#"):
-                    continue
-                if stripped.startswith("***"):
-                    in_test_or_keyword = (
-                        "test case" in stripped.lower() or "keyword" in stripped.lower()
-                    )
-                    continue
-                if in_test_or_keyword and line.startswith((" ", "\t")):
-                    candidates.append(stripped)
-            return candidates
-
-    def _resolve_calls(
-        self, candidates: list[str], keyword_names: set[str]
-    ) -> set[str]:
-        """Match raw candidate strings against a keyword set, returning matched names."""
-        calls: set[str] = set()
-        for call in candidates:
-            lowered = call.lower()
-            _match_prefixes(lowered, keyword_names, calls)
-
-            parts = lowered.split()
-            if parts and parts[0] in _BDD_PREFIXES:
-                _match_prefixes(" ".join(parts[1:]), keyword_names, calls)
-
-            if lowered.startswith("run keyword "):
-                _match_prefixes(
-                    lowered.removeprefix("run keyword ").strip(), keyword_names, calls
-                )
-
-            if lowered.startswith("run keywords "):
-                for part in re.split(
-                    r"\s+AND\s+",
-                    lowered.removeprefix("run keywords "),
-                    flags=re.IGNORECASE,
-                ):
-                    _match_prefixes(part.strip(), keyword_names, calls)
-
-        return calls
+            return self._regex_strategy.extract(test_file)
 
     def _find_unused_keywords(
         self,

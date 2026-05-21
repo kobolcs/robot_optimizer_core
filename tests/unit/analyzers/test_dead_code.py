@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from robot_optimizer_core.analyzers import DeadCodeAnalyzer
+from robot_optimizer_core.analyzers.dead_code import _resolve_calls
 from robot_optimizer_core.domain.entities import TestFile
 from robot_optimizer_core.domain.value_objects import PatternType, Severity
 
@@ -723,7 +724,7 @@ class TestResolveCallsRefactor:
     """Verify _resolve_calls behaviour is preserved after the O(n*m) fix."""
 
     def _resolve(self, candidates: list[str], keywords: set[str]) -> set[str]:
-        return DeadCodeAnalyzer()._resolve_calls(candidates, keywords)
+        return _resolve_calls(candidates, keywords)
 
     def test_bdd_prefix_stripped(self) -> None:
         result = self._resolve(["Given Login Page Is Open"], {"login page is open"})
