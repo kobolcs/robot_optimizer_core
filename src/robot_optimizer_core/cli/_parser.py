@@ -50,7 +50,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     analyze_cmd.add_argument(
         "--format",
-        choices=["text", "json", "sarif", "html"],
+        choices=["text", "json", "sarif", "html", "junit"],
         default="text",
         help="Output format (default: text)",
     )
@@ -97,6 +97,12 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=False,
         help="Clear the result cache before analysing.",
+    )
+    analyze_cmd.add_argument(
+        "--watch",
+        action="store_true",
+        default=False,
+        help="Watch mode: re-analyze on file save and show diff (requires watchdog library)",
     )
 
     # -- list-analyzers subcommand ---------------------------------

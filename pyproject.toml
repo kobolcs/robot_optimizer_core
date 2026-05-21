@@ -97,6 +97,11 @@ docs = [
     "mkdocs-minify-plugin>=0.8.0",
 ]
 
+# Watch mode support
+watch = [
+    "watchdog>=4.0.0",
+]
+
 [project.urls]
 Homepage = "https://github.com/kobolcs/robot_optimizer_core"
 Documentation = "https://kobolcs.github.io/robot_optimizer_core/docs"
