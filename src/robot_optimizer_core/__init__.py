@@ -130,8 +130,8 @@ from .exceptions import (
 from .listener import FlakinessListener as FlakinessListener
 
 # Logging — not part of the public API; importable for advanced use
-from .logging import configure_logging as configure_logging
-from .logging import get_logger as get_logger
+from .infrastructure.logging.adapter import configure_logging as configure_logging
+from .infrastructure.logging.adapter import get_logger as get_logger
 
 # Metrics — not part of the public API; importable for advanced use
 from .infrastructure.metrics.collector import (

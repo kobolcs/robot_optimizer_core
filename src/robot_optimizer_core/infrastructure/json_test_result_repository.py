@@ -12,7 +12,7 @@ from ..domain.repositories import TestResultRepository
 from ..domain.value_objects.flakiness_stats import FlakinessStats
 from ..domain.value_objects.test_result import TestResult
 from ..exceptions import RepositoryError
-from ..logging import get_logger
+from .logging.adapter import get_logger
 
 __all__ = ["JsonTestResultRepository"]
 

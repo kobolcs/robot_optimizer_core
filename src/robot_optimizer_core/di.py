@@ -32,7 +32,7 @@ from enum import StrEnum, auto
 from typing import Any, TypeAlias, TypeVar
 
 from .exceptions import ConfigurationError
-from .logging import get_logger
+from .infrastructure.logging.adapter import get_logger
 
 __all__ = [
     "ServiceDescriptor",

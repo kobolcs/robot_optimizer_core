@@ -42,7 +42,7 @@ from typing import (
 from ..domain.entities import TestFile
 from ..domain.value_objects import Finding, Severity
 from ..exceptions import AnalysisError
-from ..logging import get_logger
+from ..infrastructure.logging.adapter import get_logger
 from ..infrastructure.metrics.collector import MetricsCollector, get_metrics
 
 if TYPE_CHECKING:

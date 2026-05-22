@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from .exceptions import PluginError
-from .logging import get_logger
+from .infrastructure.logging.adapter import get_logger
 
 __all__ = [
     "ALLOWED_BUILTINS",

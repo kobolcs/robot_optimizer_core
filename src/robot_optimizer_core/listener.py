@@ -27,7 +27,7 @@ from typing import Any
 
 from .domain.repositories import TestResultRepository
 from .domain.value_objects import TestResult
-from .logging import get_logger
+from .infrastructure.logging.adapter import get_logger
 
 __all__ = ["FlakinessListener"]
 

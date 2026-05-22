@@ -35,7 +35,7 @@ from __future__ import annotations
 import sys
 from typing import NoReturn
 
-from ..logging import configure_logging
+from ..infrastructure.logging.adapter import configure_logging
 from ._commands import (
     _EXIT_ERROR,
     _run_analyze,

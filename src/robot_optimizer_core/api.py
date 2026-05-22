@@ -52,7 +52,7 @@ from .di import get_container
 from .domain.entities import TestFile
 from .domain.value_objects import Finding, Severity
 from .exceptions import AnalysisError, RobotFileNotFoundError
-from .logging import get_logger, log_analysis_complete, log_analysis_start
+from .infrastructure.logging.adapter import get_logger, log_analysis_complete, log_analysis_start
 
 if TYPE_CHECKING:
     from .config import Settings

@@ -26,7 +26,7 @@ from importlib.metadata import EntryPoint, entry_points
 from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
 from ..exceptions import PluginError
-from ..logging import get_logger
+from ..infrastructure.logging.adapter import get_logger
 from .base import BaseAnalyzer
 
 if TYPE_CHECKING:

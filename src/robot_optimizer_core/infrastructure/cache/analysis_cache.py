@@ -17,7 +17,7 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from ...logging import get_logger
+from ..logging.adapter import get_logger
 
 if TYPE_CHECKING:
     from ...domain.value_objects import Finding

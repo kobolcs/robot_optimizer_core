@@ -19,7 +19,7 @@ from .di import (
 )
 from .discovery import FileDiscoveryService
 from .exceptions import ConfigurationError
-from .logging import LoggerAdapter, configure_logging
+from .infrastructure.logging.adapter import LoggerAdapter, configure_logging
 from .infrastructure.metrics.collector import MetricsCollector
 from .plugin import ValidatedPluginManager
 
@@ -254,7 +254,7 @@ class ApplicationContext:
             logger = logging.getLogger(name)
 
             # Create adapter with context
-            from .logging import LoggerAdapter
+            from .infrastructure.logging.adapter import LoggerAdapter
 
             adapter = LoggerAdapter(logger, context or {})
 
