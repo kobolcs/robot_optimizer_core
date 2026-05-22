@@ -253,37 +253,29 @@ class AnalyzerRegistry:
         self.instances.pop(name, None)
 
 
-# Global registry instance
-_analyzer_registry: AnalyzerRegistry | None = None
-
-
 def get_analyzer_registry() -> AnalyzerRegistry:
-    """Get the global analyzer registry.
+    """Get the global analyzer registry from the DI container.
 
     Returns:
-        The global analyzer registry instance.
+        The singleton analyzer registry managed by the DI container.
     """
-    global _analyzer_registry
-    if _analyzer_registry is None:
-        _analyzer_registry = AnalyzerRegistry()
-        _register_built_in_analyzers(_analyzer_registry)
-        _register_entry_point_analyzers(_analyzer_registry)
-    return _analyzer_registry
+    from robot_optimizer_core.composition.container import get_container
+
+    return get_container().resolve("analyzer_registry")  # type: ignore[no-any-return]
 
 
 def reset_registry() -> None:
-    """Reset the global analyzer registry to an uninitialized state.
+    """Reset the analyzer registry singleton so the next access rebuilds it.
+
+    Clears the cached singleton in the DI container so that the next call to
+    :func:`get_analyzer_registry` (or :func:`get_container().resolve`) creates
+    a fresh, fully-populated :class:`AnalyzerRegistry`.
 
     Primarily useful for tests and plugin reload scenarios.
     """
-    global _analyzer_registry
-    _analyzer_registry = None
+    from robot_optimizer_core.composition.container import get_container
 
-
-def _set_global_registry(registry: AnalyzerRegistry) -> None:
-    """Set the global registry explicitly (called by the DI container)."""
-    global _analyzer_registry
-    _analyzer_registry = registry
+    get_container().reset_singleton("analyzer_registry")
 
 
 def _register_built_in_analyzers(registry: AnalyzerRegistry) -> None:

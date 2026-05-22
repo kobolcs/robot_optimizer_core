@@ -500,26 +500,25 @@ class ValidatedPluginManager:
             del self.plugins[name]
 
 
-# Global plugin registry instance
-_plugin_registry: PluginRegistry | None = None
-
-
 def get_plugin_registry() -> PluginRegistry:
-    """Get the global plugin registry instance.
+    """Get the global plugin registry from the DI container.
 
     Returns:
-        The global plugin registry instance.
+        The singleton plugin registry managed by the DI container.
     """
-    global _plugin_registry
-    if _plugin_registry is None:
-        _plugin_registry = PluginRegistry()
-    return _plugin_registry
+    from robot_optimizer_core.composition.container import get_container
+
+    return get_container().resolve("plugin_registry")  # type: ignore[no-any-return]
 
 
 def reset_plugin_registry() -> None:
-    """Reset the global plugin registry to an uninitialised state.
+    """Reset the plugin registry singleton so the next access rebuilds it.
+
+    Clears the cached singleton in the DI container so that the next call to
+    :func:`get_plugin_registry` creates a fresh :class:`PluginRegistry`.
 
     Primarily useful for tests and plugin reload scenarios.
     """
-    global _plugin_registry
-    _plugin_registry = None
+    from robot_optimizer_core.composition.container import get_container
+
+    get_container().reset_singleton("plugin_registry")

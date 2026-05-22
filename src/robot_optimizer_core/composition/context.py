@@ -160,11 +160,14 @@ class ApplicationContext:
                 )
 
             # The global registry is already populated by _register_defaults
-            # (via get_analyzer_registry / entry-point discovery).
+            # (via _build_registry / entry-point discovery).
             self._analyzer_registry = self._container.resolve("analyzer_registry")
 
             if self.config.enable_plugins:
-                self._plugin_manager = ValidatedPluginManager()
+                # Wire the container-managed PluginRegistry into the manager so
+                # both share the same registry instance.
+                plugin_registry = self._container.resolve("plugin_registry")
+                self._plugin_manager = ValidatedPluginManager(registry=plugin_registry)
                 self._container.register_instance(
                     "plugin_manager", self._plugin_manager
                 )

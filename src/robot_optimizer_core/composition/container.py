@@ -345,6 +345,21 @@ class ThreadSafeContainer:
         self._resolution_stack_var.set(None)
         self._scope_instances_var.set(None)
 
+    def reset_singleton(self, service_type: str) -> None:
+        """Clear the cached singleton instance for *service_type*.
+
+        The next :meth:`resolve` call for this service will trigger a fresh
+        construction.  If the service is not registered (or is not a
+        singleton) this is a no-op.
+
+        Args:
+            service_type: The service name whose singleton cache should be cleared.
+        """
+        with self._services_lock:
+            descriptor = self._services.get(service_type)
+            if descriptor is not None:
+                descriptor.instance = None
+
 
 # Global container with thread safety
 _global_container: ThreadSafeContainer | None = None
@@ -400,15 +415,11 @@ def reset_container() -> None:
     if old_container is not None:
         old_container.clear()
 
-    # Reset co-located globals so all singletons are torn down together,
+    # Reset co-located singletons so all state is torn down together,
     # preventing metric/cache bleed between test runs.
-    from ..application.analyzers.registry import reset_registry
     from ..domain.entities.test_file import _cache_lock, _from_path_cache
     from ..infrastructure.metrics.collector import reset_metrics
-    from ..infrastructure.plugins.manager import reset_plugin_registry
 
-    reset_registry()
-    reset_plugin_registry()
     reset_metrics()
 
     # Clear the module-level TestFile path cache so stale content cannot leak
@@ -423,12 +434,12 @@ def _register_defaults(container: ThreadSafeContainer) -> None:
         AnalyzerRegistry,
         _register_built_in_analyzers,
         _register_entry_point_analyzers,
-        _set_global_registry,
     )
     from ..infrastructure.config import get_settings
     from ..infrastructure.discovery import OptimizedFileDiscoveryService
     from ..infrastructure.metrics.collector import get_metrics
     from ..infrastructure.parsers import RobotASTParser
+    from ..infrastructure.plugins.manager import PluginRegistry
 
     metrics_instance = get_metrics()
 
@@ -436,13 +447,13 @@ def _register_defaults(container: ThreadSafeContainer) -> None:
         registry = AnalyzerRegistry(metrics=metrics_instance)
         _register_built_in_analyzers(registry)
         _register_entry_point_analyzers(registry)
-        _set_global_registry(registry)
         return registry
 
     # Register core services as singletons
     container.register_singleton("settings", get_settings)
     container.register_instance("metrics", metrics_instance)
     container.register_singleton("analyzer_registry", _build_registry)
+    container.register_singleton("plugin_registry", PluginRegistry)
     container.register("parser", RobotASTParser)
 
     # Use optimized file discovery for better performance
