@@ -52,7 +52,7 @@ __all__ = ["SleepDetector", "SleepDetectorAnalyzer", "get_settings"]
 
 def get_settings() -> object:
     """Resolve settings via DI container. Defined at module scope for test monkeypatching."""
-    from ...di import get_container
+    from ...composition.container import get_container
     return get_container().resolve("settings")
 
 

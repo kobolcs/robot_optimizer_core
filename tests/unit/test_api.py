@@ -98,7 +98,7 @@ def test_analyze_file_uses_container_settings_when_none_passed(
     tmp_path: Path,
 ) -> None:
     """analyze_file must resolve settings from the DI container, not a separate global."""
-    from robot_optimizer_core.di import get_container, reset_container
+    from robot_optimizer_core.composition.container import get_container, reset_container
 
     reset_container()
     container = get_container()

@@ -34,7 +34,7 @@ else:
     from typing_extensions import override
 
 from ...infrastructure.config.settings import get_settings
-from ...di import get_container
+from ...composition.container import get_container
 from ...domain.entities import TestFile
 from ...domain.repositories import TestResultRepository
 from ...domain.value_objects import (

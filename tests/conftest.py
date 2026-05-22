@@ -44,7 +44,7 @@ from robot_optimizer_core import (
     configure_metrics,
     reset_settings,
 )
-from robot_optimizer_core.di import ThreadSafeContainer as Container
+from robot_optimizer_core.composition.container import ThreadSafeContainer as Container
 from robot_optimizer_core.domain.repositories import TestResultRepository
 from robot_optimizer_core.domain.value_objects import FlakinessStats, TestResult
 

@@ -19,7 +19,7 @@ from robot_optimizer_core.application.analyzers.registry import (
     reset_registry,
 )
 from robot_optimizer_core.api import analyze_directory, analyze_file
-from robot_optimizer_core.context import create_test_application
+from robot_optimizer_core.composition.context import create_test_application
 from robot_optimizer_core.domain.value_objects import PatternType
 from robot_optimizer_core.exceptions import AnalysisError
 
@@ -311,7 +311,7 @@ class TestGlobalStateIsolation:
         assert len(r2.list()) > 0
 
     def test_reset_container_produces_fresh_container(self) -> None:
-        from robot_optimizer_core.di import get_container, reset_container
+        from robot_optimizer_core.composition.container import get_container, reset_container
 
         c1 = get_container()
         reset_container()

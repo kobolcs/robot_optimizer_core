@@ -69,16 +69,16 @@ from .api import (
 from .infrastructure.config import Settings, get_settings, reset_settings
 
 # Application context — primary entry point for wiring services
-from .context import (
+from .composition.context import (
     ApplicationConfig as ApplicationConfig,
 )
-from .context import (
+from .composition.context import (
     ApplicationContext as ApplicationContext,
 )
-from .context import (
+from .composition.context import (
     create_application as create_application,
 )
-from .context import (
+from .composition.context import (
     create_test_application as create_test_application,
 )
 
@@ -146,7 +146,7 @@ from .infrastructure.metrics.collector import (
 from .infrastructure.parsers import RobotASTParser as RobotASTParser
 
 # Plugin system
-from .plugin import Plugin, PluginMetadata
+from .infrastructure.plugins.manager import Plugin, PluginMetadata
 from .premium import PremiumFeatureError, is_premium_installed
 
 # File I/O providers — for advanced use (testing, custom sources)

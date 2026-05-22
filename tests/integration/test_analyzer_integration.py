@@ -26,7 +26,7 @@ from robot_optimizer_core import (
     register_analyzer,
 )
 from robot_optimizer_core.application.analyzers import BaseAnalyzer
-from robot_optimizer_core.di import ThreadSafeContainer as Container
+from robot_optimizer_core.composition.container import ThreadSafeContainer as Container
 from robot_optimizer_core.domain.repositories import TestResultRepository
 from robot_optimizer_core.domain.value_objects import (
     FlakinessStats,
@@ -514,7 +514,7 @@ class TestAnalyzerPerformance:
 @pytest.mark.integration
 class TestResetContainerIntegration:
     def test_get_container_after_reset_returns_new_instance(self) -> None:
-        from robot_optimizer_core.di import get_container, reset_container
+        from robot_optimizer_core.composition.container import get_container, reset_container
 
         c1 = get_container()
         reset_container()
@@ -522,12 +522,12 @@ class TestResetContainerIntegration:
         assert c1 is not c2
 
     def test_reset_container_idempotent(self) -> None:
-        from robot_optimizer_core.di import reset_container
+        from robot_optimizer_core.composition.container import reset_container
         reset_container()
         reset_container()
 
     def test_get_container_after_double_reset_is_usable(self) -> None:
-        from robot_optimizer_core.di import get_container, reset_container
+        from robot_optimizer_core.composition.container import get_container, reset_container
         reset_container()
         reset_container()
         c = get_container()

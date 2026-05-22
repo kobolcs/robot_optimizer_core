@@ -18,7 +18,7 @@ from ...api import ErrorHandling
 from ...api import analyze_directory as _api_analyze_directory
 from ...api import analyze_file as _api_analyze_file
 from ...infrastructure.config import Settings
-from ...di import get_container
+from ...composition.container import get_container
 from ...domain.value_objects import Finding, Severity
 
 if TYPE_CHECKING:

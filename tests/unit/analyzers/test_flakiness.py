@@ -441,7 +441,7 @@ Very Flaky Test
         self, test_file: TestFile
     ) -> None:
         """FlakinessAnalyzer with no repository returns empty findings."""
-        from robot_optimizer_core.di import reset_container
+        from robot_optimizer_core.composition.container import reset_container
 
         reset_container()
         analyzer = FlakinessAnalyzer()

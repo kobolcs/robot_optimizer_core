@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from robot_optimizer_core.plugin import (
+from robot_optimizer_core.infrastructure.plugins.manager import (
     Plugin,
     PluginMetadata,
     PluginRegistry,

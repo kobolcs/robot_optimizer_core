@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from robot_optimizer_core.exceptions import PluginError
-from robot_optimizer_core.plugin import (
+from robot_optimizer_core.infrastructure.plugins.manager import (
     Plugin,
     PluginMetadata,
     PluginRegistry,
@@ -272,7 +272,7 @@ class TestValidatedPluginManager:
         plugin_file = tmp_path / "valid_plugin.py"
         plugin_file.write_bytes(
 
-                b"from robot_optimizer_core.plugin import Plugin, PluginMetadata\n"
+                b"from robot_optimizer_core.infrastructure.plugins.manager import Plugin, PluginMetadata\n"
                 b"\n"
                 b"class ValidPlugin(Plugin):\n"
                 b"    @property\n"
@@ -316,7 +316,7 @@ class TestValidatedPluginManager:
 
         monkeypatch.setenv("ROBOT_OPTIMIZER_ALLOW_UNSAFE_PLUGINS", "1")
         manager = ValidatedPluginManager()
-        with caplog.at_level(logging.WARNING, logger="robot_optimizer_core.plugin"):
+        with caplog.at_level(logging.WARNING, logger="robot_optimizer_core.infrastructure.plugins.manager"):
             with pytest.raises(PluginError):
                 manager.load_plugin_from_file(plugin_file, bypass_validation=True)
 
@@ -340,7 +340,7 @@ class TestValidatedPluginManager:
 
         monkeypatch.setenv("ROBOT_OPTIMIZER_ALLOW_UNSAFE_PLUGINS", "1")
         manager = ValidatedPluginManager()
-        with caplog.at_level(logging.WARNING, logger="robot_optimizer_core.plugin"):
+        with caplog.at_level(logging.WARNING, logger="robot_optimizer_core.infrastructure.plugins.manager"):
             with pytest.raises(PluginError):
                 manager.load_plugin_from_file(plugin_file, bypass_validation=True)
 
@@ -375,7 +375,7 @@ class TestValidatedPluginManager:
         plugin_file = tmp_path / "traversal.py"
         plugin_file.write_bytes(
 
-                b"from robot_optimizer_core.plugin import Plugin, PluginMetadata\n"
+                b"from robot_optimizer_core.infrastructure.plugins.manager import Plugin, PluginMetadata\n"
                 b"\n"
                 b"class TraversalPlugin(Plugin):\n"
                 b"    @property\n"

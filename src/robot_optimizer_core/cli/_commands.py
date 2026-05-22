@@ -423,7 +423,7 @@ def _run_diagnose(args: argparse.Namespace) -> int:
     """Print diagnostic information as JSON and exit 0."""
     import json
 
-    from ..context import ApplicationConfig, ApplicationContext
+    from ..composition.context import ApplicationConfig, ApplicationContext
 
     ctx = ApplicationContext(ApplicationConfig(
         enable_plugins=False,

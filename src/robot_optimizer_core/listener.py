@@ -141,7 +141,7 @@ class FlakinessListener:
     def _resolve_repository(results_path: str | Path | None) -> TestResultRepository:
         """Return a repository from the DI container or build a JSON fallback."""
         try:
-            from .di import get_container
+            from .composition.container import get_container
 
             container = get_container()
             if container.has_service("test_result_repository"):

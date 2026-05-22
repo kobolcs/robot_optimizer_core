@@ -193,7 +193,7 @@ class TestFlakinessListenerResolveFilePath:
 @pytest.mark.unit
 class TestFlakinessListenerResolveRepository:
     def test_creates_json_repo_when_no_di(self, tmp_path: Path) -> None:
-        from robot_optimizer_core.di import reset_container
+        from robot_optimizer_core.composition.container import reset_container
 
         reset_container()
         results_path = tmp_path / "results.json"
@@ -201,7 +201,7 @@ class TestFlakinessListenerResolveRepository:
         assert listener.repository is not None
 
     def test_uses_di_container_repo_when_registered(self, tmp_path: Path) -> None:
-        from robot_optimizer_core.di import get_container, reset_container
+        from robot_optimizer_core.composition.container import get_container, reset_container
 
         reset_container()
         container = get_container()

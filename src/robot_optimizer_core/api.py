@@ -48,7 +48,7 @@ from typing import (
 
 from .application.analyzers import BaseAnalyzer, SuiteAwareAnalyzer
 from .infrastructure.cache.analysis_cache import AnalysisCache
-from .di import get_container
+from .composition.container import get_container
 from .domain.entities import TestFile
 from .domain.value_objects import Finding, Severity
 from .exceptions import AnalysisError, RobotFileNotFoundError
