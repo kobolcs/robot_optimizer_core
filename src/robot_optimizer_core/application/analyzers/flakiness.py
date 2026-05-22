@@ -33,7 +33,6 @@ if sys.version_info >= (3, 12):
 else:
     from typing_extensions import override
 
-from ...infrastructure.config.settings import get_settings
 from ...composition.container import get_container
 from ...domain.entities import TestFile
 from ...domain.repositories import TestResultRepository
@@ -46,6 +45,7 @@ from ...domain.value_objects import (
     Severity,
 )
 from ...exceptions import ConfigurationError, RepositoryError
+from ...infrastructure.config.settings import get_settings
 from .base import BaseAnalyzer, ConfigValue
 
 __all__ = ["FlakinessAnalyzer", "FlakinessCategory"]

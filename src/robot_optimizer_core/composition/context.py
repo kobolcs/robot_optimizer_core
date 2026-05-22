@@ -10,18 +10,18 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
 from ..application.analyzers.registry import AnalyzerRegistry
+from ..exceptions import ConfigurationError
 from ..infrastructure.config.settings import Settings
+from ..infrastructure.discovery import FileDiscoveryService
+from ..infrastructure.logging.adapter import LoggerAdapter, configure_logging
+from ..infrastructure.metrics.collector import MetricsCollector
+from ..infrastructure.plugins.manager import ValidatedPluginManager
 from .container import (
     ThreadSafeContainer,
     _register_defaults,
     _set_global_container,
     reset_container,
 )
-from ..infrastructure.discovery import FileDiscoveryService
-from ..exceptions import ConfigurationError
-from ..infrastructure.logging.adapter import LoggerAdapter, configure_logging
-from ..infrastructure.metrics.collector import MetricsCollector
-from ..infrastructure.plugins.manager import ValidatedPluginManager
 
 
 class ScopedContainer(Protocol):

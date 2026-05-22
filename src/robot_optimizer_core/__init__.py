@@ -55,18 +55,12 @@ from .application.analyzers import (
     get_analyzer_registry as get_analyzer_registry,
 )
 
-# High-level API functions
-from .entrypoints.public_api import (
-    SuiteAnalysisResult,
-    SuiteInfo,
-    SuiteStatistics,
-    analyze_directory,
-    analyze_file,
-    analyze_suite,
+# Service layer (recommended for most uses)
+from .application.services.analysis_service import (
+    AnalysisResult,
+    AnalysisService,
+    DirectoryAnalysisResult,
 )
-
-# Configuration
-from .infrastructure.config import Settings, get_settings, reset_settings
 
 # Application context — primary entry point for wiring services
 from .composition.context import (
@@ -81,9 +75,6 @@ from .composition.context import (
 from .composition.context import (
     create_test_application as create_test_application,
 )
-
-# Core services — not part of the public API; importable for advanced use
-from .infrastructure.discovery import FileDiscoveryService as FileDiscoveryService
 
 # Core domain models — primary value objects (Finding, Location, Pattern, etc.) in __all__;
 # additional types (FlakinessStats, SleepPattern, TestResult) and base types re-exported
@@ -118,6 +109,19 @@ from .domain.value_objects import (
     TestResult as TestResult,
 )
 
+# Listener — not part of the public API; importable for advanced use
+from .entrypoints.listener import FlakinessListener as FlakinessListener
+
+# High-level API functions
+from .entrypoints.public_api import (
+    SuiteAnalysisResult,
+    SuiteInfo,
+    SuiteStatistics,
+    analyze_directory,
+    analyze_file,
+    analyze_suite,
+)
+
 # Exceptions
 from .exceptions import (
     AnalysisError,
@@ -126,8 +130,22 @@ from .exceptions import (
     RobotOptimizerError,
 )
 
-# Listener — not part of the public API; importable for advanced use
-from .entrypoints.listener import FlakinessListener as FlakinessListener
+# Configuration
+from .infrastructure.config import Settings, get_settings, reset_settings
+
+# Core services — not part of the public API; importable for advanced use
+from .infrastructure.discovery import FileDiscoveryService as FileDiscoveryService
+
+# File I/O providers — for advanced use (testing, custom sources)
+from .infrastructure.file_provider import (
+    DiskFileProvider as DiskFileProvider,
+)
+from .infrastructure.file_provider import (
+    FileProvider as FileProvider,
+)
+from .infrastructure.file_provider import (
+    InMemoryFileProvider as InMemoryFileProvider,
+)
 
 # Logging — not part of the public API; importable for advanced use
 from .infrastructure.logging.adapter import configure_logging as configure_logging
@@ -148,24 +166,6 @@ from .infrastructure.parsers import RobotASTParser as RobotASTParser
 # Plugin system
 from .infrastructure.plugins.manager import Plugin, PluginMetadata
 from .premium import PremiumFeatureError, is_premium_installed
-
-# File I/O providers — for advanced use (testing, custom sources)
-from .infrastructure.file_provider import (
-    DiskFileProvider as DiskFileProvider,
-)
-from .infrastructure.file_provider import (
-    FileProvider as FileProvider,
-)
-from .infrastructure.file_provider import (
-    InMemoryFileProvider as InMemoryFileProvider,
-)
-
-# Service layer (recommended for most uses)
-from .application.services.analysis_service import (
-    AnalysisResult,
-    AnalysisService,
-    DirectoryAnalysisResult,
-)
 
 __all__ = [
     "AnalysisError",

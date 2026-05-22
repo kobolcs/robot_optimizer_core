@@ -11,11 +11,11 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from ..public_api import analyze_directory, analyze_file
-from ...infrastructure.cache.analysis_cache import AnalysisCache
-from ...infrastructure.config.settings import Settings
 from ...domain.value_objects import Finding, Severity
 from ...exceptions import AnalysisError
+from ...infrastructure.cache.analysis_cache import AnalysisCache
+from ...infrastructure.config.settings import Settings
+from ..public_api import analyze_directory, analyze_file
 from ._baseline import filter_baseline, load_baseline, save_baseline
 from ._formatters import _format_json, _format_junit, _format_sarif, _format_text
 from ._html import _format_html

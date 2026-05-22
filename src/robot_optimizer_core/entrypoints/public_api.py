@@ -47,16 +47,24 @@ from typing import (
 )
 
 from ..application.analyzers import BaseAnalyzer, SuiteAwareAnalyzer
-from ..infrastructure.cache.analysis_cache import AnalysisCache
 from ..composition.container import get_container
 from ..domain.entities import TestFile
 from ..domain.value_objects import Finding, Severity
 from ..exceptions import AnalysisError, RobotFileNotFoundError
-from ..infrastructure.logging.adapter import get_logger, log_analysis_complete, log_analysis_start
+from ..infrastructure.cache.analysis_cache import AnalysisCache
+from ..infrastructure.logging.adapter import (
+    get_logger,
+    log_analysis_complete,
+    log_analysis_start,
+)
 
 if TYPE_CHECKING:
+    from ..domain.value_objects.robot_ast import (
+        RobotImport,
+        RobotKeyword,
+        RobotTestCase,
+    )
     from ..infrastructure.config import Settings
-    from ..domain.value_objects.robot_ast import RobotImport, RobotKeyword, RobotTestCase
     from ..infrastructure.metrics.collector import MetricsCollector
 
 from ..premium import PremiumFeatureError
