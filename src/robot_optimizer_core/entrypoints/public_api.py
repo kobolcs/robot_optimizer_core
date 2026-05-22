@@ -33,7 +33,6 @@ from __future__ import annotations
 
 import dataclasses
 import functools
-import os
 import time
 import warnings
 from collections.abc import Callable
@@ -287,6 +286,13 @@ def analyze_file(
     return all_findings
 
 
+def _get_or_build_service() -> Any:
+    """Build an AnalysisService wired via the composition context."""
+    from ..composition.context import get_analysis_service
+
+    return get_analysis_service()
+
+
 def _validate_directory_path(directory_path: str | Path) -> Path:
     """Validate that the directory path exists and is a directory."""
     path = Path(directory_path)
@@ -404,58 +410,16 @@ def analyze_directory(
         if min_severity is None:
             min_severity = severity_filter
 
-    # Validate directory and resolve settings
+    # Validate directory and resolve settings / metrics before delegating.
     path = _validate_directory_path(directory_path)
     container = get_container()
     if settings is None:
         settings = container.resolve("settings")
-    discovery: Any = container.resolve("file_discovery")
-
-    # Discover files with resolved patterns
-    resolved_patterns = patterns or settings.file_patterns
-    resolved_excludes = exclude_patterns or settings.exclude_patterns
-    files = discovery.find_files(
-        root_path=path,
-        patterns=resolved_patterns,
-        exclude_patterns=resolved_excludes,
-        recursive=recursive,
-    )
-
-    logger.info(
-        "Starting directory analysis",
-        extra={
-            "directory": str(path),
-            "file_count": len(files),
-            "recursive": recursive,
-        },
-    )
-
-    # Resolve cache hits before dispatching to the thread pool.
-    cache: AnalysisCache | None = None
-    cache_hits: dict[Path, list[Finding]] = {}
-    file_hashes: dict[Path, str] = {}
-    files_to_analyze = files
-
     if metrics is None:
         metrics = container.resolve("metrics")
 
-    if use_cache:
-        cache = AnalysisCache()
-        files_to_analyze, cache_hits, file_hashes = _resolve_cache(files, cache)
-        hit_count = len(cache_hits)
-        miss_count = len(files_to_analyze)
-        if hit_count or miss_count:
-            logger.debug(
-                "Cache: %d hit(s), %d miss(es)", hit_count, miss_count
-            )
-            metrics.gauge("cache.hits", hit_count)
-            metrics.gauge("cache.misses", miss_count)
-            if files:
-                metrics.gauge("cache.hit_rate", hit_count / len(files))
-
-    # Execute analysis on cache misses only.
-    _default_workers = min(4, (os.cpu_count() or 1))
-    effective_workers = max_workers if max_workers is not None else _default_workers
+    # Build the per-file callable using the *module-level* analyze_file name so
+    # that monkeypatching public_api.analyze_file is respected by the thread pool.
     analyze_fn = functools.partial(
         _analyze_one_file,
         analyzers=analyzers,
@@ -463,41 +427,23 @@ def analyze_directory(
         min_severity=min_severity,
         pattern_filter=pattern_filter,
     )
-    dir_results, file_errors = _execute_directory_analysis(
-        files_to_analyze, analyze_fn, effective_workers, fail_fast
+
+    return cast(
+        "DirectoryResults",
+        _get_or_build_service().run_directory_analysis(
+            directory_path=path,
+            analyze_fn=analyze_fn,
+            patterns=patterns,
+            exclude_patterns=exclude_patterns,
+            recursive=recursive,
+            settings=settings,
+            fail_fast=fail_fast,
+            error_handling=error_handling,
+            max_workers=max_workers,
+            metrics=metrics,
+            use_cache=use_cache,
+        ),
     )
-
-    # Merge cache hits into results and persist new entries.
-    for fp, cached_findings in cache_hits.items():
-        dir_results.findings[fp] = cached_findings
-    if cache is not None:
-        for fp, new_findings in dir_results.findings.items():
-            if fp not in cache_hits and fp in file_hashes:
-                cache.put(fp, file_hashes[fp], new_findings)
-        cache.flush()
-
-    # Log and track metrics
-    total_findings = sum(len(findings) for findings in dir_results.findings.values())
-    logger.info(
-        "Directory analysis complete",
-        extra={
-            "directory": str(path),
-            "files_analyzed": len(dir_results.findings),
-            "files_failed": len(file_errors),
-            "total_findings": total_findings,
-        },
-    )
-
-    metrics.gauge("batch.files_analyzed", len(dir_results.findings))
-    metrics.gauge("batch.files_failed", len(file_errors))
-    metrics.gauge("batch.total_findings", total_findings)
-
-    # Handle errors
-    _handle_directory_analysis_errors(
-        file_errors, error_handling, fail_fast, dir_results
-    )
-
-    return dir_results
 
 
 def _resolve_cache(

@@ -356,6 +356,33 @@ class ApplicationContext:
         self.shutdown()
 
 
+# ---------------------------------------------------------------------------
+# Service factory
+# ---------------------------------------------------------------------------
+
+
+def get_analysis_service() -> Any:
+    """Build an AnalysisService with all dependencies from the global container.
+
+    Returns a new :class:`~robot_optimizer_core.application.services.analysis_service.AnalysisService`
+    instance wired with the current container's settings, metrics, file-discovery
+    service, and analyzer registry.  Import is lazy to avoid circular imports.
+
+    Returns:
+        Ready-to-use AnalysisService instance.
+    """
+    from ..application.services.analysis_service import AnalysisService
+    from .container import get_container
+
+    container = get_container()
+    return AnalysisService(
+        settings=container.resolve("settings"),
+        metrics=container.resolve("metrics"),
+        file_discovery=container.resolve("file_discovery"),
+        registry=container.resolve("analyzer_registry"),
+    )
+
+
 # Factory functions (no globals!)
 def create_application(config: ApplicationConfig | None = None) -> ApplicationContext:
     """Create a new application context.
