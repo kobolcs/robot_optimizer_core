@@ -150,13 +150,13 @@ from .plugin import Plugin, PluginMetadata
 from .premium import PremiumFeatureError, is_premium_installed
 
 # File I/O providers — for advanced use (testing, custom sources)
-from .providers import (
+from .infrastructure.file_provider import (
     DiskFileProvider as DiskFileProvider,
 )
-from .providers import (
+from .infrastructure.file_provider import (
     FileProvider as FileProvider,
 )
-from .providers import (
+from .infrastructure.file_provider import (
     InMemoryFileProvider as InMemoryFileProvider,
 )
 
