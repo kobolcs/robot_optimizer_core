@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from robot_optimizer_core.cli import main
+from robot_optimizer_core.entrypoints.cli import main
 
 # ---------------------------------------------------------------------------
 # ExceptionGroup in _analyze_path
@@ -24,7 +24,7 @@ class TestExceptionGroupInAnalyzePath:
         robot_file = tmp_path / "t.robot"
         robot_file.write_text("*** Test Cases ***\nT\n    Log    hi\n")
         eg = ExceptionGroup("multi", [ValueError("err1"), RuntimeError("err2")])
-        with patch("robot_optimizer_core.cli._commands.analyze_file", side_effect=eg):
+        with patch("robot_optimizer_core.entrypoints.cli._commands.analyze_file", side_effect=eg):
             with pytest.raises(SystemExit) as exc:
                 main(["analyze", str(robot_file)])
         assert exc.value.code == 2
@@ -43,7 +43,7 @@ class TestClearCacheFlag:
     def test_clear_cache_flag_invokes_cache_clear(self, tmp_path: Path) -> None:
         robot_file = tmp_path / "t.robot"
         robot_file.write_text("*** Test Cases ***\nT\n    Log    hi\n")
-        with patch("robot_optimizer_core.cli._commands.AnalysisCache") as mock_cache_cls:
+        with patch("robot_optimizer_core.entrypoints.cli._commands.AnalysisCache") as mock_cache_cls:
             mock_cache_cls.return_value.clear = MagicMock()
             with pytest.raises(SystemExit):
                 main(["analyze", "--clear-cache", str(robot_file)])
@@ -61,7 +61,7 @@ class TestWatchModeDispatch:
         robot_file = tmp_path / "t.robot"
         robot_file.write_text("*** Test Cases ***\nT\n    Log    hi\n")
         with patch(
-            "robot_optimizer_core.cli._commands._run_watch_mode", return_value=0
+            "robot_optimizer_core.entrypoints.cli._commands._run_watch_mode", return_value=0
         ) as mock_watch, pytest.raises(SystemExit) as exc:
             main(["analyze", "--watch", str(robot_file)])
         mock_watch.assert_called_once()
@@ -135,10 +135,10 @@ class TestWatchModeHappyPath:
         }
 
         with patch.dict(sys.modules, fake_watchdog_modules), \
-             patch("robot_optimizer_core.cli._commands.signal.signal", side_effect=fake_signal), \
-             patch("robot_optimizer_core.cli._commands.time.sleep", side_effect=fake_sleep), \
+             patch("robot_optimizer_core.entrypoints.cli._commands.signal.signal", side_effect=fake_signal), \
+             patch("robot_optimizer_core.entrypoints.cli._commands.time.sleep", side_effect=fake_sleep), \
              patch(
-                 "robot_optimizer_core.cli._commands._analyze_path",
+                 "robot_optimizer_core.entrypoints.cli._commands._analyze_path",
                  return_value=([], False),
              ):
             with pytest.raises(SystemExit) as exc:

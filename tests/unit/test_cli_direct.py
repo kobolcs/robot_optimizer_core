@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from robot_optimizer_core.cli import main
+from robot_optimizer_core.entrypoints.cli import main
 
 _SLEEP_ROBOT = b"*** Test Cases ***\nMy Test\n    Sleep    5\n"
 _CLEAN_ROBOT = b"*** Test Cases ***\nMy Test\n    Log    hello\n"

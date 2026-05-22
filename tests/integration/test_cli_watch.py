@@ -16,7 +16,7 @@ class TestWatchMode:
         f = tmp_path / "test.robot"
         f.write_bytes(b"*** Test Cases ***\nMy Test\n    Log    hello\n")
 
-        from robot_optimizer_core.cli._parser import _build_parser
+        from robot_optimizer_core.entrypoints.cli._parser import _build_parser
 
         parser = _build_parser()
         args = parser.parse_args(["analyze", str(f), "--watch"])
@@ -27,7 +27,7 @@ class TestWatchMode:
         test_file = tmp_path / "test.robot"
         test_file.write_bytes(b"*** Test Cases ***\nMy Test\n    Log    hello\n")
 
-        from robot_optimizer_core.cli._commands import _compute_finding_diff
+        from robot_optimizer_core.entrypoints.cli._commands import _compute_finding_diff
         from robot_optimizer_core.domain.value_objects import Finding, Severity
         from robot_optimizer_core.domain.value_objects.location import Location
         from robot_optimizer_core.domain.value_objects.pattern import (
@@ -64,7 +64,7 @@ class TestWatchMode:
         """Watch mode should detect when findings are resolved."""
         test_file = tmp_path / "test.robot"
 
-        from robot_optimizer_core.cli._commands import _compute_finding_diff
+        from robot_optimizer_core.entrypoints.cli._commands import _compute_finding_diff
         from robot_optimizer_core.domain.value_objects import Finding, Severity
         from robot_optimizer_core.domain.value_objects.location import Location
         from robot_optimizer_core.domain.value_objects.pattern import (
@@ -101,7 +101,7 @@ class TestWatchMode:
         """Watch mode should handle when there are no changes."""
         test_file = tmp_path / "test.robot"
 
-        from robot_optimizer_core.cli._commands import _compute_finding_diff
+        from robot_optimizer_core.entrypoints.cli._commands import _compute_finding_diff
         from robot_optimizer_core.domain.value_objects import Finding, Severity
         from robot_optimizer_core.domain.value_objects.location import Location
         from robot_optimizer_core.domain.value_objects.pattern import (
@@ -133,7 +133,7 @@ class TestWatchMode:
 
     def test_print_watch_diff_no_changes(self, capsys) -> None:
         """_print_watch_diff should show message when there are no changes."""
-        from robot_optimizer_core.cli._commands import _print_watch_diff
+        from robot_optimizer_core.entrypoints.cli._commands import _print_watch_diff
 
         _print_watch_diff([], [])
         captured = capsys.readouterr()
@@ -141,7 +141,7 @@ class TestWatchMode:
 
     def test_print_watch_diff_with_new_findings(self, tmp_path: Path, capsys) -> None:
         """_print_watch_diff should display new findings."""
-        from robot_optimizer_core.cli._commands import _print_watch_diff
+        from robot_optimizer_core.entrypoints.cli._commands import _print_watch_diff
         from robot_optimizer_core.domain.value_objects import Finding, Severity
         from robot_optimizer_core.domain.value_objects.location import Location
         from robot_optimizer_core.domain.value_objects.pattern import (
@@ -170,7 +170,7 @@ class TestWatchMode:
 
     def test_print_watch_diff_with_resolved_findings(self, tmp_path: Path, capsys) -> None:
         """_print_watch_diff should display resolved findings."""
-        from robot_optimizer_core.cli._commands import _print_watch_diff
+        from robot_optimizer_core.entrypoints.cli._commands import _print_watch_diff
         from robot_optimizer_core.domain.value_objects import Finding, Severity
         from robot_optimizer_core.domain.value_objects.location import Location
         from robot_optimizer_core.domain.value_objects.pattern import (
@@ -207,7 +207,7 @@ class TestCliOutputFormats:
 
         from unittest.mock import MagicMock
 
-        from robot_optimizer_core.cli._commands import _run_analyze
+        from robot_optimizer_core.entrypoints.cli._commands import _run_analyze
 
         args = MagicMock()
         args.path = str(test_file)
@@ -235,7 +235,7 @@ class TestCliOutputFormats:
 
         from unittest.mock import MagicMock
 
-        from robot_optimizer_core.cli._commands import _run_analyze
+        from robot_optimizer_core.entrypoints.cli._commands import _run_analyze
 
         args = MagicMock()
         args.path = str(test_file)

@@ -118,7 +118,7 @@ Issues = "https://github.com/kobolcs/robot_optimizer_core/issues"
 Changelog = "https://github.com/kobolcs/robot_optimizer_core/blob/master/CHANGELOG.md"
 
 [project.scripts]
-robot-optimizer = "robot_optimizer_core.cli:main"
+robot-optimizer = "robot_optimizer_core.entrypoints.cli:main"
 
 [project.entry-points."robot_optimizer_core.analyzers"]
 # Core analyzers available for discovery

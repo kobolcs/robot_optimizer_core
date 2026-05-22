@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from robot_optimizer_core.cli._baseline import (
+from robot_optimizer_core.entrypoints.cli._baseline import (
     BaselineKey,
     _finding_key,
     filter_baseline,
