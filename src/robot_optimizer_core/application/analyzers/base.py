@@ -40,10 +40,10 @@ from typing import (
 )
 
 from ...domain.entities import TestFile
+from ...domain.ports.metrics import IMetrics
 from ...domain.value_objects import Finding, Severity
 from ...exceptions import AnalysisError
 from ...infrastructure.logging.adapter import get_logger
-from ...infrastructure.metrics.collector import MetricsCollector, get_metrics
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -94,24 +94,23 @@ class BaseAnalyzer(ABC):
 
     Attributes:
         config: Analyzer-specific configuration.
-        metrics_enabled: Whether to collect metrics for this analyzer.
     """
 
-    __slots__ = ("_logger", "_metrics", "config", "metrics_enabled")
+    __slots__ = ("_logger", "_metrics", "config")
 
     def __init__(
-        self, config: dict[str, ConfigValue] | None = None, metrics_enabled: bool = True
+        self,
+        config: dict[str, ConfigValue] | None = None,
+        metrics: IMetrics | None = None,
     ) -> None:
         """Initialize the analyzer.
 
         Args:
             config: Analyzer-specific configuration.
-            metrics_enabled: Whether to collect metrics.
+            metrics: Optional metrics sink; no metrics are recorded when ``None``.
         """
         self.config = config or {}
-        self.metrics_enabled = metrics_enabled
-        # Resolved lazily on first safe_analyze call
-        self._metrics: MetricsCollector | None = None
+        self._metrics = metrics
         self._logger = get_logger(
             f"{__name__}.{self.__class__.__name__}", {"analyzer": self.name}
         )
@@ -253,9 +252,6 @@ class BaseAnalyzer(ABC):
         self._logger.debug("Starting analysis", extra={"file": str(test_file.path)})
 
         try:
-            if self.metrics_enabled and self._metrics is None:
-                self._metrics = get_metrics()
-
             # Pre-analysis hook
             self.pre_analyze(test_file)
 

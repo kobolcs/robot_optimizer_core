@@ -99,15 +99,14 @@ class TestBaseAnalyzer:
         assert analyzer.tags == ["test", "unit"]
         assert analyzer.supports_auto_fix is True
         assert analyzer.config == {}
-        assert analyzer.metrics_enabled is True
+        assert analyzer._metrics is None
 
     def test_create_analyzer_with_config(self) -> None:
         """Test creating analyzer with custom config."""
         config = {"threshold": 10, "enabled": True}
-        analyzer = ConcreteAnalyzer(config=config, metrics_enabled=False)
+        analyzer = ConcreteAnalyzer(config=config)
 
         assert analyzer.config == config
-        assert analyzer.metrics_enabled is False
 
     def test_analyze_method(self, test_file: TestFile) -> None:
         """Test basic analyze method."""
@@ -299,9 +298,9 @@ class TestBaseAnalyzer:
 
         assert "Can't instantiate abstract class" in str(exc_info.value)
 
-    def test_metrics_disabled(self, test_file: TestFile) -> None:
-        """Test analyzer with metrics disabled."""
-        analyzer = ConcreteAnalyzer(metrics_enabled=False)
+    def test_no_metrics_by_default(self, test_file: TestFile) -> None:
+        """Test analyzer works without metrics."""
+        analyzer = ConcreteAnalyzer()
 
         assert analyzer._metrics is None
 

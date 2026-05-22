@@ -25,6 +25,7 @@ import builtins
 from importlib.metadata import EntryPoint, entry_points
 from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
+from ...domain.ports.metrics import IMetrics
 from ...exceptions import PluginError
 from ...infrastructure.logging.adapter import get_logger
 from .base import BaseAnalyzer
@@ -71,10 +72,11 @@ class AnalyzerRegistry:
         default_analyzers: List of analyzer names to use by default.
     """
 
-    __slots__ = ("analyzers", "default_analyzers", "instances")
+    __slots__ = ("_metrics", "analyzers", "default_analyzers", "instances")
 
-    def __init__(self) -> None:
+    def __init__(self, metrics: IMetrics | None = None) -> None:
         """Initialize the analyzer registry."""
+        self._metrics = metrics
         self.analyzers: dict[str, AnalyzerClass] = {}
         self.instances: dict[str, BaseAnalyzer] = {}
         self.default_analyzers: list[str] = [
@@ -175,7 +177,9 @@ class AnalyzerRegistry:
                 details={"available": self.list()},
             )
 
-        return self.analyzers[name]()
+        instance = self.analyzers[name]()
+        instance._metrics = self._metrics
+        return instance
 
     def list(self) -> list[str]:
         """List all registered analyzer names.
@@ -274,6 +278,12 @@ def reset_registry() -> None:
     """
     global _analyzer_registry
     _analyzer_registry = None
+
+
+def _set_global_registry(registry: AnalyzerRegistry) -> None:
+    """Set the global registry explicitly (called by the DI container)."""
+    global _analyzer_registry
+    _analyzer_registry = registry
 
 
 def _register_built_in_analyzers(registry: AnalyzerRegistry) -> None:

@@ -419,16 +419,30 @@ def reset_container() -> None:
 
 def _register_defaults(container: ThreadSafeContainer) -> None:
     """Register default services in the container."""
-    from ..application.analyzers.registry import get_analyzer_registry
+    from ..application.analyzers.registry import (
+        AnalyzerRegistry,
+        _register_built_in_analyzers,
+        _register_entry_point_analyzers,
+        _set_global_registry,
+    )
     from ..infrastructure.config import get_settings
     from ..infrastructure.discovery import OptimizedFileDiscoveryService
     from ..infrastructure.metrics.collector import get_metrics
     from ..infrastructure.parsers import RobotASTParser
 
+    metrics_instance = get_metrics()
+
+    def _build_registry() -> AnalyzerRegistry:
+        registry = AnalyzerRegistry(metrics=metrics_instance)
+        _register_built_in_analyzers(registry)
+        _register_entry_point_analyzers(registry)
+        _set_global_registry(registry)
+        return registry
+
     # Register core services as singletons
     container.register_singleton("settings", get_settings)
-    container.register_singleton("metrics", get_metrics)
-    container.register_singleton("analyzer_registry", get_analyzer_registry)
+    container.register_instance("metrics", metrics_instance)
+    container.register_singleton("analyzer_registry", _build_registry)
     container.register("parser", RobotASTParser)
 
     # Use optimized file discovery for better performance
