@@ -8,7 +8,7 @@ from collections.abc import Iterator
 import pytest
 
 from robot_optimizer_core.exceptions import ValidationError
-from robot_optimizer_core.metrics import MetricsCollector, TimingStats, get_metrics
+from robot_optimizer_core.infrastructure.metrics.collector import MetricsCollector, TimingStats, get_metrics
 
 
 @pytest.fixture
@@ -168,7 +168,7 @@ class TestMetricsCollector:
             m.stop()
 
     def test_configure_metrics_replaces_global(self) -> None:
-        from robot_optimizer_core.metrics import configure_metrics, get_metrics
+        from robot_optimizer_core.infrastructure.metrics.collector import configure_metrics, get_metrics
 
         m1 = configure_metrics(enabled=True)
         try:
@@ -209,7 +209,7 @@ class TestMetricsCollector:
             m.stop()
 
     def test_configure_metrics_stops_old_collector(self) -> None:
-        from robot_optimizer_core.metrics import configure_metrics
+        from robot_optimizer_core.infrastructure.metrics.collector import configure_metrics
 
         m1 = configure_metrics(enabled=True)
         m2 = configure_metrics(enabled=True)
@@ -262,7 +262,7 @@ class TestMetricsCollector:
             m.stop()
 
     def test_get_metrics_creates_when_none(self) -> None:
-        import robot_optimizer_core.metrics as metrics_mod
+        import robot_optimizer_core.infrastructure.metrics.collector as metrics_mod
 
         old = metrics_mod._global_metrics
         metrics_mod._global_metrics = None
@@ -275,7 +275,7 @@ class TestMetricsCollector:
             metrics_mod._global_metrics = old
 
     def test_reset_metrics_stops_and_clears_global(self) -> None:
-        from robot_optimizer_core.metrics import get_metrics, reset_metrics
+        from robot_optimizer_core.infrastructure.metrics.collector import get_metrics, reset_metrics
 
         m = get_metrics()
         m.increment("test.reset")
@@ -288,6 +288,6 @@ class TestMetricsCollector:
         m2.stop()
 
     def test_reset_metrics_idempotent_when_none(self) -> None:
-        from robot_optimizer_core.metrics import reset_metrics
+        from robot_optimizer_core.infrastructure.metrics.collector import reset_metrics
         reset_metrics()
         reset_metrics()  # should not raise

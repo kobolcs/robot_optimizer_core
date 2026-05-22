@@ -57,7 +57,7 @@ from .logging import get_logger, log_analysis_complete, log_analysis_start
 if TYPE_CHECKING:
     from .config import Settings
     from .domain.value_objects.robot_ast import RobotImport, RobotKeyword, RobotTestCase
-    from .metrics import MetricsCollector
+    from .infrastructure.metrics.collector import MetricsCollector
 
 from .premium import PremiumFeatureError
 

@@ -506,7 +506,7 @@ def test_get_analyzer_instances_passes_through_instance(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 def test_analyze_directory_with_metrics_passed(tmp_path: Path) -> None:
-    from robot_optimizer_core.metrics import MetricsCollector
+    from robot_optimizer_core.infrastructure.metrics.collector import MetricsCollector
 
     f = tmp_path / "t.robot"
     f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")

@@ -43,7 +43,7 @@ from ..domain.entities import TestFile
 from ..domain.value_objects import Finding, Severity
 from ..exceptions import AnalysisError
 from ..logging import get_logger
-from ..metrics import MetricsCollector, get_metrics
+from ..infrastructure.metrics.collector import MetricsCollector, get_metrics
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

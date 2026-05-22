@@ -20,7 +20,7 @@ from .di import (
 from .discovery import FileDiscoveryService
 from .exceptions import ConfigurationError
 from .logging import LoggerAdapter, configure_logging
-from .metrics import MetricsCollector
+from .infrastructure.metrics.collector import MetricsCollector
 from .plugin import ValidatedPluginManager
 
 

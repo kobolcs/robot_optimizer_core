@@ -134,13 +134,13 @@ from .logging import configure_logging as configure_logging
 from .logging import get_logger as get_logger
 
 # Metrics — not part of the public API; importable for advanced use
-from .metrics import (
+from .infrastructure.metrics.collector import (
     MetricsCollector as MetricsCollector,
 )
-from .metrics import (
+from .infrastructure.metrics.collector import (
     configure_metrics as configure_metrics,
 )
-from .metrics import (
+from .infrastructure.metrics.collector import (
     get_metrics as get_metrics,
 )
 from .parsers import RobotASTParser as RobotASTParser

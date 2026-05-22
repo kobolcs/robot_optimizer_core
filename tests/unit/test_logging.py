@@ -168,12 +168,12 @@ class TestLoggerAdapterContext:
 class TestMetricsHandler:
     def test_emit_increments_total(self) -> None:
         from robot_optimizer_core.logging import MetricsHandler
-        from robot_optimizer_core.metrics import MetricsCollector
+        from robot_optimizer_core.infrastructure.metrics.collector import MetricsCollector
 
         m = MetricsCollector(enabled=True)
         handler = MetricsHandler()
         # MetricsHandler uses the global; patch it
-        import robot_optimizer_core.metrics as _metrics_mod
+        import robot_optimizer_core.infrastructure.metrics.collector as _metrics_mod
 
         old = _metrics_mod._global_metrics
         _metrics_mod._global_metrics = m
@@ -191,11 +191,11 @@ class TestMetricsHandler:
 
     def test_emit_error_increments_module_counter(self) -> None:
         from robot_optimizer_core.logging import MetricsHandler
-        from robot_optimizer_core.metrics import MetricsCollector
+        from robot_optimizer_core.infrastructure.metrics.collector import MetricsCollector
 
         m = MetricsCollector(enabled=True)
         handler = MetricsHandler()
-        import robot_optimizer_core.metrics as _metrics_mod
+        import robot_optimizer_core.infrastructure.metrics.collector as _metrics_mod
 
         old = _metrics_mod._global_metrics
         _metrics_mod._global_metrics = m

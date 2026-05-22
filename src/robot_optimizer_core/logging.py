@@ -126,7 +126,7 @@ class MetricsHandler(logging.Handler):
         Args:
             record: The log record to emit.
         """
-        from .metrics import get_metrics  # deferred to avoid import cycle
+        from .infrastructure.metrics.collector import get_metrics  # deferred to avoid import cycle
         metrics = get_metrics()
 
         # Track log levels

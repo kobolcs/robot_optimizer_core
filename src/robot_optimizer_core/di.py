@@ -404,7 +404,7 @@ def reset_container() -> None:
     # preventing metric/cache bleed between test runs.
     from .analyzers.registry import reset_registry
     from .domain.entities.test_file import _cache_lock, _from_path_cache
-    from .metrics import reset_metrics
+    from .infrastructure.metrics.collector import reset_metrics
     from .plugin import reset_plugin_registry
 
     reset_registry()
@@ -422,7 +422,7 @@ def _register_defaults(container: ThreadSafeContainer) -> None:
     from .analyzers.registry import get_analyzer_registry
     from .config import get_settings
     from .discovery import OptimizedFileDiscoveryService
-    from .metrics import get_metrics
+    from .infrastructure.metrics.collector import get_metrics
     from .parsers import RobotASTParser
 
     # Register core services as singletons
