@@ -46,7 +46,7 @@ from typing import (
     cast,
 )
 
-from .analyzers import BaseAnalyzer, SuiteAwareAnalyzer
+from .application.analyzers import BaseAnalyzer, SuiteAwareAnalyzer
 from .infrastructure.cache.analysis_cache import AnalysisCache
 from .di import get_container
 from .domain.entities import TestFile
@@ -641,7 +641,7 @@ def analyze_suite(
     """Analyze a Robot Framework test suite with AST parsing.
 
     When the ``dead_code`` analyzer is active, this function uses
-    :meth:`~robot_optimizer_core.analyzers.DeadCodeAnalyzer.analyze_suite`
+    :meth:`~robot_optimizer_core.application.analyzers.DeadCodeAnalyzer.analyze_suite`
     for cross-file unused keyword detection.  Per-file findings from all other
     analyzers are preserved; dead-code findings are replaced with the
     suite-level ones to avoid false positives caused by keywords that are

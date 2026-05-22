@@ -5,8 +5,8 @@ from importlib.metadata import EntryPoint
 
 import pytest
 
-from robot_optimizer_core.analyzers import BaseAnalyzer, SleepDetector
-from robot_optimizer_core.analyzers.registry import (
+from robot_optimizer_core.application.analyzers import BaseAnalyzer, SleepDetector
+from robot_optimizer_core.application.analyzers.registry import (
     AnalyzerRegistry,
     _iter_analyzer_entry_points,
     _register_entry_point_analyzers,
@@ -111,12 +111,12 @@ def test_register_entry_point_analyzers_loads_canonical_group(
 
     ep = EntryPoint(
         name="external_plugin",
-        value="robot_optimizer_core.analyzers:SleepDetector",
-        group="robot_optimizer_core.analyzers",
+        value="robot_optimizer_core.application.analyzers:SleepDetector",
+        group="robot_optimizer_core.application.analyzers",
     )
 
     monkeypatch.setattr(
-        "robot_optimizer_core.analyzers.registry._iter_analyzer_entry_points",
+        "robot_optimizer_core.application.analyzers.registry._iter_analyzer_entry_points",
         lambda: [ep],
     )
 
@@ -228,10 +228,10 @@ class TestIterAnalyzerEntryPoints:
         assert isinstance(result, list)
 
     def test_old_style_entry_points(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        fake_eps: dict[str, list[object]] = {"robot_optimizer_core.analyzers": []}
+        fake_eps: dict[str, list[object]] = {"robot_optimizer_core.application.analyzers": []}
 
         monkeypatch.setattr(
-            "robot_optimizer_core.analyzers.registry.entry_points",
+            "robot_optimizer_core.application.analyzers.registry.entry_points",
             lambda: fake_eps,
         )
         result = _iter_analyzer_entry_points()

@@ -34,10 +34,10 @@ from __future__ import annotations
 from .__version__ import __version__, __version_info__
 
 # Analyzers
-from .analyzers import (
+from .application.analyzers import (
     AnalyzerRegistry as AnalyzerRegistry,
 )
-from .analyzers import (
+from .application.analyzers import (
     BaseAnalyzer,
     DeadCodeAnalyzer,
     FlakinessAnalyzer,
@@ -51,7 +51,7 @@ from .analyzers import (
     list_analyzers,
     register_analyzer,
 )
-from .analyzers import (
+from .application.analyzers import (
     get_analyzer_registry as get_analyzer_registry,
 )
 

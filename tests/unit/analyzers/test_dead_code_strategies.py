@@ -9,7 +9,7 @@ from unittest import mock
 
 import pytest
 
-from robot_optimizer_core.analyzers.dead_code import (
+from robot_optimizer_core.application.analyzers.dead_code import (
     DeadCodeAnalyzer,
     _ASTDeadCodeStrategy,
     _RegexDeadCodeStrategy,
@@ -79,7 +79,7 @@ class TestASTStrategy:
 
     def test_raises_on_unparseable_content(self) -> None:
         with mock.patch(
-            "robot_optimizer_core.analyzers.dead_code._ASTDeadCodeStrategy.extract",
+            "robot_optimizer_core.application.analyzers.dead_code._ASTDeadCodeStrategy.extract",
             side_effect=Exception("parse failure"),
         ), pytest.raises(Exception, match="parse failure"):
             self.strategy.extract(_make_file("not robot content"))

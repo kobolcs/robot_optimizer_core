@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from robot_optimizer_core.analyzers.registry import (
+from robot_optimizer_core.application.analyzers.registry import (
     get_analyzer_registry,
     reset_registry,
 )
@@ -70,7 +70,7 @@ class TestRegistryReset:
             assert name in registry.list()
 
     def test_custom_analyzer_not_present_after_reset(self) -> None:
-        from robot_optimizer_core.analyzers import BaseAnalyzer
+        from robot_optimizer_core.application.analyzers import BaseAnalyzer
         from robot_optimizer_core.domain.entities import TestFile
         from robot_optimizer_core.domain.value_objects import Finding
 
@@ -259,7 +259,7 @@ class TestPatternTypeIntegrity:
     def test_naming_convention_emits_camel_case_type(self, tmp_path: Path) -> None:
         from datetime import UTC, datetime
 
-        from robot_optimizer_core.analyzers.naming_convention import (
+        from robot_optimizer_core.application.analyzers.naming_convention import (
             NamingConventionAnalyzer,
         )
         from robot_optimizer_core.domain.entities import TestFile
@@ -274,7 +274,7 @@ class TestPatternTypeIntegrity:
     def test_tag_consistency_emits_semantic_types(self, tmp_path: Path) -> None:
         from datetime import UTC, datetime
 
-        from robot_optimizer_core.analyzers.tag_consistency import (
+        from robot_optimizer_core.application.analyzers.tag_consistency import (
             TagConsistencyAnalyzer,
         )
         from robot_optimizer_core.domain.entities import TestFile
@@ -319,7 +319,7 @@ class TestGlobalStateIsolation:
         assert c1 is not c2
 
     def test_sleep_detector_alias_identity(self) -> None:
-        from robot_optimizer_core.analyzers.sleep_detector import (
+        from robot_optimizer_core.application.analyzers.sleep_detector import (
             SleepDetector,
             SleepDetectorAnalyzer,
         )

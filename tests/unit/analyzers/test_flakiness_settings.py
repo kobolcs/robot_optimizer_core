@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from robot_optimizer_core.analyzers.flakiness import FlakinessAnalyzer
+from robot_optimizer_core.application.analyzers.flakiness import FlakinessAnalyzer
 
 
 @pytest.mark.unit
@@ -17,7 +17,7 @@ class TestFlakinessSettingsCoupling:
         assert analyzer._min_runs == 5
 
     def test_missing_threshold_reads_from_settings(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        import robot_optimizer_core.analyzers.flakiness as flakiness_mod
+        import robot_optimizer_core.application.analyzers.flakiness as flakiness_mod
         from robot_optimizer_core.infrastructure.config import Settings
 
         custom_settings = Settings(flakiness_threshold=0.15, flakiness_min_runs=7)

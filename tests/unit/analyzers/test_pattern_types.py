@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from robot_optimizer_core.analyzers.naming_convention import NamingConventionAnalyzer
-from robot_optimizer_core.analyzers.tag_consistency import TagConsistencyAnalyzer
+from robot_optimizer_core.application.analyzers.naming_convention import NamingConventionAnalyzer
+from robot_optimizer_core.application.analyzers.tag_consistency import TagConsistencyAnalyzer
 from robot_optimizer_core.domain.entities import TestFile
 from robot_optimizer_core.domain.value_objects.pattern import PatternType
 

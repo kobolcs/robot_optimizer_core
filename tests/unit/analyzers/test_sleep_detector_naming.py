@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from robot_optimizer_core.analyzers.sleep_detector import (
+from robot_optimizer_core.application.analyzers.sleep_detector import (
     SleepDetector,
     SleepDetectorAnalyzer,
 )
@@ -32,7 +32,7 @@ class TestSleepDetectorSettingsCoupling:
         assert analyzer._severity_thresholds["warning"] == pytest.approx(2.0)
 
     def test_no_config_reads_thresholds_from_settings(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        import robot_optimizer_core.analyzers.sleep_detector as sleep_mod
+        import robot_optimizer_core.application.analyzers.sleep_detector as sleep_mod
         from robot_optimizer_core.infrastructure.config import Settings
 
         custom_settings = Settings(max_acceptable_sleep_seconds=3.0)

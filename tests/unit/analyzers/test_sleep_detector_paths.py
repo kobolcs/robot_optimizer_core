@@ -14,7 +14,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from robot_optimizer_core.analyzers.sleep_detector import SleepDetector
+from robot_optimizer_core.application.analyzers.sleep_detector import SleepDetector
 from robot_optimizer_core.domain.entities import TestFile
 
 

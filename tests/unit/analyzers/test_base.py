@@ -13,7 +13,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from robot_optimizer_core.analyzers.base import BaseAnalyzer
+from robot_optimizer_core.application.analyzers.base import BaseAnalyzer
 from robot_optimizer_core.domain.entities import TestFile
 from robot_optimizer_core.domain.value_objects import (
     Finding,

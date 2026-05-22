@@ -13,7 +13,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from robot_optimizer_core.analyzers import FlakinessAnalyzer
+from robot_optimizer_core.application.analyzers import FlakinessAnalyzer
 from robot_optimizer_core.infrastructure.config import Settings
 from robot_optimizer_core.domain.entities import TestFile
 from robot_optimizer_core.domain.repositories import TestResultRepository

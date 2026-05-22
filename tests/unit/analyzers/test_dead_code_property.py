@@ -16,7 +16,7 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from robot_optimizer_core.analyzers import DeadCodeAnalyzer
+from robot_optimizer_core.application.analyzers import DeadCodeAnalyzer
 from robot_optimizer_core.domain.entities import TestFile
 from robot_optimizer_core.domain.value_objects import PatternType
 

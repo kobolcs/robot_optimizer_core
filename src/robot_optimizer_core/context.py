@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
-from .analyzers.registry import AnalyzerRegistry
+from .application.analyzers.registry import AnalyzerRegistry
 from .infrastructure.config.settings import Settings
 from .di import (
     ThreadSafeContainer,

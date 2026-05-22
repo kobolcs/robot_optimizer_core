@@ -8,13 +8,13 @@ from pathlib import Path
 
 import pytest
 
-from robot_optimizer_core.analyzers import (
+from robot_optimizer_core.application.analyzers import (
     HardcodedValueAnalyzer,
     NamingConventionAnalyzer,
     SetupTeardownAnalyzer,
     TagConsistencyAnalyzer,
 )
-from robot_optimizer_core.analyzers.test_documentation import (
+from robot_optimizer_core.application.analyzers.test_documentation import (
     TestDocumentationAnalyzer as DocAnalyzer,
 )
 from robot_optimizer_core.domain.entities import TestFile

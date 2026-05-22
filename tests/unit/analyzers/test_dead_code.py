@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from robot_optimizer_core.analyzers import DeadCodeAnalyzer
-from robot_optimizer_core.analyzers.dead_code import _resolve_calls
+from robot_optimizer_core.application.analyzers import DeadCodeAnalyzer
+from robot_optimizer_core.application.analyzers.dead_code import _resolve_calls
 from robot_optimizer_core.domain.entities import TestFile
 from robot_optimizer_core.domain.value_objects import PatternType, Severity
 
@@ -693,7 +693,7 @@ class TestMatchPrefixes:
     """Unit tests for the _match_prefixes module-level helper."""
 
     def setup_method(self) -> None:
-        from robot_optimizer_core.analyzers.dead_code import _match_prefixes
+        from robot_optimizer_core.application.analyzers.dead_code import _match_prefixes
         self._fn = _match_prefixes
 
     def _run(self, call: str, keywords: set[str]) -> set[str]:

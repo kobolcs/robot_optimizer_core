@@ -402,7 +402,7 @@ def reset_container() -> None:
 
     # Reset co-located globals so all singletons are torn down together,
     # preventing metric/cache bleed between test runs.
-    from .analyzers.registry import reset_registry
+    from .application.analyzers.registry import reset_registry
     from .domain.entities.test_file import _cache_lock, _from_path_cache
     from .infrastructure.metrics.collector import reset_metrics
     from .plugin import reset_plugin_registry
@@ -419,7 +419,7 @@ def reset_container() -> None:
 
 def _register_defaults(container: ThreadSafeContainer) -> None:
     """Register default services in the container."""
-    from .analyzers.registry import get_analyzer_registry
+    from .application.analyzers.registry import get_analyzer_registry
     from .infrastructure.config import get_settings
     from .infrastructure.discovery import OptimizedFileDiscoveryService
     from .infrastructure.metrics.collector import get_metrics

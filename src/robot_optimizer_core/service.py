@@ -22,7 +22,7 @@ from .di import get_container
 from .domain.value_objects import Finding, Severity
 
 if TYPE_CHECKING:
-    from .analyzers import BaseAnalyzer
+    from .application.analyzers import BaseAnalyzer
 
 __all__ = ["AnalysisResult", "AnalysisService", "DirectoryAnalysisResult"]
 

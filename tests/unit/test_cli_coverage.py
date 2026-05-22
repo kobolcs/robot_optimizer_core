@@ -184,7 +184,7 @@ class TestListAnalyzersErrorPath:
         mock_registry.get_info.side_effect = KeyError("missing")
 
         with patch(
-            "robot_optimizer_core.analyzers.get_analyzer_registry",
+            "robot_optimizer_core.application.analyzers.get_analyzer_registry",
             return_value=mock_registry,
         ), pytest.raises(SystemExit) as exc:
             main(["list-analyzers"])
@@ -207,7 +207,7 @@ class TestListAnalyzersNoTagsPath:
         }
 
         with patch(
-            "robot_optimizer_core.analyzers.get_analyzer_registry",
+            "robot_optimizer_core.application.analyzers.get_analyzer_registry",
             return_value=mock_registry,
         ), pytest.raises(SystemExit) as exc:
             main(["list-analyzers"])

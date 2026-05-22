@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from robot_optimizer_core.analyzers import SetupTeardownAnalyzer
+from robot_optimizer_core.application.analyzers import SetupTeardownAnalyzer
 from robot_optimizer_core.domain.entities import TestFile
 
 

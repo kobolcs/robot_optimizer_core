@@ -21,7 +21,7 @@ from ._formatters import _format_json, _format_junit, _format_sarif, _format_tex
 from ._html import _format_html
 
 if TYPE_CHECKING:
-    from ..analyzers import BaseAnalyzer
+    from ..application.analyzers import BaseAnalyzer
 
 # Exit codes — keep in sync with cli module docstring.
 _EXIT_OK = 0
@@ -441,7 +441,7 @@ def _run_diagnose(args: argparse.Namespace) -> int:
 
 
 def _run_list_analyzers(args: argparse.Namespace) -> int:
-    from ..analyzers import get_analyzer_registry
+    from ..application.analyzers import get_analyzer_registry
 
     registry = get_analyzer_registry()
     names = registry.list()

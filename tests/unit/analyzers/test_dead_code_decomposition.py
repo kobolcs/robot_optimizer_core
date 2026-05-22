@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from robot_optimizer_core.analyzers.dead_code import (
+from robot_optimizer_core.application.analyzers.dead_code import (
     DeadCodeAnalyzer,
     _ASTDeadCodeStrategy,
 )

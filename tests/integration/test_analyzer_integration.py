@@ -25,7 +25,7 @@ from robot_optimizer_core import (
     get_analyzer_registry,
     register_analyzer,
 )
-from robot_optimizer_core.analyzers import BaseAnalyzer
+from robot_optimizer_core.application.analyzers import BaseAnalyzer
 from robot_optimizer_core.di import ThreadSafeContainer as Container
 from robot_optimizer_core.domain.repositories import TestResultRepository
 from robot_optimizer_core.domain.value_objects import (
@@ -361,7 +361,7 @@ class TestRegistryResetIntegration:
 
     def test_reset_then_analyze_file_works(self, tmp_path: Path) -> None:
         """After reset_registry the analysis pipeline must fully reconstruct."""
-        from robot_optimizer_core.analyzers.registry import reset_registry
+        from robot_optimizer_core.application.analyzers.registry import reset_registry
 
         f = tmp_path / "sample.robot"
         f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
@@ -371,7 +371,7 @@ class TestRegistryResetIntegration:
         assert isinstance(findings, list)
 
     def test_reset_restores_all_builtins_at_integration_level(self) -> None:
-        from robot_optimizer_core.analyzers.registry import (
+        from robot_optimizer_core.application.analyzers.registry import (
             get_analyzer_registry,
             reset_registry,
         )
@@ -541,7 +541,7 @@ class TestResetContainerIntegration:
 @pytest.mark.integration
 class TestSleepDetectorAnalyzerIntegration:
     def test_alias_and_canonical_produce_same_findings(self, sample_robot_file: Path) -> None:
-        from robot_optimizer_core.analyzers.sleep_detector import (
+        from robot_optimizer_core.application.analyzers.sleep_detector import (
             SleepDetector,
             SleepDetectorAnalyzer,
         )

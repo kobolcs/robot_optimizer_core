@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from robot_optimizer_core.analyzers.base import BaseAnalyzer
+from robot_optimizer_core.application.analyzers.base import BaseAnalyzer
 from robot_optimizer_core.domain.entities import TestFile
 from robot_optimizer_core.domain.value_objects import Finding
 
@@ -35,7 +35,7 @@ def _make_file(tmp_path: Path) -> TestFile:
 @pytest.mark.unit
 class TestBaseAnalyzerLazyMetrics:
     def test_construction_does_not_call_get_metrics(self) -> None:
-        with patch("robot_optimizer_core.analyzers.base.get_metrics") as mock:
+        with patch("robot_optimizer_core.application.analyzers.base.get_metrics") as mock:
             _MinimalAnalyzer()
             mock.assert_not_called()
 
@@ -46,7 +46,7 @@ class TestBaseAnalyzerLazyMetrics:
         assert analyzer._metrics is not None
 
     def test_metrics_disabled_never_resolved(self, tmp_path: Path) -> None:
-        with patch("robot_optimizer_core.analyzers.base.get_metrics") as mock:
+        with patch("robot_optimizer_core.application.analyzers.base.get_metrics") as mock:
             analyzer = _MinimalAnalyzer(metrics_enabled=False)
             analyzer.safe_analyze(_make_file(tmp_path))
             mock.assert_not_called()
