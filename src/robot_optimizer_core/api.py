@@ -47,7 +47,7 @@ from typing import (
 )
 
 from .analyzers import BaseAnalyzer, SuiteAwareAnalyzer
-from .cache import AnalysisCache
+from .infrastructure.cache.analysis_cache import AnalysisCache
 from .di import get_container
 from .domain.entities import TestFile
 from .domain.value_objects import Finding, Severity

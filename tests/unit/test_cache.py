@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from robot_optimizer_core.cache import (
+from robot_optimizer_core.infrastructure.cache.analysis_cache import (
     AnalysisCache,
     _finding_from_dict,
     _finding_to_dict,
