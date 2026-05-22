@@ -12,7 +12,7 @@ import pytest
 
 from robot_optimizer_core.domain.value_objects.test_result import TestResult
 from robot_optimizer_core.exceptions import RepositoryError
-from robot_optimizer_core.infrastructure.json_test_result_repository import (
+from robot_optimizer_core.infrastructure.repositories.json_test_result_repository import (
     JsonTestResultRepository,
     _parse_ts,
 )
