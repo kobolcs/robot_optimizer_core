@@ -1,1 +1,247 @@
-[]
+[
+  {
+    "file_path": "examples/bad_robot_suite/checkout.robot",
+    "pattern_type": "HARDCODED_VALUE",
+    "line": 25
+  },
+  {
+    "file_path": "examples/bad_robot_suite/checkout.robot",
+    "pattern_type": "SLEEP_IN_TEST",
+    "line": 19
+  },
+  {
+    "file_path": "examples/bad_robot_suite/checkout.robot",
+    "pattern_type": "SINGLETON_TAG",
+    "line": 11
+  },
+  {
+    "file_path": "examples/bad_robot_suite/checkout.robot",
+    "pattern_type": "SINGLETON_TAG",
+    "line": 23
+  },
+  {
+    "file_path": "examples/bad_robot_suite/checkout.robot",
+    "pattern_type": "SINGLETON_TAG",
+    "line": 23
+  },
+  {
+    "file_path": "examples/bad_robot_suite/checkout.robot",
+    "pattern_type": "MISSING_DOCUMENTATION",
+    "line": 23
+  },
+  {
+    "file_path": "examples/bad_robot_suite/login.robot",
+    "pattern_type": "SLEEP_IN_TEST",
+    "line": 13
+  },
+  {
+    "file_path": "examples/bad_robot_suite/login.robot",
+    "pattern_type": "SLEEP_IN_TEST",
+    "line": 26
+  },
+  {
+    "file_path": "examples/bad_robot_suite/login.robot",
+    "pattern_type": "SINGLETON_TAG",
+    "line": 9
+  },
+  {
+    "file_path": "examples/bad_robot_suite/login.robot",
+    "pattern_type": "SINGLETON_TAG",
+    "line": 9
+  },
+  {
+    "file_path": "examples/bad_robot_suite/login.robot",
+    "pattern_type": "SINGLETON_TAG",
+    "line": 17
+  },
+  {
+    "file_path": "examples/bad_robot_suite/login.robot",
+    "pattern_type": "MISSING_DOCUMENTATION",
+    "line": 17
+  },
+  {
+    "file_path": "examples/bad_robot_suite/login.robot",
+    "pattern_type": "MISSING_DOCUMENTATION",
+    "line": 24
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/common.resource",
+    "pattern_type": "UNUSED_KEYWORD",
+    "line": 8
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/common.resource",
+    "pattern_type": "UNUSED_KEYWORD",
+    "line": 12
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/common.resource",
+    "pattern_type": "UNUSED_KEYWORD",
+    "line": 15
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/common.resource",
+    "pattern_type": "UNUSED_KEYWORD",
+    "line": 19
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/common.resource",
+    "pattern_type": "UNUSED_KEYWORD",
+    "line": 22
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/common.resource",
+    "pattern_type": "UNUSED_KEYWORD",
+    "line": 25
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/common.resource",
+    "pattern_type": "UNUSED_KEYWORD",
+    "line": 33
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/common.resource",
+    "pattern_type": "MISSING_DOCUMENTATION",
+    "line": 8
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/common.resource",
+    "pattern_type": "MISSING_DOCUMENTATION",
+    "line": 12
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/common.resource",
+    "pattern_type": "MISSING_DOCUMENTATION",
+    "line": 15
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/common.resource",
+    "pattern_type": "MISSING_DOCUMENTATION",
+    "line": 19
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/common.resource",
+    "pattern_type": "MISSING_DOCUMENTATION",
+    "line": 22
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/common.resource",
+    "pattern_type": "MISSING_DOCUMENTATION",
+    "line": 25
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/common.resource",
+    "pattern_type": "MISSING_DOCUMENTATION",
+    "line": 29
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/common.resource",
+    "pattern_type": "MISSING_DOCUMENTATION",
+    "line": 33
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/legacy_keywords.resource",
+    "pattern_type": "UNUSED_KEYWORD",
+    "line": 5
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/legacy_keywords.resource",
+    "pattern_type": "UNUSED_KEYWORD",
+    "line": 12
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/legacy_keywords.resource",
+    "pattern_type": "UNUSED_KEYWORD",
+    "line": 17
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/legacy_keywords.resource",
+    "pattern_type": "UNUSED_KEYWORD",
+    "line": 26
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/legacy_keywords.resource",
+    "pattern_type": "UNUSED_KEYWORD",
+    "line": 29
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/legacy_keywords.resource",
+    "pattern_type": "UNUSED_KEYWORD",
+    "line": 33
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/legacy_keywords.resource",
+    "pattern_type": "UNUSED_KEYWORD",
+    "line": 41
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/legacy_keywords.resource",
+    "pattern_type": "UNUSED_KEYWORD",
+    "line": 44
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/legacy_keywords.resource",
+    "pattern_type": "UNUSED_KEYWORD",
+    "line": 48
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/legacy_keywords.resource",
+    "pattern_type": "MISSING_DOCUMENTATION",
+    "line": 5
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/legacy_keywords.resource",
+    "pattern_type": "MISSING_DOCUMENTATION",
+    "line": 9
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/legacy_keywords.resource",
+    "pattern_type": "MISSING_DOCUMENTATION",
+    "line": 12
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/legacy_keywords.resource",
+    "pattern_type": "MISSING_DOCUMENTATION",
+    "line": 17
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/legacy_keywords.resource",
+    "pattern_type": "MISSING_DOCUMENTATION",
+    "line": 23
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/legacy_keywords.resource",
+    "pattern_type": "MISSING_DOCUMENTATION",
+    "line": 26
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/legacy_keywords.resource",
+    "pattern_type": "MISSING_DOCUMENTATION",
+    "line": 29
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/legacy_keywords.resource",
+    "pattern_type": "MISSING_DOCUMENTATION",
+    "line": 33
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/legacy_keywords.resource",
+    "pattern_type": "MISSING_DOCUMENTATION",
+    "line": 38
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/legacy_keywords.resource",
+    "pattern_type": "MISSING_DOCUMENTATION",
+    "line": 41
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/legacy_keywords.resource",
+    "pattern_type": "MISSING_DOCUMENTATION",
+    "line": 44
+  },
+  {
+    "file_path": "examples/bad_robot_suite/resources/legacy_keywords.resource",
+    "pattern_type": "MISSING_DOCUMENTATION",
+    "line": 48
+  }
+]

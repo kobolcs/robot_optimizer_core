@@ -19,8 +19,9 @@ BaselineKey = tuple[str, str, int]
 
 
 def _finding_key(f: Finding) -> BaselineKey:
+    fp = f.location.file_path
     return (
-        f.location.file_path.as_posix(),
+        _relative_posix(fp, Path.cwd()),
         f.pattern.type.name,
         f.location.line,
     )
@@ -56,16 +57,29 @@ def load_baseline(path: Path) -> set[BaselineKey]:
 
 
 def save_baseline(findings: list[Finding], path: Path) -> None:
-    """Write *findings* to a baseline JSON file, creating it if necessary."""
+    """Write *findings* to a baseline JSON file, creating it if necessary.
+
+    Paths are stored relative to the current working directory so the file
+    is portable across machines and CI environments.
+    """
+    cwd = Path.cwd()
     entries = [
         {
-            "file_path": f.location.file_path.as_posix(),
+            "file_path": _relative_posix(f.location.file_path, cwd),
             "pattern_type": f.pattern.type.name,
             "line": f.location.line,
         }
         for f in findings
     ]
     path.write_text(json.dumps(entries, indent=2), encoding="utf-8")
+
+
+def _relative_posix(file_path: Path, base: Path) -> str:
+    """Return *file_path* as a POSIX string relative to *base*, or absolute if not under *base*."""
+    try:
+        return file_path.relative_to(base).as_posix()
+    except ValueError:
+        return file_path.as_posix()
 
 
 def filter_baseline(
