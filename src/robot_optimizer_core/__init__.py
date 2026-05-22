@@ -161,7 +161,7 @@ from .infrastructure.file_provider import (
 )
 
 # Service layer (recommended for most uses)
-from .service import (
+from .application.services.analysis_service import (
     AnalysisResult,
     AnalysisService,
     DirectoryAnalysisResult,
