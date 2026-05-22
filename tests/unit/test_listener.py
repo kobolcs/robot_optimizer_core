@@ -11,7 +11,7 @@ import pytest
 
 from robot_optimizer_core.domain.repositories import TestResultRepository
 from robot_optimizer_core.domain.value_objects import TestResult
-from robot_optimizer_core.listener import FlakinessListener
+from robot_optimizer_core.entrypoints.listener import FlakinessListener
 
 
 class _FakeRepo(TestResultRepository):

@@ -127,7 +127,7 @@ from .exceptions import (
 )
 
 # Listener — not part of the public API; importable for advanced use
-from .listener import FlakinessListener as FlakinessListener
+from .entrypoints.listener import FlakinessListener as FlakinessListener
 
 # Logging — not part of the public API; importable for advanced use
 from .infrastructure.logging.adapter import configure_logging as configure_logging
