@@ -83,7 +83,7 @@ from .context import (
 )
 
 # Core services — not part of the public API; importable for advanced use
-from .discovery import FileDiscoveryService as FileDiscoveryService
+from .infrastructure.discovery import FileDiscoveryService as FileDiscoveryService
 
 # Core domain models — primary value objects (Finding, Location, Pattern, etc.) in __all__;
 # additional types (FlakinessStats, SleepPattern, TestResult) and base types re-exported

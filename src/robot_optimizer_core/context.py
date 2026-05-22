@@ -17,7 +17,7 @@ from .di import (
     _set_global_container,
     reset_container,
 )
-from .discovery import FileDiscoveryService
+from .infrastructure.discovery import FileDiscoveryService
 from .exceptions import ConfigurationError
 from .infrastructure.logging.adapter import LoggerAdapter, configure_logging
 from .infrastructure.metrics.collector import MetricsCollector

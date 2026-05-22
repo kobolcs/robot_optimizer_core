@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from robot_optimizer_core.discovery.file_finder import (
+from robot_optimizer_core.infrastructure.discovery.file_finder import (
     OptimizedFileDiscoveryService,
     PathExclusionTrie,
     PatternMatcher,
@@ -210,7 +210,7 @@ class TestOptimizedFileDiscoveryService:
 
         (tmp_path / "a.robot").write_bytes(b"*** Test Cases ***")
         with mock.patch(
-            "robot_optimizer_core.discovery.file_finder.FuturesTimeoutError",
+            "robot_optimizer_core.infrastructure.discovery.file_finder.FuturesTimeoutError",
             Exception,
         ):
             with mock.patch(

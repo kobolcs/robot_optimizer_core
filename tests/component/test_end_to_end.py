@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 from robot_optimizer_core.api import analyze_directory, analyze_file
-from robot_optimizer_core.discovery import FileDiscoveryService
+from robot_optimizer_core.infrastructure.discovery import FileDiscoveryService
 from robot_optimizer_core.domain.value_objects import PatternType, Severity
 
 _SUITE_WITH_ISSUES = """\
