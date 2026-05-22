@@ -56,7 +56,7 @@ from .application.analyzers import (
 )
 
 # High-level API functions
-from .api import (
+from .entrypoints.public_api import (
     SuiteAnalysisResult,
     SuiteInfo,
     SuiteStatistics,

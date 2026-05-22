@@ -18,7 +18,7 @@ from robot_optimizer_core.application.analyzers.registry import (
     get_analyzer_registry,
     reset_registry,
 )
-from robot_optimizer_core.api import analyze_directory, analyze_file
+from robot_optimizer_core.entrypoints.public_api import analyze_directory, analyze_file
 from robot_optimizer_core.composition.context import create_test_application
 from robot_optimizer_core.domain.value_objects import PatternType
 from robot_optimizer_core.exceptions import AnalysisError
@@ -203,7 +203,7 @@ class TestFailFastBehaviour:
     def test_fail_fast_stops_after_first_error(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        import robot_optimizer_core.api as api_mod
+        import robot_optimizer_core.entrypoints.public_api as api_mod
 
         for i in range(4):
             (tmp_path / f"t{i}.robot").write_bytes(
@@ -229,7 +229,7 @@ class TestFailFastBehaviour:
     def test_no_fail_fast_processes_all_files(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        import robot_optimizer_core.api as api_mod
+        import robot_optimizer_core.entrypoints.public_api as api_mod
 
         for i in range(3):
             (tmp_path / f"t{i}.robot").write_bytes(

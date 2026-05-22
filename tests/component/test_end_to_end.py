@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from robot_optimizer_core.api import analyze_directory, analyze_file
+from robot_optimizer_core.entrypoints.public_api import analyze_directory, analyze_file
 from robot_optimizer_core.infrastructure.discovery import FileDiscoveryService
 from robot_optimizer_core.domain.value_objects import PatternType, Severity
 

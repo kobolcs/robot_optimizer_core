@@ -162,7 +162,7 @@ class TestAnalyzeFindings:
 
 class TestAnalyzeDirectory:
     def test_directory_aggregates_findings(self, tmp_path: Path) -> None:
-        from robot_optimizer_core.api import DirectoryResults
+        from robot_optimizer_core.entrypoints.public_api import DirectoryResults
 
         f1 = tmp_path / "a.robot"
         f2 = tmp_path / "b.robot"
@@ -175,7 +175,7 @@ class TestAnalyzeDirectory:
         assert exc.value.code == 1
 
     def test_directory_no_findings_exits_zero(self, tmp_path: Path) -> None:
-        from robot_optimizer_core.api import DirectoryResults
+        from robot_optimizer_core.entrypoints.public_api import DirectoryResults
 
         with patch("robot_optimizer_core.entrypoints.cli._commands.analyze_directory", return_value=DirectoryResults()):
             with pytest.raises(SystemExit) as exc:
@@ -1006,7 +1006,7 @@ class TestJunitFormat:
 
 class TestPartialFailure:
     def test_partial_failure_exits_three(self, tmp_path: Path) -> None:
-        from robot_optimizer_core.api import DirectoryResults
+        from robot_optimizer_core.entrypoints.public_api import DirectoryResults
 
         results = DirectoryResults()
         results.errors = [(tmp_path / "bad.robot", Exception("parse fail"))]

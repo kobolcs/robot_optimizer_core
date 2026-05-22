@@ -14,9 +14,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple
 
-from ...api import ErrorHandling
-from ...api import analyze_directory as _api_analyze_directory
-from ...api import analyze_file as _api_analyze_file
+from ...entrypoints.public_api import ErrorHandling
+from ...entrypoints.public_api import analyze_directory as _api_analyze_directory
+from ...entrypoints.public_api import analyze_file as _api_analyze_file
 from ...infrastructure.config import Settings
 from ...composition.container import get_container
 from ...domain.value_objects import Finding, Severity

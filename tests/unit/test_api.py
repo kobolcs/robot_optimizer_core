@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-import robot_optimizer_core.api as _api_module
-from robot_optimizer_core.api import (
+import robot_optimizer_core.entrypoints.public_api as _api_module
+from robot_optimizer_core.entrypoints.public_api import (
     _analyze_one_file,
     _execute_directory_analysis,
     analyze_directory,
@@ -132,7 +132,7 @@ def test_analyze_file_uses_safe_analyze(
             return []
 
     monkeypatch.setattr(
-        "robot_optimizer_core.api._get_analyzer_instances",
+        "robot_optimizer_core.entrypoints.public_api._get_analyzer_instances",
         lambda analyzers, settings: [HookedAnalyzer()],
     )
 
@@ -327,7 +327,7 @@ def test_analyze_file_wraps_load_exception(
     def boom(*a, **kw):
         raise ValueError("parse kaboom")
 
-    monkeypatch.setattr("robot_optimizer_core.api.TestFile.from_path", boom)
+    monkeypatch.setattr("robot_optimizer_core.entrypoints.public_api.TestFile.from_path", boom)
 
     with pytest.raises(AnalysisError, match="Failed to load file"):
         analyze_file(robot_file)
@@ -347,7 +347,7 @@ def test_analyze_file_analyzer_failure_raises_analysis_error(
             raise RuntimeError("analyzer boom")
 
     monkeypatch.setattr(
-        "robot_optimizer_core.api._get_analyzer_instances",
+        "robot_optimizer_core.entrypoints.public_api._get_analyzer_instances",
         lambda *a, **kw: [ExplodingAnalyzer()],
     )
 
@@ -362,7 +362,7 @@ def test_analyze_file_analyzer_failure_raises_analysis_error(
 
 @pytest.mark.unit
 def test_validate_directory_path_nonexistent(tmp_path: Path) -> None:
-    from robot_optimizer_core.api import _validate_directory_path
+    from robot_optimizer_core.entrypoints.public_api import _validate_directory_path
     from robot_optimizer_core.exceptions import RobotFileNotFoundError
 
     with pytest.raises(RobotFileNotFoundError):
@@ -374,7 +374,7 @@ def test_validate_directory_path_file_raises(tmp_path: Path) -> None:
     f = tmp_path / "f.robot"
     f.write_bytes(b"x")
     with pytest.raises(AnalysisError, match="not a directory"):
-        from robot_optimizer_core.api import _validate_directory_path
+        from robot_optimizer_core.entrypoints.public_api import _validate_directory_path
 
         _validate_directory_path(f)
 
@@ -386,7 +386,7 @@ def test_validate_directory_path_file_raises(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 def test_handle_errors_raise_mode(tmp_path: Path) -> None:
-    from robot_optimizer_core.api import (
+    from robot_optimizer_core.entrypoints.public_api import (
         DirectoryResults,
         _handle_directory_analysis_errors,
     )
@@ -399,7 +399,7 @@ def test_handle_errors_raise_mode(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 def test_handle_errors_warn_mode_attaches_to_result(tmp_path: Path) -> None:
-    from robot_optimizer_core.api import (
+    from robot_optimizer_core.entrypoints.public_api import (
         DirectoryResults,
         _handle_directory_analysis_errors,
     )
@@ -412,7 +412,7 @@ def test_handle_errors_warn_mode_attaches_to_result(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 def test_handle_errors_skip_mode_no_exception(tmp_path: Path) -> None:
-    from robot_optimizer_core.api import (
+    from robot_optimizer_core.entrypoints.public_api import (
         DirectoryResults,
         _handle_directory_analysis_errors,
     )
@@ -426,7 +426,7 @@ def test_handle_errors_skip_mode_no_exception(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 def test_handle_errors_no_op_for_empty(tmp_path: Path) -> None:
-    from robot_optimizer_core.api import (
+    from robot_optimizer_core.entrypoints.public_api import (
         DirectoryResults,
         _handle_directory_analysis_errors,
     )
@@ -442,7 +442,7 @@ def test_handle_errors_no_op_for_empty(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 def test_analyze_suite_single_file(tmp_path: Path) -> None:
-    from robot_optimizer_core.api import analyze_suite
+    from robot_optimizer_core.entrypoints.public_api import analyze_suite
 
     f = tmp_path / "suite.robot"
     f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
@@ -454,7 +454,7 @@ def test_analyze_suite_single_file(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 def test_analyze_suite_directory(tmp_path: Path) -> None:
-    from robot_optimizer_core.api import analyze_suite
+    from robot_optimizer_core.entrypoints.public_api import analyze_suite
 
     (tmp_path / "a.robot").write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
     result = analyze_suite(tmp_path)
@@ -463,7 +463,7 @@ def test_analyze_suite_directory(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 def test_analyze_suite_with_dead_code_analyzer(tmp_path: Path) -> None:
-    from robot_optimizer_core.api import analyze_suite
+    from robot_optimizer_core.entrypoints.public_api import analyze_suite
 
     f = tmp_path / "suite.robot"
     f.write_bytes(
@@ -479,10 +479,10 @@ def test_analyze_suite_with_dead_code_analyzer(tmp_path: Path) -> None:
 def test_load_test_files_logs_warning_on_bad_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import robot_optimizer_core.api as _api_mod
+    import robot_optimizer_core.entrypoints.public_api as _api_mod
 
     monkeypatch.setattr(_api_mod.TestFile, "from_path", lambda p: (_ for _ in ()).throw(RuntimeError("bad")))
-    from robot_optimizer_core.api import _load_test_files
+    from robot_optimizer_core.entrypoints.public_api import _load_test_files
 
     result = _load_test_files([tmp_path / "f.robot"])
     assert result == []
@@ -490,7 +490,7 @@ def test_load_test_files_logs_warning_on_bad_file(
 
 @pytest.mark.unit
 def test_get_analyzer_instances_passes_through_instance(tmp_path: Path) -> None:
-    from robot_optimizer_core.api import _get_analyzer_instances
+    from robot_optimizer_core.entrypoints.public_api import _get_analyzer_instances
     from robot_optimizer_core.infrastructure.config import Settings
 
     class FakeAnalyzer:

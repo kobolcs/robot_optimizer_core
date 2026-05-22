@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from ...api import analyze_directory, analyze_file
+from ..public_api import analyze_directory, analyze_file
 from ...infrastructure.cache.analysis_cache import AnalysisCache
 from ...infrastructure.config.settings import Settings
 from ...domain.value_objects import Finding, Severity
