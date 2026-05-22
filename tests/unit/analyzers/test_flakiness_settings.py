@@ -18,7 +18,7 @@ class TestFlakinessSettingsCoupling:
 
     def test_missing_threshold_reads_from_settings(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import robot_optimizer_core.analyzers.flakiness as flakiness_mod
-        from robot_optimizer_core.config import Settings
+        from robot_optimizer_core.infrastructure.config import Settings
 
         custom_settings = Settings(flakiness_threshold=0.15, flakiness_min_runs=7)
         monkeypatch.setattr(flakiness_mod, "get_settings", lambda: custom_settings)

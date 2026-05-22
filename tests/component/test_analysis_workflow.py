@@ -102,13 +102,13 @@ class TestSettingsStrictness:
     def test_unknown_key_raises_at_settings_construction(self) -> None:
         from pydantic import ValidationError
 
-        from robot_optimizer_core.config import Settings
+        from robot_optimizer_core.infrastructure.config import Settings
 
         with pytest.raises((ValidationError, TypeError)):
             Settings(this_key_does_not_exist="boom")
 
     def test_valid_keys_construct_without_error(self) -> None:
-        from robot_optimizer_core.config import Settings
+        from robot_optimizer_core.infrastructure.config import Settings
 
         s = Settings(max_file_size_mb=2.0, log_level="WARNING")
         assert s.max_file_size_mb == pytest.approx(2.0)

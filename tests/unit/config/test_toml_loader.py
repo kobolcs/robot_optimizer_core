@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from robot_optimizer_core.config import Settings, load_settings_from_toml
-from robot_optimizer_core.config.toml_loader import (
+from robot_optimizer_core.infrastructure.config import Settings, load_settings_from_toml
+from robot_optimizer_core.infrastructure.config.toml_loader import (
     _find_toml_root,
     _read_optimizer_section,
     load_settings_from_toml_file,

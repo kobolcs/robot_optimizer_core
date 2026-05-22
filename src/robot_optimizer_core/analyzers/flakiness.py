@@ -33,7 +33,7 @@ if sys.version_info >= (3, 12):
 else:
     from typing_extensions import override
 
-from ..config.settings import get_settings
+from ..infrastructure.config.settings import get_settings
 from ..di import get_container
 from ..domain.entities import TestFile
 from ..domain.repositories import TestResultRepository

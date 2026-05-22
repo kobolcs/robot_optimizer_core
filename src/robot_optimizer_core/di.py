@@ -420,7 +420,7 @@ def reset_container() -> None:
 def _register_defaults(container: ThreadSafeContainer) -> None:
     """Register default services in the container."""
     from .analyzers.registry import get_analyzer_registry
-    from .config import get_settings
+    from .infrastructure.config import get_settings
     from .infrastructure.discovery import OptimizedFileDiscoveryService
     from .infrastructure.metrics.collector import get_metrics
     from .infrastructure.parsers import RobotASTParser

@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 
 from ..api import analyze_directory, analyze_file
 from ..infrastructure.cache.analysis_cache import AnalysisCache
-from ..config.settings import Settings
+from ..infrastructure.config.settings import Settings
 from ..domain.value_objects import Finding, Severity
 from ..exceptions import AnalysisError
 from ._baseline import filter_baseline, load_baseline, save_baseline
@@ -52,7 +52,7 @@ def _load_config(args: argparse.Namespace) -> Settings | None:
     if not getattr(args, "config", None):
         return None
     try:
-        from ..config.toml_loader import load_settings_from_toml_file
+        from ..infrastructure.config.toml_loader import load_settings_from_toml_file
 
         return load_settings_from_toml_file(args.config)
     except FileNotFoundError as exc:

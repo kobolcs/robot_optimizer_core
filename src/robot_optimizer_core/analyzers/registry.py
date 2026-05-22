@@ -313,7 +313,7 @@ def _register_entry_point_analyzers(registry: AnalyzerRegistry) -> None:
     are skipped with a warning.  When the list is empty (the default)
     every installed entry point is loaded with an info-level notice.
     """
-    from ..config import get_settings
+    from ..infrastructure.config import get_settings
 
     try:
         trusted = set(get_settings().trusted_analyzer_packages)

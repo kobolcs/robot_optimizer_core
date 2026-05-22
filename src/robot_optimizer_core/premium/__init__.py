@@ -209,7 +209,7 @@ def fire_telemetry_event(event: str, **properties: object) -> None:
     """
     try:
         # Lazy import to avoid circular dependency at module import time.
-        from ..config import get_settings
+        from ..infrastructure.config import get_settings
 
         if not get_settings().enable_telemetry:
             return

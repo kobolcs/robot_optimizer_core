@@ -66,7 +66,7 @@ from .api import (
 )
 
 # Configuration
-from .config import Settings, get_settings, reset_settings
+from .infrastructure.config import Settings, get_settings, reset_settings
 
 # Application context — primary entry point for wiring services
 from .context import (

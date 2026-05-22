@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
 from .analyzers.registry import AnalyzerRegistry
-from .config.settings import Settings
+from .infrastructure.config.settings import Settings
 from .di import (
     ThreadSafeContainer,
     _register_defaults,

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from robot_optimizer_core.config import Settings
+from robot_optimizer_core.infrastructure.config import Settings
 from robot_optimizer_core.di import reset_container
 from robot_optimizer_core.domain.value_objects import Finding, Severity
 from robot_optimizer_core.service import (

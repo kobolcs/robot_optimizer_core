@@ -55,7 +55,7 @@ from .exceptions import AnalysisError, RobotFileNotFoundError
 from .infrastructure.logging.adapter import get_logger, log_analysis_complete, log_analysis_start
 
 if TYPE_CHECKING:
-    from .config import Settings
+    from .infrastructure.config import Settings
     from .domain.value_objects.robot_ast import RobotImport, RobotKeyword, RobotTestCase
     from .infrastructure.metrics.collector import MetricsCollector
 

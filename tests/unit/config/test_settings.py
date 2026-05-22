@@ -8,7 +8,7 @@ from pathlib import Path
 import pydantic
 import pytest
 
-from robot_optimizer_core.config.settings import (
+from robot_optimizer_core.infrastructure.config.settings import (
     Settings,
     configure_settings,
     get_settings,

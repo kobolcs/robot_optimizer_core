@@ -14,7 +14,7 @@ from robot_optimizer_core.api import (
     analyze_directory,
     analyze_file,
 )
-from robot_optimizer_core.config import Settings
+from robot_optimizer_core.infrastructure.config import Settings
 from robot_optimizer_core.domain.value_objects import Finding
 from robot_optimizer_core.exceptions import AnalysisError
 
@@ -491,7 +491,7 @@ def test_load_test_files_logs_warning_on_bad_file(
 @pytest.mark.unit
 def test_get_analyzer_instances_passes_through_instance(tmp_path: Path) -> None:
     from robot_optimizer_core.api import _get_analyzer_instances
-    from robot_optimizer_core.config import Settings
+    from robot_optimizer_core.infrastructure.config import Settings
 
     class FakeAnalyzer:
         name = "fake"

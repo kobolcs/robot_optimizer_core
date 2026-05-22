@@ -88,9 +88,9 @@ class TestTelemetry:
         fire_telemetry_event("some_event", key="value")
 
     def test_register_handler_is_called(self) -> None:
-        import robot_optimizer_core.config.settings as settings_mod
+        import robot_optimizer_core.infrastructure.config.settings as settings_mod
         import robot_optimizer_core.premium as prem_mod
-        from robot_optimizer_core.config import Settings
+        from robot_optimizer_core.infrastructure.config import Settings
 
         calls: list[tuple[str, dict]] = []
 
@@ -108,9 +108,9 @@ class TestTelemetry:
             settings_mod._settings = old_settings
 
     def test_handler_exception_does_not_propagate(self) -> None:
-        import robot_optimizer_core.config.settings as settings_mod
+        import robot_optimizer_core.infrastructure.config.settings as settings_mod
         import robot_optimizer_core.premium as prem_mod
-        from robot_optimizer_core.config import Settings
+        from robot_optimizer_core.infrastructure.config import Settings
 
         def bad_handler(event: str, props: dict) -> None:
             raise RuntimeError("handler exploded")
@@ -158,7 +158,7 @@ class TestTelemetry:
             raise RuntimeError("boom")
 
         # Simulate get_settings raising
-        import robot_optimizer_core.config as conf_mod
+        import robot_optimizer_core.infrastructure.config as conf_mod
 
         monkeypatch.setattr(conf_mod, "get_settings", raise_error)
         try:
@@ -182,9 +182,9 @@ class TestTelemetry:
             prem_mod._telemetry_handler = old
 
     def test_fire_no_op_when_telemetry_enabled_but_handler_none(self) -> None:
-        import robot_optimizer_core.config.settings as settings_mod
+        import robot_optimizer_core.infrastructure.config.settings as settings_mod
         import robot_optimizer_core.premium as prem_mod
-        from robot_optimizer_core.config import Settings
+        from robot_optimizer_core.infrastructure.config import Settings
 
         old_handler = prem_mod._telemetry_handler
         old_settings = settings_mod._settings

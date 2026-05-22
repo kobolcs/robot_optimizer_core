@@ -33,7 +33,7 @@ class TestSleepDetectorSettingsCoupling:
 
     def test_no_config_reads_thresholds_from_settings(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import robot_optimizer_core.analyzers.sleep_detector as sleep_mod
-        from robot_optimizer_core.config import Settings
+        from robot_optimizer_core.infrastructure.config import Settings
 
         custom_settings = Settings(max_acceptable_sleep_seconds=3.0)
         monkeypatch.setattr(sleep_mod, "get_settings", lambda: custom_settings)
