@@ -423,7 +423,7 @@ def _register_defaults(container: ThreadSafeContainer) -> None:
     from .config import get_settings
     from .discovery import OptimizedFileDiscoveryService
     from .infrastructure.metrics.collector import get_metrics
-    from .parsers import RobotASTParser
+    from .infrastructure.parsers import RobotASTParser
 
     # Register core services as singletons
     container.register_singleton("settings", get_settings)

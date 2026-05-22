@@ -143,7 +143,7 @@ from .infrastructure.metrics.collector import (
 from .infrastructure.metrics.collector import (
     get_metrics as get_metrics,
 )
-from .parsers import RobotASTParser as RobotASTParser
+from .infrastructure.parsers import RobotASTParser as RobotASTParser
 
 # Plugin system
 from .plugin import Plugin, PluginMetadata

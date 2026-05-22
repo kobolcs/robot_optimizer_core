@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 from robot_optimizer_core.domain.entities.test_file import TestFile
-from robot_optimizer_core.parsers.robot_ast_parser import RobotASTParser
+from robot_optimizer_core.infrastructure.parsers.robot_ast_parser import RobotASTParser
 
 
 def _make_file(content: str, path: Path = Path("suite.robot")) -> TestFile:

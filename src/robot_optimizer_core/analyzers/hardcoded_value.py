@@ -17,7 +17,7 @@ else:
 
 from ..domain.entities import TestFile
 from ..domain.value_objects import Finding, Location, Pattern, PatternType, Severity
-from ..parsers.robot_ast_parser import RobotASTParser
+from ..infrastructure.parsers.robot_ast_parser import RobotASTParser
 from .base import BaseAnalyzer, ConfigValue
 
 __all__ = ["HardcodedValueAnalyzer"]

@@ -44,7 +44,7 @@ from ..domain.value_objects import (
 )
 from ..domain.value_objects.robot_ast import KeywordCall
 from ..exceptions import ConfigurationError
-from ..parsers.robot_ast_parser import RobotASTParser
+from ..infrastructure.parsers.robot_ast_parser import RobotASTParser
 from .base import BaseAnalyzer, ConfigValue
 
 __all__ = ["SleepDetector", "SleepDetectorAnalyzer", "get_settings"]

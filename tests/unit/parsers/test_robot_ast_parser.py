@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from robot_optimizer_core.domain.entities.test_file import TestFile
-from robot_optimizer_core.parsers.robot_ast_parser import RobotASTParser
+from robot_optimizer_core.infrastructure.parsers.robot_ast_parser import RobotASTParser
 
 
 def _make_file(content: str, path: Path = Path("suite.robot")) -> TestFile:
@@ -247,7 +247,7 @@ class TestParseErrorFallback:
             raise RuntimeError("parse failed")
 
         monkeypatch.setattr(
-            "robot_optimizer_core.parsers.robot_ast_parser.get_model", _raise
+            "robot_optimizer_core.infrastructure.parsers.robot_ast_parser.get_model", _raise
         )
         parser = RobotASTParser()
         suite = parser.parse_suite(_make_file("*** Test Cases ***"))
