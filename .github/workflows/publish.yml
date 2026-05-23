@@ -76,6 +76,49 @@ jobs:
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
 
+  changelog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Check if version section already exists in CHANGELOG.md
+        id: check
+        run: |
+          if grep -qF "## [${{ steps.version.outputs.version }}]" CHANGELOG.md; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install git-cliff
+        if: steps.check.outputs.exists == 'false'
+        run: pip install git-cliff  # NOSONAR
+
+      - name: Generate changelog section for ${{ github.ref_name }}
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          git-cliff --tag "${{ github.ref_name }}" --unreleased --prepend CHANGELOG.md
+
+      - name: Commit updated CHANGELOG.md
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git commit -m "chore(release): update CHANGELOG.md for ${{ github.ref_name }}"
+          git push origin HEAD:master
+
   publish-testpypi-dry-run:
     needs: build
     runs-on: ubuntu-latest
