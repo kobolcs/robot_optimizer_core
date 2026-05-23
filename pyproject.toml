@@ -177,6 +177,7 @@ markers = [
     "unit: Unit tests - fast and isolated",
     "integration: Integration tests - component interactions",
     "component: Component tests - multi-component workflows",
+    "functional: Black-box functional tests against the installed CLI",
     "slow: Tests that take significant time",
     "performance: Performance benchmarks",
 ]
