@@ -138,21 +138,29 @@ def _write_output(all_findings: list[Finding], args: argparse.Namespace) -> int:
     return _EXIT_OK
 
 
+_WATCH_MAX_FILES_WARN = 500
+
+
+def _flatten_state(state: dict[Path, list[Finding]]) -> list[Finding]:
+    """Flatten per-file state dict into a single ordered list."""
+    return [f for findings in state.values() for f in findings]
+
+
 def _compute_finding_diff(
     prev_findings: list[Finding], curr_findings: list[Finding]
 ) -> tuple[list[Finding], list[Finding]]:
     """Compute new and resolved findings between two analysis runs.
 
+    Uses ``Finding.fingerprint`` as the stable identity key — the same hash
+    used by baseline diffing — so the two mechanisms stay consistent.
+
     Returns a tuple of (new_findings, resolved_findings).
     """
-    prev_set = {(f.location.file_path, f.location.line, f.pattern.type) for f in prev_findings}
-    curr_set = {(f.location.file_path, f.location.line, f.pattern.type) for f in curr_findings}
+    prev_fps = {f.fingerprint for f in prev_findings}
+    curr_fps = {f.fingerprint for f in curr_findings}
 
-    new_keys = curr_set - prev_set
-    resolved_keys = prev_set - curr_set
-
-    new_findings = [f for f in curr_findings if (f.location.file_path, f.location.line, f.pattern.type) in new_keys]
-    resolved_findings = [f for f in prev_findings if (f.location.file_path, f.location.line, f.pattern.type) in resolved_keys]
+    new_findings = [f for f in curr_findings if f.fingerprint not in prev_fps]
+    resolved_findings = [f for f in prev_findings if f.fingerprint not in curr_fps]
 
     return new_findings, resolved_findings
 
@@ -175,6 +183,9 @@ def _print_watch_diff(new_findings: list[Finding], resolved_findings: list[Findi
             print(f"  ✓ {f.location.file_path}:{f.location.line} - {f.pattern.name}", file=sys.stderr)
 
 
+_WATCHED_EXTENSIONS = frozenset({".robot", ".resource"})
+
+
 def _run_watch_mode(
     path: Path,
     analyzer_names: list[str | BaseAnalyzer] | None,
@@ -182,11 +193,19 @@ def _run_watch_mode(
     severity_filter: Severity | None,
     args: argparse.Namespace,
 ) -> int:
-    """Run in watch mode: monitor files and re-analyze on changes."""
+    """Run in watch mode: monitor files and re-analyze on changes.
+
+    State is kept as a ``dict[Path, list[Finding]]`` so that a change to one
+    file never corrupts findings from other files.  Every event snapshots the
+    full prev state, applies the per-file update, then diffs against the new
+    full state — keeping scope consistent across all event types.
+    """
     try:
         from watchdog.events import (
             DirModifiedEvent,
+            FileDeletedEvent,
             FileModifiedEvent,
+            FileMovedEvent,
             FileSystemEventHandler,
         )
         from watchdog.observers import Observer
@@ -197,50 +216,109 @@ def _run_watch_mode(
         )
         return _EXIT_ERROR
 
-    # Initial analysis
+    # ------------------------------------------------------------------ init
     print(f"[*] Watching {path} for changes (Ctrl+C to exit)...", file=sys.stderr)
-    prev_findings, _ = _analyze_path(path, analyzer_names, settings, severity_filter, use_cache=True)
-    if prev_findings is None:
+
+    # Build per-file state from the initial scan so we never start with a
+    # scope mismatch between a directory's files.
+    state: dict[Path, list[Finding]] = {}
+    if path.is_dir():
+        from ..public_api import analyze_directory as _analyze_dir
+
+        try:
+            dir_result = _analyze_dir(
+                path,
+                analyzers=analyzer_names,
+                settings=settings,
+                min_severity=severity_filter,
+                error_handling="warn",
+                use_cache=True,
+            )
+            state = dict(dir_result.findings)
+        except Exception as exc:
+            print(f"error: initial analysis failed: {exc}", file=sys.stderr)
+            return _EXIT_ERROR
+    elif path.is_file():
+        file_findings, _ = _analyze_path(path, analyzer_names, settings, severity_filter, use_cache=True)
+        if file_findings is None:
+            return _EXIT_ERROR
+        state = {path: file_findings}
+    else:
+        print(f"error: path does not exist: {path}", file=sys.stderr)
         return _EXIT_ERROR
 
-    current_findings = prev_findings.copy()
+    if len(state) > _WATCH_MAX_FILES_WARN:
+        print(
+            f"[!] Watching {len(state)} files — consider narrowing the path for faster diffs",
+            file=sys.stderr,
+        )
+
     should_exit = False
+
+    def _decode_path(raw: str | bytes) -> Path:
+        if isinstance(raw, bytes):
+            return Path(raw.decode("utf-8"))
+        return Path(raw)
 
     class FileChangeHandler(FileSystemEventHandler):
         def on_modified(self, event: FileModifiedEvent | DirModifiedEvent) -> None:
-            nonlocal current_findings, prev_findings, should_exit
+            nonlocal should_exit
             if event.is_directory:
                 return
-
-            src_path = event.src_path
-            if isinstance(src_path, bytes):
-                src_path = src_path.decode("utf-8")
-            file_path = Path(src_path)
-            if file_path.suffix not in (".robot", ".resource"):
+            file_path = _decode_path(event.src_path)
+            if file_path.suffix not in _WATCHED_EXTENSIONS:
                 return
 
-            # Debounce: skip if file was just written (wait for stable state)
-            time.sleep(0.1)
+            time.sleep(0.1)  # debounce
 
-            # Re-analyze the changed file
             print(f"\n[*] File changed: {file_path}", file=sys.stderr)
+            prev_flat = _flatten_state(state)
             findings, _ = _analyze_path(file_path, analyzer_names, settings, severity_filter, use_cache=False)
-            if findings is not None:
-                new_findings, resolved_findings = _compute_finding_diff(current_findings, findings)
-                _print_watch_diff(new_findings, resolved_findings)
-                current_findings = findings
+            if findings is None:
+                return  # analysis error — keep previous state intact
+            state[file_path] = findings
+            curr_flat = _flatten_state(state)
+            new_f, resolved_f = _compute_finding_diff(prev_flat, curr_flat)
+            _print_watch_diff(new_f, resolved_f)
+
+        def on_deleted(self, event: FileDeletedEvent) -> None:
+            if event.is_directory:
+                return
+            file_path = _decode_path(event.src_path)
+            if file_path not in state:
+                return
+
+            print(f"\n[*] File deleted: {file_path}", file=sys.stderr)
+            prev_flat = _flatten_state(state)
+            state.pop(file_path)
+            curr_flat = _flatten_state(state)
+            new_f, resolved_f = _compute_finding_diff(prev_flat, curr_flat)
+            _print_watch_diff(new_f, resolved_f)
+
+        def on_moved(self, event: FileMovedEvent) -> None:
+            src = _decode_path(event.src_path)
+            dest = _decode_path(event.dest_path)
+            if src.suffix not in _WATCHED_EXTENSIONS and dest.suffix not in _WATCHED_EXTENSIONS:
+                return
+
+            print(f"\n[*] File moved: {src} → {dest}", file=sys.stderr)
+            prev_flat = _flatten_state(state)
+            state.pop(src, None)
+            if dest.suffix in _WATCHED_EXTENSIONS:
+                findings, _ = _analyze_path(dest, analyzer_names, settings, severity_filter, use_cache=False)
+                state[dest] = findings if findings is not None else []
+            curr_flat = _flatten_state(state)
+            new_f, resolved_f = _compute_finding_diff(prev_flat, curr_flat)
+            _print_watch_diff(new_f, resolved_f)
 
     def handle_signal(signum: int, frame: object) -> None:
         nonlocal should_exit
         should_exit = True
 
-    # Set up signal handler for Ctrl+C
     signal.signal(signal.SIGINT, handle_signal)
 
-    # Set up file system observer
     observer = Observer()
-    event_handler = FileChangeHandler()
-    observer.schedule(event_handler, str(path), recursive=True)
+    observer.schedule(FileChangeHandler(), str(path), recursive=True)
     observer.start()
 
     try:

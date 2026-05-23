@@ -18,6 +18,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Watch mode scope correctness: `_run_watch_mode` now maintains state as `dict[Path, list[Finding]]`
+  instead of a flat `list[Finding]`. Previously, re-analysing a single changed file replaced the
+  entire N-file state, causing all subsequent diffs to compare wrong scopes (false "resolved" for
+  every other file's findings, false "new" for the next changed file). Each event now snapshots the
+  full prev state, applies its per-file update, and diffs against the new full state — keeping scope
+  consistent across modified, deleted, and moved events.
+- Watch mode diff key switched from `(file_path, line, pattern_type)` to `Finding.fingerprint`
+  (the same SHA-256-based stable identity used by baseline diffing), making the two mechanisms
+  consistent and catching same-location findings that differ only in message.
+- Watch mode now handles `FileDeletedEvent` and `FileMovedEvent` in addition to `FileModifiedEvent`.
+  Deleted files are removed from state (all their findings become resolved); moved/renamed files
+  remove the old entry and analyse the destination (findings at the new path appear as new).
+- Watch mode: analysis error on a changed file no longer corrupts global state — the previous
+  per-file entry is kept intact and the event is silently skipped.
+
 - Cache correctness: severity filter now applied **after** cache writes so the cache always stores
   full findings; a subsequent filtered run no longer receives truncated cached results.
 - Cache correctness: analyzer scope (e.g. `--analyzers sleep_detector`) is now encoded in the
