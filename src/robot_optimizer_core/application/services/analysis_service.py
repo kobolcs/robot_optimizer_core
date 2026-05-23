@@ -324,7 +324,7 @@ class AnalysisService:
         self._cache: IAnalysisCache | None = cache
 
     @classmethod
-    def from_container(cls) -> "AnalysisService":
+    def from_container(cls) -> AnalysisService:
         """Construct the service by resolving all dependencies from the global container."""
         from ...composition.container import get_container
         container = get_container()
@@ -527,11 +527,11 @@ class AnalysisService:
         fail_fast: bool,
         error_handling: ErrorHandling,
         max_workers: int | None,
-        metrics: Any,
+        metrics: IMetrics,
         use_cache: bool,
         min_severity: Severity | None = None,
         analyzer_names: list[str] | None = None,
-    ) -> Any:
+    ) -> DirectoryResults:
         """Execute directory analysis: discovery, cache, thread pool, metrics, errors."""
         resolved_patterns = patterns or settings.file_patterns
         resolved_excludes = exclude_patterns or settings.exclude_patterns

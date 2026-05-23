@@ -518,8 +518,10 @@ def test_load_test_files_logs_warning_on_bad_file(
     monkeypatch.setattr(_api_mod.TestFile, "from_path", lambda p: (_ for _ in ()).throw(RuntimeError("bad")))
     from robot_optimizer_core.entrypoints.public_api import _load_test_files
 
-    result = _load_test_files([tmp_path / "f.robot"])
-    assert result == []
+    test_files, load_errors = _load_test_files([tmp_path / "f.robot"])
+    assert test_files == []
+    assert len(load_errors) == 1
+    assert isinstance(load_errors[0][1], RuntimeError)
 
 
 @pytest.mark.unit

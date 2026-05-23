@@ -37,18 +37,19 @@ import time
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
-    Any,
     cast,
 )
 
 from ..application.analyzers import BaseAnalyzer, SuiteAwareAnalyzer
-from ..application.services.analysis_service import DirectoryResults
+from ..application.services.analysis_service import AnalysisService, DirectoryResults
 from ..composition.container import get_container
 from ..domain.entities import TestFile
 from ..domain.value_objects.results import AnalysisMeta, FileAnalysisResult
 from ..exceptions import AnalysisError, RobotFileNotFoundError
 
 if TYPE_CHECKING:
+    from ..domain.ports.file_discovery import IFileDiscovery
+    from ..domain.ports.parser import IParser
     from ..domain.value_objects import Finding, Severity
     from ..domain.value_objects.robot_ast import (
         RobotImport,
@@ -135,7 +136,7 @@ def _str_analyzer_names(
     return names or None
 
 
-def _get_or_build_service() -> Any:
+def _get_or_build_service() -> AnalysisService:
     """Build an AnalysisService wired via the composition context."""
     from ..composition.context import get_analysis_service
 
@@ -310,23 +311,30 @@ def analyze_directory(
     )
 
 
-def _load_test_files(files: list[Path]) -> list[TestFile]:
-    """Load TestFile objects from file paths."""
+def _load_test_files(
+    files: list[Path],
+) -> tuple[list[TestFile], list[tuple[Path, Exception]]]:
+    """Load TestFile objects from file paths.
+
+    Returns a (test_files, load_errors) tuple so callers can surface failures
+    instead of silently dropping them.
+    """
     test_files: list[TestFile] = []
+    load_errors: list[tuple[Path, Exception]] = []
     for file_path in files:
         try:
-            tf = TestFile.from_path(file_path)
-            test_files.append(tf)
+            test_files.append(TestFile.from_path(file_path))
         except Exception as e:
             logger.warning(
                 f"Failed to load file for suite analysis: {file_path}",
                 extra={"error": str(e)},
             )
-    return test_files
+            load_errors.append((file_path, e))
+    return test_files, load_errors
 
 
 def _gather_suite_structure(
-    test_files: list[TestFile], parser: Any
+    test_files: list[TestFile], parser: IParser
 ) -> tuple[SuiteInfo, list[Path]]:
     """Parse and gather suite structure information."""
     suite_info = SuiteInfo(files=len(test_files))
@@ -446,18 +454,15 @@ def analyze_suite(
     if path.is_file():
         files: list[Path] = [path]
     else:
-        discovery: Any = container.resolve("file_discovery")
+        discovery: IFileDiscovery = container.resolve("file_discovery")
         files = discovery.find_files(path)
 
-    parser: Any = container.resolve("parser")
-    test_files = _load_test_files(files)
+    parser: IParser = container.resolve("parser")
+    test_files, load_errors = _load_test_files(files)
     suite_info, parse_failed_paths = _gather_suite_structure(test_files, parser)
 
-    if parse_failed_paths:
-        failed_set = set(parse_failed_paths)
-        test_files_for_suite = [tf for tf in test_files if tf.path not in failed_set]
-    else:
-        test_files_for_suite = test_files
+    failed_set = {p for p, _ in load_errors} | set(parse_failed_paths)
+    test_files_for_suite = [tf for tf in test_files if tf.path not in failed_set] if failed_set else test_files
 
     if settings is None:
         settings = container.resolve("settings")
@@ -472,7 +477,7 @@ def analyze_suite(
         else:
             other_analyzers.append(a)
 
-    all_findings, file_findings, suite_errors = _analyze_with_other_analyzers(
+    all_findings, file_findings, analyze_errors = _analyze_with_other_analyzers(
         test_files, other_analyzers
     )
     for _suite_analyzer in suite_aware_analyzers:
@@ -492,5 +497,5 @@ def analyze_suite(
         file_findings=file_findings,
         suite_info=suite_info,
         statistics=statistics,
-        errors=suite_errors,
+        errors=load_errors + analyze_errors,
     )

@@ -186,6 +186,88 @@ def _print_watch_diff(new_findings: list[Finding], resolved_findings: list[Findi
 _WATCHED_EXTENSIONS = frozenset({".robot", ".resource"})
 _WATCH_DEBOUNCE_SECONDS: float = 0.5  # editors may write in multiple steps (save + format)
 
+try:
+    from watchdog.events import FileSystemEventHandler as _FileSystemEventHandler
+except ImportError:  # pragma: no cover — watchdog is optional
+    class _FileSystemEventHandler:  # type: ignore[no-redef]
+        pass
+
+
+class _FileChangeHandler(_FileSystemEventHandler):
+    """Watchdog event handler for watch mode.
+
+    Encapsulates per-file state and analysis callbacks so it can be constructed
+    and tested independently of the observer loop.
+    """
+
+    def __init__(
+        self,
+        state: dict[Path, list[Finding]],
+        analyzer_names: list[str | BaseAnalyzer] | None,
+        settings: Settings | None,
+        severity_filter: Severity | None,
+    ) -> None:
+        super().__init__()
+        self._state = state
+        self._analyzer_names = analyzer_names
+        self._settings = settings
+        self._severity_filter = severity_filter
+
+    @staticmethod
+    def _decode_path(raw: str | bytes) -> Path:
+        if isinstance(raw, bytes):
+            return Path(raw.decode("utf-8"))
+        return Path(raw)
+
+    def on_modified(self, event: object) -> None:
+        if getattr(event, "is_directory", False):
+            return
+        file_path = self._decode_path(event.src_path)  # type: ignore[union-attr]
+        if file_path.suffix not in _WATCHED_EXTENSIONS:
+            return
+
+        time.sleep(_WATCH_DEBOUNCE_SECONDS)
+
+        print(f"\n[*] File changed: {file_path}", file=sys.stderr)
+        prev_flat = _flatten_state(self._state)
+        findings, _ = _analyze_path(file_path, self._analyzer_names, self._settings, self._severity_filter, use_cache=False)
+        if findings is None:
+            return
+        self._state[file_path] = findings
+        curr_flat = _flatten_state(self._state)
+        new_f, resolved_f = _compute_finding_diff(prev_flat, curr_flat)
+        _print_watch_diff(new_f, resolved_f)
+
+    def on_deleted(self, event: object) -> None:
+        if getattr(event, "is_directory", False):
+            return
+        file_path = self._decode_path(event.src_path)  # type: ignore[union-attr]
+        if file_path not in self._state:
+            return
+
+        print(f"\n[*] File deleted: {file_path}", file=sys.stderr)
+        prev_flat = _flatten_state(self._state)
+        self._state.pop(file_path)
+        curr_flat = _flatten_state(self._state)
+        new_f, resolved_f = _compute_finding_diff(prev_flat, curr_flat)
+        _print_watch_diff(new_f, resolved_f)
+
+    def on_moved(self, event: object) -> None:
+        src = self._decode_path(event.src_path)  # type: ignore[union-attr]
+        dest = self._decode_path(event.dest_path)  # type: ignore[union-attr]
+        if src.suffix not in _WATCHED_EXTENSIONS and dest.suffix not in _WATCHED_EXTENSIONS:
+            return
+
+        print(f"\n[*] File moved: {src} → {dest}", file=sys.stderr)
+        prev_flat = _flatten_state(self._state)
+        self._state.pop(src, None)
+        if dest.suffix in _WATCHED_EXTENSIONS:
+            findings, _ = _analyze_path(dest, self._analyzer_names, self._settings, self._severity_filter, use_cache=False)
+            self._state[dest] = findings if findings is not None else []
+        curr_flat = _flatten_state(self._state)
+        new_f, resolved_f = _compute_finding_diff(prev_flat, curr_flat)
+        _print_watch_diff(new_f, resolved_f)
+
 
 def _run_watch_mode(
     path: Path,
@@ -202,13 +284,6 @@ def _run_watch_mode(
     full state — keeping scope consistent across all event types.
     """
     try:
-        from watchdog.events import (
-            DirModifiedEvent,
-            FileDeletedEvent,
-            FileModifiedEvent,
-            FileMovedEvent,
-            FileSystemEventHandler,
-        )
         from watchdog.observers import Observer
     except ImportError:
         print(
@@ -256,70 +331,15 @@ def _run_watch_mode(
 
     should_exit = False
 
-    def _decode_path(raw: str | bytes) -> Path:
-        if isinstance(raw, bytes):
-            return Path(raw.decode("utf-8"))
-        return Path(raw)
-
-    class FileChangeHandler(FileSystemEventHandler):
-        def on_modified(self, event: FileModifiedEvent | DirModifiedEvent) -> None:
-            nonlocal should_exit
-            if event.is_directory:
-                return
-            file_path = _decode_path(event.src_path)
-            if file_path.suffix not in _WATCHED_EXTENSIONS:
-                return
-
-            time.sleep(_WATCH_DEBOUNCE_SECONDS)
-
-            print(f"\n[*] File changed: {file_path}", file=sys.stderr)
-            prev_flat = _flatten_state(state)
-            findings, _ = _analyze_path(file_path, analyzer_names, settings, severity_filter, use_cache=False)
-            if findings is None:
-                return  # analysis error — keep previous state intact
-            state[file_path] = findings
-            curr_flat = _flatten_state(state)
-            new_f, resolved_f = _compute_finding_diff(prev_flat, curr_flat)
-            _print_watch_diff(new_f, resolved_f)
-
-        def on_deleted(self, event: FileDeletedEvent) -> None:
-            if event.is_directory:
-                return
-            file_path = _decode_path(event.src_path)
-            if file_path not in state:
-                return
-
-            print(f"\n[*] File deleted: {file_path}", file=sys.stderr)
-            prev_flat = _flatten_state(state)
-            state.pop(file_path)
-            curr_flat = _flatten_state(state)
-            new_f, resolved_f = _compute_finding_diff(prev_flat, curr_flat)
-            _print_watch_diff(new_f, resolved_f)
-
-        def on_moved(self, event: FileMovedEvent) -> None:
-            src = _decode_path(event.src_path)
-            dest = _decode_path(event.dest_path)
-            if src.suffix not in _WATCHED_EXTENSIONS and dest.suffix not in _WATCHED_EXTENSIONS:
-                return
-
-            print(f"\n[*] File moved: {src} → {dest}", file=sys.stderr)
-            prev_flat = _flatten_state(state)
-            state.pop(src, None)
-            if dest.suffix in _WATCHED_EXTENSIONS:
-                findings, _ = _analyze_path(dest, analyzer_names, settings, severity_filter, use_cache=False)
-                state[dest] = findings if findings is not None else []
-            curr_flat = _flatten_state(state)
-            new_f, resolved_f = _compute_finding_diff(prev_flat, curr_flat)
-            _print_watch_diff(new_f, resolved_f)
-
     def handle_signal(signum: int, frame: object) -> None:
         nonlocal should_exit
         should_exit = True
 
     signal.signal(signal.SIGINT, handle_signal)
 
+    handler = _FileChangeHandler(state, analyzer_names, settings, severity_filter)
     observer = Observer()
-    observer.schedule(FileChangeHandler(), str(path), recursive=True)
+    observer.schedule(handler, str(path), recursive=True)
     observer.start()
 
     try:
