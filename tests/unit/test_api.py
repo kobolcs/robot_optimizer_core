@@ -538,3 +538,164 @@ def test_analyze_directory_with_metrics_passed(tmp_path: Path) -> None:
         analyze_directory(tmp_path, metrics=m)
     finally:
         m.stop()
+
+
+@pytest.mark.unit
+def test_analyze_file_with_both_settings_and_metrics_skips_container(
+    tmp_path: Path,
+) -> None:
+    from robot_optimizer_core.infrastructure.config import Settings
+    from robot_optimizer_core.infrastructure.metrics.collector import MetricsCollector
+
+    rf = tmp_path / "t.robot"
+    rf.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+    m = MetricsCollector(enabled=False)
+    try:
+        result = analyze_file(rf, settings=Settings(), metrics=m)
+    finally:
+        m.stop()
+    assert isinstance(result, FileAnalysisResult)
+
+
+@pytest.mark.unit
+def test_analyze_file_with_only_settings_resolves_metrics_from_container(
+    tmp_path: Path,
+) -> None:
+    from robot_optimizer_core.infrastructure.config import Settings
+
+    rf = tmp_path / "t.robot"
+    rf.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+    result = analyze_file(rf, settings=Settings())
+    assert isinstance(result, FileAnalysisResult)
+
+
+@pytest.mark.unit
+def test_analyze_one_file_with_metrics_reraises_analysis_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import robot_optimizer_core.entrypoints.public_api as _api_mod
+    from robot_optimizer_core.infrastructure.config import Settings
+    from robot_optimizer_core.infrastructure.metrics.collector import MetricsCollector
+
+    rf = tmp_path / "t.robot"
+    rf.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+
+    def boom(*a, **kw):
+        raise AnalysisError("forced")
+
+    monkeypatch.setattr(_api_mod, "analyze_file", boom)
+    m = MetricsCollector(enabled=False)
+    try:
+        with pytest.raises(AnalysisError):
+            _analyze_one_file(rf, None, Settings(), m, None)
+    finally:
+        m.stop()
+
+
+@pytest.mark.unit
+def test_analyze_directory_with_settings_skips_settings_resolution(
+    tmp_path: Path,
+) -> None:
+    from robot_optimizer_core.infrastructure.config import Settings
+
+    f = tmp_path / "t.robot"
+    f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+    result = analyze_directory(tmp_path, settings=Settings())
+    assert result is not None
+
+
+@pytest.mark.unit
+def test_gather_suite_structure_handles_parse_failure(tmp_path: Path) -> None:
+    from unittest.mock import MagicMock
+
+    from robot_optimizer_core.domain.entities.test_file import TestFile
+    from robot_optimizer_core.entrypoints.public_api import _gather_suite_structure
+
+    rf = tmp_path / "t.robot"
+    rf.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+    tf = TestFile.from_path(rf)
+
+    parser = MagicMock()
+    parser.parse_suite.side_effect = RuntimeError("parse boom")
+
+    suite_info, failed_paths = _gather_suite_structure([tf], parser)
+    assert rf in failed_paths
+    assert suite_info.files == 1
+
+
+@pytest.mark.unit
+def test_analyze_with_other_analyzers_exception_path(tmp_path: Path) -> None:
+    from robot_optimizer_core.domain.entities.test_file import TestFile
+    from robot_optimizer_core.entrypoints.public_api import _analyze_with_other_analyzers
+
+    rf = tmp_path / "t.robot"
+    rf.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+    tf = TestFile.from_path(rf)
+
+    class BoomAnalyzer:
+        name = "boom"
+
+        def safe_analyze(self, f: object) -> list:
+            raise RuntimeError("analyzer exploded")
+
+    all_findings, file_findings, errors = _analyze_with_other_analyzers([tf], [BoomAnalyzer()])
+    assert len(errors) == 1
+    assert errors[0][0] == rf
+
+
+@pytest.mark.unit
+def test_run_suite_analysis_with_no_analyzer_is_noop(tmp_path: Path) -> None:
+    from robot_optimizer_core.entrypoints.public_api import _run_suite_analysis
+
+    _run_suite_analysis(None, [], [], {})
+
+
+@pytest.mark.unit
+def test_analyze_suite_with_min_severity_filter(tmp_path: Path) -> None:
+    from robot_optimizer_core.domain.value_objects.severity import Severity
+    from robot_optimizer_core.entrypoints.public_api import analyze_suite
+
+    f = tmp_path / "suite.robot"
+    f.write_bytes(b"*** Test Cases ***\nT\n    Sleep    5s\n")
+    result = analyze_suite(f, min_severity=Severity.ERROR)
+    assert isinstance(result.findings, list)
+
+
+@pytest.mark.unit
+def test_analyze_suite_with_explicit_settings(tmp_path: Path) -> None:
+    from robot_optimizer_core.entrypoints.public_api import analyze_suite
+    from robot_optimizer_core.infrastructure.config import Settings
+
+    f = tmp_path / "suite.robot"
+    f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+    result = analyze_suite(f, settings=Settings())
+    assert isinstance(result.findings, list)
+
+
+@pytest.mark.unit
+def test_analyze_suite_with_parse_failure_excludes_failed_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import robot_optimizer_core.entrypoints.public_api as _api_mod
+    from robot_optimizer_core.entrypoints.public_api import analyze_suite
+
+    f = tmp_path / "suite.robot"
+    f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+
+    original = _api_mod._gather_suite_structure
+
+    def patched(test_files, parser):
+        suite_info, _ = original(test_files, parser)
+        return suite_info, [f]
+
+    monkeypatch.setattr(_api_mod, "_gather_suite_structure", patched)
+    result = analyze_suite(f)
+    assert isinstance(result.findings, list)
+
+
+@pytest.mark.unit
+def test_infrastructure_getattr_raises_for_unknown_name() -> None:
+    import robot_optimizer_core.infrastructure as infra
+
+    with pytest.raises(AttributeError, match="no attribute"):
+        _ = infra.NonExistent  # type: ignore[attr-defined]

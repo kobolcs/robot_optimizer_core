@@ -173,6 +173,37 @@ class TestUpgradePremiumInstalled:
 
 
 # ---------------------------------------------------------------------------
+# diagnose subcommand
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestDiagnoseCommand:
+    def test_diagnose_exits_zero(self, capsys: pytest.CaptureFixture[str]) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main(["diagnose"])
+        assert exc.value.code == 0
+        out = capsys.readouterr().out
+        assert out.strip().startswith("{")
+
+    def test_ensure_utf8_streams_skips_non_reconfigurable_stream(self) -> None:
+        from robot_optimizer_core.entrypoints.cli import _ensure_utf8_streams
+
+        class _NoReconfigure:
+            pass
+
+        original_stdout = sys.stdout
+        original_stderr = sys.stderr
+        try:
+            sys.stdout = _NoReconfigure()  # type: ignore[assignment]
+            sys.stderr = _NoReconfigure()  # type: ignore[assignment]
+            _ensure_utf8_streams()  # must not raise
+        finally:
+            sys.stdout = original_stdout
+            sys.stderr = original_stderr
+
+
+# ---------------------------------------------------------------------------
 # _run_list_analyzers: error path and no-tags branch
 # ---------------------------------------------------------------------------
 

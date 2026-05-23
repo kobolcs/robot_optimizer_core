@@ -29,7 +29,7 @@ from enum import IntEnum
 
 if sys.version_info >= (3, 12):
     from typing import override
-else:
+else:  # pragma: no cover
     from typing_extensions import override
 
 
@@ -91,6 +91,8 @@ class Severity(IntEnum):
                 return "⚠️"
             case Severity.INFO:
                 return "\N{INFORMATION SOURCE}\N{VARIATION SELECTOR-16}"
+            case _:  # pragma: no cover
+                raise AssertionError(self)
 
     @property
     def color(self) -> str:
@@ -108,6 +110,8 @@ class Severity(IntEnum):
                 return "yellow"
             case Severity.INFO:
                 return "blue"
+            case _:  # pragma: no cover
+                raise AssertionError(self)
 
     @property
     def ansi_code(self) -> str:
@@ -123,6 +127,8 @@ class Severity(IntEnum):
                 return "\033[93m"  # Bright yellow
             case Severity.INFO:
                 return "\033[94m"  # Bright blue
+            case _:  # pragma: no cover
+                raise AssertionError(self)
 
     @property
     def priority(self) -> int:
@@ -160,6 +166,8 @@ class Severity(IntEnum):
                     "Minor improvements and suggestions that can enhance "
                     "test suite quality"
                 )
+            case _:  # pragma: no cover
+                raise AssertionError(self)
 
     @property
     def exit_code(self) -> int:
@@ -178,6 +186,8 @@ class Severity(IntEnum):
                 return 1  # Warnings found
             case Severity.INFO:
                 return 0  # Only info, success
+            case _:  # pragma: no cover
+                raise AssertionError(self)
 
     @classmethod
     def from_string(cls, value: str) -> Severity:

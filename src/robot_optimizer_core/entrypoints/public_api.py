@@ -137,7 +137,7 @@ def _create_analyzer_instance(
     """Create a fresh analyzer instance, injecting per-analyzer config when provided."""
     registry = get_container().resolve("analyzer_registry")
     cls = registry.analyzers.get(name)
-    if cls is None:
+    if cls is None:  # pragma: no cover
         return cast("BaseAnalyzer", registry.create(name))
     return cast("BaseAnalyzer", cls(config=config or {}))
 

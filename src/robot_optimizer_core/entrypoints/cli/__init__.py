@@ -89,7 +89,7 @@ def main(argv: list[str] | None = None) -> NoReturn:
             code = _run_upgrade(args)
         case "diagnose":
             code = _run_diagnose(args)
-        case _:
+        case _:  # pragma: no cover
             parser.print_help()
             code = _EXIT_ERROR
 
