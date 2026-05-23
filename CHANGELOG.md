@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `refactor`: 25-issue maintainability pass across core domain, service layer, and CLI:
+  - `Location`: removed custom `__init__` (all callers use keyword args); collapsed two
+    `field_validator` validators into a single `model_validator(mode="after")`; rewrote
+    `contains()` with tuple interval arithmetic (5 lines, replacing 30); fixed two trailing-colon
+    bugs in `range_str` output.
+  - `Finding`: removed `model_dump()` override that incorrectly returned live Python objects
+    instead of Pydantic-standard primitives; documented three-level identity hierarchy
+    (`__eq__`/`__hash__`, `fingerprint`, `BaselineKey`).
+  - `Baseline`: keys are now SHA-256 `fingerprint` strings (stable cross-run identity) instead
+    of `(relative_file_path, pattern_type_name, line)` tuples; legacy format read-compatible
+    via synthetic `legacy:…` keys; both `save_baseline` and `load_baseline` accept an explicit
+    `base: Path` for hermetic testing without monkeypatching.
+  - `AnalysisService`: constructor now requires all dependencies explicitly (`settings`,
+    `metrics`, `file_discovery`, `registry`); `from_container()` classmethod is the wiring
+    point; `analyze_file` exception narrowed from bare `except Exception` to
+    `except (AnalysisError, RobotFileNotFoundError)`.
+  - `public_api.analyze_file` / `analyze_suite`: removed ~80-line duplicate analysis pipeline;
+    both now delegate to `service._run_file_analysis()` and `service._get_analyzer_instances()`.
+  - `run_directory_analysis`: return type corrected from `Any` to `DirectoryResults`; `metrics`
+    param typed as `IMetrics`; `IFileDiscovery` and `IParser` replace `Any` for `discovery`
+    and `parser` container resolves in `analyze_suite`; `Any` removed from `public_api` imports.
+  - `_load_test_files`: now returns `(list[TestFile], list[tuple[Path, Exception]])` so load
+    failures are surfaced in `SuiteAnalysisResult.errors` instead of being silently dropped.
+  - `_FileChangeHandler`: extracted from nested class inside `_run_watch_mode` to module level;
+    inherits from `watchdog.FileSystemEventHandler` via optional `try/except` import at module
+    scope; `_run_watch_mode` body reduced by ~50 lines.
 - `perf`: moved 79 type-annotation-only imports under `if TYPE_CHECKING:` across 30 source files
   (TC001/TC003), eliminating redundant runtime import overhead with no behaviour change.
   `[tool.ruff.lint.flake8-type-checking] runtime-evaluated-base-classes` added to pyproject.toml
