@@ -29,11 +29,11 @@ class TestParseTsFunction:
         assert ts.tzinfo is not None
 
     def test_raises_for_non_string(self) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Expected ISO-8601 string"):
             _parse_ts(12345)  # type: ignore[arg-type]
 
     def test_raises_for_none(self) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Expected ISO-8601 string"):
             _parse_ts(None)  # type: ignore[arg-type]
 
 

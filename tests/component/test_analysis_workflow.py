@@ -10,6 +10,7 @@ component boundary.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
@@ -30,7 +31,7 @@ from robot_optimizer_core.exceptions import AnalysisError
 class TestApplicationContextAnalyzerCoverage:
     """All 8 built-in analyzers must be available through ApplicationContext."""
 
-    EXPECTED = {
+    EXPECTED: ClassVar[set[str]] = {
         "dead_code",
         "sleep_detector",
         "flakiness",

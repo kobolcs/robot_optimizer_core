@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import pytest
 
 from robot_optimizer_core.application.analyzers.dead_code import (
@@ -51,7 +53,7 @@ class TestDeadCodeWalkDecomposition:
 
     def test_iter_nested_bodies_body(self) -> None:
         class FakeItem:
-            body = [1, 2]
+            body: ClassVar[list[int]] = [1, 2]
         assert [1, 2] in list(self.strategy._iter_nested_bodies(FakeItem()))
 
     def test_iter_nested_bodies_empty(self) -> None:
@@ -63,21 +65,21 @@ class TestDeadCodeWalkDecomposition:
         """Test that Try nodes are walked via .next linked list (RF 7.1+)."""
         class FakeTryNode:
             type = "TRY"
-            body = ["try_body"]
+            body: ClassVar[list[str]] = ["try_body"]
             next = None
             finalbody = None
 
         class FakeExceptNode:
             type = "TRY"
-            body = ["except_body"]
+            body: ClassVar[list[str]] = ["except_body"]
             next = None
             finalbody = None
 
         class FakeFinallyNode:
             type = "TRY"
-            body = ["finally_body"]
+            body: ClassVar[list[str]] = ["finally_body"]
             next = None
-            finalbody = ["finalbody_content"]
+            finalbody: ClassVar[list[str]] = ["finalbody_content"]
 
         # Link them together: TRY -> EXCEPT -> FINALLY
         try_node = FakeTryNode()

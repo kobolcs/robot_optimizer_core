@@ -375,13 +375,13 @@ def test_validate_directory_path_nonexistent(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 def test_validate_directory_path_file_raises(tmp_path: Path) -> None:
+    from robot_optimizer_core.application.services.analysis_service import (
+        _validate_directory_path,
+    )
+
     f = tmp_path / "f.robot"
     f.write_bytes(b"x")
     with pytest.raises(AnalysisError, match="not a directory"):
-        from robot_optimizer_core.application.services.analysis_service import (
-            _validate_directory_path,
-        )
-
         _validate_directory_path(f)
 
 

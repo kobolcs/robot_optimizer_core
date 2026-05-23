@@ -106,15 +106,15 @@ class TestSeverity:
         assert Severity.from_string("INFO") == Severity.INFO
 
         # Invalid values
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="Invalid severity") as exc_info:
             Severity.from_string("invalid")
         assert "Invalid severity" in str(exc_info.value)
         assert "error, warning, info" in str(exc_info.value)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Invalid severity"):
             Severity.from_string("")
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Invalid severity"):
             Severity.from_string("CRITICAL")
 
     def test_is_at_least(self) -> None:

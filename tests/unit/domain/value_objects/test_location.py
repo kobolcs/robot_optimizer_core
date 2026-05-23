@@ -270,7 +270,7 @@ class TestLocation:
         loc5 = Location(file_path=Path("test1.robot"), line=10)
         loc6 = Location(file_path=Path("test2.robot"), line=10)
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="different files") as exc_info:
             loc5.merge(loc6)
         assert "different files" in str(exc_info.value)
 
@@ -289,11 +289,11 @@ class TestLocation:
         assert offset2.column == 4
 
         # Invalid negative offset
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="invalid line number") as exc_info:
             loc.offset(lines=-10)  # Would make line 0
         assert "invalid line number" in str(exc_info.value).lower()
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="invalid column number") as exc_info:
             loc.offset(columns=-5)  # Would make column 0
         assert "invalid column number" in str(exc_info.value).lower()
 

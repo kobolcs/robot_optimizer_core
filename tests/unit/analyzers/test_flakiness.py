@@ -365,48 +365,43 @@ Very Flaky Test
     def test_validate_config(self, mock_repository: Mock) -> None:
         """Test configuration validation."""
         # Invalid days_back
-        with pytest.raises(ConfigurationError) as exc_info:
-            analyzer = FlakinessAnalyzer(
+        with pytest.raises(ConfigurationError, match="days_back must be at least 1") as exc_info:
+            FlakinessAnalyzer(
                 test_result_repository=mock_repository, config={"days_back": 0}
             )
-            analyzer.validate_config()
         assert "days_back must be at least 1" in str(exc_info.value)
 
         # Invalid failure_threshold
-        with pytest.raises(ConfigurationError) as exc_info:
-            analyzer = FlakinessAnalyzer(
+        with pytest.raises(ConfigurationError, match="failure_threshold must be between 0 and 1") as exc_info:
+            FlakinessAnalyzer(
                 test_result_repository=mock_repository,
                 config={"failure_threshold": 1.5},
             )
-            analyzer.validate_config()
         assert "failure_threshold must be between 0 and 1" in str(exc_info.value)
 
         # Invalid min_runs
-        with pytest.raises(ConfigurationError) as exc_info:
-            analyzer = FlakinessAnalyzer(
+        with pytest.raises(ConfigurationError, match="min_runs must be at least 2") as exc_info:
+            FlakinessAnalyzer(
                 test_result_repository=mock_repository, config={"min_runs": 1}
             )
-            analyzer.validate_config()
         assert "min_runs must be at least 2" in str(exc_info.value)
 
         # Missing severity threshold
-        with pytest.raises(ConfigurationError) as exc_info:
-            analyzer = FlakinessAnalyzer(
+        with pytest.raises(ConfigurationError, match="Missing severity threshold: error") as exc_info:
+            FlakinessAnalyzer(
                 test_result_repository=mock_repository,
                 config={"severity_thresholds": {"info": 0.1, "warning": 0.2}},
             )
-            analyzer.validate_config()
         assert "Missing severity threshold: error" in str(exc_info.value)
 
         # Invalid severity threshold value
-        with pytest.raises(ConfigurationError) as exc_info:
-            analyzer = FlakinessAnalyzer(
+        with pytest.raises(ConfigurationError, match="must be between 0 and 1") as exc_info:
+            FlakinessAnalyzer(
                 test_result_repository=mock_repository,
                 config={
                     "severity_thresholds": {"info": 0.1, "warning": -0.1, "error": 0.3}
                 },
             )
-            analyzer.validate_config()
         assert "must be between 0 and 1" in str(exc_info.value)
 
     def test_settings_integration(self, mock_repository: Mock) -> None:
