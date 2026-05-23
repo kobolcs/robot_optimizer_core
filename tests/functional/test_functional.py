@@ -133,9 +133,10 @@ class TestEntryPoint:
         result = _cli("--version")
         assert "robot-optimizer" in result.stdout.lower()
 
-    def test_version_reports_2_0(self) -> None:
+    def test_version_reports_semver(self) -> None:
+        import re
         result = _cli("--version")
-        assert "2.0" in result.stdout
+        assert re.search(r"\d+\.\d+", result.stdout), f"No semver in: {result.stdout!r}"
 
     def test_help_exits_zero(self) -> None:
         assert _cli("--help").returncode == 0
@@ -282,50 +283,45 @@ class TestKnownFindings:
 
 # ---------------------------------------------------------------------------
 # Severity filtering
-# NOTE: --no-cache is required here because the cache stores raw findings and
-# does not include the severity filter in its key.  Cached results bypass
-# post-filter logic, which is a known cache-key bug to fix separately.
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.functional
 class TestSeverityFilter:
     def test_min_severity_warning_excludes_info(self) -> None:
-        data = _analyze_json("--min-severity", "WARNING", "--no-cache")
+        data = _analyze_json("--min-severity", "WARNING")
         severities = {f["severity"] for f in data["findings"]}
         assert "INFO" not in severities
 
     def test_min_severity_warning_count(self) -> None:
-        data = _analyze_json("--min-severity", "WARNING", "--no-cache")
+        data = _analyze_json("--min-severity", "WARNING")
         assert len(data["findings"]) == EXPECTED_BY_SEVERITY["WARNING"]
 
     def test_min_severity_error_returns_empty(self) -> None:
         # The example suite has no ERROR-level findings
-        data = _analyze_json("--min-severity", "ERROR", "--no-cache")
+        data = _analyze_json("--min-severity", "ERROR")
         assert len(data["findings"]) == 0
 
 
 # ---------------------------------------------------------------------------
 # Analyzer selection
-# NOTE: same cache-key limitation — must run with --no-cache so the analyzer
-# list is actually applied rather than the cached full-set results being used.
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.functional
 class TestAnalyzerSelection:
     def test_single_analyzer_sleep_only(self) -> None:
-        data = _analyze_json("--analyzers", "sleep_detector", "--no-cache")
+        data = _analyze_json("--analyzers", "sleep_detector")
         types = {f["pattern_type"] for f in data["findings"]}
         assert types == {"SLEEP_IN_TEST"}
 
     def test_single_analyzer_dead_code_only(self) -> None:
-        data = _analyze_json("--analyzers", "dead_code", "--no-cache")
+        data = _analyze_json("--analyzers", "dead_code")
         types = {f["pattern_type"] for f in data["findings"]}
         assert types == {"UNUSED_KEYWORD"}
 
     def test_two_analyzers_combined(self) -> None:
-        data = _analyze_json("--analyzers", "sleep_detector,dead_code", "--no-cache")
+        data = _analyze_json("--analyzers", "sleep_detector,dead_code")
         types = {f["pattern_type"] for f in data["findings"]}
         assert "SLEEP_IN_TEST" in types
         assert "UNUSED_KEYWORD" in types

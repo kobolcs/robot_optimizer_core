@@ -14,6 +14,7 @@ service is testable without global state.
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import os
 import time
 from collections.abc import Callable
@@ -149,10 +150,31 @@ def _validate_directory_path(directory_path: str | Path) -> Path:
     return path
 
 
+def _analyzer_scope_key(analyzer_names: list[str] | None) -> str:
+    """Return an 8-hex fingerprint of the requested analyzer set.
+
+    Different analyzer selections produce different scope keys so that a
+    cached run using all analyzers is never returned for a run that requested
+    only a subset (or vice-versa).  ``None`` means "all registered analyzers".
+    """
+    if analyzer_names is None:
+        return "__all__"
+    scope = ",".join(sorted(analyzer_names))
+    return hashlib.sha256(scope.encode()).hexdigest()[:8]
+
+
 def _resolve_cache(
-    files: list[Path], cache: IAnalysisCache
+    files: list[Path],
+    cache: IAnalysisCache,
+    analyzer_names: list[str] | None,
 ) -> tuple[list[Path], dict[Path, list[Finding]], dict[Path, str]]:
-    """Split *files* into cache hits and misses."""
+    """Split *files* into cache hits and misses.
+
+    The cache key encodes both the file content hash and the analyzer scope
+    so that a run requesting only ``sleep_detector`` never receives cached
+    results from a full-analyzer run (and vice-versa).
+    """
+    scope = _analyzer_scope_key(analyzer_names)
     misses: list[Path] = []
     hits: dict[Path, list[Finding]] = {}
     hashes: dict[Path, str] = {}
@@ -160,8 +182,9 @@ def _resolve_cache(
     for fp in files:
         try:
             h = cache.file_hash(fp)
-            hashes[fp] = h
-            cached = cache.get(fp, h)
+            composite = f"{h}:{scope}"
+            hashes[fp] = composite
+            cached = cache.get(fp, composite)
             if cached is not None:
                 hits[fp] = cached
             else:
@@ -495,6 +518,8 @@ class AnalysisService:
         max_workers: int | None,
         metrics: Any,
         use_cache: bool,
+        min_severity: Severity | None = None,
+        analyzer_names: list[str] | None = None,
     ) -> Any:
         """Execute directory analysis: discovery, cache, thread pool, metrics, errors."""
         resolved_patterns = patterns or settings.file_patterns
@@ -522,7 +547,9 @@ class AnalysisService:
 
         if use_cache and self._cache is not None:
             active_cache = self._cache
-            files_to_analyze, cache_hits, file_hashes = _resolve_cache(files, active_cache)
+            files_to_analyze, cache_hits, file_hashes = _resolve_cache(
+                files, active_cache, analyzer_names
+            )
             hit_count = len(cache_hits)
             miss_count = len(files_to_analyze)
             if hit_count or miss_count:
@@ -546,6 +573,14 @@ class AnalysisService:
                 if fp not in cache_hits and fp in file_hashes:
                     active_cache.put(fp, file_hashes[fp], new_findings)
             active_cache.flush()
+
+        # Apply severity filter to all findings (cache hits and fresh) after
+        # persistence so the cache always stores the full unfiltered set.
+        if min_severity is not None:
+            for fp in dir_results.findings:
+                dir_results.findings[fp] = [
+                    f for f in dir_results.findings[fp] if f.severity <= min_severity
+                ]
 
         total_findings = sum(len(f) for f in dir_results.findings.values())
         logger.info(
@@ -592,16 +627,22 @@ class AnalysisService:
         """
         directory_path = _validate_directory_path(directory)
 
+        # min_severity is intentionally omitted from _analyze_one so that the
+        # cache stores full unfiltered results.  run_directory_analysis applies
+        # the filter after cache writes.
         def _analyze_one(fp: Path) -> tuple[Path, list[Finding]]:
             findings = self._run_file_analysis(
                 fp,
                 analyzers=analyzers,
                 settings=None,
-                min_severity=min_severity,
+                min_severity=None,
                 pattern_filter=None,
             )
             return fp, findings
 
+        str_analyzers = (
+            [a for a in analyzers if isinstance(a, str)] if analyzers else None
+        )
         dir_results = self.run_directory_analysis(
             directory_path=directory_path,
             analyze_fn=_analyze_one,
@@ -614,6 +655,8 @@ class AnalysisService:
             max_workers=None,
             metrics=self._metrics,
             use_cache=True,
+            min_severity=min_severity,
+            analyzer_names=str_analyzers,
         )
 
         return DirectoryAnalysisResult(

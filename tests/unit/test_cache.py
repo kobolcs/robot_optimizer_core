@@ -8,14 +8,14 @@ from pathlib import Path
 
 import pytest
 
+from robot_optimizer_core.domain.value_objects import Finding, Severity
+from robot_optimizer_core.domain.value_objects.location import Location
+from robot_optimizer_core.domain.value_objects.pattern import Pattern, PatternType
 from robot_optimizer_core.infrastructure.cache.analysis_cache import (
     AnalysisCache,
     _finding_from_dict,
     _finding_to_dict,
 )
-from robot_optimizer_core.domain.value_objects import Finding, Severity
-from robot_optimizer_core.domain.value_objects.location import Location
-from robot_optimizer_core.domain.value_objects.pattern import Pattern, PatternType
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -366,3 +366,73 @@ class TestCacheOsErrors:
 
         with patch("pathlib.Path.unlink", side_effect=OSError("permission denied")):
             cache.clear()  # must not raise
+
+
+# ---------------------------------------------------------------------------
+# Analyzer scope key (cache-key bug fix regression tests)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestAnalyzerScopeKey:
+    """_analyzer_scope_key must produce distinct keys for different scopes."""
+
+    def test_none_returns_all_sentinel(self) -> None:
+        from robot_optimizer_core.application.services.analysis_service import (
+            _analyzer_scope_key,
+        )
+        assert _analyzer_scope_key(None) == "__all__"
+
+    def test_empty_list_differs_from_none(self) -> None:
+        from robot_optimizer_core.application.services.analysis_service import (
+            _analyzer_scope_key,
+        )
+        assert _analyzer_scope_key([]) != _analyzer_scope_key(None)
+
+    def test_same_analyzers_same_key(self) -> None:
+        from robot_optimizer_core.application.services.analysis_service import (
+            _analyzer_scope_key,
+        )
+        assert _analyzer_scope_key(["a", "b"]) == _analyzer_scope_key(["a", "b"])
+
+    def test_order_independent(self) -> None:
+        from robot_optimizer_core.application.services.analysis_service import (
+            _analyzer_scope_key,
+        )
+        assert _analyzer_scope_key(["b", "a"]) == _analyzer_scope_key(["a", "b"])
+
+    def test_different_sets_different_keys(self) -> None:
+        from robot_optimizer_core.application.services.analysis_service import (
+            _analyzer_scope_key,
+        )
+        assert _analyzer_scope_key(["sleep_detector"]) != _analyzer_scope_key(["dead_code"])
+        assert _analyzer_scope_key(["sleep_detector"]) != _analyzer_scope_key(None)
+
+    def test_key_is_short_hex_string(self) -> None:
+        from robot_optimizer_core.application.services.analysis_service import (
+            _analyzer_scope_key,
+        )
+        key = _analyzer_scope_key(["sleep_detector"])
+        assert len(key) == 8
+        assert all(c in "0123456789abcdef" for c in key)
+
+    def test_composite_cache_key_embeds_scope(self, tmp_path: Path) -> None:
+        """A run with sleep_detector scope must NOT hit a cache entry from __all__."""
+        cache_dir = tmp_path / "cache"
+        cache = AnalysisCache(cache_dir=cache_dir)
+        fp = tmp_path / "suite.robot"
+        fp.write_bytes(b"*** Test Cases ***\n")
+        raw_hash = AnalysisCache.file_hash(fp)
+
+        all_composite = f"{raw_hash}:__all__"
+        cache.put(fp, all_composite, [_make_finding(fp)])
+        cache.flush()
+
+        # A scoped run must not see the __all__ entry
+        from robot_optimizer_core.application.services.analysis_service import (
+            _analyzer_scope_key,
+        )
+        scoped_hash = f"{raw_hash}:{_analyzer_scope_key(['sleep_detector'])}"
+        fresh = AnalysisCache(cache_dir=cache_dir)
+        assert fresh.get(fp, scoped_hash) is None
+        assert fresh.get(fp, all_composite) is not None

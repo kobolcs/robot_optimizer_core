@@ -7,14 +7,14 @@ from pathlib import Path
 
 import pytest
 
-from robot_optimizer_core.infrastructure.config import Settings
-from robot_optimizer_core.composition.container import reset_container
-from robot_optimizer_core.domain.value_objects import Finding, Severity
 from robot_optimizer_core.application.services.analysis_service import (
     AnalysisResult,
     AnalysisService,
     DirectoryAnalysisResult,
 )
+from robot_optimizer_core.composition.container import reset_container
+from robot_optimizer_core.domain.value_objects import Finding, Severity
+from robot_optimizer_core.infrastructure.config import Settings
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -214,7 +214,9 @@ class TestAnalysisService:
 
     def test_run_file_analysis_with_instance_analyzer(self, tmp_path: Path) -> None:
         """_get_analyzer_instances case _: branch — pass a pre-built instance."""
-        from robot_optimizer_core.application.analyzers.dead_code import DeadCodeAnalyzer
+        from robot_optimizer_core.application.analyzers.dead_code import (
+            DeadCodeAnalyzer,
+        )
 
         f = tmp_path / "t.robot"
         f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
@@ -242,7 +244,6 @@ class TestAnalysisService:
 
     def test_run_directory_analysis_no_cache(self, tmp_path: Path) -> None:
         """run_directory_analysis with use_cache=False skips cache branches."""
-        from robot_optimizer_core.domain.value_objects import Finding
 
         f = tmp_path / "t.robot"
         f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
@@ -293,10 +294,9 @@ class TestAnalysisService:
 
     def test_run_file_analysis_analyzer_raises_analysis_error(self, tmp_path: Path) -> None:
         """except AnalysisError in per-analyzer loop re-raises (lines 422-424)."""
-        from robot_optimizer_core.domain.entities import TestFile
-        from robot_optimizer_core.domain.value_objects import Finding
-        from robot_optimizer_core.exceptions import AnalysisError
         from robot_optimizer_core.application.analyzers.base import BaseAnalyzer
+        from robot_optimizer_core.domain.entities import TestFile
+        from robot_optimizer_core.exceptions import AnalysisError
 
         class _RaisingAnalyzer(BaseAnalyzer):
             @property
@@ -339,3 +339,100 @@ class TestAnalysisService:
         result = svc.list_analyzers()
         assert "dead_code" in result
         assert "error" in result["dead_code"]
+
+
+# ---------------------------------------------------------------------------
+# Cache correctness: severity filter and analyzer scope (regression tests)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestCacheKeyCorrectness:
+    """Regression tests for the cache-key bug where:
+    - min_severity was ignored for cache hits (stale filtered results served)
+    - analyzer scope was not encoded in the key (wrong scope could be returned)
+    """
+
+    _SLEEP_ROBOT = b"*** Test Cases ***\nMy Test\n    Sleep    5\n"
+
+    def _make_service(self, cache_dir: Path) -> AnalysisService:
+        from robot_optimizer_core.composition.container import get_container
+        from robot_optimizer_core.infrastructure.cache.analysis_cache import AnalysisCache
+        from robot_optimizer_core.infrastructure.metrics.collector import get_metrics
+
+        container = get_container()
+        svc = AnalysisService(
+            settings=Settings(),
+            metrics=get_metrics(),
+            registry=container.resolve("analyzer_registry"),
+            cache=AnalysisCache(cache_dir=cache_dir),
+        )
+        return svc
+
+    def test_severity_filter_applied_to_cache_hits(self, tmp_path: Path) -> None:
+        """A second run with min_severity must filter even when results come from cache."""
+        robot_file = tmp_path / "suite.robot"
+        robot_file.write_bytes(self._SLEEP_ROBOT)
+        cache_dir = tmp_path / "cache"
+
+        svc = self._make_service(cache_dir)
+        # First run: cache is populated with full findings (WARNING + INFO)
+        result1 = svc.analyze_directory(tmp_path, min_severity=None)
+        total = sum(len(fs) for fs in result1.results.values())
+        assert total > 0
+
+        # Second run: same file (cache hit), but filtered to WARNING+
+        svc2 = self._make_service(cache_dir)
+        result2 = svc2.analyze_directory(tmp_path, min_severity=Severity.WARNING)
+        for findings in result2.results.values():
+            assert all(f.severity <= Severity.WARNING for f in findings)
+
+    def test_cache_stores_full_findings_not_filtered(self, tmp_path: Path) -> None:
+        """Running with min_severity must not pollute the cache with partial results."""
+        robot_file = tmp_path / "suite.robot"
+        robot_file.write_bytes(self._SLEEP_ROBOT)
+        cache_dir = tmp_path / "cache"
+
+        svc1 = self._make_service(cache_dir)
+        # First run: filtered — should NOT store only WARNING findings
+        svc1.analyze_directory(tmp_path, min_severity=Severity.WARNING)
+
+        svc2 = self._make_service(cache_dir)
+        # Second run: no filter — must return full set from cache, not filtered set
+        result = svc2.analyze_directory(tmp_path, min_severity=None)
+        all_findings = [f for fs in result.results.values() for f in fs]
+        has_info = any(f.severity == Severity.INFO for f in all_findings)
+        assert has_info, "Cache must store full findings; INFO findings should be present"
+
+    def test_different_analyzer_scopes_are_independent_in_cache(
+        self, tmp_path: Path
+    ) -> None:
+        """A sleep_detector-only run must not be served cached full-run results."""
+        robot_file = tmp_path / "suite.robot"
+        robot_file.write_bytes(self._SLEEP_ROBOT)
+        cache_dir = tmp_path / "cache"
+
+        # First run: all analyzers (populates __all__ scope)
+        svc1 = self._make_service(cache_dir)
+        result_all = svc1.analyze_directory(tmp_path, min_severity=None)
+        all_types = {
+            f.pattern.type.name
+            for fs in result_all.results.values()
+            for f in fs
+        }
+
+        # Second run: sleep_detector only (different scope key → cache miss → fresh)
+        svc2 = self._make_service(cache_dir)
+        result_scoped = svc2.analyze_directory(
+            tmp_path, analyzers=["sleep_detector"], min_severity=None
+        )
+        scoped_types = {
+            f.pattern.type.name
+            for fs in result_scoped.results.values()
+            for f in fs
+        }
+
+        # The scoped run must ONLY contain sleep findings
+        assert scoped_types == {"SLEEP_IN_TEST"}
+        # And the full run must have had more types
+        assert len(all_types) >= len(scoped_types)

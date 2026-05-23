@@ -374,11 +374,15 @@ def analyze_directory(
         metrics = container.resolve("metrics")
 
     import functools
+    # min_severity is intentionally omitted here so that analyze_fn always
+    # returns the full finding set.  run_directory_analysis applies the filter
+    # after cache writes, ensuring the cache stores unfiltered results and the
+    # same cache entry is valid for any severity threshold.
     analyze_fn = functools.partial(
         _analyze_one_file,
         analyzers=analyzers,
         settings=settings,
-        min_severity=min_severity,
+        min_severity=None,
         pattern_filter=pattern_filter,
     )
 
@@ -396,6 +400,10 @@ def analyze_directory(
             max_workers=max_workers,
             metrics=metrics,
             use_cache=use_cache,
+            min_severity=min_severity,
+            analyzer_names=[
+                a for a in (analyzers or []) if isinstance(a, str)
+            ] or None,
         ),
     )
 
