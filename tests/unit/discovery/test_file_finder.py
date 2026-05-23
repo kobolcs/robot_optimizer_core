@@ -7,13 +7,13 @@ from pathlib import Path
 
 import pytest
 
+from robot_optimizer_core.exceptions import (
+    RobotFileNotFoundError as RFFileNotFoundError,
+)
 from robot_optimizer_core.infrastructure.discovery.file_finder import (
     OptimizedFileDiscoveryService,
     PathExclusionTrie,
     PatternMatcher,
-)
-from robot_optimizer_core.exceptions import (
-    RobotFileNotFoundError as RFFileNotFoundError,
 )
 
 

@@ -27,13 +27,13 @@ class TestWatchMode:
         test_file = tmp_path / "test.robot"
         test_file.write_bytes(b"*** Test Cases ***\nMy Test\n    Log    hello\n")
 
-        from robot_optimizer_core.entrypoints.cli._commands import _compute_finding_diff
         from robot_optimizer_core.domain.value_objects import Finding, Severity
         from robot_optimizer_core.domain.value_objects.location import Location
         from robot_optimizer_core.domain.value_objects.pattern import (
             Pattern,
             PatternType,
         )
+        from robot_optimizer_core.entrypoints.cli._commands import _compute_finding_diff
 
         pattern = Pattern(
             type=PatternType.SLEEP_IN_TEST,
@@ -64,13 +64,13 @@ class TestWatchMode:
         """Watch mode should detect when findings are resolved."""
         test_file = tmp_path / "test.robot"
 
-        from robot_optimizer_core.entrypoints.cli._commands import _compute_finding_diff
         from robot_optimizer_core.domain.value_objects import Finding, Severity
         from robot_optimizer_core.domain.value_objects.location import Location
         from robot_optimizer_core.domain.value_objects.pattern import (
             Pattern,
             PatternType,
         )
+        from robot_optimizer_core.entrypoints.cli._commands import _compute_finding_diff
 
         pattern = Pattern(
             type=PatternType.SLEEP_IN_TEST,
@@ -101,13 +101,13 @@ class TestWatchMode:
         """Watch mode should handle when there are no changes."""
         test_file = tmp_path / "test.robot"
 
-        from robot_optimizer_core.entrypoints.cli._commands import _compute_finding_diff
         from robot_optimizer_core.domain.value_objects import Finding, Severity
         from robot_optimizer_core.domain.value_objects.location import Location
         from robot_optimizer_core.domain.value_objects.pattern import (
             Pattern,
             PatternType,
         )
+        from robot_optimizer_core.entrypoints.cli._commands import _compute_finding_diff
 
         pattern = Pattern(
             type=PatternType.SLEEP_IN_TEST,
@@ -141,13 +141,13 @@ class TestWatchMode:
 
     def test_print_watch_diff_with_new_findings(self, tmp_path: Path, capsys) -> None:
         """_print_watch_diff should display new findings."""
-        from robot_optimizer_core.entrypoints.cli._commands import _print_watch_diff
         from robot_optimizer_core.domain.value_objects import Finding, Severity
         from robot_optimizer_core.domain.value_objects.location import Location
         from robot_optimizer_core.domain.value_objects.pattern import (
             Pattern,
             PatternType,
         )
+        from robot_optimizer_core.entrypoints.cli._commands import _print_watch_diff
 
         test_file = tmp_path / "test.robot"
         pattern = Pattern(
@@ -170,13 +170,13 @@ class TestWatchMode:
 
     def test_print_watch_diff_with_resolved_findings(self, tmp_path: Path, capsys) -> None:
         """_print_watch_diff should display resolved findings."""
-        from robot_optimizer_core.entrypoints.cli._commands import _print_watch_diff
         from robot_optimizer_core.domain.value_objects import Finding, Severity
         from robot_optimizer_core.domain.value_objects.location import Location
         from robot_optimizer_core.domain.value_objects.pattern import (
             Pattern,
             PatternType,
         )
+        from robot_optimizer_core.entrypoints.cli._commands import _print_watch_diff
 
         test_file = tmp_path / "test.robot"
         pattern = Pattern(

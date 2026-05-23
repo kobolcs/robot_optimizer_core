@@ -87,21 +87,30 @@ class TestThreadSafeContainerRegister:
             c.resolve("a")
 
     def test_singleton_returns_same_instance(self) -> None:
-        from robot_optimizer_core.composition.container import ServiceLifetime, ThreadSafeContainer
+        from robot_optimizer_core.composition.container import (
+            ServiceLifetime,
+            ThreadSafeContainer,
+        )
 
         c = ThreadSafeContainer()
         c.register("svc", lambda: object(), ServiceLifetime.SINGLETON)
         assert c.resolve("svc") is c.resolve("svc")
 
     def test_transient_returns_different_instances(self) -> None:
-        from robot_optimizer_core.composition.container import ServiceLifetime, ThreadSafeContainer
+        from robot_optimizer_core.composition.container import (
+            ServiceLifetime,
+            ThreadSafeContainer,
+        )
 
         c = ThreadSafeContainer()
         c.register("svc", lambda: object(), ServiceLifetime.TRANSIENT)
         assert c.resolve("svc") is not c.resolve("svc")
 
     def test_scoped_returns_same_instance_within_scope(self) -> None:
-        from robot_optimizer_core.composition.container import ServiceLifetime, ThreadSafeContainer
+        from robot_optimizer_core.composition.container import (
+            ServiceLifetime,
+            ThreadSafeContainer,
+        )
 
         c = ThreadSafeContainer()
         c.register("svc", lambda: object(), ServiceLifetime.SCOPED)
@@ -197,7 +206,10 @@ class TestThreadSafeContainerRegister:
         assert instance.dep is dep_instance
 
     def test_service_descriptor_non_singleton_does_not_cache(self) -> None:
-        from robot_optimizer_core.composition.container import ServiceDescriptor, ServiceLifetime
+        from robot_optimizer_core.composition.container import (
+            ServiceDescriptor,
+            ServiceLifetime,
+        )
 
         calls = 0
 
@@ -212,7 +224,10 @@ class TestThreadSafeContainerRegister:
         assert calls == 2
 
     def test_service_descriptor_singleton_caches(self) -> None:
-        from robot_optimizer_core.composition.container import ServiceDescriptor, ServiceLifetime
+        from robot_optimizer_core.composition.container import (
+            ServiceDescriptor,
+            ServiceLifetime,
+        )
 
         calls = 0
 
@@ -242,7 +257,10 @@ class TestThreadSafeContainerRegister:
         assert result == raw_value
 
     def test_scope_instances_initializes_from_none(self) -> None:
-        from robot_optimizer_core.composition.container import ServiceLifetime, ThreadSafeContainer
+        from robot_optimizer_core.composition.container import (
+            ServiceLifetime,
+            ThreadSafeContainer,
+        )
 
         c = ThreadSafeContainer()
         c.register("scoped_svc", lambda: object(), ServiceLifetime.SCOPED)

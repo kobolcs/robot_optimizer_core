@@ -201,7 +201,10 @@ class TestFlakinessListenerResolveRepository:
         assert listener.repository is not None
 
     def test_uses_di_container_repo_when_registered(self, tmp_path: Path) -> None:
-        from robot_optimizer_core.composition.container import get_container, reset_container
+        from robot_optimizer_core.composition.container import (
+            get_container,
+            reset_container,
+        )
 
         reset_container()
         container = get_container()

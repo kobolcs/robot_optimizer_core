@@ -54,12 +54,8 @@ Example — writing a plugin that contributes an analyzer::
 
 from __future__ import annotations
 
-# --- domain value objects (stable, immutable) ---
-from .domain.value_objects.finding import Finding
-from .domain.value_objects.location import Location
-from .domain.value_objects.remediation import RemediationHint
-from .domain.value_objects.results import AnalysisMeta, FileAnalysisResult
-from .domain.value_objects.severity import Severity
+# --- application base classes ---
+from .application.analyzers.base import BaseAnalyzer, ConfigValue, SuiteAwareAnalyzer
 
 # --- domain entities ---
 from .domain.entities.test_file import TestFile
@@ -69,8 +65,12 @@ from .domain.ports.analyzer import IAnalyzer, ISuiteAnalyzer
 from .domain.ports.metrics import IMetrics
 from .domain.ports.plugin import IPluginRegistry, Plugin, PluginMetadata
 
-# --- application base classes ---
-from .application.analyzers.base import BaseAnalyzer, ConfigValue, SuiteAwareAnalyzer
+# --- domain value objects (stable, immutable) ---
+from .domain.value_objects.finding import Finding
+from .domain.value_objects.location import Location
+from .domain.value_objects.remediation import RemediationHint
+from .domain.value_objects.results import AnalysisMeta, FileAnalysisResult
+from .domain.value_objects.severity import Severity
 
 # --- error taxonomy ---
 from .exceptions import ErrorCategory, StructuredError

@@ -154,7 +154,10 @@ class TestLoggerAdapterContext:
         assert adapter.extra.get("component") == "parser"
 
     def test_with_context_returns_new_adapter(self) -> None:
-        from robot_optimizer_core.infrastructure.logging.adapter import LoggerAdapter, get_logger
+        from robot_optimizer_core.infrastructure.logging.adapter import (
+            LoggerAdapter,
+            get_logger,
+        )
 
         adapter = get_logger("test.adapter.with")
         new_adapter = adapter.with_context(phase="analysis")
@@ -168,7 +171,9 @@ class TestLoggerAdapterContext:
 class TestMetricsHandler:
     def test_emit_increments_total(self) -> None:
         from robot_optimizer_core.infrastructure.logging.adapter import MetricsHandler
-        from robot_optimizer_core.infrastructure.metrics.collector import MetricsCollector
+        from robot_optimizer_core.infrastructure.metrics.collector import (
+            MetricsCollector,
+        )
 
         m = MetricsCollector(enabled=True)
         handler = MetricsHandler()
@@ -191,7 +196,9 @@ class TestMetricsHandler:
 
     def test_emit_error_increments_module_counter(self) -> None:
         from robot_optimizer_core.infrastructure.logging.adapter import MetricsHandler
-        from robot_optimizer_core.infrastructure.metrics.collector import MetricsCollector
+        from robot_optimizer_core.infrastructure.metrics.collector import (
+            MetricsCollector,
+        )
 
         m = MetricsCollector(enabled=True)
         handler = MetricsHandler()
@@ -219,7 +226,10 @@ class TestLogContextVariable:
         import json
         import logging
 
-        from robot_optimizer_core.infrastructure.logging.adapter import StructuredFormatter, logging_context
+        from robot_optimizer_core.infrastructure.logging.adapter import (
+            StructuredFormatter,
+            logging_context,
+        )
 
         fmt = StructuredFormatter()
         token = logging_context.set({"request_id": "abc123"})
@@ -238,7 +248,9 @@ class TestLogContextVariable:
 class TestLogConvenienceFunctions:
     def test_log_analysis_start_no_logger(self, tmp_path) -> None:
 
-        from robot_optimizer_core.infrastructure.logging.adapter import log_analysis_start
+        from robot_optimizer_core.infrastructure.logging.adapter import (
+            log_analysis_start,
+        )
 
         f = tmp_path / "t.robot"
         f.write_bytes(b"")
@@ -246,13 +258,17 @@ class TestLogConvenienceFunctions:
 
     def test_log_analysis_start_with_nonexistent_file(self, tmp_path) -> None:
 
-        from robot_optimizer_core.infrastructure.logging.adapter import log_analysis_start
+        from robot_optimizer_core.infrastructure.logging.adapter import (
+            log_analysis_start,
+        )
 
         log_analysis_start(tmp_path / "nope.robot", "dead_code")
 
     def test_log_analysis_complete_no_logger(self, tmp_path) -> None:
 
-        from robot_optimizer_core.infrastructure.logging.adapter import log_analysis_complete
+        from robot_optimizer_core.infrastructure.logging.adapter import (
+            log_analysis_complete,
+        )
 
         log_analysis_complete(tmp_path / "t.robot", "dead_code", 5, 0.1)
 

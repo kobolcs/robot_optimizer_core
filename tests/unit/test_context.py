@@ -302,7 +302,10 @@ class TestDiagnosticReport:
         assert report["shutdown"] is True
 
     def test_report_with_metrics_enabled_includes_metrics_summary(self) -> None:
-        from robot_optimizer_core.composition.context import ApplicationConfig, ApplicationContext
+        from robot_optimizer_core.composition.context import (
+            ApplicationConfig,
+            ApplicationContext,
+        )
         config = ApplicationConfig(
             enable_plugins=False,
             enable_metrics=True,
@@ -319,7 +322,10 @@ class TestDiagnosticReport:
             ctx.shutdown()
 
     def test_report_with_plugins_enabled_lists_plugins(self) -> None:
-        from robot_optimizer_core.composition.context import ApplicationConfig, ApplicationContext
+        from robot_optimizer_core.composition.context import (
+            ApplicationConfig,
+            ApplicationContext,
+        )
         config = ApplicationConfig(
             enable_plugins=True,
             enable_metrics=False,

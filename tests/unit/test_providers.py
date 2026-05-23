@@ -7,7 +7,10 @@ from pathlib import Path
 
 import pytest
 
-from robot_optimizer_core.infrastructure.file_provider import DiskFileProvider, InMemoryFileProvider
+from robot_optimizer_core.infrastructure.file_provider import (
+    DiskFileProvider,
+    InMemoryFileProvider,
+)
 
 
 @pytest.mark.unit

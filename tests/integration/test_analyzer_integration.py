@@ -469,7 +469,10 @@ class TestErrorHandlingIntegration:
         def fail_on_bad(path, *a, **kw):
             if "b_bad" in str(path):
                 raise AnalysisError("forced", file_path=path)
-            from robot_optimizer_core.domain.value_objects.results import FileAnalysisResult, AnalysisMeta
+            from robot_optimizer_core.domain.value_objects.results import (
+                AnalysisMeta,
+                FileAnalysisResult,
+            )
             return FileAnalysisResult(file_path=path, findings=[], meta=AnalysisMeta())
 
         monkeypatch.setattr(api_mod, "analyze_file", fail_on_bad)
@@ -540,7 +543,10 @@ class TestAnalyzerPerformance:
 @pytest.mark.integration
 class TestResetContainerIntegration:
     def test_get_container_after_reset_returns_new_instance(self) -> None:
-        from robot_optimizer_core.composition.container import get_container, reset_container
+        from robot_optimizer_core.composition.container import (
+            get_container,
+            reset_container,
+        )
 
         c1 = get_container()
         reset_container()
@@ -553,7 +559,10 @@ class TestResetContainerIntegration:
         reset_container()
 
     def test_get_container_after_double_reset_is_usable(self) -> None:
-        from robot_optimizer_core.composition.container import get_container, reset_container
+        from robot_optimizer_core.composition.container import (
+            get_container,
+            reset_container,
+        )
         reset_container()
         reset_container()
         c = get_container()

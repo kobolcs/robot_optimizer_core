@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import pytest
 
-from robot_optimizer_core.application.analyzers.tag_consistency import TagConsistencyAnalyzer
+from robot_optimizer_core.application.analyzers.tag_consistency import (
+    TagConsistencyAnalyzer,
+)
 
 
 @pytest.mark.unit

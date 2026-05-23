@@ -92,6 +92,9 @@ from .domain.base import (
     ValueObject as ValueObject,
 )
 from .domain.entities import TestFile
+
+# Plugin system
+from .domain.ports.plugin import Plugin, PluginMetadata
 from .domain.value_objects import (
     Finding,
     Location,
@@ -162,9 +165,6 @@ from .infrastructure.metrics.collector import (
     get_metrics as get_metrics,
 )
 from .infrastructure.parsers import RobotASTParser as RobotASTParser
-
-# Plugin system
-from .domain.ports.plugin import Plugin, PluginMetadata
 from .premium import PremiumFeatureError, is_premium_installed
 
 __all__ = [

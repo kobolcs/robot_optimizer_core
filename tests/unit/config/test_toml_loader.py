@@ -7,13 +7,13 @@ from pathlib import Path
 
 import pytest
 
+from robot_optimizer_core.domain.value_objects import Severity
 from robot_optimizer_core.infrastructure.config import Settings, load_settings_from_toml
 from robot_optimizer_core.infrastructure.config.toml_loader import (
     _find_toml_root,
     _read_optimizer_section,
     load_settings_from_toml_file,
 )
-from robot_optimizer_core.domain.value_objects import Severity
 
 
 @pytest.mark.unit

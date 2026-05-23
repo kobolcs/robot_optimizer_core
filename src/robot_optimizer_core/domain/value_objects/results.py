@@ -4,8 +4,9 @@
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Iterator
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterator
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .finding import Finding

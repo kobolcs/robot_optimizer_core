@@ -8,13 +8,13 @@ from pathlib import Path
 import pydantic
 import pytest
 
+from robot_optimizer_core.exceptions import ConfigurationError
 from robot_optimizer_core.infrastructure.config.settings import (
     Settings,
     configure_settings,
     get_settings,
     reset_settings,
 )
-from robot_optimizer_core.exceptions import ConfigurationError
 
 
 @pytest.fixture(autouse=True)

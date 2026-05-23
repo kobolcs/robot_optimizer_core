@@ -541,7 +541,9 @@ class TestContributeAnalyzers:
         plugin.activate()
         manager._register_contributed_analyzers(plugin)
 
-        from robot_optimizer_core.application.analyzers.registry import get_analyzer_registry
+        from robot_optimizer_core.application.analyzers.registry import (
+            get_analyzer_registry,
+        )
         registry = get_analyzer_registry()
         assert "_contrib_test_analyzer" in registry.list()
 

@@ -14,7 +14,6 @@ from unittest.mock import Mock
 import pytest
 
 from robot_optimizer_core.application.analyzers import FlakinessAnalyzer
-from robot_optimizer_core.infrastructure.config import Settings
 from robot_optimizer_core.domain.entities import TestFile
 from robot_optimizer_core.domain.repositories import TestResultRepository
 from robot_optimizer_core.domain.value_objects import (
@@ -23,6 +22,7 @@ from robot_optimizer_core.domain.value_objects import (
     Severity,
 )
 from robot_optimizer_core.exceptions import ConfigurationError, RepositoryError
+from robot_optimizer_core.infrastructure.config import Settings
 
 
 @pytest.mark.unit

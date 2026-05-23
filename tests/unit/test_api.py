@@ -13,15 +13,15 @@ from robot_optimizer_core.application.services.analysis_service import (
     _handle_directory_analysis_errors,
     _validate_directory_path,
 )
+from robot_optimizer_core.domain.value_objects import Finding
+from robot_optimizer_core.domain.value_objects.results import FileAnalysisResult
 from robot_optimizer_core.entrypoints.public_api import (
     _analyze_one_file,
     analyze_directory,
     analyze_file,
 )
-from robot_optimizer_core.infrastructure.config import Settings
-from robot_optimizer_core.domain.value_objects import Finding
-from robot_optimizer_core.domain.value_objects.results import FileAnalysisResult
 from robot_optimizer_core.exceptions import AnalysisError
+from robot_optimizer_core.infrastructure.config import Settings
 
 
 @pytest.mark.unit
@@ -104,7 +104,10 @@ def test_analyze_file_uses_container_settings_when_none_passed(
     tmp_path: Path,
 ) -> None:
     """analyze_file must resolve settings from the DI container, not a separate global."""
-    from robot_optimizer_core.composition.container import get_container, reset_container
+    from robot_optimizer_core.composition.container import (
+        get_container,
+        reset_container,
+    )
 
     reset_container()
     container = get_container()
@@ -364,7 +367,6 @@ def test_analyze_file_analyzer_failure_raises_analysis_error(
 
 @pytest.mark.unit
 def test_validate_directory_path_nonexistent(tmp_path: Path) -> None:
-    from robot_optimizer_core.application.services.analysis_service import _validate_directory_path
     from robot_optimizer_core.exceptions import RobotFileNotFoundError
 
     with pytest.raises(RobotFileNotFoundError):
@@ -376,7 +378,9 @@ def test_validate_directory_path_file_raises(tmp_path: Path) -> None:
     f = tmp_path / "f.robot"
     f.write_bytes(b"x")
     with pytest.raises(AnalysisError, match="not a directory"):
-        from robot_optimizer_core.application.services.analysis_service import _validate_directory_path
+        from robot_optimizer_core.application.services.analysis_service import (
+            _validate_directory_path,
+        )
 
         _validate_directory_path(f)
 
@@ -411,7 +415,6 @@ def test_analyze_directory_file_path_raises(tmp_path: Path) -> None:
 def test_handle_errors_raise_mode(tmp_path: Path) -> None:
     from robot_optimizer_core.application.services.analysis_service import (
         DirectoryResults,
-        _handle_directory_analysis_errors,
     )
 
     errors = [(tmp_path / "f.robot", AnalysisError("bad"))]
@@ -424,7 +427,6 @@ def test_handle_errors_raise_mode(tmp_path: Path) -> None:
 def test_handle_errors_warn_mode_attaches_to_result(tmp_path: Path) -> None:
     from robot_optimizer_core.application.services.analysis_service import (
         DirectoryResults,
-        _handle_directory_analysis_errors,
     )
 
     errors = [(tmp_path / "f.robot", AnalysisError("bad"))]
@@ -437,7 +439,6 @@ def test_handle_errors_warn_mode_attaches_to_result(tmp_path: Path) -> None:
 def test_handle_errors_skip_mode_no_exception(tmp_path: Path) -> None:
     from robot_optimizer_core.application.services.analysis_service import (
         DirectoryResults,
-        _handle_directory_analysis_errors,
     )
 
     errors = [(tmp_path / "f.robot", AnalysisError("bad"))]
@@ -451,7 +452,6 @@ def test_handle_errors_skip_mode_no_exception(tmp_path: Path) -> None:
 def test_handle_errors_no_op_for_empty(tmp_path: Path) -> None:
     from robot_optimizer_core.application.services.analysis_service import (
         DirectoryResults,
-        _handle_directory_analysis_errors,
     )
 
     dr = DirectoryResults()

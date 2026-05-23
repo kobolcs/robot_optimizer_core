@@ -44,7 +44,7 @@ from ...domain.value_objects import Finding, Severity
 from ...exceptions import AnalysisError
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    pass
 
 import logging
 

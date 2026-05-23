@@ -10,8 +10,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from robot_optimizer_core.domain.value_objects import Finding, Severity
+from robot_optimizer_core.domain.value_objects.location import Location
+from robot_optimizer_core.domain.value_objects.pattern import Pattern, PatternType
 from robot_optimizer_core.entrypoints.cli import main
-from robot_optimizer_core.entrypoints.cli._formatters import _format_junit, _format_sarif
+from robot_optimizer_core.entrypoints.cli._formatters import (
+    _format_junit,
+    _format_sarif,
+)
 from robot_optimizer_core.entrypoints.cli._html import (
     _PATTERN_CATEGORY_DEFAULT,
     _PATTERN_CATEGORY_MAP,
@@ -24,9 +30,6 @@ from robot_optimizer_core.entrypoints.cli._html import (
     _html_render_findings_table,
     _html_render_grouped_findings,
 )
-from robot_optimizer_core.domain.value_objects import Finding, Severity
-from robot_optimizer_core.domain.value_objects.location import Location
-from robot_optimizer_core.domain.value_objects.pattern import Pattern, PatternType
 
 # ---------------------------------------------------------------------------
 # Fixtures

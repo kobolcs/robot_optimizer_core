@@ -16,6 +16,7 @@ Example:
 
 from __future__ import annotations
 
+import logging
 import threading
 from datetime import UTC, datetime, timezone
 from pathlib import Path
@@ -29,7 +30,6 @@ from ..base import DomainEvent as BaseDomainEvent
 from ..base import Entity
 from ..value_objects.test_result import TestResult as BaseTestResult
 
-import logging
 logger = logging.getLogger(__name__)
 
 # Per-run file cache keyed by (resolved_path, mtime).

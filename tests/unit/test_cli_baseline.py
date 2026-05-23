@@ -8,19 +8,19 @@ from pathlib import Path
 
 import pytest
 
-from robot_optimizer_core.entrypoints.cli._baseline import (
-    BaselineKey,
-    _finding_key,
-    filter_baseline,
-    load_baseline,
-    save_baseline,
-)
 from robot_optimizer_core.domain.value_objects import (
     Finding,
     Location,
     Pattern,
     PatternType,
     Severity,
+)
+from robot_optimizer_core.entrypoints.cli._baseline import (
+    BaselineKey,
+    _finding_key,
+    filter_baseline,
+    load_baseline,
+    save_baseline,
 )
 
 # ---------------------------------------------------------------------------
