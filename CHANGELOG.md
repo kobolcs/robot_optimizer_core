@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `perf`: moved 79 type-annotation-only imports under `if TYPE_CHECKING:` across 30 source files
+  (TC001/TC003), eliminating redundant runtime import overhead with no behaviour change.
+  `[tool.ruff.lint.flake8-type-checking] runtime-evaluated-base-classes` added to pyproject.toml
+  so Pydantic/ValueObject subclass fields are correctly excluded from TC001.
+- `test`: PT012 nested-`with` collapses and RUF012 `ClassVar` annotations applied across unit
+  tests; `match=` argument added to bare `pytest.raises` calls (PT011).
+
 ### Fixed
 
 - Cache correctness: severity filter now applied **after** cache writes so the cache always stores
@@ -14,8 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cache correctness: analyzer scope (e.g. `--analyzers sleep_detector`) is now encoded in the
   cache key via `_analyzer_scope_key()` (8-hex SHA-256 of sorted names), preventing a
   scoped run from serving results cached by a different analyzer set.
+- Missing `TYPE_CHECKING` import in `application/analyzers/base.py` after TC001 moves.
+- Coverage gate (≥95%) restored after TC001 moves: added `# pragma: no cover` to version-gated
+  `typing_extensions` fallback, exhaustive-enum `match` wildcard arms, and two unreachable
+  defensive guards; added 13 targeted tests for previously uncovered paths in `analyze_file`,
+  `analyze_suite`, `_gather_suite_structure`, `_analyze_with_other_analyzers`,
+  `_run_suite_analysis`, and the `infrastructure` lazy-import `__getattr__`.
 
-### Changed
+### Changed (pre-existing)
 
 - `tox.ini`: `[testenv]` now sets `package = wheel` so tox builds a wheel directly instead of
   the sdist→wheel path that silently dropped package files (hatchling strips `src/` in sdists,
