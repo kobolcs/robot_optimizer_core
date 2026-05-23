@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import argparse
 import json
 import signal
 import sys
@@ -13,14 +12,16 @@ from typing import TYPE_CHECKING
 
 from ...domain.value_objects import Finding, Severity
 from ...exceptions import AnalysisError
-from ...infrastructure.config.settings import Settings
 from ..public_api import analyze_directory, analyze_file
 from ._baseline import filter_baseline, load_baseline, save_baseline
 from ._formatters import _format_json, _format_junit, _format_sarif, _format_text
 from ._html import _format_html
 
 if TYPE_CHECKING:
+    import argparse
+
     from ...application.analyzers import BaseAnalyzer
+    from ...infrastructure.config.settings import Settings
 
 # Exit codes — keep in sync with cli module docstring.
 _EXIT_OK = 0

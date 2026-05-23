@@ -4,11 +4,12 @@
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import Iterator
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
     from .finding import Finding
 
 __all__ = ["AnalysisMeta", "FileAnalysisResult"]

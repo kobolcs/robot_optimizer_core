@@ -39,11 +39,13 @@ from typing import (
     overload,
 )
 
-from ...domain.entities import TestFile
 from ...domain.ports.analyzer import ISuiteAnalyzer as SuiteAwareAnalyzer
-from ...domain.ports.metrics import IMetrics
 from ...domain.value_objects import Finding, Severity
 from ...exceptions import AnalysisError
+
+if TYPE_CHECKING:
+    from ...domain.entities import TestFile
+    from ...domain.ports.metrics import IMetrics
 
 # Type alias for analyzer configuration values
 __all__ = ["BaseAnalyzer", "ConfigValue", "SuiteAwareAnalyzer"]

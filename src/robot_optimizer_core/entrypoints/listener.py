@@ -23,9 +23,11 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from ..domain.repositories import TestResultRepository
+if TYPE_CHECKING:
+    from ..domain.repositories import TestResultRepository
+
 from ..domain.value_objects import TestResult
 from ..infrastructure.logging.adapter import get_logger
 

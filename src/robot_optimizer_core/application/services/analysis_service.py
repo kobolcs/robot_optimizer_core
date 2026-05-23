@@ -17,18 +17,13 @@ import dataclasses
 import hashlib
 import os
 import time
-from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, cast
 
 from ...domain.entities import TestFile
-from ...domain.ports.analyzer_registry import IAnalyzerRegistry
-from ...domain.ports.cache import IAnalysisCache
-from ...domain.ports.file_discovery import IFileDiscovery
 from ...domain.value_objects import Finding, Severity
 from ...exceptions import AnalysisError, RobotFileNotFoundError
-from ...infrastructure.config import Settings
 from ...infrastructure.logging.adapter import (
     get_logger,
     log_analysis_complete,
@@ -36,7 +31,13 @@ from ...infrastructure.logging.adapter import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from ...domain.ports.analyzer_registry import IAnalyzerRegistry
+    from ...domain.ports.cache import IAnalysisCache
+    from ...domain.ports.file_discovery import IFileDiscovery
     from ...domain.ports.metrics import IMetrics
+    from ...infrastructure.config import Settings
     from ..analyzers import BaseAnalyzer
 
 __all__ = [

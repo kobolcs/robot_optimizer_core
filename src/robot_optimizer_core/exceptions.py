@@ -34,8 +34,10 @@ from __future__ import annotations
 import dataclasses
 import sys
 from enum import StrEnum
-from pathlib import Path
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 if sys.version_info >= (3, 12):
     from typing import override

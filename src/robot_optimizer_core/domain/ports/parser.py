@@ -3,10 +3,11 @@
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from ..entities.test_file import TestFile
-from ..value_objects.robot_ast import RobotSuite
+if TYPE_CHECKING:
+    from ..entities.test_file import TestFile
+    from ..value_objects.robot_ast import RobotSuite
 
 
 @runtime_checkable

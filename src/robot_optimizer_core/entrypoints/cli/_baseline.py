@@ -11,8 +11,10 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from ...domain.value_objects import Finding
+if TYPE_CHECKING:
+    from ...domain.value_objects import Finding
 
 # Uniquely identifies a finding for suppression: (posix file path, pattern type name, line).
 BaselineKey = tuple[str, str, int]

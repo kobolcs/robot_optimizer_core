@@ -26,16 +26,18 @@ from __future__ import annotations
 
 import sys
 from enum import StrEnum, auto
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 if sys.version_info >= (3, 12):
     from typing import override
 else:
     from typing_extensions import override
 
+if TYPE_CHECKING:
+    from ...domain.entities import TestFile
+    from ...domain.repositories import TestResultRepository
+
 from ...composition.container import get_container
-from ...domain.entities import TestFile
-from ...domain.repositories import TestResultRepository
 from ...domain.value_objects import (
     Finding,
     FlakinessStats,

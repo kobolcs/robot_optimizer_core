@@ -4,10 +4,13 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-from ..value_objects.flakiness_stats import FlakinessStats
-from ..value_objects.test_result import TestResult
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from ..value_objects.flakiness_stats import FlakinessStats
+    from ..value_objects.test_result import TestResult
 
 
 class ITestResultRepository(ABC):

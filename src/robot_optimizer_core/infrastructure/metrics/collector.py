@@ -24,11 +24,13 @@ import logging as _stdlib_logging
 import threading
 import time
 from collections import defaultdict, deque
-from collections.abc import Callable, Generator
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Generator
 
 from ...exceptions import ValidationError as _ValidationError
 

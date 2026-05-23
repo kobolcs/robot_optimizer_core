@@ -265,6 +265,9 @@ ignore = [
     "PLR0913",  # public API surface intentionally accepts many optional kwargs
 ]
 
+[tool.ruff.lint.flake8-type-checking]
+runtime-evaluated-base-classes = ["pydantic.BaseModel", "robot_optimizer_core.domain.base.ValueObject"]
+
 [tool.ruff.lint.pylint]
 max-args = 8
 

@@ -46,11 +46,11 @@ from ..application.analyzers import BaseAnalyzer, SuiteAwareAnalyzer
 from ..application.services.analysis_service import DirectoryResults
 from ..composition.container import get_container
 from ..domain.entities import TestFile
-from ..domain.value_objects import Finding, Severity
 from ..domain.value_objects.results import AnalysisMeta, FileAnalysisResult
 from ..exceptions import AnalysisError, RobotFileNotFoundError
 
 if TYPE_CHECKING:
+    from ..domain.value_objects import Finding, Severity
     from ..domain.value_objects.robot_ast import (
         RobotImport,
         RobotKeyword,

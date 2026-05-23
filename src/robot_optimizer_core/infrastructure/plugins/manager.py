@@ -8,9 +8,11 @@ import builtins as _builtins_module
 import hashlib
 import os
 import sys
-from collections.abc import Callable
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
 
 from ...domain.ports.plugin import Plugin, PluginMetadata
 from ...exceptions import PluginError

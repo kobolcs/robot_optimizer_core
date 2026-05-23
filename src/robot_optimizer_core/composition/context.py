@@ -4,12 +4,15 @@
 from __future__ import annotations
 
 import threading
-from collections.abc import Iterator
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
-from ..application.analyzers.registry import AnalyzerRegistry
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from ..application.analyzers.registry import AnalyzerRegistry
+
 from ..exceptions import ConfigurationError
 from ..infrastructure.config.settings import Settings
 from ..infrastructure.discovery import FileDiscoveryService

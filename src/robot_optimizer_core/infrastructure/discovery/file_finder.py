@@ -22,11 +22,14 @@ from __future__ import annotations
 
 import fnmatch
 import re
-from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 from ...exceptions import AnalysisError
 from ...exceptions import RobotFileNotFoundError as RFFileNotFoundError

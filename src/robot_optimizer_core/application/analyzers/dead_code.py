@@ -11,8 +11,7 @@ import dataclasses
 import re
 import sys
 from collections import defaultdict
-from collections.abc import Generator, Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 if sys.version_info >= (3, 12):
     from typing import Protocol, override
@@ -21,7 +20,11 @@ else:
 
     from typing_extensions import override
 
-from ...domain.entities import TestFile
+if TYPE_CHECKING:
+    from collections.abc import Generator, Sequence
+
+    from ...domain.entities import TestFile
+
 from ...domain.value_objects import Finding, Location, Pattern, PatternType, Severity
 from .base import BaseAnalyzer, ConfigValue
 

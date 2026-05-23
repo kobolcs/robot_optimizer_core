@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
-from contextlib import AbstractContextManager
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from contextlib import AbstractContextManager
 
 
 @runtime_checkable

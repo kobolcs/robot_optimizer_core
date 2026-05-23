@@ -26,14 +26,17 @@ import dataclasses
 import re
 import sys
 from decimal import Decimal, InvalidOperation
-from typing import ClassVar, cast
+from typing import TYPE_CHECKING, ClassVar, cast
 
 if sys.version_info >= (3, 12):
     from typing import override
 else:
     from typing_extensions import override
 
-from ...domain.entities import TestFile
+if TYPE_CHECKING:
+    from ...domain.entities import TestFile
+    from ...domain.value_objects.robot_ast import KeywordCall
+
 from ...domain.value_objects import (
     Finding,
     Location,
@@ -42,7 +45,6 @@ from ...domain.value_objects import (
     Severity,
     SleepPattern,
 )
-from ...domain.value_objects.robot_ast import KeywordCall
 from ...exceptions import ConfigurationError
 from ...infrastructure.parsers.robot_ast_parser import RobotASTParser
 from .base import BaseAnalyzer, ConfigValue

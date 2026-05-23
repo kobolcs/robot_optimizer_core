@@ -9,13 +9,16 @@ from __future__ import annotations
 
 import re
 import sys
+from typing import TYPE_CHECKING
 
 if sys.version_info >= (3, 12):
     from typing import override
 else:
     from typing_extensions import override
 
-from ...domain.entities import TestFile
+if TYPE_CHECKING:
+    from ...domain.entities import TestFile
+
 from ...domain.value_objects import Finding, Location, Pattern, PatternType, Severity
 from ...infrastructure.parsers.robot_ast_parser import RobotASTParser
 from .base import BaseAnalyzer, ConfigValue

@@ -3,11 +3,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from ..entities.test_file import TestFile
-from ..value_objects.finding import Finding
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from ..entities.test_file import TestFile
+    from ..value_objects.finding import Finding
 
 
 @runtime_checkable

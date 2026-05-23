@@ -21,16 +21,18 @@ Example:
 
 from __future__ import annotations
 
-import builtins
 from importlib.metadata import EntryPoint, entry_points
 from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
-from ...domain.ports.metrics import IMetrics
 from ...exceptions import PluginError
 from ...infrastructure.logging.adapter import get_logger
 from .base import BaseAnalyzer
 
 if TYPE_CHECKING:
+    import builtins
+
+    from ...domain.ports.metrics import IMetrics
+
     AnalyzerClass: TypeAlias = type[BaseAnalyzer]
 
 __all__ = [
