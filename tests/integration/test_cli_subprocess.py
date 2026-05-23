@@ -96,7 +96,8 @@ class TestAnalyzeFormatSubprocess:
         f.write_bytes(b"*** Test Cases ***\nMy Test\n    Sleep    10\n")
         result = _run("analyze", str(f), "--format", "json")
         parsed = json.loads(result.stdout)
-        assert isinstance(parsed, list)
+        assert parsed["schema_version"] == "1"
+        assert isinstance(parsed["findings"], list)
 
     def test_text_output_contains_finding_info(self, tmp_path: Path) -> None:
         f = tmp_path / "t.robot"
@@ -118,7 +119,8 @@ class TestMinSeveritySubprocess:
         f = tmp_path / "t.robot"
         f.write_bytes(b"*** Test Cases ***\nMy Test\n    Sleep    2\n")
         result = _run("analyze", str(f), "--format", "json", "--min-severity", "ERROR")
-        findings = json.loads(result.stdout)
+        parsed = json.loads(result.stdout)
+        findings = parsed["findings"]
         severities = {finding["severity"] for finding in findings}
         assert "WARNING" not in severities
         assert "INFO" not in severities

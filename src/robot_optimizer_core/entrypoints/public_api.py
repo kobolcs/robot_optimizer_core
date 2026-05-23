@@ -32,8 +32,8 @@ Example:
 from __future__ import annotations
 
 import dataclasses
+import logging
 import time
-import warnings
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -43,22 +43,12 @@ from typing import (
 )
 
 from ..application.analyzers import BaseAnalyzer, SuiteAwareAnalyzer
-from ..application.services.analysis_service import (
-    DirectoryResults,
-    _execute_directory_analysis,
-    _handle_directory_analysis_errors,
-    _validate_directory_path,
-)
+from ..application.services.analysis_service import DirectoryResults
 from ..composition.container import get_container
 from ..domain.entities import TestFile
 from ..domain.value_objects import Finding, Severity
+from ..domain.value_objects.results import AnalysisMeta, FileAnalysisResult
 from ..exceptions import AnalysisError, RobotFileNotFoundError
-from ..infrastructure.cache.analysis_cache import AnalysisCache
-from ..infrastructure.logging.adapter import (
-    get_logger,
-    log_analysis_complete,
-    log_analysis_start,
-)
 
 if TYPE_CHECKING:
     from ..domain.value_objects.robot_ast import (
@@ -123,7 +113,9 @@ class SuiteAnalysisResult:
 
 
 __all__ = [
+    "AnalysisMeta",
     "DirectoryResults",
+    "FileAnalysisResult",
     "PremiumFeatureError",
     "SuiteAnalysisResult",
     "SuiteInfo",
@@ -133,15 +125,7 @@ __all__ = [
     "analyze_suite",
 ]
 
-logger = get_logger(__name__)
-
-
-def _warn_deprecated_param(old: str, new: str, since: str, stacklevel: int = 3) -> None:
-    warnings.warn(
-        f"The '{old}' parameter is deprecated since {since}. Use '{new}' instead.",
-        DeprecationWarning,
-        stacklevel=stacklevel,
-    )
+logger = logging.getLogger(__name__)
 
 
 def _get_or_build_service() -> Any:
@@ -202,13 +186,8 @@ def analyze_file(
     min_severity: Severity | None = None,
     pattern_filter: list[str] | None = None,
     metrics: MetricsCollector | None = None,
-    *,
-    severity_filter: Severity | None = None,
-) -> list[Finding]:
+) -> FileAnalysisResult:
     """Analyze a single Robot Framework file.
-
-    This is the main entry point for analyzing individual files.
-    It handles file loading, parsing, and running the specified analyzers.
 
     Args:
         file_path: Path to the Robot Framework file.
@@ -218,29 +197,23 @@ def analyze_file(
             level are returned (e.g. ``Severity.WARNING`` drops INFO findings).
         pattern_filter: When given, only findings whose analyzer name
             matches one of these strings are returned.
-        metrics: Optional metrics collector for recording analysis metrics
-            (default: global metrics instance). Pass a no-op implementation
-            to disable metrics collection.
-        severity_filter: Deprecated alias for *min_severity*.  Will be
-            removed in a future release.
+        metrics: Optional metrics collector (default: global instance).
 
     Returns:
-        List of findings from all analyzers.
+        :class:`~robot_optimizer_core.domain.value_objects.results.FileAnalysisResult`
+        containing findings and analysis metadata.  The result is iterable
+        (``for f in result``) and supports ``len(result)`` for call-sites
+        written against the old ``list[Finding]`` return type.
 
     Raises:
-        FileNotFoundError: If the file doesn't exist.
+        RobotFileNotFoundError: If the file doesn't exist.
         AnalysisError: If analysis fails.
 
     Example:
-        >>> findings = analyze_file("tests/login.robot")
-        >>> for finding in findings:
+        >>> result = analyze_file("tests/login.robot")
+        >>> for finding in result:
         ...     print(f"{finding.severity.name}: {finding.message}")
     """
-    if severity_filter is not None:
-        _warn_deprecated_param("severity_filter", "min_severity", "1.0.0b1", stacklevel=2)
-        if min_severity is None:
-            min_severity = severity_filter
-
     path = Path(file_path)
 
     if not path.exists():
@@ -269,16 +242,18 @@ def analyze_file(
         raise AnalysisError(f"Failed to load file: {e}", file_path=path) from e
 
     analyzer_instances = _get_analyzer_instances(analyzers, settings)
-
+    analyzer_names: list[str] = []
     all_findings: list[Finding] = []
+    t0 = time.time()
 
     for analyzer in analyzer_instances:
         analyzer_name = analyzer.name
+        analyzer_names.append(analyzer_name)
 
         if pattern_filter is not None and analyzer_name not in pattern_filter:
             continue
 
-        log_analysis_start(path, analyzer_name, logger)
+        logger.debug("Starting analysis: %s on %s", analyzer_name, path)
         start_time = time.time()
 
         try:
@@ -286,7 +261,10 @@ def analyze_file(
             all_findings.extend(findings)
 
             duration = time.time() - start_time
-            log_analysis_complete(path, analyzer_name, len(findings), duration, logger)
+            logger.debug(
+                "Analysis complete: %s on %s — %d finding(s) in %.3fs",
+                analyzer_name, path, len(findings), duration,
+            )
 
             metrics.increment("analysis.completed")
             metrics.timing(f"analyzer.{analyzer_name}.duration", duration)
@@ -303,12 +281,17 @@ def analyze_file(
                 f"Analysis failed: {e}", file_path=path, analyzer=analyzer_name
             ) from e
 
+    duration_ms = (time.time() - t0) * 1000
     metrics.gauge("findings.total", len(all_findings))
 
     if min_severity is not None:
         all_findings = [f for f in all_findings if f.severity <= min_severity]
 
-    return all_findings
+    meta = AnalysisMeta(
+        duration_ms=duration_ms,
+        analyzer_names=tuple(analyzer_names),
+    )
+    return FileAnalysisResult(file_path=path, findings=all_findings, meta=meta)
 
 
 def _analyze_one_file(
@@ -319,14 +302,14 @@ def _analyze_one_file(
     pattern_filter: list[str] | None,
 ) -> tuple[Path, list[Finding]]:
     """Analyze a single file and return (path, findings). Used by analyze_directory."""
-    findings = analyze_file(
+    result = analyze_file(
         file_path,
         analyzers,
         settings,
         min_severity=min_severity,
         pattern_filter=pattern_filter,
     )
-    return file_path, findings
+    return file_path, result.findings
 
 
 def analyze_directory(
@@ -336,20 +319,14 @@ def analyze_directory(
     recursive: bool = True,
     analyzers: list[str | BaseAnalyzer] | None = None,
     settings: Settings | None = None,
-    fail_fast: bool = False,
     error_handling: ErrorHandling = "raise",
     min_severity: Severity | None = None,
     pattern_filter: list[str] | None = None,
     max_workers: int | None = None,
     metrics: MetricsCollector | None = None,
     use_cache: bool = True,
-    *,
-    severity_filter: Severity | None = None,
 ) -> DirectoryResults:
     """Analyze all Robot Framework files in a directory.
-
-    This function discovers and analyzes all matching files in a directory,
-    returning a mapping of file paths to their findings.
 
     Args:
         directory_path: Path to the directory.
@@ -358,61 +335,38 @@ def analyze_directory(
         recursive: Whether to search subdirectories.
         analyzers: List of analyzer names or instances.
         settings: Configuration settings.
-        fail_fast: Stop on first error (deprecated; prefer ``error_handling``).
         error_handling: How to handle per-file analysis errors.
-            ``"raise"`` re-raises as ExceptionGroup (default for the Python API).
+            ``"raise"`` re-raises as ExceptionGroup (default).
             ``"skip"`` silently discards failed files and returns partial results.
             ``"warn"`` logs a warning and returns partial results (exit-code 3
             on the CLI).
-
-            .. note::
-                The CLI always invokes this function with ``error_handling="warn"``
-                so that a single bad file does not abort a directory scan.  The
-                Python API defaults to ``"raise"`` to surface errors immediately.
-                Pass ``error_handling="warn"`` explicitly if you want CLI-like
-                behaviour from the Python API.
-
         min_severity: Only return findings at or more severe than this level.
         pattern_filter: Only run/return findings from analyzers with these names.
-        severity_filter: Deprecated alias for *min_severity*.  Will be
-            removed in a future release.
-        max_workers: Maximum number of threads for parallel file analysis
-            Defaults to ``min(4, cpu_count)``. Pass ``1`` to
-            force sequential behaviour.
-        metrics: Optional metrics collector for recording batch metrics
-            (default: global metrics instance). Pass a no-op implementation
-            to disable metrics collection.
-        use_cache: When ``True`` (default), unchanged files are skipped and
-            their findings are returned from ``~/.cache/robot-optimizer/cache.json``.
-            Pass ``False`` to force a full re-analysis (equivalent to
-            ``--no-cache`` on the CLI).
+        max_workers: Maximum number of threads for parallel file analysis.
+            Defaults to ``min(4, cpu_count)``. Pass ``1`` to force sequential.
+        metrics: Optional metrics collector (default: global instance).
+        use_cache: When ``True`` (default), unchanged files return cached results.
+            Pass ``False`` to force a full re-analysis.
 
     Returns:
-        Dictionary mapping file paths to findings.
+        :class:`~robot_optimizer_core.application.services.analysis_service.DirectoryResults`
+        with ``.findings`` (dict of path → list[Finding]) and ``.errors``.
 
     Raises:
-        FileNotFoundError: If directory doesn't exist.
-        AnalysisError: If analysis fails (when fail_fast=True or
-            ``error_handling="raise"``).
+        RobotFileNotFoundError: If directory doesn't exist.
+        ExceptionGroup: If analysis fails and ``error_handling="raise"``.
 
     Example:
-        >>> findings_map = analyze_directory("tests/", recursive=True)
-        >>> for file_path, findings in findings_map.items():
+        >>> result = analyze_directory("tests/", recursive=True)
+        >>> for file_path, findings in result.findings.items():
         ...     print(f"{file_path}: {len(findings)} findings")
     """
-    if fail_fast:
-        warnings.warn(
-            "The 'fail_fast' parameter is deprecated since 1.0.0b1 and will be "
-            "removed in a future release. Use error_handling='raise' instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-    if severity_filter is not None:
-        _warn_deprecated_param("severity_filter", "min_severity", "1.0.0b1", stacklevel=2)
-        if min_severity is None:
-            min_severity = severity_filter
-
-    path = _validate_directory_path(directory_path)
+    _dir = Path(directory_path)
+    if not _dir.exists():
+        raise RobotFileNotFoundError(_dir)
+    if not _dir.is_dir():
+        raise AnalysisError("Path is not a directory", file_path=_dir)
+    path = _dir
     container = get_container()
     if settings is None:
         settings = container.resolve("settings")
@@ -437,7 +391,7 @@ def analyze_directory(
             exclude_patterns=exclude_patterns,
             recursive=recursive,
             settings=settings,
-            fail_fast=fail_fast,
+            fail_fast=False,
             error_handling=error_handling,
             max_workers=max_workers,
             metrics=metrics,

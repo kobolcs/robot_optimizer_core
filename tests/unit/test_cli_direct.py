@@ -71,7 +71,8 @@ class TestFormatJsonReal:
         _run(monkeypatch, ["analyze", str(f), "--format", "json", "--no-fail"])
         out = capsys.readouterr().out
         parsed = json.loads(out)
-        assert isinstance(parsed, list)
+        assert parsed["schema_version"] == "1"
+        assert isinstance(parsed["findings"], list)
 
     def test_json_findings_have_expected_keys(
         self,
@@ -83,8 +84,9 @@ class TestFormatJsonReal:
         f.write_bytes(_SLEEP_ROBOT)
         _run(monkeypatch, ["analyze", str(f), "--format", "json", "--no-fail"])
         parsed = json.loads(capsys.readouterr().out)
-        assert len(parsed) > 0
-        finding = parsed[0]
+        findings = parsed["findings"]
+        assert len(findings) > 0
+        finding = findings[0]
         assert "severity" in finding
         assert "message" in finding
 
@@ -98,8 +100,9 @@ class TestFormatJsonReal:
         f.write_bytes(_SLEEP_ROBOT)
         _run(monkeypatch, ["analyze", str(f), "--format", "json", "--no-fail"])
         parsed = json.loads(capsys.readouterr().out)
-        assert all(isinstance(item["severity"], str) for item in parsed)
-        assert all("." not in item["severity"] for item in parsed)
+        findings = parsed["findings"]
+        assert all(isinstance(item["severity"], str) for item in findings)
+        assert all("." not in item["severity"] for item in findings)
 
 
 # ---------------------------------------------------------------------------
@@ -122,7 +125,7 @@ class TestMinSeverityFiltering:
             ["analyze", str(f), "--format", "json", "--min-severity", "ERROR", "--no-fail"],
         )
         parsed = json.loads(capsys.readouterr().out)
-        severities = {item["severity"] for item in parsed}
+        severities = {item["severity"] for item in parsed["findings"]}
         assert "WARNING" not in severities
         assert "INFO" not in severities
 
@@ -140,7 +143,7 @@ class TestMinSeverityFiltering:
         )
         parsed = json.loads(capsys.readouterr().out)
         # Sleep detector fires at WARNING; the list must be non-empty
-        assert len(parsed) > 0
+        assert len(parsed["findings"]) > 0
 
 
 # ---------------------------------------------------------------------------

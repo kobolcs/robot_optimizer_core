@@ -195,12 +195,12 @@ class TestDeadCodeASTWorkflow:
 
 
 # ---------------------------------------------------------------------------
-# Fix 5: fail_fast is honoured even with max_workers > 1
+# error_handling behaviour
 # ---------------------------------------------------------------------------
 
 @pytest.mark.component
-class TestFailFastBehaviour:
-    def test_fail_fast_stops_after_first_error(
+class TestErrorHandlingBehaviour:
+    def test_error_handling_raise_collects_all_then_raises(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         import robot_optimizer_core.entrypoints.public_api as api_mod
@@ -219,14 +219,12 @@ class TestFailFastBehaviour:
 
         monkeypatch.setattr(api_mod, "analyze_file", fail_all)
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            with pytest.raises(AnalysisError):
-                analyze_directory(tmp_path, max_workers=4, fail_fast=True)
+        with pytest.raises(ExceptionGroup):
+            analyze_directory(tmp_path, max_workers=1, error_handling="raise")
 
-        assert call_count == 1
+        assert call_count == 4
 
-    def test_no_fail_fast_processes_all_files(
+    def test_error_handling_warn_processes_all_files(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         import robot_optimizer_core.entrypoints.public_api as api_mod

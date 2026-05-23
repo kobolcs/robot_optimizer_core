@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING
 
 from ...domain.value_objects import Finding, Severity
 from ...exceptions import AnalysisError
-from ...infrastructure.cache.analysis_cache import AnalysisCache
 from ...infrastructure.config.settings import Settings
 from ..public_api import analyze_directory, analyze_file
 from ._baseline import filter_baseline, load_baseline, save_baseline
@@ -88,12 +87,12 @@ def _analyze_path(
                 f for fs in results.findings.values() for f in fs
             ]
         elif path.is_file():
-            all_findings = analyze_file(
+            all_findings = list(analyze_file(
                 path,
                 analyzers=analyzer_names,
                 settings=settings,
                 min_severity=severity_filter,
-            )
+            ))
         else:
             print(f"error: path does not exist: {path}", file=sys.stderr)
             return None, False
@@ -268,7 +267,8 @@ def _run_analyze(args: argparse.Namespace) -> int:
         return _EXIT_ERROR
 
     if getattr(args, "clear_cache", False):
-        AnalysisCache().clear()
+        from ...composition.context import get_analysis_service
+        get_analysis_service().clear_cache()
 
     # Handle watch mode
     if getattr(args, "watch", False):

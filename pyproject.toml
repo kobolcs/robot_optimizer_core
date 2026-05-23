@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "robot-framework-optimizer-core"
-version = "1.0.0b1"
+version = "2.0.0"
 description = "Core analysis engine for Robot Framework test suite optimization"
 readme = "README.md"
 requires-python = ">=3.11"

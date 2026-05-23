@@ -200,9 +200,10 @@ class TestJsonFormat:
                 main(["analyze", str(rf_file), "--format", "json"])
         out = capsys.readouterr().out
         parsed = json.loads(out)
-        assert isinstance(parsed, list)
-        assert len(parsed) == 1
-        assert parsed[0]["message"] == "Use explicit wait"
+        assert parsed["schema_version"] == "1"
+        findings = parsed["findings"]
+        assert len(findings) == 1
+        assert findings[0]["message"] == "Use explicit wait"
 
     def test_json_severity_is_plain_string(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
@@ -216,7 +217,7 @@ class TestJsonFormat:
                 main(["analyze", str(rf_file), "--format", "json"])
         out = capsys.readouterr().out
         parsed = json.loads(out)
-        assert parsed[0]["severity"] == "WARNING"
+        assert parsed["findings"][0]["severity"] == "WARNING"
 
     def test_json_empty_findings_is_empty_list(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
@@ -227,7 +228,9 @@ class TestJsonFormat:
             with pytest.raises(SystemExit):
                 main(["analyze", str(rf_file), "--format", "json"])
         out = capsys.readouterr().out
-        assert json.loads(out) == []
+        result = json.loads(out)
+        assert result["schema_version"] == "1"
+        assert result["findings"] == []
 
 
 # ---------------------------------------------------------------------------

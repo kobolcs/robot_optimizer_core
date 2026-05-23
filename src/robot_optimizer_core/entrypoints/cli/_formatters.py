@@ -58,7 +58,11 @@ def _format_text(findings: list[Finding], path: Path) -> str:
 
 def _format_json(findings: list[Finding]) -> str:
     records = [f.to_dict() for f in findings]
-    return json.dumps(records, indent=2, default=str)
+    output = {
+        "schema_version": "1",
+        "findings": records,
+    }
+    return json.dumps(output, indent=2, default=str)
 
 
 def _format_sarif(findings: list[Finding], path: Path) -> str:

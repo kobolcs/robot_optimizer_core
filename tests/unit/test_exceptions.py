@@ -24,8 +24,9 @@ from robot_optimizer_core.exceptions import (
 class TestRobotOptimizerError:
     def test_basic_message(self) -> None:
         err = RobotOptimizerError("something went wrong")
-        assert str(err) == "something went wrong"
         assert err.message == "something went wrong"
+        assert "something went wrong" in str(err)
+        assert err.error_code == "ANALYSIS_FAILED"  # default code
 
     def test_details_default_empty(self) -> None:
         assert RobotOptimizerError("msg").details == {}
@@ -34,8 +35,10 @@ class TestRobotOptimizerError:
         err = RobotOptimizerError("error", details={"key": "value"})
         assert "key=value" in str(err)
 
-    def test_str_without_details_is_message_only(self) -> None:
-        assert str(RobotOptimizerError("just a message")) == "just a message"
+    def test_str_includes_error_code(self) -> None:
+        err = RobotOptimizerError("just a message")
+        assert "[" in str(err)
+        assert "just a message" in str(err)
 
     def test_is_exception(self) -> None:
         with pytest.raises(RobotOptimizerError):

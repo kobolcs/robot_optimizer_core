@@ -367,8 +367,8 @@ class TestRegistryResetIntegration:
         f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
 
         reset_registry()
-        findings = analyze_file(f, analyzers=["dead_code"])
-        assert isinstance(findings, list)
+        result = analyze_file(f, analyzers=["dead_code"])
+        assert isinstance(result.findings, list)
 
     def test_reset_restores_all_builtins_at_integration_level(self) -> None:
         from robot_optimizer_core.application.analyzers.registry import (
@@ -453,19 +453,45 @@ class TestDeadCodeASTIntegration:
 
 
 @pytest.mark.integration
-class TestFailFastIntegration:
-    """Integration tests verifying fail_fast behaviour with real files."""
+class TestErrorHandlingIntegration:
+    """Integration tests verifying error_handling behaviour with real files."""
 
-    def test_fail_fast_with_unreadable_content(self, temp_dir: Path) -> None:
-        """fail_fast=True should surface the first error and stop."""
-        # Create a valid file and a binary file that will fail parsing
+    def test_error_handling_warn_returns_partial_results(self, temp_dir: Path, monkeypatch) -> None:
+        """error_handling='warn' collects errors and returns partial results."""
+        import robot_optimizer_core.entrypoints.public_api as api_mod
+        from robot_optimizer_core.exceptions import AnalysisError
+
         valid = temp_dir / "a_valid.robot"
         valid.write_bytes(b"*** Test Cases ***\nT\n    Log    hi\n")
         bad = temp_dir / "b_bad.robot"
-        bad.write_bytes(b"\x00\x01\x02\x03\xff")  # binary → parse error
+        bad.write_bytes(b"*** Test Cases ***\nT\n    Log    hi\n")
 
-        with pytest.raises(Exception, match=r".+"):
-            analyze_directory(temp_dir, analyzers=["dead_code"], fail_fast=True)
+        def fail_on_bad(path, *a, **kw):
+            if "b_bad" in str(path):
+                raise AnalysisError("forced", file_path=path)
+            from robot_optimizer_core.domain.value_objects.results import FileAnalysisResult, AnalysisMeta
+            return FileAnalysisResult(file_path=path, findings=[], meta=AnalysisMeta())
+
+        monkeypatch.setattr(api_mod, "analyze_file", fail_on_bad)
+
+        result = analyze_directory(temp_dir, analyzers=["dead_code"], error_handling="warn")
+        assert len(result.errors) == 1
+
+    def test_error_handling_raise_raises_exception_group(self, temp_dir: Path, monkeypatch) -> None:
+        """error_handling='raise' raises ExceptionGroup after processing all files."""
+        import robot_optimizer_core.entrypoints.public_api as api_mod
+        from robot_optimizer_core.exceptions import AnalysisError
+
+        for name in ["a.robot", "b.robot"]:
+            (temp_dir / name).write_bytes(b"*** Test Cases ***\nT\n    Log    hi\n")
+
+        def fail_all(path, *a, **kw):
+            raise AnalysisError("forced", file_path=path)
+
+        monkeypatch.setattr(api_mod, "analyze_file", fail_all)
+
+        with pytest.raises(ExceptionGroup):
+            analyze_directory(temp_dir, analyzers=["dead_code"], error_handling="raise")
 
 
 @pytest.mark.integration

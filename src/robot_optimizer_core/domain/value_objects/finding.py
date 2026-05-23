@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re as _re
 from typing import Any
 from uuid import UUID, uuid4
@@ -15,6 +16,7 @@ from pydantic import ConfigDict, Field, computed_field, field_validator
 from ..base import ValueObject
 from .location import Location
 from .pattern import Pattern
+from .remediation import RemediationHint
 from .severity import Severity
 
 
@@ -44,7 +46,21 @@ class Finding(ValueObject):
     location: Location = Field(..., description="Location in the file")
     message: str = Field(..., min_length=1, description="Human-readable message")
     context: dict[str, Any] | None = Field(
-        default=None, description="Additional context"
+        default=None, description="Additional context (deprecated; prefer remediation and tags)"
+    )
+    confidence: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=1.0,
+        description="Analyzer certainty in [0.0, 1.0]. 1.0 = definitive.",
+    )
+    tags: frozenset[str] = Field(
+        default_factory=frozenset,
+        description="Free-form labels for filtering and grouping (e.g. 'auto-fix', 'flaky-risk').",
+    )
+    remediation: RemediationHint | None = Field(
+        default=None,
+        description="Structured remediation guidance. Supersedes ad-hoc context entries.",
     )
 
     def __eq__(self, other: object) -> bool:
@@ -156,6 +172,23 @@ class Finding(ValueObject):
         """Check if finding has additional context."""
         return self.context is not None and len(self.context) > 0
 
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def fingerprint(self) -> str:
+        """Stable 16-hex-char content hash for baseline diffing.
+
+        Derived from (pattern_type, file_path, line, message[:120]).  Survives
+        re-analysis of the same code — two findings that describe the same
+        problem at the same location always produce the same fingerprint.
+        """
+        raw = "\x00".join([
+            self.pattern.type.name,
+            self.location.file_path.as_posix(),
+            str(self.location.line),
+            self.message[:120],
+        ])
+        return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
     def format_for_console(self) -> str:
         """Format the finding for console output.
 
@@ -198,12 +231,28 @@ class Finding(ValueObject):
             "location": self.location,
             "message": self.message,
             "context": self.context,
+            "confidence": self.confidence,
+            "tags": self.tags,
+            "remediation": self.remediation,
         }
 
     def to_dict(self) -> dict[str, Any]:
         """Convert finding to a dictionary for serialization."""
+        remediation_dict: dict[str, Any] | None = None
+        if self.remediation is not None:
+            r = self.remediation
+            remediation_dict = {
+                "summary": r.summary,
+                "effort": r.effort,
+                "steps": list(r.steps),
+                "docs_url": r.docs_url,
+                "auto_fixable": r.auto_fixable,
+                "related_rule_ids": list(r.related_rule_ids),
+            }
         return {
+            "schema_version": "1",
             "id": str(self.id),
+            "fingerprint": self.fingerprint,
             "file": self.location.file_path.name,
             "file_path": self.file_path,
             "line": self.location.line,
@@ -212,11 +261,14 @@ class Finding(ValueObject):
             "location": self.location.model_dump(),
             "severity": self.severity.name,
             "message": self.message,
+            "confidence": self.confidence,
+            "tags": sorted(self.tags),
             "pattern": self.pattern.model_dump() | {"type": self.pattern.type},
             "pattern_type": self.pattern.type.name,
             "pattern_name": self.pattern.name,
             "recommendation": self.pattern.recommendation,
             "is_auto_fixable": self.is_auto_fixable,
+            "remediation": remediation_dict,
             "context": self.context,
         }
 
@@ -272,6 +324,9 @@ class Finding(ValueObject):
                 "recommendation": self.pattern.recommendation,
                 "auto_fixable": self.is_auto_fixable,
                 "finding_id": str(self.id),
+                "fingerprint": self.fingerprint,
+                "confidence": self.confidence,
+                "tags": sorted(self.tags),
             },
         }
 

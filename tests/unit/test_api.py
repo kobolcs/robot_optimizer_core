@@ -8,14 +8,19 @@ from pathlib import Path
 import pytest
 
 import robot_optimizer_core.entrypoints.public_api as _api_module
+from robot_optimizer_core.application.services.analysis_service import (
+    _execute_directory_analysis,
+    _handle_directory_analysis_errors,
+    _validate_directory_path,
+)
 from robot_optimizer_core.entrypoints.public_api import (
     _analyze_one_file,
-    _execute_directory_analysis,
     analyze_directory,
     analyze_file,
 )
 from robot_optimizer_core.infrastructure.config import Settings
 from robot_optimizer_core.domain.value_objects import Finding
+from robot_optimizer_core.domain.value_objects.results import FileAnalysisResult
 from robot_optimizer_core.exceptions import AnalysisError
 
 
@@ -49,9 +54,10 @@ class TestAnalyzeFileMaxSizeEnforcement:
         robot_file.write_bytes(b"*** Test Cases ***\nSample Test\n    Log    hello\n")
 
         settings = Settings(max_file_size_mb=10.0)
-        findings = analyze_file(robot_file, settings=settings)
+        result = analyze_file(robot_file, settings=settings)
 
-        assert isinstance(findings, list)
+        assert isinstance(result, FileAnalysisResult)
+        assert isinstance(result.findings, list)
 
     def test_file_exactly_at_limit_is_not_rejected_by_size_check(
         self, tmp_path: Path
@@ -69,13 +75,13 @@ class TestAnalyzeFileMaxSizeEnforcement:
         robot_file.write_bytes((base_content + padding).encode("utf-8"))
 
         try:
-            findings = analyze_file(robot_file, settings=settings)
+            result = analyze_file(robot_file, settings=settings)
         except AnalysisError as exc:
             pytest.fail(
                 f"File at exactly the limit must analyze successfully without triggering the size guard, got: {exc}"
             )
 
-        assert isinstance(findings, list)
+        assert isinstance(result, FileAnalysisResult)
 
     def test_size_error_not_double_wrapped(self, tmp_path: Path) -> None:
         """AnalysisError from the size guard must not be re-wrapped (fix 5b)."""
@@ -136,8 +142,9 @@ def test_analyze_file_uses_safe_analyze(
         lambda analyzers, settings: [HookedAnalyzer()],
     )
 
-    analyze_file(robot_file)
+    result = analyze_file(robot_file)
     assert calls == ["safe"]
+    assert isinstance(result, FileAnalysisResult)
 
 
 @pytest.mark.unit
@@ -167,18 +174,17 @@ def test_analyze_file_with_dead_code_analyzer_does_not_crash(tmp_path: Path) -> 
     robot_file = tmp_path / "sample.robot"
     robot_file.write_bytes(b"*** Test Cases ***\nCase\n    Log    ok\n")
 
-    findings = analyze_file(robot_file, analyzers=["dead_code"])
+    result = analyze_file(robot_file, analyzers=["dead_code"])
 
-    assert isinstance(findings, list)
+    assert isinstance(result, FileAnalysisResult)
+    assert isinstance(result.findings, list)
 
 
 @pytest.mark.unit
-def test_fail_fast_stops_on_first_error(
+def test_error_handling_raise_collects_all_errors_then_raises(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """fail_fast=True must stop after the first failing file, not process all files."""
-    import warnings
-
+    """error_handling='raise' processes all files then raises an ExceptionGroup."""
     for i in range(3):
         (tmp_path / f"test_{i}.robot").write_bytes(
             b"*** Test Cases ***\nT\n    Log    ok\n"
@@ -186,25 +192,21 @@ def test_fail_fast_stops_on_first_error(
 
     call_count = 0
 
-    def always_fail(path: Path, *args: object, **kwargs: object) -> list[Finding]:
+    def always_fail(path: Path, *args: object, **kwargs: object) -> FileAnalysisResult:
         nonlocal call_count
         call_count += 1
         raise AnalysisError("forced failure", file_path=path)
 
     monkeypatch.setattr(_api_module, "analyze_file", always_fail)
 
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", DeprecationWarning)
-        with pytest.raises(AnalysisError):
-            analyze_directory(tmp_path, max_workers=4, fail_fast=True)
+    with pytest.raises(ExceptionGroup):
+        analyze_directory(tmp_path, max_workers=1, error_handling="raise")
 
-    assert call_count == 1, (
-        f"fail_fast=True processed {call_count} files before stopping; expected 1"
-    )
+    assert call_count == 3
 
 
 @pytest.mark.unit
-def test_fail_fast_false_processes_all_files_and_collects_errors(
+def test_error_handling_warn_processes_all_files_and_collects_errors(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """error_handling='warn' continues through all files and surfaces errors on the result."""
@@ -215,7 +217,7 @@ def test_fail_fast_false_processes_all_files_and_collects_errors(
 
     call_count = 0
 
-    def always_fail(path: Path, *args: object, **kwargs: object) -> list[Finding]:
+    def always_fail(path: Path, *args: object, **kwargs: object) -> FileAnalysisResult:
         nonlocal call_count
         call_count += 1
         raise AnalysisError("forced failure", file_path=path)
@@ -356,13 +358,13 @@ def test_analyze_file_analyzer_failure_raises_analysis_error(
 
 
 # ---------------------------------------------------------------------------
-# _validate_directory_path
+# _validate_directory_path (analysis_service)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 def test_validate_directory_path_nonexistent(tmp_path: Path) -> None:
-    from robot_optimizer_core.entrypoints.public_api import _validate_directory_path
+    from robot_optimizer_core.application.services.analysis_service import _validate_directory_path
     from robot_optimizer_core.exceptions import RobotFileNotFoundError
 
     with pytest.raises(RobotFileNotFoundError):
@@ -374,9 +376,30 @@ def test_validate_directory_path_file_raises(tmp_path: Path) -> None:
     f = tmp_path / "f.robot"
     f.write_bytes(b"x")
     with pytest.raises(AnalysisError, match="not a directory"):
-        from robot_optimizer_core.entrypoints.public_api import _validate_directory_path
+        from robot_optimizer_core.application.services.analysis_service import _validate_directory_path
 
         _validate_directory_path(f)
+
+
+# ---------------------------------------------------------------------------
+# analyze_directory — path validation (public_api inlined validation)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_analyze_directory_nonexistent_raises(tmp_path: Path) -> None:
+    from robot_optimizer_core.exceptions import RobotFileNotFoundError
+
+    with pytest.raises(RobotFileNotFoundError):
+        analyze_directory(tmp_path / "does_not_exist")
+
+
+@pytest.mark.unit
+def test_analyze_directory_file_path_raises(tmp_path: Path) -> None:
+    f = tmp_path / "f.robot"
+    f.write_bytes(b"x")
+    with pytest.raises(AnalysisError, match="not a directory"):
+        analyze_directory(f)
 
 
 # ---------------------------------------------------------------------------
@@ -386,7 +409,7 @@ def test_validate_directory_path_file_raises(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 def test_handle_errors_raise_mode(tmp_path: Path) -> None:
-    from robot_optimizer_core.entrypoints.public_api import (
+    from robot_optimizer_core.application.services.analysis_service import (
         DirectoryResults,
         _handle_directory_analysis_errors,
     )
@@ -399,7 +422,7 @@ def test_handle_errors_raise_mode(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 def test_handle_errors_warn_mode_attaches_to_result(tmp_path: Path) -> None:
-    from robot_optimizer_core.entrypoints.public_api import (
+    from robot_optimizer_core.application.services.analysis_service import (
         DirectoryResults,
         _handle_directory_analysis_errors,
     )
@@ -412,7 +435,7 @@ def test_handle_errors_warn_mode_attaches_to_result(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 def test_handle_errors_skip_mode_no_exception(tmp_path: Path) -> None:
-    from robot_optimizer_core.entrypoints.public_api import (
+    from robot_optimizer_core.application.services.analysis_service import (
         DirectoryResults,
         _handle_directory_analysis_errors,
     )
@@ -426,7 +449,7 @@ def test_handle_errors_skip_mode_no_exception(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 def test_handle_errors_no_op_for_empty(tmp_path: Path) -> None:
-    from robot_optimizer_core.entrypoints.public_api import (
+    from robot_optimizer_core.application.services.analysis_service import (
         DirectoryResults,
         _handle_directory_analysis_errors,
     )
