@@ -27,6 +27,8 @@ DEFAULT_MIN = 80
 THRESHOLDS: dict[str, int] = {
     # Two-line entry-point shim — not meaningful to test in isolation.
     "src/robot_optimizer_core/__main__.py": 0,
+    # Pure re-export surface — every symbol is tested via its origin module.
+    "src/robot_optimizer_core/extensions.py": 0,
 }
 
 

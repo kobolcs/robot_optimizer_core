@@ -14,13 +14,12 @@ service is testable without global state.
 from __future__ import annotations
 
 import dataclasses
-import logging
 import os
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, cast
 
 from ...domain.entities import TestFile
 from ...domain.ports.analyzer_registry import IAnalyzerRegistry
@@ -151,7 +150,7 @@ def _validate_directory_path(directory_path: str | Path) -> Path:
 
 
 def _resolve_cache(
-    files: list[Path], cache: AnalysisCache
+    files: list[Path], cache: IAnalysisCache
 ) -> tuple[list[Path], dict[Path, list[Finding]], dict[Path, str]]:
     """Split *files* into cache hits and misses."""
     misses: list[Path] = []
@@ -290,7 +289,9 @@ class AnalysisService:
         cache: IAnalysisCache | None = None,
     ) -> None:
         if settings is None or metrics is None or file_discovery is None or registry is None:
-            from ...composition.container import get_container  # lazy: keeps app layer clean
+            from ...composition.container import (
+                get_container,  # lazy: keeps app layer clean
+            )
             container = get_container()
             self.settings: Settings = settings or container.resolve("settings")
             self._metrics: IMetrics = metrics or container.resolve("metrics")
@@ -315,7 +316,7 @@ class AnalysisService:
 
         cls = self._registry.analyzers.get(name)
         if cls is None:  # pragma: no cover
-            return self._registry.create(name)  # type: ignore[no-any-return]
+            return cast(BaseAnalyzer, self._registry.create(name))
         instance = cls(config=config or {})
         if not isinstance(instance, _BaseAnalyzer):  # pragma: no cover
             raise AnalysisError(
@@ -329,7 +330,6 @@ class AnalysisService:
         settings: Settings,
     ) -> list[BaseAnalyzer]:
         """Resolve analyzer names/instances into concrete BaseAnalyzer objects."""
-        from ..analyzers.base import BaseAnalyzer as _BaseAnalyzer
 
         analyzer_config = settings.analyzer_config
 
@@ -356,7 +356,7 @@ class AnalysisService:
                         )
                     )
                 case _:
-                    instances.append(analyzer)  # type: ignore[arg-type]
+                    instances.append(analyzer)
 
         return instances
 

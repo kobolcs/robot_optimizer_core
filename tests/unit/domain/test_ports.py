@@ -16,8 +16,6 @@ from robot_optimizer_core.domain.ports import (
     IMetrics,
     IParser,
     ISuiteAnalyzer,
-    ITestFileRepository,
-    ITestResultRepository,
 )
 from robot_optimizer_core.domain.ports.repository import (
     ITestFileRepository,
@@ -25,9 +23,10 @@ from robot_optimizer_core.domain.ports.repository import (
 )
 from robot_optimizer_core.domain.repositories.interfaces import (
     ITestFileRepository as ITestFileRepo2,
+)
+from robot_optimizer_core.domain.repositories.interfaces import (
     ITestResultRepository as ITestResultRepo2,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

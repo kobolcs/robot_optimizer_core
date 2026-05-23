@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import dataclasses
 import sys
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -54,7 +54,7 @@ ERROR_VALIDATION_FAILED = "VALIDATION_FAILED"
 ERROR_REPOSITORY_FAILED = "REPOSITORY_FAILED"
 
 
-class ErrorCategory(str, Enum):
+class ErrorCategory(StrEnum):
     """Broad category for machine-readable error routing.
 
     Attributes:
