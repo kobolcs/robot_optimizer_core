@@ -234,7 +234,7 @@ class TestITestFileRepository:
 
     def test_concrete_impl(self):
         repo = _ConcreteTestFileRepo()
-        assert repo.find_files(Path(".")) == []
+        assert repo.find_files(Path()) == []
         assert repo.get_content(Path("f.robot")) == ""
 
     def test_isinstance_of_abc(self):

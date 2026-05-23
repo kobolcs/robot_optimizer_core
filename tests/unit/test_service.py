@@ -357,7 +357,9 @@ class TestCacheKeyCorrectness:
 
     def _make_service(self, cache_dir: Path) -> AnalysisService:
         from robot_optimizer_core.composition.container import get_container
-        from robot_optimizer_core.infrastructure.cache.analysis_cache import AnalysisCache
+        from robot_optimizer_core.infrastructure.cache.analysis_cache import (
+            AnalysisCache,
+        )
         from robot_optimizer_core.infrastructure.metrics.collector import get_metrics
 
         container = get_container()

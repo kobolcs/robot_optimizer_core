@@ -339,7 +339,7 @@ class AnalysisService:
 
         cls = self._registry.analyzers.get(name)
         if cls is None:  # pragma: no cover
-            return cast(BaseAnalyzer, self._registry.create(name))
+            return cast("BaseAnalyzer", self._registry.create(name))
         instance = cls(config=config or {})
         if not isinstance(instance, _BaseAnalyzer):  # pragma: no cover
             raise AnalysisError(

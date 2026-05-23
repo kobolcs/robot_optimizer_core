@@ -580,8 +580,7 @@ class TestContributeAnalyzers:
         with patch(
             "robot_optimizer_core.application.analyzers.registry.get_analyzer_registry",
             side_effect=RuntimeError("registry unavailable"),
-        ):
-            with caplog.at_level(logging.WARNING, logger=_MANAGER_LOGGER):
-                manager._register_contributed_analyzers(plugin)  # must not propagate
+        ), caplog.at_level(logging.WARNING, logger=_MANAGER_LOGGER):
+            manager._register_contributed_analyzers(plugin)  # must not propagate
 
         assert any("registry" in r.message.lower() for r in caplog.records)

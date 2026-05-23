@@ -13,16 +13,16 @@ from .repository import ITestFileRepository, ITestResultRepository
 
 __all__ = [
     "FileProvider",
-    "IAnalyzer",
     "IAnalysisCache",
+    "IAnalyzer",
     "IAnalyzerRegistry",
     "IFileDiscovery",
     "IMetrics",
     "IParser",
+    "IPluginRegistry",
     "ISuiteAnalyzer",
     "ITestFileRepository",
     "ITestResultRepository",
-    "IPluginRegistry",
     "Plugin",
     "PluginMetadata",
 ]

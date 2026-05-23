@@ -48,9 +48,8 @@ class TestClearCacheFlag:
         with patch(
             "robot_optimizer_core.composition.context.get_analysis_service",
             return_value=mock_service,
-        ):
-            with pytest.raises(SystemExit):
-                main(["analyze", "--clear-cache", str(robot_file)])
+        ), pytest.raises(SystemExit):
+            main(["analyze", "--clear-cache", str(robot_file)])
         mock_service.clear_cache.assert_called_once()
 
 
