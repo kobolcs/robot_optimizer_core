@@ -1,10 +1,25 @@
 # src/robot_optimizer_core/entrypoints/cli/_baseline.py
 """Baseline support for the analyze subcommand.
 
-A baseline is a JSON file that records a snapshot of findings.  On
-subsequent runs, any finding whose (file_path, pattern_type, line) triple
-matches a baseline entry is suppressed so only *new* regressions are
-reported.
+A baseline is a JSON file that records a snapshot of findings.  On subsequent
+runs, any finding whose fingerprint matches a baseline entry is suppressed so
+only *new* regressions are reported.
+
+Identity model
+--------------
+Baseline entries store ``Finding.fingerprint`` (SHA-256 of pattern_type +
+file_path + line + message[:120], truncated to 16 hex chars).  This is the
+same stable identity used by watch-mode diffs so both subsystems agree on
+what constitutes "the same finding."
+
+Legacy files (pre-fingerprint format) stored
+``(relative_file_path, pattern_type_name, line)`` triples.  They are
+read-compatible via :func:`_legacy_key`; new writes always use fingerprints.
+
+The ``base`` parameter on :func:`save_baseline` and :func:`load_baseline`
+controls the working directory used for path relativisation.  It defaults to
+``Path.cwd()`` so existing callers are unaffected, but tests can inject a
+stable path instead of monkeypatching ``os.getcwd``.
 """
 
 from __future__ import annotations
@@ -16,23 +31,33 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ...domain.value_objects import Finding
 
-# Uniquely identifies a finding for suppression: (posix file path, pattern type name, line).
-BaselineKey = tuple[str, str, int]
+# A baseline key is a fingerprint string.
+BaselineKey = str
 
 
-def _finding_key(f: Finding) -> BaselineKey:
-    fp = f.location.file_path
-    return (
-        _relative_posix(fp, Path.cwd()),
-        f.pattern.type.name,
-        f.location.line,
-    )
+def _legacy_key(entry: dict) -> str | None:
+    """Convert an old-format baseline entry to a fingerprint-compatible string.
+
+    Old entries stored ``(file_path, pattern_type, line)``; we emit a
+    synthetic key that won't collide with any real fingerprint so legacy
+    entries stay harmlessly inactive rather than crashing.
+    """
+    try:
+        return f"legacy:{entry['file_path']}:{entry['pattern_type']}:{entry['line']}"
+    except (KeyError, TypeError):
+        return None
 
 
-def load_baseline(path: Path) -> set[BaselineKey]:
+def load_baseline(path: Path, base: Path | None = None) -> set[BaselineKey]:
     """Load baseline keys from a JSON file.
 
-    Returns an empty set when the file does not exist yet (first run).
+    Args:
+        path: Path to the baseline JSON file.
+        base: Base directory for resolving relative paths stored in legacy
+            entries.  Defaults to ``Path.cwd()``.
+
+    Returns:
+        Set of fingerprint strings.  Empty when the file does not exist yet.
 
     Raises:
         ValueError: If the file exists but cannot be parsed.
@@ -51,23 +76,32 @@ def load_baseline(path: Path) -> set[BaselineKey]:
 
     keys: set[BaselineKey] = set()
     for entry in data:
-        try:
-            keys.add((entry["file_path"], entry["pattern_type"], int(entry["line"])))
-        except (KeyError, TypeError, ValueError):
+        if not isinstance(entry, dict):
             continue
+        if "fingerprint" in entry:
+            keys.add(str(entry["fingerprint"]))
+        else:
+            # Legacy format migration: synthesise a non-colliding key.
+            legacy = _legacy_key(entry)
+            if legacy:
+                keys.add(legacy)
     return keys
 
 
-def save_baseline(findings: list[Finding], path: Path) -> None:
-    """Write *findings* to a baseline JSON file, creating it if necessary.
+def save_baseline(
+    findings: list[Finding], path: Path, base: Path | None = None
+) -> None:
+    """Write *findings* to a baseline JSON file (creating it if necessary).
 
-    Paths are stored relative to the current working directory so the file
-    is portable across machines and CI environments.
+    Each entry stores ``fingerprint`` plus human-readable context fields so
+    the file remains diffable in code review.  Paths are stored relative to
+    *base* (default: ``Path.cwd()``) for portability across machines and CI.
     """
-    cwd = Path.cwd()
+    base = base or Path.cwd()
     entries = [
         {
-            "file_path": _relative_posix(f.location.file_path, cwd),
+            "fingerprint": f.fingerprint,
+            "file_path": _relative_posix(f.location.file_path, base),
             "pattern_type": f.pattern.type.name,
             "line": f.location.line,
         }
@@ -77,7 +111,7 @@ def save_baseline(findings: list[Finding], path: Path) -> None:
 
 
 def _relative_posix(file_path: Path, base: Path) -> str:
-    """Return *file_path* as a POSIX string relative to *base*, or absolute if not under *base*."""
+    """Return *file_path* as a POSIX string relative to *base*, or absolute."""
     try:
         return file_path.relative_to(base).as_posix()
     except ValueError:
@@ -88,14 +122,14 @@ def filter_baseline(
     findings: list[Finding],
     baseline: set[BaselineKey],
 ) -> tuple[list[Finding], list[Finding]]:
-    """Partition *findings* into (new_findings, suppressed_findings).
+    """Partition *findings* into ``(new_findings, suppressed_findings)``.
 
-    A finding is *suppressed* when its key matches an entry in the baseline.
+    A finding is suppressed when its fingerprint matches a baseline entry.
     """
     new: list[Finding] = []
     suppressed: list[Finding] = []
     for f in findings:
-        if _finding_key(f) in baseline:
+        if f.fingerprint in baseline:
             suppressed.append(f)
         else:
             new.append(f)

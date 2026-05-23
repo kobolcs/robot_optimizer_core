@@ -38,7 +38,6 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Literal,
     cast,
 )
 
@@ -59,10 +58,8 @@ if TYPE_CHECKING:
     from ..infrastructure.config import Settings
     from ..infrastructure.metrics.collector import MetricsCollector
 
+from ..application.services.analysis_service import ErrorHandling
 from ..premium import PremiumFeatureError
-
-# Supported error_handling values.
-ErrorHandling = Literal["raise", "skip", "warn"]
 
 
 @dataclasses.dataclass
@@ -124,55 +121,26 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
+def _str_analyzer_names(
+    analyzers: list[str | BaseAnalyzer] | None,
+) -> list[str] | None:
+    """Extract string analyzer names from a mixed name/instance list.
+
+    Returns None when *analyzers* is None or contains no string names,
+    which signals "run all registered analyzers" to the cache-key logic.
+    """
+    if not analyzers:
+        return None
+    names = [a for a in analyzers if isinstance(a, str)]
+    return names or None
+
+
 def _get_or_build_service() -> Any:
     """Build an AnalysisService wired via the composition context."""
     from ..composition.context import get_analysis_service
 
     return get_analysis_service()
 
-
-def _create_analyzer_instance(
-    name: str, config: dict[str, object] | None = None
-) -> BaseAnalyzer:
-    """Create a fresh analyzer instance, injecting per-analyzer config when provided."""
-    registry = get_container().resolve("analyzer_registry")
-    cls = registry.analyzers.get(name)
-    if cls is None:  # pragma: no cover
-        return cast("BaseAnalyzer", registry.create(name))
-    return cast("BaseAnalyzer", cls(config=config or {}))
-
-
-def _get_analyzer_instances(
-    analyzers: list[str | BaseAnalyzer] | None, settings: Settings
-) -> list[BaseAnalyzer]:
-    """Resolve a list of analyzer names/instances into concrete BaseAnalyzer objects."""
-    analyzer_config = settings.analyzer_config
-
-    if analyzers is None:
-        registry = get_container().resolve("analyzer_registry")
-        names = [
-            name
-            for name in registry.list()
-            if not getattr(
-                registry.analyzers.get(name), "requires_external_repo", False
-            )
-        ]
-        return [
-            _create_analyzer_instance(name, analyzer_config.get(name))
-            for name in names
-        ]
-
-    instances = []
-    for analyzer in analyzers:
-        match analyzer:
-            case str():
-                instances.append(
-                    _create_analyzer_instance(analyzer, analyzer_config.get(analyzer))
-                )
-            case _:
-                instances.append(analyzer)
-
-    return instances
 
 
 def analyze_file(
@@ -211,83 +179,23 @@ def analyze_file(
         ...     print(f"{finding.severity.name}: {finding.message}")
     """
     path = Path(file_path)
-
     if not path.exists():
         raise RobotFileNotFoundError(path)
 
-    if settings is None or metrics is None:
-        container = get_container()
-        if settings is None:
-            settings = container.resolve("settings")
-        if metrics is None:
-            metrics = container.resolve("metrics")
-
-    try:
-        file_size = path.stat().st_size
-        if file_size > settings.max_file_size_bytes:
-            raise AnalysisError(
-                f"File exceeds maximum size: {path} "
-                f"({file_size} bytes, limit: {settings.max_file_size_bytes} bytes)",
-                file_path=path,
-            )
-
-        test_file = TestFile.from_path(path)
-    except AnalysisError:
-        raise
-    except Exception as e:
-        raise AnalysisError(f"Failed to load file: {e}", file_path=path) from e
-
-    analyzer_instances = _get_analyzer_instances(analyzers, settings)
-    analyzer_names: list[str] = []
-    all_findings: list[Finding] = []
+    service = _get_or_build_service()
+    resolved_settings = settings or service.settings
     t0 = time.time()
-
-    for analyzer in analyzer_instances:
-        analyzer_name = analyzer.name
-        analyzer_names.append(analyzer_name)
-
-        if pattern_filter is not None and analyzer_name not in pattern_filter:
-            continue
-
-        logger.debug("Starting analysis: %s on %s", analyzer_name, path)
-        start_time = time.time()
-
-        try:
-            findings = analyzer.safe_analyze(test_file)
-            all_findings.extend(findings)
-
-            duration = time.time() - start_time
-            logger.debug(
-                "Analysis complete: %s on %s — %d finding(s) in %.3fs",
-                analyzer_name, path, len(findings), duration,
-            )
-
-            metrics.increment("analysis.completed")
-            metrics.timing(f"analyzer.{analyzer_name}.duration", duration)
-            metrics.gauge(f"analyzer.{analyzer_name}.findings", len(findings))
-
-        except AnalysisError:
-            metrics.increment("analysis.failed")
-            raise
-
-        except Exception as e:
-            metrics.increment("analysis.failed")
-            metrics.increment(f"analyzer.{analyzer_name}.failed")
-            raise AnalysisError(
-                f"Analysis failed: {e}", file_path=path, analyzer=analyzer_name
-            ) from e
-
+    findings = service._run_file_analysis(
+        path, analyzers, resolved_settings, min_severity, pattern_filter, metrics
+    )
     duration_ms = (time.time() - t0) * 1000
-    metrics.gauge("findings.total", len(all_findings))
 
-    if min_severity is not None:
-        all_findings = [f for f in all_findings if f.severity <= min_severity]
-
+    analyzer_instances = service._get_analyzer_instances(analyzers, resolved_settings)
     meta = AnalysisMeta(
         duration_ms=duration_ms,
-        analyzer_names=tuple(analyzer_names),
+        analyzer_names=tuple(a.name for a in analyzer_instances),
     )
-    return FileAnalysisResult(file_path=path, findings=all_findings, meta=meta)
+    return FileAnalysisResult(file_path=path, findings=findings, meta=meta)
 
 
 def _analyze_one_file(
@@ -397,9 +305,7 @@ def analyze_directory(
             metrics=metrics,
             use_cache=use_cache,
             min_severity=min_severity,
-            analyzer_names=[
-                a for a in (analyzers or []) if isinstance(a, str)
-            ] or None,
+            analyzer_names=_str_analyzer_names(analyzers),
         ),
     )
 
@@ -555,7 +461,8 @@ def analyze_suite(
 
     if settings is None:
         settings = container.resolve("settings")
-    analyzer_instances = _get_analyzer_instances(analyzers, settings)
+    service = _get_or_build_service()
+    analyzer_instances = service._get_analyzer_instances(analyzers, settings)
 
     suite_aware_analyzers: list[SuiteAwareAnalyzer] = []
     other_analyzers: list[BaseAnalyzer] = []

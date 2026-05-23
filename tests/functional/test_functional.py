@@ -61,9 +61,9 @@ EXPECTED_BY_FILE: dict[str, int] = {
 # analyzer messages don't change.
 KNOWN_FINGERPRINTS = {
     # Sleep 5s in checkout.robot:19
-    "checkout_sleep_5s": "b3a16b9595d062dd",
+    "checkout_sleep_5s": "c92ae2fa5a977d6d",
     # Hardcoded URL in checkout.robot:25
-    "checkout_hardcoded_url": "c8ae980756bb5b89",
+    "checkout_hardcoded_url": "31a549b1d24fcd6e",
 }
 
 

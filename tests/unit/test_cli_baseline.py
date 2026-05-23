@@ -17,7 +17,6 @@ from robot_optimizer_core.domain.value_objects import (
 )
 from robot_optimizer_core.entrypoints.cli._baseline import (
     BaselineKey,
-    _finding_key,
     filter_baseline,
     load_baseline,
     save_baseline,
@@ -50,34 +49,6 @@ def _make_finding(
 
 
 # ---------------------------------------------------------------------------
-# _finding_key
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-class TestFindingKey:
-    def test_key_components(self) -> None:
-        f = _make_finding(file_path=Path("tests/suite.robot"), line=42)
-        key = _finding_key(f)
-        assert key == ("tests/suite.robot", "SLEEP_IN_TEST", 42)
-
-    def test_uses_posix_path(self) -> None:
-        f = _make_finding(file_path=Path("a/b/c.robot"), line=1)
-        file_part, *_ = _finding_key(f)
-        assert "\\" not in file_part
-
-    def test_different_pattern_types_give_different_keys(self) -> None:
-        f1 = _make_finding(pattern_type=PatternType.SLEEP_IN_TEST)
-        f2 = _make_finding(pattern_type=PatternType.DUPLICATE_KEYWORD)
-        assert _finding_key(f1) != _finding_key(f2)
-
-    def test_different_lines_give_different_keys(self) -> None:
-        f1 = _make_finding(line=1)
-        f2 = _make_finding(line=2)
-        assert _finding_key(f1) != _finding_key(f2)
-
-
-# ---------------------------------------------------------------------------
 # load_baseline
 # ---------------------------------------------------------------------------
 
@@ -88,7 +59,20 @@ class TestLoadBaseline:
         result = load_baseline(tmp_path / "nonexistent.json")
         assert result == set()
 
-    def test_loads_valid_file(self, tmp_path: Path) -> None:
+    def test_loads_fingerprint_format(self, tmp_path: Path) -> None:
+        f = _make_finding()
+        baseline_file = tmp_path / "baseline.json"
+        baseline_file.write_text(
+            json.dumps([{"fingerprint": f.fingerprint, "file_path": "suite.robot",
+                         "pattern_type": "SLEEP_IN_TEST", "line": 10}]),
+            encoding="utf-8",
+        )
+        keys = load_baseline(baseline_file)
+        assert f.fingerprint in keys
+        assert len(keys) == 1
+
+    def test_loads_legacy_format(self, tmp_path: Path) -> None:
+        """Old (file_path, pattern_type, line) entries are read without crashing."""
         baseline_file = tmp_path / "baseline.json"
         baseline_file.write_text(
             json.dumps([
@@ -98,9 +82,10 @@ class TestLoadBaseline:
             encoding="utf-8",
         )
         keys = load_baseline(baseline_file)
-        assert ("suite.robot", "SLEEP_IN_TEST", 10) in keys
-        assert ("other.robot", "DUPLICATE_KEYWORD", 5) in keys
+        # Legacy keys are stored as synthetic strings — they won't match real fingerprints.
         assert len(keys) == 2
+        for k in keys:
+            assert k.startswith("legacy:")
 
     def test_invalid_json_raises_value_error(self, tmp_path: Path) -> None:
         baseline_file = tmp_path / "bad.json"
@@ -108,28 +93,38 @@ class TestLoadBaseline:
         with pytest.raises(ValueError, match="Cannot parse baseline"):
             load_baseline(baseline_file)
 
+    def test_os_error_raises_value_error(self, tmp_path: Path) -> None:
+        baseline_file = tmp_path / "unreadable.json"
+        baseline_file.write_text("[]", encoding="utf-8")
+        baseline_file.chmod(0o000)
+        try:
+            with pytest.raises(ValueError, match="Cannot read baseline"):
+                load_baseline(baseline_file)
+        finally:
+            baseline_file.chmod(0o644)
+
     def test_skips_malformed_entries(self, tmp_path: Path) -> None:
+        f = _make_finding()
         baseline_file = tmp_path / "baseline.json"
         baseline_file.write_text(
             json.dumps([
-                {"file_path": "suite.robot", "pattern_type": "SLEEP_IN_TEST", "line": 10},
-                {"missing_key": True},
+                {"fingerprint": f.fingerprint},
                 None,
+                123,
             ]),
             encoding="utf-8",
         )
         keys = load_baseline(baseline_file)
+        assert f.fingerprint in keys
         assert len(keys) == 1
-        assert ("suite.robot", "SLEEP_IN_TEST", 10) in keys
 
-    def test_line_coerced_to_int(self, tmp_path: Path) -> None:
+    def test_inject_base_for_hermetic_loading(self, tmp_path: Path) -> None:
+        """load_baseline accepts an explicit base so tests don't need monkeypatch."""
+        f = _make_finding()
         baseline_file = tmp_path / "baseline.json"
-        baseline_file.write_text(
-            json.dumps([{"file_path": "a.robot", "pattern_type": "NO_TAGS", "line": "7"}]),
-            encoding="utf-8",
-        )
-        keys = load_baseline(baseline_file)
-        assert ("a.robot", "NO_TAGS", 7) in keys
+        save_baseline([f], baseline_file, base=tmp_path)
+        keys = load_baseline(baseline_file, base=tmp_path)
+        assert f.fingerprint in keys
 
 
 # ---------------------------------------------------------------------------
@@ -142,7 +137,7 @@ class TestSaveBaseline:
     def test_creates_file(self, tmp_path: Path) -> None:
         baseline_file = tmp_path / "baseline.json"
         f = _make_finding()
-        save_baseline([f], baseline_file)
+        save_baseline([f], baseline_file, base=tmp_path)
         assert baseline_file.exists()
 
     def test_written_entries_are_loadable(self, tmp_path: Path) -> None:
@@ -151,25 +146,46 @@ class TestSaveBaseline:
             _make_finding(file_path=Path("a.robot"), line=1),
             _make_finding(file_path=Path("b.robot"), line=99, pattern_type=PatternType.NO_TAGS),
         ]
-        save_baseline(findings, baseline_file)
-        keys = load_baseline(baseline_file)
-        assert ("a.robot", "SLEEP_IN_TEST", 1) in keys
-        assert ("b.robot", "NO_TAGS", 99) in keys
+        save_baseline(findings, baseline_file, base=tmp_path)
+        keys = load_baseline(baseline_file, base=tmp_path)
+        for f in findings:
+            assert f.fingerprint in keys
         assert len(keys) == 2
+
+    def test_entry_contains_human_readable_fields(self, tmp_path: Path) -> None:
+        baseline_file = tmp_path / "baseline.json"
+        f = _make_finding(line=42)
+        save_baseline([f], baseline_file, base=tmp_path)
+        data = json.loads(baseline_file.read_text())
+        assert data[0]["fingerprint"] == f.fingerprint
+        assert data[0]["pattern_type"] == "SLEEP_IN_TEST"
+        assert data[0]["line"] == 42
 
     def test_empty_findings_writes_empty_array(self, tmp_path: Path) -> None:
         baseline_file = tmp_path / "baseline.json"
-        save_baseline([], baseline_file)
+        save_baseline([], baseline_file, base=tmp_path)
         data = json.loads(baseline_file.read_text())
         assert data == []
 
     def test_overwrites_existing_file(self, tmp_path: Path) -> None:
         baseline_file = tmp_path / "baseline.json"
-        save_baseline([_make_finding(line=1)], baseline_file)
-        save_baseline([_make_finding(line=2)], baseline_file)
-        keys = load_baseline(baseline_file)
+        f1 = _make_finding(line=1)
+        f2 = _make_finding(line=2)
+        save_baseline([f1], baseline_file, base=tmp_path)
+        save_baseline([f2], baseline_file, base=tmp_path)
+        keys = load_baseline(baseline_file, base=tmp_path)
+        assert f2.fingerprint in keys
+        assert f1.fingerprint not in keys
         assert len(keys) == 1
-        assert ("suite.robot", "SLEEP_IN_TEST", 2) in keys
+
+    def test_base_controls_relative_path(self, tmp_path: Path) -> None:
+        """file_path stored relative to base, not cwd."""
+        robot_file = tmp_path / "sub" / "test.robot"
+        f = _make_finding(file_path=robot_file, line=5)
+        baseline_file = tmp_path / "baseline.json"
+        save_baseline([f], baseline_file, base=tmp_path)
+        data = json.loads(baseline_file.read_text())
+        assert data[0]["file_path"] == "sub/test.robot"
 
 
 # ---------------------------------------------------------------------------
@@ -188,7 +204,7 @@ class TestFilterBaseline:
     def test_full_match_everything_suppressed(self) -> None:
         f1 = _make_finding(line=1)
         f2 = _make_finding(line=2)
-        baseline: set[BaselineKey] = {_finding_key(f1), _finding_key(f2)}
+        baseline: set[BaselineKey] = {f1.fingerprint, f2.fingerprint}
         new, suppressed = filter_baseline([f1, f2], baseline)
         assert new == []
         assert suppressed == [f1, f2]
@@ -196,7 +212,7 @@ class TestFilterBaseline:
     def test_partial_match(self) -> None:
         f1 = _make_finding(line=1)
         f2 = _make_finding(line=2)
-        baseline: set[BaselineKey] = {_finding_key(f1)}
+        baseline: set[BaselineKey] = {f1.fingerprint}
         new, suppressed = filter_baseline([f1, f2], baseline)
         assert new == [f2]
         assert suppressed == [f1]
@@ -204,7 +220,7 @@ class TestFilterBaseline:
     def test_different_file_not_suppressed(self) -> None:
         baseline_finding = _make_finding(file_path=Path("a.robot"), line=10)
         current_finding = _make_finding(file_path=Path("b.robot"), line=10)
-        baseline: set[BaselineKey] = {_finding_key(baseline_finding)}
+        baseline: set[BaselineKey] = {baseline_finding.fingerprint}
         new, suppressed = filter_baseline([current_finding], baseline)
         assert new == [current_finding]
         assert suppressed == []
@@ -212,7 +228,7 @@ class TestFilterBaseline:
     def test_different_line_not_suppressed(self) -> None:
         baseline_finding = _make_finding(line=10)
         current_finding = _make_finding(line=11)
-        baseline: set[BaselineKey] = {_finding_key(baseline_finding)}
+        baseline: set[BaselineKey] = {baseline_finding.fingerprint}
         new, suppressed = filter_baseline([current_finding], baseline)
         assert new == [current_finding]
         assert suppressed == []
@@ -220,12 +236,22 @@ class TestFilterBaseline:
     def test_different_pattern_type_not_suppressed(self) -> None:
         baseline_finding = _make_finding(pattern_type=PatternType.SLEEP_IN_TEST)
         current_finding = _make_finding(pattern_type=PatternType.DUPLICATE_KEYWORD)
-        baseline: set[BaselineKey] = {_finding_key(baseline_finding)}
+        baseline: set[BaselineKey] = {baseline_finding.fingerprint}
         new, suppressed = filter_baseline([current_finding], baseline)
         assert new == [current_finding]
         assert suppressed == []
 
     def test_empty_findings_returns_empty(self) -> None:
-        new, suppressed = filter_baseline([], {("x.robot", "SLEEP_IN_TEST", 1)})
+        new, suppressed = filter_baseline([], {"some-fingerprint-key"})
         assert new == []
+        assert suppressed == []
+
+    def test_message_change_not_suppressed(self) -> None:
+        """fingerprint includes message so wording changes are treated as new."""
+        f1 = _make_finding(message="Sleep 5s detected")
+        f2 = _make_finding(message="Sleep 10s detected")
+        assert f1.fingerprint != f2.fingerprint
+        baseline: set[BaselineKey] = {f1.fingerprint}
+        new, suppressed = filter_baseline([f2], baseline)
+        assert new == [f2]
         assert suppressed == []

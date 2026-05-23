@@ -30,7 +30,7 @@ def _make_finding(severity: Severity = Severity.WARNING) -> Finding:
         id=uuid4(),
         pattern=Pattern.sleep_in_test("1s"),
         severity=severity,
-        location=Location(Path("test.robot"), 1),
+        location=Location(file_path=Path("test.robot"), line=1),
         message="test finding",
         context={},
     )
@@ -142,24 +142,31 @@ class TestAnalysisService:
         reset_container()
 
     def test_init_with_custom_settings(self) -> None:
+        base = AnalysisService.from_container()
         settings = Settings(max_file_size_mb=1.0)
-        svc = AnalysisService(settings=settings)
+        svc = AnalysisService(
+            settings=settings,
+            metrics=base._metrics,
+            file_discovery=base._file_discovery,
+            registry=base._registry,
+            cache=base._cache,
+        )
         assert svc.settings.max_file_size_mb == 1.0
 
     def test_init_without_settings_uses_container(self) -> None:
-        svc = AnalysisService()
+        svc = AnalysisService.from_container()
         assert svc.settings is not None
 
     def test_analyze_file_success(self, tmp_path: Path) -> None:
         f = tmp_path / "t.robot"
         f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
-        svc = AnalysisService()
+        svc = AnalysisService.from_container()
         result = svc.analyze_file(f)
         assert result.is_success
         assert isinstance(result.findings, list)
 
     def test_analyze_file_error_captured(self, tmp_path: Path) -> None:
-        svc = AnalysisService()
+        svc = AnalysisService.from_container()
         result = svc.analyze_file(tmp_path / "nonexistent.robot")
         assert not result.is_success
         assert result.error is not None
@@ -167,14 +174,14 @@ class TestAnalysisService:
     def test_analyze_file_returns_path(self, tmp_path: Path) -> None:
         f = tmp_path / "t.robot"
         f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
-        svc = AnalysisService()
+        svc = AnalysisService.from_container()
         result = svc.analyze_file(f)
         assert result.file_path == f
 
     def test_analyze_directory_returns_result(self, tmp_path: Path) -> None:
         f = tmp_path / "t.robot"
         f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
-        svc = AnalysisService()
+        svc = AnalysisService.from_container()
         result = svc.analyze_directory(tmp_path)
         assert isinstance(result, DirectoryAnalysisResult)
         assert result.success_count >= 1
@@ -182,25 +189,25 @@ class TestAnalysisService:
     def test_analyze_directory_string_path(self, tmp_path: Path) -> None:
         f = tmp_path / "t.robot"
         f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
-        svc = AnalysisService()
+        svc = AnalysisService.from_container()
         result = svc.analyze_directory(str(tmp_path))
         assert isinstance(result, DirectoryAnalysisResult)
 
     def test_list_analyzers_returns_dict(self) -> None:
-        svc = AnalysisService()
+        svc = AnalysisService.from_container()
         analyzers = svc.list_analyzers()
         assert isinstance(analyzers, dict)
         assert len(analyzers) > 0
 
     def test_list_analyzers_has_known_analyzer(self) -> None:
-        svc = AnalysisService()
+        svc = AnalysisService.from_container()
         analyzers = svc.list_analyzers()
         assert "dead_code" in analyzers or "sleep_detector" in analyzers
 
     def test_analyze_file_with_severity_filter(self, tmp_path: Path) -> None:
         f = tmp_path / "t.robot"
         f.write_bytes(b"*** Test Cases ***\nT\n    Sleep    5s\n")
-        svc = AnalysisService()
+        svc = AnalysisService.from_container()
         result = svc.analyze_file(f, min_severity=Severity.ERROR)
         # Should succeed; findings filtered by severity
         assert result.is_success
@@ -208,7 +215,7 @@ class TestAnalysisService:
     def test_analyze_file_with_specific_analyzers(self, tmp_path: Path) -> None:
         f = tmp_path / "t.robot"
         f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
-        svc = AnalysisService()
+        svc = AnalysisService.from_container()
         result = svc.analyze_file(f, analyzers=["dead_code"])
         assert result.is_success
 
@@ -220,7 +227,7 @@ class TestAnalysisService:
 
         f = tmp_path / "t.robot"
         f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
-        svc = AnalysisService()
+        svc = AnalysisService.from_container()
         findings = svc._run_file_analysis(
             f, analyzers=[DeadCodeAnalyzer()], settings=None,
             min_severity=None, pattern_filter=None,
@@ -234,7 +241,14 @@ class TestAnalysisService:
         f = tmp_path / "big.robot"
         f.write_bytes(b"x" * 150_000)
         settings = Settings(max_file_size_mb=0.1)
-        svc = AnalysisService(settings=settings)
+        base = AnalysisService.from_container()
+        svc = AnalysisService(
+            settings=settings,
+            metrics=base._metrics,
+            file_discovery=base._file_discovery,
+            registry=base._registry,
+            cache=base._cache,
+        )
 
         with pytest.raises(AnalysisError, match="exceeds maximum size"):
             svc._run_file_analysis(
@@ -248,7 +262,7 @@ class TestAnalysisService:
         f = tmp_path / "t.robot"
         f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
 
-        svc = AnalysisService()
+        svc = AnalysisService.from_container()
 
         def _noop(fp: Path) -> tuple[Path, list[Finding]]:
             return fp, []
@@ -272,7 +286,7 @@ class TestAnalysisService:
         """pattern_filter that matches nothing should return empty findings."""
         f = tmp_path / "t.robot"
         f.write_bytes(b"*** Test Cases ***\nT\n    Sleep    5s\n")
-        svc = AnalysisService()
+        svc = AnalysisService.from_container()
         findings = svc._run_file_analysis(
             f, analyzers=None, settings=None,
             min_severity=None, pattern_filter=["nonexistent_analyzer"],
@@ -285,7 +299,7 @@ class TestAnalysisService:
 
         f = tmp_path / "binary.robot"
         f.write_bytes(b"\x00\x01\x02binary content")
-        svc = AnalysisService()
+        svc = AnalysisService.from_container()
         with pytest.raises(AnalysisError, match="Failed to load file"):
             svc._run_file_analysis(
                 f, analyzers=None, settings=None,
@@ -312,7 +326,7 @@ class TestAnalysisService:
 
         f = tmp_path / "t.robot"
         f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
-        svc = AnalysisService()
+        svc = AnalysisService.from_container()
         with pytest.raises(AnalysisError, match="deliberate"):
             svc._run_file_analysis(
                 f, analyzers=[_RaisingAnalyzer()], settings=None,
@@ -331,9 +345,11 @@ class TestAnalysisService:
             def get_info(self, _name: str) -> dict:
                 raise RuntimeError("boom")
 
+        base = AnalysisService.from_container()
         svc = AnalysisService(
             settings=get_settings(),
             metrics=get_metrics(),
+            file_discovery=base._file_discovery,
             registry=_BrokenRegistry(),
         )
         result = svc.list_analyzers()
@@ -356,20 +372,19 @@ class TestCacheKeyCorrectness:
     _SLEEP_ROBOT = b"*** Test Cases ***\nMy Test\n    Sleep    5\n"
 
     def _make_service(self, cache_dir: Path) -> AnalysisService:
-        from robot_optimizer_core.composition.container import get_container
         from robot_optimizer_core.infrastructure.cache.analysis_cache import (
             AnalysisCache,
         )
         from robot_optimizer_core.infrastructure.metrics.collector import get_metrics
 
-        container = get_container()
-        svc = AnalysisService(
+        base = AnalysisService.from_container()
+        return AnalysisService(
             settings=Settings(),
             metrics=get_metrics(),
-            registry=container.resolve("analyzer_registry"),
+            file_discovery=base._file_discovery,
+            registry=base._registry,
             cache=AnalysisCache(cache_dir=cache_dir),
         )
-        return svc
 
     def test_severity_filter_applied_to_cache_hits(self, tmp_path: Path) -> None:
         """A second run with min_severity must filter even when results come from cache."""

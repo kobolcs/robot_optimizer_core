@@ -35,11 +35,23 @@ class Finding(ValueObject):
         use_enum_values=False,
     )
 
-    # id is excluded from __eq__ and __hash__ intentionally: Finding is a
-    # value object identified by its content (pattern + location + severity),
-    # not by UUID.  Two findings with identical content are equal regardless
-    # of when they were created.  id is kept for stable external referencing
-    # (SARIF result IDs, baseline keys) but must not participate in equality.
+    # Identity hierarchy — three levels, each serving a different purpose:
+    #
+    # 1. __eq__ / __hash__  (pattern, severity, location, message)
+    #    Value equality within a single run.  Two findings describing the same
+    #    problem at the same location are equal regardless of id or context.
+    #
+    # 2. fingerprint  SHA-256(pattern_type, file_path, line, message[:120])
+    #    Cross-run stable ID.  Used by the watch-mode diff so that an unchanged
+    #    finding is never reported as new or resolved across re-analysis cycles.
+    #
+    # 3. BaselineKey  (relative_file_path, pattern_type_name, line)  [_baseline.py]
+    #    Suppression key for the --baseline workflow.  Intentionally omits the
+    #    message so that a finding whose wording changes is still suppressed.
+    #    If you change this contract, update _baseline.py and the baseline docs.
+    #
+    # id is kept only for stable external referencing (SARIF result IDs) and
+    # must not participate in any of the three equality / identity checks above.
     id: UUID = Field(default_factory=uuid4, description="Unique finding ID")
     pattern: Pattern = Field(..., description="The pattern that was matched")
     severity: Severity = Field(..., description="Severity level")
@@ -215,26 +227,6 @@ class Finding(ValueObject):
                 lines.append(f"   {key}: {value}")
 
         return "\n".join(lines)
-
-    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
-        # In non-JSON mode we return Python objects rather than serialized
-        # primitives so callers that need live Pattern/Location/Severity
-        # instances (e.g. formatters, analyzers) do not have to re-construct
-        # them.  JSON mode delegates to Pydantic's full serializer so that
-        # computed fields (file_path, line_number, …) are included.
-        if kwargs.get("mode") == "json":
-            return super().model_dump(**kwargs)
-        return {
-            "id": self.id,
-            "pattern": self.pattern,
-            "severity": self.severity,
-            "location": self.location,
-            "message": self.message,
-            "context": self.context,
-            "confidence": self.confidence,
-            "tags": self.tags,
-            "remediation": self.remediation,
-        }
 
     def to_dict(self) -> dict[str, Any]:
         """Convert finding to a dictionary for serialization."""

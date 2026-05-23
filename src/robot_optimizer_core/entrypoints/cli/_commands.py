@@ -184,6 +184,7 @@ def _print_watch_diff(new_findings: list[Finding], resolved_findings: list[Findi
 
 
 _WATCHED_EXTENSIONS = frozenset({".robot", ".resource"})
+_WATCH_DEBOUNCE_SECONDS: float = 0.5  # editors may write in multiple steps (save + format)
 
 
 def _run_watch_mode(
@@ -269,7 +270,7 @@ def _run_watch_mode(
             if file_path.suffix not in _WATCHED_EXTENSIONS:
                 return
 
-            time.sleep(0.1)  # debounce
+            time.sleep(_WATCH_DEBOUNCE_SECONDS)
 
             print(f"\n[*] File changed: {file_path}", file=sys.stderr)
             prev_flat = _flatten_state(state)
@@ -439,10 +440,8 @@ def _print_baseline_summary(
 def _print_summary(findings: list[Finding]) -> None:
     if not findings:
         return
-    counts: dict[str, int] = {}
-    for f in findings:
-        key = f.severity.name.upper()
-        counts[key] = counts.get(key, 0) + 1
+    from collections import Counter
+    counts = Counter(f.severity.name for f in findings)
     parts = ", ".join(f"{v} {k}" for k, v in sorted(counts.items()))
     print(f"Summary: {len(findings)} finding(s)  [{parts}]", file=sys.stderr)
 

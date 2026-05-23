@@ -133,16 +133,22 @@ def test_analyze_file_uses_safe_analyze(
 
     calls: list[str] = []
 
-    class HookedAnalyzer:
+    class _FakeAnalyzer:
         name = "hooked"
 
-        def safe_analyze(self, test_file: object) -> list[Finding]:
+    class _FakeService:
+        settings = None
+
+        def _run_file_analysis(self, *args, **kwargs):
             calls.append("safe")
             return []
 
+        def _get_analyzer_instances(self, analyzers, settings):
+            return [_FakeAnalyzer()]
+
     monkeypatch.setattr(
-        "robot_optimizer_core.entrypoints.public_api._get_analyzer_instances",
-        lambda analyzers, settings: [HookedAnalyzer()],
+        "robot_optimizer_core.entrypoints.public_api._get_or_build_service",
+        lambda: _FakeService(),
     )
 
     result = analyze_file(robot_file)
@@ -342,18 +348,23 @@ def test_analyze_file_wraps_load_exception(
 def test_analyze_file_analyzer_failure_raises_analysis_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    from robot_optimizer_core.exceptions import AnalysisError as _AE
+
     robot_file = tmp_path / "t.robot"
     robot_file.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
 
-    class ExplodingAnalyzer:
-        name = "exploder"
+    class _ExplodingService:
+        settings = None
 
-        def safe_analyze(self, test_file: object) -> list:
-            raise RuntimeError("analyzer boom")
+        def _run_file_analysis(self, *args, **kwargs):
+            raise _AE("Analysis failed: analyzer boom", file_path=robot_file)
+
+        def _get_analyzer_instances(self, *args, **kwargs):
+            return []
 
     monkeypatch.setattr(
-        "robot_optimizer_core.entrypoints.public_api._get_analyzer_instances",
-        lambda *a, **kw: [ExplodingAnalyzer()],
+        "robot_optimizer_core.entrypoints.public_api._get_or_build_service",
+        lambda: _ExplodingService(),
     )
 
     with pytest.raises(AnalysisError, match="Analysis failed"):
@@ -513,7 +524,7 @@ def test_load_test_files_logs_warning_on_bad_file(
 
 @pytest.mark.unit
 def test_get_analyzer_instances_passes_through_instance(tmp_path: Path) -> None:
-    from robot_optimizer_core.entrypoints.public_api import _get_analyzer_instances
+    from robot_optimizer_core.composition.context import get_analysis_service
     from robot_optimizer_core.infrastructure.config import Settings
 
     class FakeAnalyzer:
@@ -523,7 +534,8 @@ def test_get_analyzer_instances_passes_through_instance(tmp_path: Path) -> None:
             return []
 
     fake = FakeAnalyzer()
-    result = _get_analyzer_instances([fake], Settings())
+    service = get_analysis_service()
+    result = service._get_analyzer_instances([fake], Settings())
     assert fake in result
 
 

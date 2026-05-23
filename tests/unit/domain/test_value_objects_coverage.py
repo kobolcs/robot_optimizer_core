@@ -56,7 +56,7 @@ class TestLocationCoverage:
             column=5,
             end_line=15
         )
-        assert loc.range_str == "test.robot:10:5-15:"
+        assert loc.range_str == "test.robot:10:5-15"
 
 
 class TestFindingCoverage:
@@ -73,7 +73,7 @@ class TestFindingCoverage:
         finding = Finding.create(
             pattern=pattern,
             severity=Severity.ERROR,
-            location=Location(Path("test.robot"), 10),
+            location=Location(file_path=Path("test.robot"), line=10),
             message="Duplicate found"
         )
 
@@ -87,7 +87,7 @@ class TestFindingCoverage:
         finding = Finding.create(
             pattern=pattern,
             severity=Severity.WARNING,
-            location=Location(Path("test.robot"), 10, 5),
+            location=Location(file_path=Path("test.robot"), line=10, column=5),
             message="Sleep detected",
             duration="2s",
             line_text="Sleep    2s"
@@ -109,7 +109,7 @@ class TestOptimizationSuggestionCoverage:
         finding = Finding.create(
             pattern=Pattern.sleep_in_test("1s"),
             severity=Severity.WARNING,
-            location=Location(Path("test.robot"), 1),
+            location=Location(file_path=Path("test.robot"), line=1),
             message="Test"
         )
 
@@ -166,7 +166,7 @@ class TestOptimizationSuggestionCoverage:
         finding = Finding.create(
             pattern=Pattern.sleep_in_test("1s"),
             severity=Severity.WARNING,
-            location=Location(Path("test.robot"), 1),
+            location=Location(file_path=Path("test.robot"), line=1),
             message="Test"
         )
 

@@ -356,7 +356,7 @@ class MockFactory:
             "id": uuid4(),
             "pattern": Pattern.sleep_in_test("5s"),
             "severity": Severity.WARNING,
-            "location": Location(Path("test.robot"), 10),
+            "location": Location(file_path=Path("test.robot"), line=10),
             "message": "Test finding",
             "context": {},
         }

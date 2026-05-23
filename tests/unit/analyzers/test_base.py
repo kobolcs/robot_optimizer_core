@@ -54,7 +54,7 @@ class ConcreteAnalyzer(BaseAnalyzer):
             Finding.create(
                 pattern=Pattern.sleep_in_test("1s"),
                 severity=Severity.WARNING,
-                location=Location(test_file.path, 1),
+                location=Location(file_path=test_file.path, line=1),
                 message="Test finding",
             )
         ]
@@ -167,7 +167,7 @@ class TestBaseAnalyzer:
         valid_finding = Finding.create(
             pattern=Pattern.sleep_in_test("1s"),
             severity=Severity.WARNING,
-            location=Location(test_file.path, 2),
+            location=Location(file_path=test_file.path, line=2),
             message="Valid",
         )
 
@@ -175,7 +175,7 @@ class TestBaseAnalyzer:
         wrong_path = Finding.create(
             pattern=Pattern.sleep_in_test("1s"),
             severity=Severity.WARNING,
-            location=Location(Path("wrong.robot"), 10),
+            location=Location(file_path=Path("wrong.robot"), line=10),
             message="Wrong path",
         )
 
@@ -183,7 +183,7 @@ class TestBaseAnalyzer:
         invalid_line = Finding.create(
             pattern=Pattern.sleep_in_test("1s"),
             severity=Severity.WARNING,
-            location=Location(test_file.path, 999),
+            location=Location(file_path=test_file.path, line=999),
             message="Invalid line",
         )
 
@@ -246,7 +246,7 @@ class TestBaseAnalyzer:
                 extra = Finding.create(
                     pattern=Pattern.duplicate_keyword("Test"),
                     severity=Severity.ERROR,
-                    location=Location(test_file.path, 2),
+                    location=Location(file_path=test_file.path, line=2),
                     message="Added in post",
                 )
                 return findings + [extra]

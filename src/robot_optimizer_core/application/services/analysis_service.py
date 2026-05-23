@@ -299,34 +299,42 @@ class AnalysisService:
     as a fallback when a dependency is not provided.
 
     Example:
-        >>> service = AnalysisService()
+        >>> service = AnalysisService.from_container()
         >>> result = service.analyze_file("tests/login.robot")
         >>> print(f"Found {len(result.findings)} issues")
     """
 
     def __init__(
         self,
-        settings: Settings | None = None,
-        metrics: IMetrics | None = None,
-        file_discovery: IFileDiscovery | None = None,
-        registry: IAnalyzerRegistry | None = None,
+        settings: Settings,
+        metrics: IMetrics,
+        file_discovery: IFileDiscovery,
+        registry: IAnalyzerRegistry,
         cache: IAnalysisCache | None = None,
     ) -> None:
-        if settings is None or metrics is None or file_discovery is None or registry is None:
-            from ...composition.container import (
-                get_container,  # lazy: keeps app layer clean
-            )
-            container = get_container()
-            self.settings: Settings = settings or container.resolve("settings")
-            self._metrics: IMetrics = metrics or container.resolve("metrics")
-            self._file_discovery: IFileDiscovery = file_discovery or container.resolve("file_discovery")
-            self._registry: IAnalyzerRegistry = registry or container.resolve("analyzer_registry")
-        else:
-            self.settings = settings
-            self._metrics = metrics
-            self._file_discovery = file_discovery
-            self._registry = registry
+        """All dependencies must be provided explicitly.
+
+        Use :meth:`from_container` to wire the service from the global DI
+        container instead of calling this constructor directly.
+        """
+        self.settings: Settings = settings
+        self._metrics: IMetrics = metrics
+        self._file_discovery: IFileDiscovery = file_discovery
+        self._registry: IAnalyzerRegistry = registry
         self._cache: IAnalysisCache | None = cache
+
+    @classmethod
+    def from_container(cls) -> "AnalysisService":
+        """Construct the service by resolving all dependencies from the global container."""
+        from ...composition.container import get_container
+        container = get_container()
+        return cls(
+            settings=container.resolve("settings"),
+            metrics=container.resolve("metrics"),
+            file_discovery=container.resolve("file_discovery"),
+            registry=container.resolve("analyzer_registry"),
+            cache=container.resolve("analysis_cache"),
+        )
 
     # ------------------------------------------------------------------
     # Analyzer resolution helpers
@@ -499,7 +507,9 @@ class AnalysisService:
                 pattern_filter=None,
             )
             return AnalysisResult(file_path=file_path, findings=findings)
-        except Exception as exc:
+        except (AnalysisError, RobotFileNotFoundError) as exc:
+            # Expected failure modes: missing file or analysis-level error.
+            # Any other exception (programming error, OOM, etc.) propagates.
             return AnalysisResult(file_path=file_path, findings=[], error=exc)
 
     # ------------------------------------------------------------------
@@ -641,9 +651,8 @@ class AnalysisService:
             )
             return fp, findings
 
-        str_analyzers = (
-            [a for a in analyzers if isinstance(a, str)] if analyzers else None
-        )
+        str_names = [a for a in analyzers if isinstance(a, str)] if analyzers else []
+        str_analyzers = str_names or None
         dir_results = self.run_directory_analysis(
             directory_path=directory_path,
             analyze_fn=_analyze_one,

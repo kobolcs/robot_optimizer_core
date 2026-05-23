@@ -313,7 +313,7 @@ class TestAnalyzerChaining:
                                         auto_fixable=True,
                                     ),
                                     severity=Severity.INFO,
-                                    location=Location(test_file.path, i),
+                                    location=Location(file_path=test_file.path, line=i),
                                     message=f"Keyword '{line.strip()}' should start with capital",
                                 )
                                 findings.append(finding)

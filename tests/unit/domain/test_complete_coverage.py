@@ -160,7 +160,7 @@ class TestCompleteCoverage:
         finding = Finding.create(
             pattern=Pattern.sleep_in_test("2s"),
             severity=Severity.WARNING,
-            location=Location(Path("test.robot"), 10),
+            location=Location(file_path=Path("test.robot"), line=10),
             message="Sleep found"
         )
 
@@ -235,7 +235,7 @@ class TestCompleteCoverage:
             Finding(
                 pattern=Pattern.sleep_in_test("1s"),
                 severity=Severity.WARNING,
-                location=Location(Path("test.robot"), 1),
+                location=Location(file_path=Path("test.robot"), line=1),
                 message="   \t\n   "
             )
 

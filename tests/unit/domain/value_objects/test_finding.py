@@ -242,7 +242,7 @@ class TestFinding:
             recommendation="Duplicate found",  # Same as message
         )
 
-        location = Location(Path("test.robot"), 10)
+        location = Location(file_path=Path("test.robot"), line=10)
         finding = Finding(
             pattern=pattern,
             severity=Severity.ERROR,
@@ -260,7 +260,7 @@ class TestFinding:
     def test_to_dict_conversion(self) -> None:
         """Test converting finding to dictionary."""
         pattern = Pattern.sleep_in_test("3s")
-        location = Location(Path("suite/test.robot"), 42, 15)
+        location = Location(file_path=Path("suite/test.robot"), line=42, column=15)
 
         finding = Finding.create(
             pattern=pattern,
@@ -292,7 +292,7 @@ class TestFinding:
     def test_model_serialization(self) -> None:
         """Test custom model serialization."""
         pattern = Pattern.duplicate_keyword("Test")
-        location = Location(Path("test.robot"), 10)
+        location = Location(file_path=Path("test.robot"), line=10)
 
         finding = Finding(
             pattern=pattern,
@@ -301,13 +301,12 @@ class TestFinding:
             message="Duplicate keyword",
         )
 
-        # Test model_dump (inherited from ValueObject)
-        dumped = finding.model_dump()
-        assert isinstance(dumped["id"], UUID)
-        assert dumped["pattern"] == pattern
-        assert dumped["severity"] == Severity.WARNING
+        # model_dump() uses Pydantic's standard serialization; access live
+        # objects via attributes, not model_dump().
+        assert finding.pattern == pattern
+        assert finding.severity == Severity.WARNING
 
-        # Test model_dump with mode='json'
+        # model_dump(mode="json") serialises to JSON-safe primitives.
         json_data = finding.model_dump(mode="json")
         assert isinstance(json_data["id"], str)  # UUID serialized to string
         assert isinstance(json_data["pattern"], dict)
@@ -316,7 +315,7 @@ class TestFinding:
     def test_finding_equality(self) -> None:
         """Test finding equality comparison."""
         pattern = Pattern.sleep_in_test("1s")
-        location = Location(Path("test.robot"), 10)
+        location = Location(file_path=Path("test.robot"), line=10)
 
         id1 = uuid4()
         finding1 = Finding(
@@ -359,7 +358,7 @@ class TestFinding:
     def test_finding_immutability(self) -> None:
         """Test that findings are immutable."""
         pattern = Pattern.sleep_in_test("1s")
-        location = Location(Path("test.robot"), 10)
+        location = Location(file_path=Path("test.robot"), line=10)
 
         finding = Finding(
             pattern=pattern,
@@ -380,7 +379,7 @@ class TestFinding:
     def test_finding_with_all_severity_levels(self) -> None:
         """Test findings with all severity levels."""
         pattern = Pattern.sleep_in_test("1s")
-        location = Location(Path("test.robot"), 10)
+        location = Location(file_path=Path("test.robot"), line=10)
 
         for severity in [Severity.ERROR, Severity.WARNING, Severity.INFO]:
             finding = Finding(

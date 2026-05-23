@@ -12,14 +12,14 @@ Example:
         from pathlib import Path
 
         # Simple location
-        loc = Location(Path("test.robot"), line=10)
+        loc = Location(file_path=Path("test.robot"), line=10)
 
         # Location with column
-        loc = Location(Path("test.robot"), line=10, column=5)
+        loc = Location(file_path=Path("test.robot"), line=10, column=5)
 
         # Location range
         loc = Location(
-            Path("test.robot"),
+            file_path=Path("test.robot"),
             line=10, column=5,
             end_line=15, end_column=20
         )
@@ -27,10 +27,10 @@ Example:
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
-from typing import Any
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from ..base import ValueObject
 
@@ -42,6 +42,8 @@ class Location(ValueObject):
     (start and end positions). This is used to precisely identify where
     findings occur in test files.
 
+    All arguments must be passed as keyword arguments.
+
     Attributes:
         file_path: Path to the file.
         line: Line number (1-based).
@@ -50,16 +52,12 @@ class Location(ValueObject):
         end_column: End column for ranges (optional).
 
     Example:
-        >>> loc = Location(Path("test.robot"), line=42)
+        >>> loc = Location(file_path=Path("test.robot"), line=42)
         >>> print(loc.range_str)
         test.robot:42
 
-        >>> # Positional arguments also work for convenience
-        >>> loc = Location(Path("test.robot"), 42)
-        >>> loc = Location(Path("test.robot"), 42, 5)  # with column
-
         >>> range_loc = Location(
-        ...     Path("test.robot"),
+        ...     file_path=Path("test.robot"),
         ...     line=10, column=5,
         ...     end_line=12, end_column=15
         ... )
@@ -73,228 +71,104 @@ class Location(ValueObject):
     end_line: int | None = Field(None, ge=1, description="End line for ranges")
     end_column: int | None = Field(None, ge=1, description="End column for ranges")
 
-    def __init__(
-        self,
-        file_path: Path | str | None = None,
-        line: int | None = None,
-        column: int | None = None,
-        end_line: int | None = None,
-        end_column: int | None = None,
-        **data: Any,
-    ):
-        """Initialize Location with flexible argument handling.
-
-        Supports both positional and keyword arguments for convenience.
-
-        Args:
-            file_path: Path to the file (positional or keyword)
-            line: Line number (positional or keyword)
-            column: Column number (positional or keyword, optional)
-            end_line: End line for ranges (keyword only, optional)
-            end_column: End column for ranges (keyword only, optional)
-            **data: Additional keyword arguments passed to Pydantic
-        """
-        # Build kwargs dict for Pydantic
-        init_data = data.copy()
-        if file_path is not None:
-            init_data["file_path"] = file_path
-        if line is not None:
-            init_data["line"] = line
-        if column is not None:
-            init_data["column"] = column
-        if end_line is not None:
-            init_data["end_line"] = end_line
-        if end_column is not None:
-            init_data["end_column"] = end_column
-
-        super().__init__(**init_data)
-
     @field_validator("file_path", mode="before")
     @classmethod
-    def ensure_path_object(cls, v: Any) -> Path:
-        """Ensure file_path is a Path object.
+    def ensure_path_object(cls, v: object) -> Path:
+        """Coerce string file_path to Path."""
+        return Path(v) if not isinstance(v, Path) else v  # type: ignore[arg-type]
 
-        Args:
-            v: Value to convert (string or Path).
-
-        Returns:
-            Path object.
-        """
-        return Path(v) if not isinstance(v, Path) else v
-
-    @field_validator("end_line")
-    @classmethod
-    def validate_end_line(cls, v: int | None, info: Any) -> int | None:
-        """Validate end line is not before start line.
-
-        Args:
-            v: End line value.
-            info: Validation context.
-
-        Returns:
-            Validated end line.
-
-        Raises:
-            ValueError: If end line is before start line.
-        """
-        if v is not None and "line" in info.data and v < info.data["line"]:
+    @model_validator(mode="after")
+    def validate_range_consistency(self) -> "Location":
+        """Validate all cross-field range constraints in one place."""
+        if self.end_line is not None and self.end_line < self.line:
             raise ValueError(
-                f"End line ({v}) cannot be before start line ({info.data['line']})"
+                f"End line ({self.end_line}) cannot be before start line ({self.line})"
             )
-        return v
-
-    @field_validator("end_column")
-    @classmethod
-    def validate_end_column(cls, v: int | None, info: Any) -> int | None:
-        """Validate end column constraints.
-
-        End column requires a start column, and if on the same line,
-        must be after the start column.
-
-        Args:
-            v: End column value.
-            info: Validation context.
-
-        Returns:
-            Validated end column.
-
-        Raises:
-            ValueError: If validation fails.
-        """
-        if v is not None:
-            # Must have start column
-            if "column" not in info.data or info.data.get("column") is None:
-                raise ValueError("Cannot have end_column without column")
-
-            # If on same line, end must be after start
-            if (
-                "end_line" in info.data
-                and "line" in info.data
-                and info.data.get("end_line") == info.data["line"]
-                and "column" in info.data
-                and v < info.data["column"]
-            ):
-                raise ValueError(
-                    f"End column ({v}) cannot be before start column "
-                    f"({info.data['column']}) on the same line"
-                )
-        return v
+        if self.end_column is not None and self.column is None:
+            raise ValueError("Cannot have end_column without column")
+        if (
+            self.end_column is not None
+            and self.end_line == self.line
+            and self.end_column < self.column  # type: ignore[operator]  # column not None (checked above)
+        ):
+            raise ValueError(
+                f"End column ({self.end_column}) cannot be before start column "
+                f"({self.column}) on the same line"
+            )
+        return self
 
     @property
     def range_str(self) -> str:
-        """Get a string representation of the location range.
+        """Human-readable location string.
 
-        Format:
-        - Simple: "file.robot:10"
-        - With column: "file.robot:10:5"
-        - Range: "file.robot:10:5-15:20"
-
-        Returns:
-            Human-readable location string.
+        Formats:
+        - ``file.robot:10``            — line only
+        - ``file.robot:10:5``          — line + column
+        - ``file.robot:10-12``         — line range, no columns
+        - ``file.robot:10-12:20``      — line range, end column only
+        - ``file.robot:10:5-12``       — line range with start column
+        - ``file.robot:10:5-12:20``    — full range
         """
-        # Start with file and line
         match (self.column, self.end_line, self.end_column):
             case (None, None, _):
                 return f"{self.file_path}:{self.line}"
             case (column, None, _):
                 return f"{self.file_path}:{self.line}:{column}"
             case (None, end_line, None):
-                return f"{self.file_path}:{self.line}-{end_line}:"
+                return f"{self.file_path}:{self.line}-{end_line}"
             case (None, end_line, end_col):
                 return f"{self.file_path}:{self.line}-{end_line}:{end_col}"
             case (column, end_line, None):
-                return f"{self.file_path}:{self.line}:{column}-{end_line}:"
+                return f"{self.file_path}:{self.line}:{column}-{end_line}"
             case (column, end_line, end_col):
                 return f"{self.file_path}:{self.line}:{column}-{end_line}:{end_col}"
 
     @property
     def is_range(self) -> bool:
-        """Check if this location represents a range.
-
-        Returns:
-            True if end_line is specified.
-        """
+        """True if this location covers a range of lines."""
         return self.end_line is not None
 
     @property
     def is_point(self) -> bool:
-        """Check if this location represents a single point.
-
-        Returns:
-            True if no end position is specified.
-        """
+        """True if this location is a single point (no end position)."""
         return self.end_line is None
 
-    def contains(self, other: Location) -> bool:
-        """Check if this location contains another location."""
-        if self.file_path != other.file_path:
-            return False
+    def contains(self, other: "Location") -> bool:
+        """Return True if *self* fully contains *other*.
 
-        if not self._lines_contain(other):
-            return False
-
-        if not self._start_column_contains(other):
-            return False
-
-        return self._end_column_contains(other)
-
-    def _lines_contain(self, other: Location) -> bool:
-        """Check if this location's lines contain the other location's lines."""
-        self_end_line = self.end_line or self.line
-        other_end_line = other.end_line or other.line
-        return not (other.line < self.line or other_end_line > self_end_line)
-
-    def _start_column_contains(self, other: Location) -> bool:
-        """Check if start columns are properly contained."""
-        if self.column is None or other.line != self.line:
-            return True
-        return other.column is not None and other.column >= self.column
-
-    def _end_column_contains(self, other: Location) -> bool:
-        """Check if end columns are properly contained."""
-        self_end_line = self.end_line or self.line
-        other_end_line = other.end_line or other.line
-        # Use effective end column: for point locations, end at start column
-        self_end_column = self.column if self.end_line is None else self.end_column
-        if self_end_column is None or other_end_line != self_end_line:
-            return True
-        # Determine other's effective end column
-        if other.end_column is not None:
-            other_end_column: int | None = other.end_column
-        elif other.end_line is None:
-            # Point location: end column is the start column
-            other_end_column = other.column
-        else:
-            # Multi-line range without explicit end column: unknown bound
-            return False
-        return other_end_column is not None and other_end_column <= self_end_column
-
-    def overlaps(self, other: Location) -> bool:
-        """Check if this location overlaps with another location.
-
-        Two locations overlap if they share any common positions.
-
-        Args:
-            other: Location to check.
-
-        Returns:
-            True if locations overlap.
+        Uses tuple interval arithmetic.  For the *self* range, a missing
+        end_column means "unbounded" (sys.maxsize).  For a *point* other
+        (no end_line), the end equals the start so only the start position
+        is checked against *self*'s bounds.
         """
-        # Must be same file
+        if self.file_path != other.file_path:
+            return False
+        self_start = (self.line, self.column or 0)
+        self_end = (self.end_line or self.line, self.end_column or sys.maxsize)
+        other_start = (other.line, other.column or 0)
+        # Point location: end == start so only start is checked.
+        if other.end_line is None:
+            other_end = other_start
+        else:
+            other_end = (other.end_line, other.end_column or sys.maxsize)
+        return self_start <= other_start and other_end <= self_end
+
+    def overlaps(self, other: "Location") -> bool:
+        """Return True if *self* and *other* share any common position.
+
+        Two locations overlap when neither ends strictly before the other starts.
+        """
         if self.file_path != other.file_path:
             return False
 
-        # Get effective ranges
         self_end_line = self.end_line or self.line
         other_end_line = other.end_line or other.line
 
-        # Check line overlap
         if self.line > other_end_line or self_end_line < other.line:
             return False
 
-        # Lines overlap, check columns if on same line
+        # Lines overlap; for shared boundary lines check column intervals.
         if self.line == other_end_line or self_end_line == other.line:
-            # Need column info for precise check
             match (
                 self.line == other_end_line,
                 self.column,
@@ -304,7 +178,6 @@ class Location(ValueObject):
                 case (True, start_col, _, other_end_col) if (
                     start_col is not None and other_end_col is not None
                 ):
-                    # Check if other ends before we start
                     if other_end_col < start_col:
                         return False
 
@@ -312,30 +185,20 @@ class Location(ValueObject):
                 case (True, self_end_col, other_col) if (
                     self_end_col is not None and other_col is not None
                 ):
-                    # Check if we end before other starts
                     if self_end_col < other_col:
                         return False
 
         return True
 
-    def merge(self, other: Location) -> Location:
-        """Merge this location with another to create a combined range.
-
-        The result spans from the earliest position to the latest position.
-
-        Args:
-            other: Location to merge with.
-
-        Returns:
-            New location covering both ranges.
+    def merge(self, other: "Location") -> "Location":
+        """Return a new Location spanning the union of *self* and *other*.
 
         Raises:
-            ValueError: If locations are in different files.
+            ValueError: If the two locations are in different files.
         """
         if self.file_path != other.file_path:
             raise ValueError("Cannot merge locations from different files")
 
-        # Find earliest start
         match (self.line, other.line):
             case (self_line, other_line) if self_line < other_line:
                 start_line = self_line
@@ -343,7 +206,7 @@ class Location(ValueObject):
             case (self_line, other_line) if self_line > other_line:
                 start_line = other_line
                 start_column = other.column
-            case _:  # Same line
+            case _:
                 start_line = self.line
                 start_column = (
                     None
@@ -351,7 +214,6 @@ class Location(ValueObject):
                     else min(self.column, other.column)
                 )
 
-        # Find latest end
         self_end_line = self.end_line or self.line
         other_end_line = other.end_line or other.line
 
@@ -362,7 +224,7 @@ class Location(ValueObject):
             case (self_end, other_end) if self_end < other_end:
                 end_line = other_end
                 end_column = other.end_column
-            case _:  # Same end line
+            case _:
                 end_line = self_end_line
                 end_column = (
                     None
@@ -378,18 +240,11 @@ class Location(ValueObject):
             end_column=end_column,
         )
 
-    def offset(self, lines: int = 0, columns: int = 0) -> Location:
-        """Create a new location offset by the given amount.
-
-        Args:
-            lines: Number of lines to offset (can be negative).
-            columns: Number of columns to offset (can be negative).
-
-        Returns:
-            New location with adjusted position.
+    def offset(self, lines: int = 0, columns: int = 0) -> "Location":
+        """Return a new Location shifted by *lines* and *columns*.
 
         Raises:
-            ValueError: If offset would create invalid position.
+            ValueError: If the resulting position would be invalid (line < 1).
         """
         new_line = self.line + lines
         if new_line < 1:

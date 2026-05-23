@@ -151,7 +151,7 @@ class TestLocation:
 
         # With end line only
         loc3 = Location(file_path=Path("test.robot"), line=10, end_line=15)
-        assert loc3.range_str == "test.robot:10-15:"
+        assert loc3.range_str == "test.robot:10-15"
 
         # With full range
         loc4 = Location(
@@ -161,7 +161,7 @@ class TestLocation:
 
         # With end line but no end column
         loc5 = Location(file_path=Path("test.robot"), line=10, column=5, end_line=15)
-        assert loc5.range_str == "test.robot:10:5-15:"
+        assert loc5.range_str == "test.robot:10:5-15"
 
     def test_is_range_and_is_point(self) -> None:
         """Test range and point detection."""
@@ -392,7 +392,7 @@ class TestLocationUncoveredBranches:
         end_column requires column — but can test the 'None, end_line, None' case.
         """
         loc = Location(file_path=Path("f.robot"), line=3, end_line=7)
-        assert loc.range_str == "f.robot:3-7:"
+        assert loc.range_str == "f.robot:3-7"
 
     def test_contains_with_other_having_end_column(self) -> None:
         """cover: _end_column_contains when other.end_column is not None."""

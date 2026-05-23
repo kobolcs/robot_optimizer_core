@@ -107,7 +107,7 @@ class TestDomainEvents:
         finding = Finding.create(
             pattern=Pattern.duplicate_keyword("Login"),
             severity=Severity.ERROR,
-            location=Location(Path("test.robot"), 10),
+            location=Location(file_path=Path("test.robot"), line=10),
             message="Duplicate keyword found"
         )
 

@@ -35,7 +35,7 @@ def _make_finding(file_path: Path, line: int = 10) -> Finding:
     return Finding.create(
         pattern=_make_pattern(),
         severity=Severity.WARNING,
-        location=Location(file_path, line),
+        location=Location(file_path=file_path, line=line),
         message="Sleep detected",
     )
 
@@ -66,7 +66,7 @@ class TestFindingSerialisation:
         finding = Finding.create(
             pattern=_make_pattern(),
             severity=Severity.ERROR,
-            location=Location(fp, 5),
+            location=Location(file_path=fp, line=5),
             message="With context",
             keyword_name="My Keyword",
         )
@@ -97,7 +97,7 @@ class TestFindingSerialisation:
             finding = Finding.create(
                 pattern=_make_pattern(),
                 severity=sev,
-                location=Location(fp, 1),
+                location=Location(file_path=fp, line=1),
                 message="test",
             )
             assert _finding_from_dict(_finding_to_dict(finding)).severity == sev
