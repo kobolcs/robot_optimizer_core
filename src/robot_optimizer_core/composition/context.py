@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
@@ -282,23 +282,17 @@ class ApplicationContext:
         }
 
         if self._initialized and self._container is not None:
-            try:
+            with suppress(Exception):
                 from .container import get_container as _get_container
                 report["services"] = _get_container()._list_all_services()
-            except Exception:
-                pass
 
         if self._analyzer_registry is not None:
-            try:
+            with suppress(Exception):
                 report["analyzers"] = self._analyzer_registry.list()
-            except Exception:
-                pass
 
         if self._plugin_manager is not None:
-            try:
+            with suppress(Exception):
                 report["plugins"] = list(self._plugin_manager.plugins.keys())
-            except Exception:
-                pass
 
         if self._metrics is not None:
             try:

@@ -489,6 +489,8 @@ class DeadCodeAnalyzer(BaseAnalyzer):
         per_file_display: dict[str, str],
     ) -> list[Finding]:
         """Find unused keywords across the suite."""
+        if not all_definitions:
+            return []
         findings: list[Finding] = []
         for kw_name, locations in all_definitions.items():
             if kw_name in all_calls:

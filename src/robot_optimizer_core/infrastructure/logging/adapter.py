@@ -318,10 +318,7 @@ def get_logger(name: str, context: dict[str, Any] | None = None) -> LoggerAdapte
         >>> logger.info("Starting analysis", extra={"file": "test.robot"})
     """
     # Create new logger
-    logger = logging.getLogger(name)
-    adapter = LoggerAdapter(logger, context or {})
-
-    return adapter
+    return LoggerAdapter(logging.getLogger(name), context or {})
 
 
 def _safe_file_size(path: Path) -> int:

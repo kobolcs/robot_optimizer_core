@@ -50,6 +50,15 @@ from .base import BaseAnalyzer, ConfigValue
 
 __all__ = ["FlakinessAnalyzer", "FlakinessCategory"]
 
+# Failure-rate thresholds used in severity classification and recommendations.
+_RATE_HIGH: float = 0.5   # fails more often than passes → logic issue
+_RATE_MEDIUM: float = 0.2  # high timing-related failure rate
+_RATE_LOW: float = 0.1    # moderate, likely race condition
+# Average investigation time per failure (15 min) used for cost estimate.
+_INVESTIGATION_HOURS_PER_FAILURE: float = 0.25
+# Minimum confidence runs for root-cause categorisation.
+_MIN_CONFIDENCE_RUNS: int = 2
+
 
 class FlakinessCategory(StrEnum):
     """Categorizes the likely root cause of test flakiness."""
@@ -288,8 +297,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
             message_parts.append(f"Trend: {trend_symbol}")
 
         # Estimate time wasted
-        avg_investigation_hours = 0.25  # 15 minutes per failure
-        time_wasted = stats.failures * avg_investigation_hours
+        time_wasted = stats.failures * _INVESTIGATION_HOURS_PER_FAILURE
         message_parts.append(f"Est. {time_wasted:.1f} hours wasted on failures")
 
         message = " - ".join(message_parts)
@@ -341,17 +349,17 @@ class FlakinessAnalyzer(BaseAnalyzer):
         rate = stats.failure_rate
 
         match rate:
-            case r if r > 0.5:
+            case r if r > _RATE_HIGH:
                 return (
                     "Test fails more often than passes - investigate test logic "
                     "and prerequisites"
                 )
-            case r if r > 0.2:
+            case r if r > _RATE_MEDIUM:
                 return (
                     "High failure rate suggests timing issues - add explicit waits "
                     "and check test isolation"
                 )
-            case r if r > 0.1:
+            case r if r > _RATE_LOW:
                 return (
                     "Moderate flakiness - check for race conditions and "
                     "environmental dependencies"
@@ -399,7 +407,7 @@ class FlakinessAnalyzer(BaseAnalyzer):
         Returns:
             FlakinessCategory enum value.
         """
-        if stats.failure_rate > 0.5:
+        if stats.failure_rate > _RATE_HIGH:
             return FlakinessCategory.LOGIC_ISSUE
 
         test_lower = stats.test_name.lower()

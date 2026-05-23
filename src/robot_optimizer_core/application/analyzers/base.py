@@ -29,12 +29,14 @@ Example:
 
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from typing import (
-    TYPE_CHECKING,
     ClassVar,
+    Literal,
     TypeAlias,
     TypeVar,
+    overload,
 )
 
 from ...domain.entities import TestFile
@@ -42,11 +44,6 @@ from ...domain.ports.analyzer import ISuiteAnalyzer as SuiteAwareAnalyzer
 from ...domain.ports.metrics import IMetrics
 from ...domain.value_objects import Finding, Severity
 from ...exceptions import AnalysisError
-
-if TYPE_CHECKING:
-    pass
-
-import logging
 
 # Type alias for analyzer configuration values
 __all__ = ["BaseAnalyzer", "ConfigValue", "SuiteAwareAnalyzer"]
@@ -255,8 +252,6 @@ class BaseAnalyzer(ABC):
                 },
             )
 
-            return final_findings
-
         except AnalysisError:
             # Re-raise analysis errors
             if self._metrics:
@@ -279,6 +274,9 @@ class BaseAnalyzer(ABC):
                 file_path=test_file.path,
                 analyzer=self.name,
             ) from e
+
+        else:
+            return final_findings
 
     def _validate_findings(
         self, findings: list[Finding], test_file: TestFile
@@ -346,8 +344,18 @@ class BaseAnalyzer(ABC):
 
         return validated
 
+    @overload
     def get_config_value(
-        self, key: str, default: ConfigValue = None, required: bool = False
+        self, key: str, default: ConfigValue = ..., *, required: Literal[True]
+    ) -> str | int | float | bool | dict[str, object] | list[object]: ...
+
+    @overload
+    def get_config_value(
+        self, key: str, default: ConfigValue = ..., *, required: Literal[False] = ...
+    ) -> ConfigValue: ...
+
+    def get_config_value(
+        self, key: str, default: ConfigValue = None, *, required: bool = False
     ) -> ConfigValue:
         """Get a configuration value.
 
@@ -356,6 +364,10 @@ class BaseAnalyzer(ABC):
         need type guarantees should use the typed helpers
         :meth:`get_bool_config`, :meth:`get_int_config`, etc., which validate
         the stored value at runtime.
+
+        When *required* is ``True`` and the key is present the return type is
+        narrowed to non-None ``ConfigValue`` (via overload); a missing key
+        raises ``ConfigurationError`` before returning.
 
         Args:
             key: Configuration key.

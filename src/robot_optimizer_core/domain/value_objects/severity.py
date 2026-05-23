@@ -90,7 +90,7 @@ class Severity(IntEnum):
             case Severity.WARNING:
                 return "⚠️"
             case Severity.INFO:
-                return "ℹ️"
+                return "\N{INFORMATION SOURCE}\N{VARIATION SELECTOR-16}"
 
     @property
     def color(self) -> str:

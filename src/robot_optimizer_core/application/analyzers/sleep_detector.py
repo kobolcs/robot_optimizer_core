@@ -49,6 +49,11 @@ from .base import BaseAnalyzer, ConfigValue
 
 __all__ = ["SleepDetector", "SleepDetectorAnalyzer", "get_settings"]
 
+# A regex group-count of at least this many means the match captured a unit token.
+_MIN_GROUPS_WITH_UNIT: int = 2
+# Duration (seconds) below which a sleep suggestion uses the short message form.
+_LONG_SLEEP_THRESHOLD_SECONDS: float = 5.0
+
 
 def get_settings() -> object:
     """Resolve settings via DI container. Defined at module scope for test monkeypatching."""
@@ -428,7 +433,7 @@ class SleepDetectorAnalyzer(BaseAnalyzer):
         duration_str = match.group(1)
         raw_unit = (
             match.group(2)
-            if match.lastindex is not None and match.lastindex >= 2
+            if match.lastindex is not None and match.lastindex >= _MIN_GROUPS_WITH_UNIT
             else None
         )
         unit = _normalise_unit(raw_unit)
@@ -729,7 +734,7 @@ class SleepDetectorAnalyzer(BaseAnalyzer):
                 f"Sub-second sleep{block_hint} — verify it is necessary; "
                 f"if so, replace with '{wait_keyword}'"
             )
-        if duration < 5:
+        if duration < _LONG_SLEEP_THRESHOLD_SECONDS:
             return f"Replace with '{wait_keyword}'{block_hint}"
         return (
             f"Long sleep ({duration:.0f}s){block_hint} indicates missing synchronization — "

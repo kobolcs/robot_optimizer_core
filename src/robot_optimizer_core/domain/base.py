@@ -399,9 +399,7 @@ class DomainEvent(BaseModel, ABC):
         # Convert PascalCase to snake_case
         import re
 
-        name = re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
-
-        return name
+        return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
 
     @computed_field  # type: ignore[prop-decorator]  # pydantic/mypy: computed_field+property pattern not yet suppressed by plugin
     @property

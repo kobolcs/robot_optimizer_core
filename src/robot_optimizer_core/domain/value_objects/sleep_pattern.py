@@ -5,6 +5,7 @@
 """
 
 from decimal import Decimal
+from typing import Final
 
 from pydantic import (
     Field,
@@ -16,6 +17,9 @@ from pydantic import (
 
 from ..base import ValueObject
 from .pattern import Pattern
+
+# Duration threshold (seconds) used to separate WARNING from ERROR sleep findings.
+_EXCESSIVE_SLEEP_SECONDS: Final[float] = 5.0
 
 
 class SleepPattern(ValueObject):
@@ -120,7 +124,7 @@ class SleepPattern(ValueObject):
     @property
     def is_excessive(self) -> bool:
         """Check if sleep duration is excessive (>5 seconds)."""
-        return self.duration_in_seconds > 5
+        return self.duration_in_seconds > _EXCESSIVE_SLEEP_SECONDS
 
     @computed_field  # type: ignore[prop-decorator]  # pydantic/mypy: computed_field+property pattern not yet suppressed by plugin
     @property
@@ -145,7 +149,7 @@ class SleepPattern(ValueObject):
         """Suggest severity based on duration."""
         if self.duration_in_seconds < 1:
             return "INFO"
-        if self.duration_in_seconds <= 5:
+        if self.duration_in_seconds <= _EXCESSIVE_SLEEP_SECONDS:
             return "WARNING"
         return "ERROR"
 

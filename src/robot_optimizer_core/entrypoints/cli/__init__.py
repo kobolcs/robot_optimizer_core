@@ -33,6 +33,7 @@ Exit codes:
 from __future__ import annotations
 
 import sys
+from contextlib import suppress
 from typing import NoReturn
 
 from ...infrastructure.logging.adapter import configure_logging
@@ -60,12 +61,10 @@ def _ensure_utf8_streams() -> None:
     for stream in (sys.stdout, sys.stderr):
         reconfigure = getattr(stream, "reconfigure", None)
         if callable(reconfigure):
-            try:
-                reconfigure(encoding="utf-8", errors="replace")
-            except (ValueError, OSError):
+            with suppress(ValueError, OSError):
                 # Stream is already detached or doesn't support encoding changes;
-                # fall back silently rather than crash before argument parsing.
-                pass
+                # suppress rather than crash before argument parsing.
+                reconfigure(encoding="utf-8", errors="replace")
 
 
 def main(argv: list[str] | None = None) -> NoReturn:

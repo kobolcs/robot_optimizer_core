@@ -169,18 +169,14 @@ from .premium import PremiumFeatureError, is_premium_installed
 
 __all__ = [
     "AnalysisError",
-    # Service layer (recommended for most uses)
     "AnalysisResult",
     "AnalysisService",
-    "DirectoryAnalysisResult",
-    # Application context — primary entry point for wiring services
     "ApplicationConfig",
     "ApplicationContext",
-    # Analyzer classes
     "BaseAnalyzer",
     "ConfigurationError",
     "DeadCodeAnalyzer",
-    # Domain value objects used in findings
+    "DirectoryAnalysisResult",
     "DiskFileProvider",
     "FileProvider",
     "Finding",
@@ -191,14 +187,11 @@ __all__ = [
     "NamingConventionAnalyzer",
     "Pattern",
     "PatternType",
-    # Plugin system
     "Plugin",
     "PluginError",
     "PluginMetadata",
     "PremiumFeatureError",
-    # Exceptions
     "RobotOptimizerError",
-    # Configuration
     "Settings",
     "SetupTeardownAnalyzer",
     "Severity",
@@ -209,18 +202,15 @@ __all__ = [
     "TagConsistencyAnalyzer",
     "TestDocumentationAnalyzer",
     "TestFile",
-    # Version
     "__version__",
     "__version_info__",
     "analyze_directory",
-    # High-level API — primary entry points
     "analyze_file",
     "analyze_suite",
     "create_application",
     "create_test_application",
     "get_analyzer",
     "get_settings",
-    # Premium detection (useful for plugin authors)
     "is_premium_installed",
     "list_analyzers",
     "register_analyzer",

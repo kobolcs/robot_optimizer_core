@@ -103,12 +103,8 @@ class SuiteAnalysisResult:
 
     findings: list[Finding] = dataclasses.field(default_factory=list)
     file_findings: dict[Path, list[Finding]] = dataclasses.field(default_factory=dict)
-    suite_info: SuiteInfo = dataclasses.field(
-        default_factory=lambda: SuiteInfo()
-    )
-    statistics: SuiteStatistics = dataclasses.field(
-        default_factory=lambda: SuiteStatistics()
-    )
+    suite_info: SuiteInfo = dataclasses.field(default_factory=SuiteInfo)
+    statistics: SuiteStatistics = dataclasses.field(default_factory=SuiteStatistics)
     errors: list[tuple[Path, Exception]] = dataclasses.field(default_factory=list)
 
 

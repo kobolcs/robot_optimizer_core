@@ -22,6 +22,9 @@ from .base import BaseAnalyzer, ConfigValue
 
 __all__ = ["HardcodedValueAnalyzer"]
 
+# Max characters of a credential token shown in the finding message before truncation.
+_MAX_CREDENTIAL_DISPLAY_LEN: int = 40
+
 # URL patterns (http/https/ftp with host)
 _URL_RE = re.compile(
     r"""(?x)
@@ -207,7 +210,7 @@ class HardcodedValueAnalyzer(BaseAnalyzer):
         results: list[Finding] = []
         for m in _CRED_RE.finditer(line):
             token = m.group(0)
-            display = token[:40] + "..." if len(token) > 40 else token
+            display = token[:_MAX_CREDENTIAL_DISPLAY_LEN] + "..." if len(token) > _MAX_CREDENTIAL_DISPLAY_LEN else token
             results.append(
                 self._make_finding(
                     line_num,

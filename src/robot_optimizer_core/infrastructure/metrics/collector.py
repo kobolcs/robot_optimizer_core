@@ -25,7 +25,7 @@ import threading
 import time
 from collections import defaultdict, deque
 from collections.abc import Callable, Generator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -301,10 +301,8 @@ class MetricsCollector:
         self.stop()
 
     def __del__(self) -> None:
-        try:
+        with suppress(Exception):
             self.stop()
-        except Exception:
-            pass
 
     def _cleanup_loop(self) -> None:
         """Background cleanup thread."""

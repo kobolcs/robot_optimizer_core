@@ -161,6 +161,4 @@ def _format_junit(findings: list[Finding], path: Path) -> str:
         failure.text = finding.message
 
     # Convert to string with XML declaration
-    result = ET.tostring(testsuite, encoding="unicode")
-    xml_str = '<?xml version="1.0" encoding="UTF-8"?>\n' + result
-    return xml_str
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(testsuite, encoding="unicode")
