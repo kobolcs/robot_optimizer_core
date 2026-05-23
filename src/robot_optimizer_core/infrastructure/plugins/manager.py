@@ -19,6 +19,9 @@ from ..logging.adapter import get_logger
 __all__ = [
     "ALLOWED_BUILTINS",
     "ALLOWED_IMPORTS",
+    # Plugin and PluginMetadata are re-exported here for backward compatibility.
+    # New code should import them from robot_optimizer_core.extensions or
+    # robot_optimizer_core.domain.ports.plugin.
     "Plugin",
     "PluginMetadata",
     "PluginRegistry",
@@ -393,6 +396,8 @@ class ValidatedPluginManager:
         plugin.is_active = True
         self.plugins[metadata.name] = plugin
 
+        self._register_contributed_analyzers(plugin)
+
         logger.info(
             f"Plugin loaded securely: {metadata.name} v{metadata.version}",
             extra={"file_hash": file_hash},
@@ -456,6 +461,62 @@ class ValidatedPluginManager:
             stacklevel=2,
         )
         self.load_plugin_from_file(file_path, bypass_validation=True)
+
+    def _register_contributed_analyzers(self, plugin: Plugin) -> None:
+        """Register analyzer classes contributed by *plugin* into the shared registry.
+
+        Called automatically after a plugin is activated.  If the plugin's
+        ``contribute_analyzers()`` returns an empty list (the default) this is a no-op.
+        Non-``BaseAnalyzer`` types are skipped with a warning so a bad plugin
+        cannot corrupt the registry.
+        """
+        try:
+            contributed = plugin.contribute_analyzers()
+        except Exception as exc:
+            logger.warning(
+                "Plugin %s raised during contribute_analyzers: %s",
+                plugin.metadata.name,
+                exc,
+            )
+            return
+
+        if not contributed:
+            return
+
+        from ...application.analyzers.base import BaseAnalyzer
+        from ...application.analyzers.registry import get_analyzer_registry
+
+        try:
+            registry = get_analyzer_registry()
+        except Exception as exc:
+            logger.warning(
+                "Could not access analyzer registry to register contributed analyzers: %s", exc
+            )
+            return
+
+        for analyzer_cls in contributed:
+            if not (isinstance(analyzer_cls, type) and issubclass(analyzer_cls, BaseAnalyzer)):
+                logger.warning(
+                    "Plugin %s contributed a non-BaseAnalyzer type %s — skipped",
+                    plugin.metadata.name,
+                    analyzer_cls,
+                )
+                continue
+            try:
+                instance = analyzer_cls()
+                registry.register(instance.name, analyzer_cls, override=True)
+                logger.info(
+                    "Registered contributed analyzer '%s' from plugin '%s'",
+                    instance.name,
+                    plugin.metadata.name,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Failed to register contributed analyzer %s from plugin %s: %s",
+                    analyzer_cls,
+                    plugin.metadata.name,
+                    exc,
+                )
 
     def unload_plugin(self, name: str) -> None:
         """Unload a plugin."""

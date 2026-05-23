@@ -435,6 +435,7 @@ def _register_defaults(container: ThreadSafeContainer) -> None:
         _register_built_in_analyzers,
         _register_entry_point_analyzers,
     )
+    from ..infrastructure.cache.analysis_cache import AnalysisCache
     from ..infrastructure.config import get_settings
     from ..infrastructure.discovery import OptimizedFileDiscoveryService
     from ..infrastructure.metrics.collector import get_metrics
@@ -458,6 +459,7 @@ def _register_defaults(container: ThreadSafeContainer) -> None:
     container.register_instance("metrics", metrics_instance)
     container.register_singleton("analyzer_registry", _build_registry)
     container.register_singleton("plugin_registry", PluginRegistry)
+    container.register_singleton("analysis_cache", AnalysisCache)
     container.register("parser", RobotASTParser)
 
     # Use optimized file discovery for better performance

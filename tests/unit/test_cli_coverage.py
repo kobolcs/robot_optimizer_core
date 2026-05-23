@@ -43,11 +43,15 @@ class TestClearCacheFlag:
     def test_clear_cache_flag_invokes_cache_clear(self, tmp_path: Path) -> None:
         robot_file = tmp_path / "t.robot"
         robot_file.write_text("*** Test Cases ***\nT\n    Log    hi\n")
-        with patch("robot_optimizer_core.entrypoints.cli._commands.AnalysisCache") as mock_cache_cls:
-            mock_cache_cls.return_value.clear = MagicMock()
+        mock_service = MagicMock()
+        mock_service.clear_cache = MagicMock()
+        with patch(
+            "robot_optimizer_core.composition.context.get_analysis_service",
+            return_value=mock_service,
+        ):
             with pytest.raises(SystemExit):
                 main(["analyze", "--clear-cache", str(robot_file)])
-        mock_cache_cls.return_value.clear.assert_called_once()
+        mock_service.clear_cache.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

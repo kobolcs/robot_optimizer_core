@@ -383,6 +383,7 @@ def get_analysis_service() -> Any:
         metrics=container.resolve("metrics"),
         file_discovery=container.resolve("file_discovery"),
         registry=container.resolve("analyzer_registry"),
+        cache=container.resolve("analysis_cache"),
     )
 
 

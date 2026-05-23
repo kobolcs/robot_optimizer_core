@@ -22,11 +22,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
-from ...composition.container import get_container
 from ...domain.entities import TestFile
+from ...domain.ports.analyzer_registry import IAnalyzerRegistry
+from ...domain.ports.cache import IAnalysisCache
+from ...domain.ports.file_discovery import IFileDiscovery
 from ...domain.value_objects import Finding, Severity
 from ...exceptions import AnalysisError, RobotFileNotFoundError
-from ...infrastructure.cache.analysis_cache import AnalysisCache
 from ...infrastructure.config import Settings
 from ...infrastructure.logging.adapter import (
     get_logger,
@@ -284,14 +285,23 @@ class AnalysisService:
         self,
         settings: Settings | None = None,
         metrics: IMetrics | None = None,
-        file_discovery: Any | None = None,
-        registry: Any | None = None,
+        file_discovery: IFileDiscovery | None = None,
+        registry: IAnalyzerRegistry | None = None,
+        cache: IAnalysisCache | None = None,
     ) -> None:
-        container = get_container()
-        self.settings: Settings = settings or container.resolve("settings")
-        self._metrics: IMetrics = metrics or container.resolve("metrics")
-        self._file_discovery: Any = file_discovery or container.resolve("file_discovery")
-        self._registry: Any = registry or container.resolve("analyzer_registry")
+        if settings is None or metrics is None or file_discovery is None or registry is None:
+            from ...composition.container import get_container  # lazy: keeps app layer clean
+            container = get_container()
+            self.settings: Settings = settings or container.resolve("settings")
+            self._metrics: IMetrics = metrics or container.resolve("metrics")
+            self._file_discovery: IFileDiscovery = file_discovery or container.resolve("file_discovery")
+            self._registry: IAnalyzerRegistry = registry or container.resolve("analyzer_registry")
+        else:
+            self.settings = settings
+            self._metrics = metrics
+            self._file_discovery = file_discovery
+            self._registry = registry
+        self._cache: IAnalysisCache | None = cache
 
     # ------------------------------------------------------------------
     # Analyzer resolution helpers
@@ -505,14 +515,14 @@ class AnalysisService:
             },
         )
 
-        cache: AnalysisCache | None = None
+        active_cache: IAnalysisCache | None = None
         cache_hits: dict[Path, list[Finding]] = {}
         file_hashes: dict[Path, str] = {}
         files_to_analyze = files
 
-        if use_cache:
-            cache = AnalysisCache()
-            files_to_analyze, cache_hits, file_hashes = _resolve_cache(files, cache)
+        if use_cache and self._cache is not None:
+            active_cache = self._cache
+            files_to_analyze, cache_hits, file_hashes = _resolve_cache(files, active_cache)
             hit_count = len(cache_hits)
             miss_count = len(files_to_analyze)
             if hit_count or miss_count:
@@ -531,11 +541,11 @@ class AnalysisService:
 
         for fp, cached_findings in cache_hits.items():
             dir_results.findings[fp] = cached_findings
-        if cache is not None:
+        if active_cache is not None:
             for fp, new_findings in dir_results.findings.items():
                 if fp not in cache_hits and fp in file_hashes:
-                    cache.put(fp, file_hashes[fp], new_findings)
-            cache.flush()
+                    active_cache.put(fp, file_hashes[fp], new_findings)
+            active_cache.flush()
 
         total_findings = sum(len(f) for f in dir_results.findings.values())
         logger.info(
@@ -629,3 +639,15 @@ class AnalysisService:
             except Exception:
                 result[name] = {"name": name, "error": "Failed to load info"}
         return result
+
+    # ------------------------------------------------------------------
+    # Cache management
+    # ------------------------------------------------------------------
+
+    def clear_cache(self) -> None:
+        """Remove all cached analysis results from the backing store.
+
+        No-op when the service was created without a cache.
+        """
+        if self._cache is not None:
+            self._cache.clear()

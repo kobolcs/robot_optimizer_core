@@ -432,3 +432,154 @@ class TestDeprecatedForceShim:
 
         assert any(issubclass(w.category, DeprecationWarning) for w in caught)
         assert any("deprecated" in str(w.message).lower() for w in caught)
+
+
+# ---------------------------------------------------------------------------
+# contribute_analyzers hook
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestContributeAnalyzers:
+    """Tests for the Plugin.contribute_analyzers() → registry wiring."""
+
+    def _make_valid_plugin_file(self, tmp_path: Path, extra_body: str = "") -> Path:
+        """Write a minimal valid plugin file to *tmp_path*."""
+        plugin_file = tmp_path / "contrib_plugin.py"
+        plugin_file.write_bytes(
+            b"from robot_optimizer_core.infrastructure.plugins.manager import Plugin, PluginMetadata\n"
+            b"from robot_optimizer_core.application.analyzers.base import BaseAnalyzer\n"
+            b"from robot_optimizer_core.domain.entities.test_file import TestFile\n"
+            b"\n"
+            b"class _ContribAnalyzer(BaseAnalyzer):\n"
+            b"    @property\n"
+            b"    def name(self): return 'contrib_analyzer'\n"
+            b"    @property\n"
+            b"    def description(self): return 'contributed'\n"
+            b"    def analyze(self, test_file): return []\n"
+            b"\n"
+            b"class ContribPlugin(Plugin):\n"
+            b"    @property\n"
+            b"    def metadata(self):\n"
+            b"        return PluginMetadata('contrib_plugin', '1.0.0', 'Contrib', 'Test')\n"
+            b"    def activate(self): self.is_active = True\n"
+            b"    def deactivate(self): self.is_active = False\n"
+            + extra_body.encode()
+        )
+        plugin_file.chmod(0o644)
+        return plugin_file
+
+    def test_default_contribute_analyzers_returns_empty(self) -> None:
+        """Plugin base class contribute_analyzers() returns [] by default."""
+        plugin = _MinimalPlugin()
+        assert plugin.contribute_analyzers() == []
+
+    def test_register_contributed_analyzers_no_op_on_empty(self) -> None:
+        """_register_contributed_analyzers does nothing when plugin contributes nothing."""
+        manager = ValidatedPluginManager()
+        plugin = _MinimalPlugin()
+        plugin.activate()
+        manager._register_contributed_analyzers(plugin)  # must not raise
+
+    def test_register_contributed_analyzers_skips_non_base_analyzer(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Non-BaseAnalyzer types contributed by a plugin are skipped with a warning."""
+        _MANAGER_LOGGER = "robot_optimizer_core.infrastructure.plugins.manager"
+
+        class _BadPlugin(_MinimalPlugin):
+            def contribute_analyzers(self) -> list:
+                return [object]  # not a BaseAnalyzer
+
+        manager = ValidatedPluginManager()
+        plugin = _BadPlugin()
+        plugin.activate()
+        with caplog.at_level(logging.WARNING, logger=_MANAGER_LOGGER):
+            manager._register_contributed_analyzers(plugin)
+        assert any("non-BaseAnalyzer" in r.message for r in caplog.records)
+
+    def test_register_contributed_analyzers_logs_on_exception(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """If contribute_analyzers() raises, a warning is logged and execution continues."""
+        _MANAGER_LOGGER = "robot_optimizer_core.infrastructure.plugins.manager"
+
+        class _ExplodingPlugin(_MinimalPlugin):
+            def contribute_analyzers(self) -> list:
+                raise RuntimeError("boom")
+
+        manager = ValidatedPluginManager()
+        plugin = _ExplodingPlugin()
+        plugin.activate()
+        with caplog.at_level(logging.WARNING, logger=_MANAGER_LOGGER):
+            manager._register_contributed_analyzers(plugin)  # must not propagate
+        assert any("boom" in r.message for r in caplog.records)
+
+    def test_register_contributed_analyzers_success_path(self) -> None:
+        """A valid BaseAnalyzer contributed by a plugin is registered in the registry."""
+        from robot_optimizer_core.application.analyzers.base import BaseAnalyzer
+        from robot_optimizer_core.domain.entities.test_file import TestFile as TF
+
+        class _ContribAnalyzer(BaseAnalyzer):
+            @property
+            def name(self) -> str:
+                return "_contrib_test_analyzer"
+
+            @property
+            def description(self) -> str:
+                return "contributed by test plugin"
+
+            def analyze(self, test_file: TF) -> list:
+                return []
+
+        class _ContribPlugin(_MinimalPlugin):
+            def contribute_analyzers(self) -> list:
+                return [_ContribAnalyzer]
+
+        manager = ValidatedPluginManager()
+        plugin = _ContribPlugin()
+        plugin.activate()
+        manager._register_contributed_analyzers(plugin)
+
+        from robot_optimizer_core.application.analyzers.registry import get_analyzer_registry
+        registry = get_analyzer_registry()
+        assert "_contrib_test_analyzer" in registry.list()
+
+    def test_register_contributed_analyzers_registry_failure_logs_warning(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """If the registry cannot be accessed, a warning is logged and execution continues."""
+        from unittest.mock import patch
+        _MANAGER_LOGGER = "robot_optimizer_core.infrastructure.plugins.manager"
+
+        from robot_optimizer_core.application.analyzers.base import BaseAnalyzer
+        from robot_optimizer_core.domain.entities.test_file import TestFile as TF
+
+        class _GoodAnalyzer(BaseAnalyzer):
+            @property
+            def name(self) -> str:
+                return "_good_contrib"
+
+            @property
+            def description(self) -> str:
+                return "good"
+
+            def analyze(self, test_file: TF) -> list:
+                return []
+
+        class _GoodPlugin(_MinimalPlugin):
+            def contribute_analyzers(self) -> list:
+                return [_GoodAnalyzer]
+
+        manager = ValidatedPluginManager()
+        plugin = _GoodPlugin()
+        plugin.activate()
+
+        with patch(
+            "robot_optimizer_core.application.analyzers.registry.get_analyzer_registry",
+            side_effect=RuntimeError("registry unavailable"),
+        ):
+            with caplog.at_level(logging.WARNING, logger=_MANAGER_LOGGER):
+                manager._register_contributed_analyzers(plugin)  # must not propagate
+
+        assert any("registry" in r.message.lower() for r in caplog.records)

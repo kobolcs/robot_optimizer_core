@@ -33,13 +33,12 @@ from abc import ABC, abstractmethod
 from typing import (
     TYPE_CHECKING,
     ClassVar,
-    Protocol,
     TypeAlias,
     TypeVar,
-    runtime_checkable,
 )
 
 from ...domain.entities import TestFile
+from ...domain.ports.analyzer import ISuiteAnalyzer as SuiteAwareAnalyzer
 from ...domain.ports.metrics import IMetrics
 from ...domain.value_objects import Finding, Severity
 from ...exceptions import AnalysisError
@@ -57,31 +56,6 @@ ConfigValue: TypeAlias = (
 )
 
 T = TypeVar("T")  # kept for any remaining generic use in subclasses
-
-
-@runtime_checkable
-class SuiteAwareAnalyzer(Protocol):
-    """Protocol for analyzers that support cross-file suite-level analysis.
-
-    Analyzers that implement this protocol receive the full list of
-    :class:`~robot_optimizer_core.domain.entities.TestFile` objects in
-    a suite, enabling cross-file detection (e.g. unused keywords that are
-    only called from other files).
-
-    Third-party analyzers can participate in :func:`analyze_suite` by
-    implementing this method alongside :class:`BaseAnalyzer`.
-    """
-
-    def analyze_suite(self, files: Sequence[TestFile]) -> list[Finding]:
-        """Analyze an entire suite of test files as a single unit.
-
-        Args:
-            files: All test files that belong to the suite.
-
-        Returns:
-            List of findings discovered across the suite.
-        """
-        ...
 
 logger = logging.getLogger(__name__)
 
