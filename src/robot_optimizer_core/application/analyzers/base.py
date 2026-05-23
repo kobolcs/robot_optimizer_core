@@ -43,10 +43,11 @@ from ...domain.entities import TestFile
 from ...domain.ports.metrics import IMetrics
 from ...domain.value_objects import Finding, Severity
 from ...exceptions import AnalysisError
-from ...infrastructure.logging.adapter import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+import logging
 
 # Type alias for analyzer configuration values
 __all__ = ["BaseAnalyzer", "ConfigValue", "SuiteAwareAnalyzer"]
@@ -82,7 +83,7 @@ class SuiteAwareAnalyzer(Protocol):
         """
         ...
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class BaseAnalyzer(ABC):
@@ -111,8 +112,9 @@ class BaseAnalyzer(ABC):
         """
         self.config = config or {}
         self._metrics = metrics
-        self._logger = get_logger(
-            f"{__name__}.{self.__class__.__name__}", {"analyzer": self.name}
+        self._logger = logging.LoggerAdapter(
+            logging.getLogger(f"{__name__}.{self.__class__.__name__}"),
+            {"analyzer": self.name},
         )
 
     @property

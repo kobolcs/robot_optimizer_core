@@ -211,3 +211,131 @@ class TestAnalysisService:
         svc = AnalysisService()
         result = svc.analyze_file(f, analyzers=["dead_code"])
         assert result.is_success
+
+    def test_run_file_analysis_with_instance_analyzer(self, tmp_path: Path) -> None:
+        """_get_analyzer_instances case _: branch — pass a pre-built instance."""
+        from robot_optimizer_core.application.analyzers.dead_code import DeadCodeAnalyzer
+
+        f = tmp_path / "t.robot"
+        f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+        svc = AnalysisService()
+        findings = svc._run_file_analysis(
+            f, analyzers=[DeadCodeAnalyzer()], settings=None,
+            min_severity=None, pattern_filter=None,
+        )
+        assert isinstance(findings, list)
+
+    def test_run_file_analysis_max_size_raises(self, tmp_path: Path) -> None:
+        """_run_file_analysis raises AnalysisError when file exceeds size limit."""
+        from robot_optimizer_core.exceptions import AnalysisError
+
+        f = tmp_path / "big.robot"
+        f.write_bytes(b"x" * 150_000)
+        settings = Settings(max_file_size_mb=0.1)
+        svc = AnalysisService(settings=settings)
+
+        with pytest.raises(AnalysisError, match="exceeds maximum size"):
+            svc._run_file_analysis(
+                f, analyzers=None, settings=settings,
+                min_severity=None, pattern_filter=None,
+            )
+
+    def test_run_directory_analysis_no_cache(self, tmp_path: Path) -> None:
+        """run_directory_analysis with use_cache=False skips cache branches."""
+        from robot_optimizer_core.domain.value_objects import Finding
+
+        f = tmp_path / "t.robot"
+        f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+
+        svc = AnalysisService()
+
+        def _noop(fp: Path) -> tuple[Path, list[Finding]]:
+            return fp, []
+
+        result = svc.run_directory_analysis(
+            directory_path=tmp_path,
+            analyze_fn=_noop,
+            patterns=["*.robot"],
+            exclude_patterns=None,
+            recursive=False,
+            settings=svc.settings,
+            fail_fast=False,
+            error_handling="warn",
+            max_workers=1,
+            metrics=svc._metrics,
+            use_cache=False,
+        )
+        assert result is not None
+
+    def test_run_file_analysis_pattern_filter_skips_analyzers(self, tmp_path: Path) -> None:
+        """pattern_filter that matches nothing should return empty findings."""
+        f = tmp_path / "t.robot"
+        f.write_bytes(b"*** Test Cases ***\nT\n    Sleep    5s\n")
+        svc = AnalysisService()
+        findings = svc._run_file_analysis(
+            f, analyzers=None, settings=None,
+            min_severity=None, pattern_filter=["nonexistent_analyzer"],
+        )
+        assert findings == []
+
+    def test_run_file_analysis_binary_file_raises_analysis_error(self, tmp_path: Path) -> None:
+        """Binary file triggers the generic except-Exception path in file loading."""
+        from robot_optimizer_core.exceptions import AnalysisError
+
+        f = tmp_path / "binary.robot"
+        f.write_bytes(b"\x00\x01\x02binary content")
+        svc = AnalysisService()
+        with pytest.raises(AnalysisError, match="Failed to load file"):
+            svc._run_file_analysis(
+                f, analyzers=None, settings=None,
+                min_severity=None, pattern_filter=None,
+            )
+
+    def test_run_file_analysis_analyzer_raises_analysis_error(self, tmp_path: Path) -> None:
+        """except AnalysisError in per-analyzer loop re-raises (lines 422-424)."""
+        from robot_optimizer_core.domain.entities import TestFile
+        from robot_optimizer_core.domain.value_objects import Finding
+        from robot_optimizer_core.exceptions import AnalysisError
+        from robot_optimizer_core.application.analyzers.base import BaseAnalyzer
+
+        class _RaisingAnalyzer(BaseAnalyzer):
+            @property
+            def name(self) -> str:
+                return "raising_analyzer"
+
+            @property
+            def description(self) -> str:
+                return "always raises"
+
+            def analyze(self, test_file: TestFile) -> list[Finding]:
+                raise AnalysisError("deliberate", file_path=test_file.path)
+
+        f = tmp_path / "t.robot"
+        f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+        svc = AnalysisService()
+        with pytest.raises(AnalysisError, match="deliberate"):
+            svc._run_file_analysis(
+                f, analyzers=[_RaisingAnalyzer()], settings=None,
+                min_severity=None, pattern_filter=None,
+            )
+
+    def test_list_analyzers_error_path(self) -> None:
+        """list_analyzers returns error entry when get_info raises."""
+        from robot_optimizer_core.infrastructure.config import get_settings
+        from robot_optimizer_core.infrastructure.metrics.collector import get_metrics
+
+        class _BrokenRegistry:
+            def list(self) -> list[str]:
+                return ["dead_code"]
+
+            def get_info(self, _name: str) -> dict:
+                raise RuntimeError("boom")
+
+        svc = AnalysisService(
+            settings=get_settings(),
+            metrics=get_metrics(),
+            registry=_BrokenRegistry(),
+        )
+        result = svc.list_analyzers()
+        assert "dead_code" in result
+        assert "error" in result["dead_code"]

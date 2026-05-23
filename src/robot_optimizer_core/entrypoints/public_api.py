@@ -32,11 +32,8 @@ Example:
 from __future__ import annotations
 
 import dataclasses
-import functools
 import time
 import warnings
-from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -46,6 +43,12 @@ from typing import (
 )
 
 from ..application.analyzers import BaseAnalyzer, SuiteAwareAnalyzer
+from ..application.services.analysis_service import (
+    DirectoryResults,
+    _execute_directory_analysis,
+    _handle_directory_analysis_errors,
+    _validate_directory_path,
+)
 from ..composition.container import get_container
 from ..domain.entities import TestFile
 from ..domain.value_objects import Finding, Severity
@@ -70,19 +73,6 @@ from ..premium import PremiumFeatureError
 
 # Supported error_handling values.
 ErrorHandling = Literal["raise", "skip", "warn"]
-
-
-@dataclasses.dataclass
-class DirectoryResults:
-    """Mapping of file paths to findings returned by :func:`analyze_directory`.
-
-    Attributes:
-        findings: Dictionary mapping file paths to their findings.
-        errors: List of (path, exception) pairs for files that could not be analysed.
-    """
-
-    findings: dict[Path, list[Finding]] = dataclasses.field(default_factory=dict)
-    errors: list[tuple[Path, Exception]] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass
@@ -133,7 +123,6 @@ class SuiteAnalysisResult:
 
 
 __all__ = [
-    "AnalysisCache",
     "DirectoryResults",
     "PremiumFeatureError",
     "SuiteAnalysisResult",
@@ -153,6 +142,57 @@ def _warn_deprecated_param(old: str, new: str, since: str, stacklevel: int = 3) 
         DeprecationWarning,
         stacklevel=stacklevel,
     )
+
+
+def _get_or_build_service() -> Any:
+    """Build an AnalysisService wired via the composition context."""
+    from ..composition.context import get_analysis_service
+
+    return get_analysis_service()
+
+
+def _create_analyzer_instance(
+    name: str, config: dict[str, object] | None = None
+) -> BaseAnalyzer:
+    """Create a fresh analyzer instance, injecting per-analyzer config when provided."""
+    registry = get_container().resolve("analyzer_registry")
+    cls = registry.analyzers.get(name)
+    if cls is None:
+        return cast("BaseAnalyzer", registry.create(name))
+    return cast("BaseAnalyzer", cls(config=config or {}))
+
+
+def _get_analyzer_instances(
+    analyzers: list[str | BaseAnalyzer] | None, settings: Settings
+) -> list[BaseAnalyzer]:
+    """Resolve a list of analyzer names/instances into concrete BaseAnalyzer objects."""
+    analyzer_config = settings.analyzer_config
+
+    if analyzers is None:
+        registry = get_container().resolve("analyzer_registry")
+        names = [
+            name
+            for name in registry.list()
+            if not getattr(
+                registry.analyzers.get(name), "requires_external_repo", False
+            )
+        ]
+        return [
+            _create_analyzer_instance(name, analyzer_config.get(name))
+            for name in names
+        ]
+
+    instances = []
+    for analyzer in analyzers:
+        match analyzer:
+            case str():
+                instances.append(
+                    _create_analyzer_instance(analyzer, analyzer_config.get(analyzer))
+                )
+            case _:
+                instances.append(analyzer)
+
+    return instances
 
 
 def analyze_file(
@@ -200,14 +240,12 @@ def analyze_file(
         _warn_deprecated_param("severity_filter", "min_severity", "1.0.0b1", stacklevel=2)
         if min_severity is None:
             min_severity = severity_filter
-    # Convert to Path
+
     path = Path(file_path)
 
-    # Validate file exists
     if not path.exists():
         raise RobotFileNotFoundError(path)
 
-    # Resolve services through the DI container (only if needed)
     if settings is None or metrics is None:
         container = get_container()
         if settings is None:
@@ -215,7 +253,6 @@ def analyze_file(
         if metrics is None:
             metrics = container.resolve("metrics")
 
-    # Enforce max file size before reading content and load file
     try:
         file_size = path.stat().st_size
         if file_size > settings.max_file_size_bytes:
@@ -231,29 +268,23 @@ def analyze_file(
     except Exception as e:
         raise AnalysisError(f"Failed to load file: {e}", file_path=path) from e
 
-    # Get analyzers
     analyzer_instances = _get_analyzer_instances(analyzers, settings)
 
-    # Run analysis
     all_findings: list[Finding] = []
 
     for analyzer in analyzer_instances:
         analyzer_name = analyzer.name
 
-        # Skip filtered analyzers early to avoid unnecessary analyzer work.
         if pattern_filter is not None and analyzer_name not in pattern_filter:
             continue
 
-        # Log and track analysis start
         log_analysis_start(path, analyzer_name, logger)
         start_time = time.time()
 
         try:
-            # Run analyzer
             findings = analyzer.safe_analyze(test_file)
             all_findings.extend(findings)
 
-            # Track success
             duration = time.time() - start_time
             log_analysis_complete(path, analyzer_name, len(findings), duration, logger)
 
@@ -262,68 +293,40 @@ def analyze_file(
             metrics.gauge(f"analyzer.{analyzer_name}.findings", len(findings))
 
         except AnalysisError:
-            # safe_analyze already wrapped, logged, and recorded the per-analyzer
-            # failure metric; only record the top-level counter here to avoid
-            # double-counting the per-analyzer metric.
             metrics.increment("analysis.failed")
             raise
 
         except Exception as e:
-            # Unexpected error outside safe_analyze (e.g. metrics/logging failure).
             metrics.increment("analysis.failed")
             metrics.increment(f"analyzer.{analyzer_name}.failed")
             raise AnalysisError(
                 f"Analysis failed: {e}", file_path=path, analyzer=analyzer_name
             ) from e
 
-    # Track total findings
     metrics.gauge("findings.total", len(all_findings))
 
-    # Apply min_severity filter after all analyzers complete.
     if min_severity is not None:
         all_findings = [f for f in all_findings if f.severity <= min_severity]
 
     return all_findings
 
 
-def _get_or_build_service() -> Any:
-    """Build an AnalysisService wired via the composition context."""
-    from ..composition.context import get_analysis_service
-
-    return get_analysis_service()
-
-
-def _validate_directory_path(directory_path: str | Path) -> Path:
-    """Validate that the directory path exists and is a directory."""
-    path = Path(directory_path)
-    if not path.exists():
-        raise RobotFileNotFoundError(path)
-    if not path.is_dir():
-        raise AnalysisError("Path is not a directory", file_path=path)
-    return path
-
-
-def _handle_directory_analysis_errors(
-    file_errors: list[tuple[Path, Exception]],
-    error_handling: ErrorHandling,
-    fail_fast: bool,
-    dir_results: DirectoryResults,
-) -> None:
-    """Handle errors from directory analysis based on error_handling mode."""
-    if not file_errors:
-        return
-    effective_handling = "raise" if fail_fast else error_handling
-    if effective_handling == "raise":
-        raise ExceptionGroup(
-            f"Analysis failed for {len(file_errors)} files",
-            [e for _, e in file_errors],
-        )
-    if effective_handling == "warn":
-        logger.warning(
-            f"Analysis had partial failures: {len(file_errors)} file(s) could not be analyzed",
-            extra={"failed_files": [str(p) for p, _ in file_errors]},
-        )
-        dir_results.errors = file_errors
+def _analyze_one_file(
+    file_path: Path,
+    analyzers: list[str | BaseAnalyzer] | None,
+    settings: Settings,
+    min_severity: Severity | None,
+    pattern_filter: list[str] | None,
+) -> tuple[Path, list[Finding]]:
+    """Analyze a single file and return (path, findings). Used by analyze_directory."""
+    findings = analyze_file(
+        file_path,
+        analyzers,
+        settings,
+        min_severity=min_severity,
+        pattern_filter=pattern_filter,
+    )
+    return file_path, findings
 
 
 def analyze_directory(
@@ -397,7 +400,6 @@ def analyze_directory(
         >>> for file_path, findings in findings_map.items():
         ...     print(f"{file_path}: {len(findings)} findings")
     """
-    # Deprecation warnings
     if fail_fast:
         warnings.warn(
             "The 'fail_fast' parameter is deprecated since 1.0.0b1 and will be "
@@ -410,7 +412,6 @@ def analyze_directory(
         if min_severity is None:
             min_severity = severity_filter
 
-    # Validate directory and resolve settings / metrics before delegating.
     path = _validate_directory_path(directory_path)
     container = get_container()
     if settings is None:
@@ -418,8 +419,7 @@ def analyze_directory(
     if metrics is None:
         metrics = container.resolve("metrics")
 
-    # Build the per-file callable using the *module-level* analyze_file name so
-    # that monkeypatching public_api.analyze_file is respected by the thread pool.
+    import functools
     analyze_fn = functools.partial(
         _analyze_one_file,
         analyzers=analyzers,
@@ -446,35 +446,6 @@ def analyze_directory(
     )
 
 
-def _resolve_cache(
-    files: list[Path], cache: AnalysisCache
-) -> tuple[list[Path], dict[Path, list[Finding]], dict[Path, str]]:
-    """Split *files* into cache hits and misses.
-
-    Returns ``(misses, hits_findings, hashes)`` where *misses* is the list of
-    files that must be analysed, *hits_findings* maps each cached file to its
-    findings, and *hashes* maps every file to its SHA-256 digest.
-    """
-    misses: list[Path] = []
-    hits: dict[Path, list[Finding]] = {}
-    hashes: dict[Path, str] = {}
-
-    for fp in files:
-        try:
-            h = cache.file_hash(fp)
-            hashes[fp] = h
-            cached = cache.get(fp, h)
-            if cached is not None:
-                hits[fp] = cached
-            else:
-                misses.append(fp)
-        except OSError:
-            # Unhashable file (e.g. permission error) → treat as miss.
-            misses.append(fp)
-
-    return misses, hits, hashes
-
-
 def _load_test_files(files: list[Path]) -> list[TestFile]:
     """Load TestFile objects from file paths."""
     test_files: list[TestFile] = []
@@ -493,12 +464,7 @@ def _load_test_files(files: list[Path]) -> list[TestFile]:
 def _gather_suite_structure(
     test_files: list[TestFile], parser: Any
 ) -> tuple[SuiteInfo, list[Path]]:
-    """Parse and gather suite structure information.
-
-    Returns ``(suite_info, failed_paths)`` where *failed_paths* lists files
-    that could not be parsed.  Callers should exclude those files from
-    suite-level analysis to avoid false-positive dead-code findings.
-    """
+    """Parse and gather suite structure information."""
     suite_info = SuiteInfo(files=len(test_files))
     failed_paths: list[Path] = []
     for tf in test_files:
@@ -519,12 +485,7 @@ def _analyze_with_other_analyzers(
     test_files: list[TestFile],
     other_analyzers: list[BaseAnalyzer],
 ) -> tuple[list[Finding], dict[Path, list[Finding]], list[tuple[Path, Exception]]]:
-    """Run non-suite-aware analyzers on each file.
-
-    Returns ``(all_findings, file_findings, errors)`` where *errors* lists
-    ``(path, exception)`` pairs for analyzer failures so callers can surface
-    partial-analysis conditions instead of silently swallowing them.
-    """
+    """Run non-suite-aware analyzers on each file."""
     all_findings: list[Finding] = []
     file_findings: dict[Path, list[Finding]] = {tf.path: [] for tf in test_files}
     errors: list[tuple[Path, Exception]] = []
@@ -605,12 +566,10 @@ def analyze_suite(
         suite_path: Path to suite file or directory.
         analyzers: List of analyzer names or instances.
         settings: Configuration settings.
+        min_severity: Only return findings at or above this severity.
 
     Returns:
-        Dictionary with analysis results including:
-        - findings: List of all findings
-        - suite_info: Parsed suite information
-        - statistics: Analysis statistics
+        SuiteAnalysisResult with findings, suite info, and statistics.
 
     Example:
         >>> results = analyze_suite("tests/")
@@ -620,35 +579,26 @@ def analyze_suite(
     path = Path(suite_path)
     container = get_container()
 
-    # Single file or directory?
     if path.is_file():
         files: list[Path] = [path]
     else:
         discovery: Any = container.resolve("file_discovery")
         files = discovery.find_files(path)
 
-    # Load test files and gather suite structure
     parser: Any = container.resolve("parser")
     test_files = _load_test_files(files)
     suite_info, parse_failed_paths = _gather_suite_structure(test_files, parser)
 
-    # Exclude files whose suite structure could not be parsed from suite-level
-    # analysis.  Passing them to a SuiteAwareAnalyzer would produce false-positive
-    # findings for symbols that are only defined in the unparseable files.
     if parse_failed_paths:
         failed_set = set(parse_failed_paths)
         test_files_for_suite = [tf for tf in test_files if tf.path not in failed_set]
     else:
         test_files_for_suite = test_files
 
-    # Resolve settings and analyzer instances
     if settings is None:
         settings = container.resolve("settings")
     analyzer_instances = _get_analyzer_instances(analyzers, settings)
 
-    # Separate suite-aware analyzers (those implementing SuiteAwareAnalyzer protocol)
-    # from per-file analyzers.  Every analyzer that provides analyze_suite() participates
-    # in cross-file detection; third-party analyzers can join without touching api.py.
     suite_aware_analyzers: list[SuiteAwareAnalyzer] = []
     other_analyzers: list[BaseAnalyzer] = []
     for a in analyzer_instances:
@@ -657,15 +607,12 @@ def analyze_suite(
         else:
             other_analyzers.append(a)
 
-    # Run per-file analyzers on ALL test files (not just parse-succeeded ones)
     all_findings, file_findings, suite_errors = _analyze_with_other_analyzers(
         test_files, other_analyzers
     )
-    # Run suite-aware analyzers only on files that parsed successfully
     for _suite_analyzer in suite_aware_analyzers:
         _run_suite_analysis(_suite_analyzer, test_files_for_suite, all_findings, file_findings)
 
-    # Apply min_severity filter before computing statistics and returning.
     if min_severity is not None:
         all_findings = [f for f in all_findings if f.severity <= min_severity]
         file_findings = {
@@ -673,7 +620,6 @@ def analyze_suite(
             for p, fs in file_findings.items()
         }
 
-    # Calculate statistics
     statistics = _calculate_suite_statistics(all_findings, suite_info)
 
     return SuiteAnalysisResult(
@@ -683,151 +629,3 @@ def analyze_suite(
         statistics=statistics,
         errors=suite_errors,
     )
-
-
-def _analyze_one_file(
-    file_path: Path,
-    analyzers: list[str | BaseAnalyzer] | None,
-    settings: Settings,
-    min_severity: Severity | None,
-    pattern_filter: list[str] | None,
-) -> tuple[Path, list[Finding]]:
-    """Analyze a single file and return (path, findings). Used by analyze_directory."""
-    findings = analyze_file(
-        file_path,
-        analyzers,
-        settings,
-        min_severity=min_severity,
-        pattern_filter=pattern_filter,
-    )
-    return file_path, findings
-
-
-def _run_sequential(
-    files: list[Path],
-    analyze_fn: Callable[[Path], tuple[Path, list[Finding]]],
-    fail_fast: bool,
-    dir_results: DirectoryResults,
-    file_errors: list[tuple[Path, Exception]],
-) -> None:
-    """Analyze files one at a time, appending results and errors in-place."""
-    for file_path in files:
-        try:
-            _, file_findings = analyze_fn(file_path)
-            dir_results.findings[file_path] = file_findings
-        except Exception as e:
-            if fail_fast:
-                raise
-            file_errors.append((file_path, e))
-            logger.exception(
-                "Failed to analyze file",
-                extra={"file": str(file_path), "error": str(e)},
-            )
-
-
-def _run_parallel(
-    files: list[Path],
-    analyze_fn: Callable[[Path], tuple[Path, list[Finding]]],
-    effective_workers: int,
-    dir_results: DirectoryResults,
-    file_errors: list[tuple[Path, Exception]],
-) -> None:
-    """Analyze files using a thread pool, appending results and errors in-place."""
-    with ThreadPoolExecutor(max_workers=effective_workers) as pool:
-        future_to_path = {pool.submit(analyze_fn, fp): fp for fp in files}
-        for future in as_completed(future_to_path):
-            fp = future_to_path[future]
-            try:
-                _, file_findings = future.result()
-                dir_results.findings[fp] = file_findings
-            except Exception as e:
-                file_errors.append((fp, e))
-                logger.exception(
-                    "Failed to analyze file",
-                    extra={"file": str(fp), "error": str(e)},
-                )
-
-
-def _execute_directory_analysis(
-    files: list[Path],
-    analyze_fn: Callable[[Path], tuple[Path, list[Finding]]],
-    effective_workers: int,
-    fail_fast: bool,
-) -> tuple[DirectoryResults, list[tuple[Path, Exception]]]:
-    """Run per-file analysis sequentially or in parallel; return results and errors."""
-    dir_results: DirectoryResults = DirectoryResults()
-    file_errors: list[tuple[Path, Exception]] = []
-
-    if effective_workers == 1 or len(files) <= 1 or fail_fast:
-        _run_sequential(files, analyze_fn, fail_fast, dir_results, file_errors)
-    else:
-        _run_parallel(files, analyze_fn, effective_workers, dir_results, file_errors)
-
-    return dir_results, file_errors
-
-
-def _create_analyzer_instance(
-    name: str, config: dict[str, object] | None = None
-) -> BaseAnalyzer:
-    """Create a fresh analyzer instance, injecting per-analyzer config when provided.
-
-    Args:
-        name: Registered analyzer name (e.g. ``"dead_code"``).
-        config: Optional config dict to pass to the analyzer constructor.
-
-    Returns:
-        A new ``BaseAnalyzer`` instance.
-    """
-    registry = get_container().resolve("analyzer_registry")
-    cls = registry.analyzers.get(name)
-    if cls is None:
-        # Fall back to the registry's create() which will raise with a clear message
-        return cast("BaseAnalyzer", registry.create(name))
-    return cast("BaseAnalyzer", cls(config=config or {}))
-
-
-def _get_analyzer_instances(
-    analyzers: list[str | BaseAnalyzer] | None, settings: Settings
-) -> list[BaseAnalyzer]:
-    """Resolve a list of analyzer names/instances into concrete ``BaseAnalyzer`` objects.
-
-    Per-analyzer configuration from ``Settings.analyzer_config`` is passed to
-    each named analyzer at construction time.
-
-    Args:
-        analyzers: List of analyzer names or pre-constructed instances.
-            Pass ``None`` to use all registered analyzers that do not require
-            an external repository.
-        settings: Configuration settings. ``settings.analyzer_config`` is
-            consulted for per-analyzer overrides.
-
-    Returns:
-        List of ready-to-use ``BaseAnalyzer`` instances.
-    """
-    analyzer_config = settings.analyzer_config
-
-    if analyzers is None:
-        registry = get_container().resolve("analyzer_registry")
-        names = [
-            name
-            for name in registry.list()
-            if not getattr(
-                registry.analyzers.get(name), "requires_external_repo", False
-            )
-        ]
-        return [
-            _create_analyzer_instance(name, analyzer_config.get(name))
-            for name in names
-        ]
-
-    instances = []
-    for analyzer in analyzers:
-        match analyzer:
-            case str():
-                instances.append(
-                    _create_analyzer_instance(analyzer, analyzer_config.get(analyzer))
-                )
-            case _:
-                instances.append(analyzer)
-
-    return instances

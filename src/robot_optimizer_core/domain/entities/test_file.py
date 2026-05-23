@@ -25,12 +25,12 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError  # Python 3.9+
 
 from pydantic import Field, computed_field, field_validator
 
-from ...infrastructure.logging.adapter import get_logger
 from ..base import DomainEvent as BaseDomainEvent
 from ..base import Entity
 from ..value_objects.test_result import TestResult as BaseTestResult
 
-logger = get_logger(__name__)
+import logging
+logger = logging.getLogger(__name__)
 
 # Per-run file cache keyed by (resolved_path, mtime).
 # Avoids double-reading the same unchanged file in analyze_suite / analyze_directory.

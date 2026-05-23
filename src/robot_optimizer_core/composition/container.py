@@ -446,7 +446,11 @@ def _register_defaults(container: ThreadSafeContainer) -> None:
     def _build_registry() -> AnalyzerRegistry:
         registry = AnalyzerRegistry(metrics=metrics_instance)
         _register_built_in_analyzers(registry)
-        _register_entry_point_analyzers(registry)
+        try:
+            trusted = set(get_settings().trusted_analyzer_packages)
+        except Exception:
+            trusted = set()
+        _register_entry_point_analyzers(registry, trusted)
         return registry
 
     # Register core services as singletons

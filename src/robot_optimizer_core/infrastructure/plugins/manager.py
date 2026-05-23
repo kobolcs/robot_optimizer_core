@@ -8,12 +8,11 @@ import builtins as _builtins_module
 import hashlib
 import os
 import sys
-from abc import ABC, abstractmethod
 from collections.abc import Callable
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ...domain.ports.plugin import Plugin, PluginMetadata
 from ...exceptions import PluginError
 from ..logging.adapter import get_logger
 
@@ -31,40 +30,6 @@ __all__ = [
 ]
 
 logger = get_logger(__name__)
-
-
-@dataclass
-class PluginMetadata:
-    """Metadata for a plugin."""
-
-    name: str
-    version: str
-    description: str
-    author: str
-
-
-class Plugin(ABC):
-    """Base class for plugins."""
-
-    def __init__(self, registry: PluginRegistry | None = None) -> None:
-        self.registry = registry
-        self.is_active: bool = False
-
-    @property
-    @abstractmethod
-    def metadata(self) -> PluginMetadata:
-        """Get plugin metadata."""
-        ...
-
-    @abstractmethod
-    def activate(self) -> None:
-        """Activate the plugin."""
-        ...
-
-    @abstractmethod
-    def deactivate(self) -> None:
-        """Deactivate the plugin."""
-        ...
 
 
 class PluginRegistry:

@@ -164,7 +164,7 @@ from .infrastructure.metrics.collector import (
 from .infrastructure.parsers import RobotASTParser as RobotASTParser
 
 # Plugin system
-from .infrastructure.plugins.manager import Plugin, PluginMetadata
+from .domain.ports.plugin import Plugin, PluginMetadata
 from .premium import PremiumFeatureError, is_premium_installed
 
 __all__ = [

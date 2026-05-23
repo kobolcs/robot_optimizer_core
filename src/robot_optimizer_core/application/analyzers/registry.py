@@ -306,21 +306,26 @@ def _register_built_in_analyzers(registry: AnalyzerRegistry) -> None:
     logger.debug("Built-in analyzers registered")
 
 
-def _register_entry_point_analyzers(registry: AnalyzerRegistry) -> None:
+def _register_entry_point_analyzers(
+    registry: AnalyzerRegistry,
+    trusted_packages: set[str] | None = None,
+) -> None:
     """Register third-party analyzers from Python entry points.
 
     Entry-point-loaded analyzers execute arbitrary package code on load.
-    When ``settings.trusted_analyzer_packages`` is non-empty, only entry
-    points declared by those distribution packages are loaded; all others
-    are skipped with a warning.  When the list is empty (the default)
-    every installed entry point is loaded with an info-level notice.
-    """
-    from ...infrastructure.config import get_settings
+    When *trusted_packages* is non-empty, only entry points declared by those
+    distribution packages are loaded; all others are skipped with a warning.
+    When empty (the default) every installed entry point is loaded with an
+    info-level notice.
 
-    try:
-        trusted = set(get_settings().trusted_analyzer_packages)
-    except Exception:
-        trusted = set()
+    Args:
+        registry: The analyzer registry to populate.
+        trusted_packages: Set of distribution package names whose entry-point
+            analyzers are allowed to load.  Pass an empty set to allow all
+            (with a warning per entry point).  Should be supplied by the
+            composition root from settings.
+    """
+    trusted = trusted_packages if trusted_packages is not None else set()
 
     for ep in _iter_analyzer_entry_points():
         dist_name: str = getattr(getattr(ep, "dist", None), "name", "") or ""
