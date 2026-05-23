@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Cache correctness: severity filter now applied **after** cache writes so the cache always stores
+  full findings; a subsequent filtered run no longer receives truncated cached results.
+- Cache correctness: analyzer scope (e.g. `--analyzers sleep_detector`) is now encoded in the
+  cache key via `_analyzer_scope_key()` (8-hex SHA-256 of sorted names), preventing a
+  scoped run from serving results cached by a different analyzer set.
+
+### Changed
+
+- `tox.ini`: `[testenv]` now sets `package = wheel` so tox builds a wheel directly instead of
+  the sdist→wheel path that silently dropped package files (hatchling strips `src/` in sdists,
+  which broke `packages = ["src/robot_optimizer_core"]` during wheel rebuild from the sdist).
+
+### Added
+
+- Functional black-box test suite (`tests/functional/test_functional.py`): 33 tests that invoke
+  the installed `robot-optimizer` entry-point as an end-user would, covering exit codes, JSON
+  schema, known finding counts/fingerprints, severity filtering, and analyzer selection.
+  Includes a slow `TestInstalledWheel` class that builds the wheel, installs into an isolated
+  venv, and asserts the full pipeline works end-to-end.
+- `cliff.toml` for automated changelog generation; `publish.yml` gains a conditional `changelog`
+  CI job that prepends the unreleased section on tag push (skipped if the section already exists).
+
 ## [2.0.0] - 2026-05-23
 
 ### Breaking Changes
