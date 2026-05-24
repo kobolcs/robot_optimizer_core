@@ -7,7 +7,93 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`Finding.id` is now deterministic** — replaced `uuid4()` (random per-call) with
+  `uuid5(_FINDING_NS, fingerprint)` so the same finding content always maps to the same
+  UUID. JSON and SARIF output are now byte-identical across repeated `analyze_file()`
+  calls on the same input. This was a silent violation of the documented "stable external
+  referencing" contract for SARIF result IDs.
+
+### Added
+
+- **Contract test suite** (`tests/contracts/`) — 68 tests that pin the public-facing
+  API, plugin, and output-schema surfaces. A failure here signals a breaking change
+  before it reaches consumers:
+  - `test_public_api_contract.py` — `analyze_file`, `analyze_directory`, `analyze_suite`
+    parameter names/defaults/return types and `__all__` exports.
+  - `test_plugin_contract.py` — `Plugin`, `PluginMetadata`, `PluginRegistry`,
+    `ValidatedPluginManager` interfaces for external plugin authors.
+  - `test_output_schema_contract.py` — JSON and SARIF structural keys validated against
+    committed schema artifacts (`tests/contracts/schemas/`); output determinism asserted.
+
+- **Analyzer determinism test suite** (`tests/component/test_analyzer_determinism.py`) —
+  28 tests verifying that `analyze_file()` and `analyze_directory()` produce
+  byte-identical results across 5 sequential runs, 20 concurrent threads, repeated
+  directory runs, and with cache on/off.
+
+- **Performance baseline tests** (`tests/component/test_performance_baselines.py`) —
+  6 `@pytest.mark.performance` tests asserting finding-count stability at 1000-test
+  scale, memory footprint <10 KB/finding, sub-linear scaling (<20× for 10× input
+  growth), and cache warm-path overhead bounds. No wall-clock gates.
+
+- **Parser property tests** (`tests/unit/parsers/test_robot_ast_parser_property.py`) —
+  10 Hypothesis property tests covering `RobotASTParser` invariants: determinism,
+  keyword/test-case count preservation, line-number ordering, name round-trip, and
+  no-crash robustness over generated Robot content.
+
+- **CI fast lane** (`.github/workflows/pr_fast.yml`) — runs on every PR push in <3 min:
+  determinism check + contract tests + unit/integration smoke. Does not duplicate the
+  lint/type checks already in `ci.yml`.
+
+- **Nightly deep lane** (`.github/workflows/nightly.yml`) — runs at 02:00 UTC:
+  quarantine suite execution, performance tests, and schema-drift detection. Mutation
+  testing and compat matrix remain in their dedicated workflows to avoid duplication.
+
+- **PR template** (`.github/pull_request_template.md`) — determinism checklist and
+  contract-change checklist enforced at review time.
+
+- **Determinism pre-commit hook** — `ci/check_test_determinism.py` (AST-based scanner
+  for `datetime.now()` without timezone and `time.sleep()` in test files) runs on every
+  commit touching `test_*.py` files.
+
+- **Quarantine age check** — `ci/check_quarantine_age.py` flags `@pytest.mark.quarantine`
+  tests older than 14 days; runs in the nightly lane and produces an artifact.
+
+- **New `pytest` markers**: `contract` (API/schema stability tests, always run) and
+  `quarantine` (flaky tests under investigation, skipped in PR gates, included in
+  nightly via `--run-quarantine`).
+
+- **New `Makefile` targets**: `test-contracts`, `test-smoke`, `test-nightly`,
+  `check-determinism`, `check-quarantine`.
+
 ### Changed
+
+- **`ci.yml` optimized**:
+  - Draft PRs now skip the 12-runner compat matrix (fast lane handles them instead).
+  - `paths-ignore` added — docs/markdown edits no longer trigger any CI job.
+  - Quality job consolidated to a single `pip install` pass; tox environments
+    (`lint`, `type`, `build`, `docs`) now run in parallel (`-p 4`).
+  - Contract tests in quality job now install `.[test]` instead of `.[dev]`,
+    avoiding mkdocs/mutmut/pre-commit overhead.
+  - `uv.lock` added to tox cache key for correct cache invalidation on lock-file changes.
+  - Uploads `coverage.xml` artifact (consumed by `sonar.yml` without re-running tests).
+
+- **`sonar.yml` optimized** — now triggers via `workflow_run` after CI completes and
+  downloads the `coverage.xml` artifact instead of re-running the full test suite
+  (~70 s saved per PR push).
+
+- **`mutation.yml` path filter corrected** — was pointing to the non-existent
+  `src/robot_optimizer_core/analyzers/` path; now correctly targets
+  `application/analyzers/` and `domain/`.
+
+- **All `datetime.now()` (naive) calls in tests replaced with `datetime.now(UTC)`**
+  across 11 test files — eliminates DST/timezone-sensitivity in test fixtures.
+
+- **`tests/conftest.py`**: added `fixed_utc_now` fixture (stable
+  `datetime(2026, 1, 15, 12, 0, 0, tzinfo=UTC)` sentinel for domain object
+  construction), `quarantine` skip mechanism, and removed duplicate
+  `pytest_collection_modifyitems` stub.
 
 - `refactor`: 21-issue source maintainability pass + 5-issue test-suite cleanup:
 
