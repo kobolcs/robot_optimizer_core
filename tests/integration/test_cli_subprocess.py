@@ -38,6 +38,7 @@ def _run(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str
         text=True,
         encoding="utf-8",
         errors="replace",
+        timeout=20,
         cwd=cwd,
         env=env,
     )
