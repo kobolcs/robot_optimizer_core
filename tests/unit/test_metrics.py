@@ -175,6 +175,7 @@ class TestMetricsCollector:
         from robot_optimizer_core.infrastructure.metrics.collector import (
             configure_metrics,
             get_metrics,
+            reset_metrics,
         )
 
         m1 = configure_metrics(enabled=True)
@@ -183,6 +184,7 @@ class TestMetricsCollector:
             assert m1 is m2
         finally:
             m1.stop()
+            reset_metrics()
 
     def test_stop_when_already_stopped_is_safe(self) -> None:
         m = MetricsCollector(enabled=True)
@@ -218,6 +220,7 @@ class TestMetricsCollector:
     def test_configure_metrics_stops_old_collector(self) -> None:
         from robot_optimizer_core.infrastructure.metrics.collector import (
             configure_metrics,
+            reset_metrics,
         )
 
         m1 = configure_metrics(enabled=True)
@@ -226,6 +229,7 @@ class TestMetricsCollector:
             assert m1 is not m2
         finally:
             m2.stop()
+            reset_metrics()
 
     def test_get_metrics_triggers_cleanup_when_overdue(self) -> None:
         import time
@@ -298,6 +302,7 @@ class TestMetricsCollector:
         data = m2.get_metrics()
         assert data["counters"] == {}
         m2.stop()
+        reset_metrics()
 
     def test_reset_metrics_idempotent_when_none(self) -> None:
         from robot_optimizer_core.infrastructure.metrics.collector import reset_metrics
