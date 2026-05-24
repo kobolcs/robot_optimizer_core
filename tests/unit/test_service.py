@@ -21,19 +21,7 @@ from robot_optimizer_core.infrastructure.config import Settings
 # ---------------------------------------------------------------------------
 
 
-def _make_finding(severity: Severity = Severity.WARNING) -> Finding:
-    from uuid import uuid4
-
-    from robot_optimizer_core.domain.value_objects import Location, Pattern
-
-    return Finding(
-        id=uuid4(),
-        pattern=Pattern.sleep_in_test("1s"),
-        severity=severity,
-        location=Location(file_path=Path("test.robot"), line=1),
-        message="test finding",
-        context={},
-    )
+from unit.helpers import _SIMPLE_ROBOT, make_finding as _make_finding
 
 
 # ---------------------------------------------------------------------------
@@ -55,20 +43,20 @@ class TestAnalysisResult:
 
     def test_error_count(self) -> None:
         findings = [
-            _make_finding(Severity.ERROR),
-            _make_finding(Severity.WARNING),
-            _make_finding(Severity.ERROR),
+            _make_finding(severity=Severity.ERROR),
+            _make_finding(severity=Severity.WARNING),
+            _make_finding(severity=Severity.ERROR),
         ]
         r = AnalysisResult(file_path=Path("f.robot"), findings=findings)
         assert r.error_count == 2
 
     def test_warning_count(self) -> None:
-        findings = [_make_finding(Severity.WARNING), _make_finding(Severity.ERROR)]
+        findings = [_make_finding(severity=Severity.WARNING), _make_finding(severity=Severity.ERROR)]
         r = AnalysisResult(file_path=Path("f.robot"), findings=findings)
         assert r.warning_count == 1
 
     def test_info_count(self) -> None:
-        findings = [_make_finding(Severity.INFO), _make_finding(Severity.INFO)]
+        findings = [_make_finding(severity=Severity.INFO), _make_finding(severity=Severity.INFO)]
         r = AnalysisResult(file_path=Path("f.robot"), findings=findings)
         assert r.info_count == 2
 
@@ -89,7 +77,7 @@ class TestDirectoryAnalysisResult:
     def _make_result(self) -> DirectoryAnalysisResult:
         p1 = Path("a.robot")
         p2 = Path("b.robot")
-        findings = [_make_finding(Severity.WARNING), _make_finding(Severity.ERROR)]
+        findings = [_make_finding(severity=Severity.WARNING), _make_finding(severity=Severity.ERROR)]
         return DirectoryAnalysisResult(
             directory=Path("tests/"),
             results={p1: findings, p2: []},
@@ -159,7 +147,7 @@ class TestAnalysisService:
 
     def test_analyze_file_success(self, tmp_path: Path) -> None:
         f = tmp_path / "t.robot"
-        f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+        f.write_bytes(_SIMPLE_ROBOT)
         svc = AnalysisService.from_container()
         result = svc.analyze_file(f)
         assert result.is_success
@@ -173,14 +161,14 @@ class TestAnalysisService:
 
     def test_analyze_file_returns_path(self, tmp_path: Path) -> None:
         f = tmp_path / "t.robot"
-        f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+        f.write_bytes(_SIMPLE_ROBOT)
         svc = AnalysisService.from_container()
         result = svc.analyze_file(f)
         assert result.file_path == f
 
     def test_analyze_directory_returns_result(self, tmp_path: Path) -> None:
         f = tmp_path / "t.robot"
-        f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+        f.write_bytes(_SIMPLE_ROBOT)
         svc = AnalysisService.from_container()
         result = svc.analyze_directory(tmp_path)
         assert isinstance(result, DirectoryAnalysisResult)
@@ -188,7 +176,7 @@ class TestAnalysisService:
 
     def test_analyze_directory_string_path(self, tmp_path: Path) -> None:
         f = tmp_path / "t.robot"
-        f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+        f.write_bytes(_SIMPLE_ROBOT)
         svc = AnalysisService.from_container()
         result = svc.analyze_directory(str(tmp_path))
         assert isinstance(result, DirectoryAnalysisResult)
@@ -214,7 +202,7 @@ class TestAnalysisService:
 
     def test_analyze_file_with_specific_analyzers(self, tmp_path: Path) -> None:
         f = tmp_path / "t.robot"
-        f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+        f.write_bytes(_SIMPLE_ROBOT)
         svc = AnalysisService.from_container()
         result = svc.analyze_file(f, analyzers=["dead_code"])
         assert result.is_success
@@ -226,13 +214,14 @@ class TestAnalysisService:
         )
 
         f = tmp_path / "t.robot"
-        f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+        f.write_bytes(_SIMPLE_ROBOT)
         svc = AnalysisService.from_container()
-        findings = svc._run_file_analysis(
+        findings, names = svc._run_file_analysis(
             f, analyzers=[DeadCodeAnalyzer()], settings=None,
             min_severity=None, pattern_filter=None,
         )
         assert isinstance(findings, list)
+        assert isinstance(names, tuple)
 
     def test_run_file_analysis_max_size_raises(self, tmp_path: Path) -> None:
         """_run_file_analysis raises AnalysisError when file exceeds size limit."""
@@ -260,25 +249,28 @@ class TestAnalysisService:
         """run_directory_analysis with use_cache=False skips cache branches."""
 
         f = tmp_path / "t.robot"
-        f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+        f.write_bytes(_SIMPLE_ROBOT)
 
         svc = AnalysisService.from_container()
 
         def _noop(fp: Path) -> tuple[Path, list[Finding]]:
             return fp, []
 
+        from robot_optimizer_core.application.services.analysis_service import DirectoryAnalysisOptions
+
+        opts = DirectoryAnalysisOptions(
+            patterns=["*.robot"],
+            recursive=False,
+            error_handling="warn",
+            max_workers=1,
+            use_cache=False,
+        )
         result = svc.run_directory_analysis(
             directory_path=tmp_path,
             analyze_fn=_noop,
-            patterns=["*.robot"],
-            exclude_patterns=None,
-            recursive=False,
+            options=opts,
             settings=svc.settings,
-            fail_fast=False,
-            error_handling="warn",
-            max_workers=1,
             metrics=svc._metrics,
-            use_cache=False,
         )
         assert result is not None
 
@@ -287,11 +279,12 @@ class TestAnalysisService:
         f = tmp_path / "t.robot"
         f.write_bytes(b"*** Test Cases ***\nT\n    Sleep    5s\n")
         svc = AnalysisService.from_container()
-        findings = svc._run_file_analysis(
+        findings, names = svc._run_file_analysis(
             f, analyzers=None, settings=None,
             min_severity=None, pattern_filter=["nonexistent_analyzer"],
         )
         assert findings == []
+        assert names == ()
 
     def test_run_file_analysis_binary_file_raises_analysis_error(self, tmp_path: Path) -> None:
         """Binary file triggers the generic except-Exception path in file loading."""
@@ -325,7 +318,7 @@ class TestAnalysisService:
                 raise AnalysisError("deliberate", file_path=test_file.path)
 
         f = tmp_path / "t.robot"
-        f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+        f.write_bytes(_SIMPLE_ROBOT)
         svc = AnalysisService.from_container()
         with pytest.raises(AnalysisError, match="deliberate"):
             svc._run_file_analysis(

@@ -10,7 +10,6 @@ import pytest
 
 from robot_optimizer_core.domain.value_objects import Finding, Severity
 from robot_optimizer_core.domain.value_objects.location import Location
-from robot_optimizer_core.domain.value_objects.pattern import Pattern, PatternType
 from robot_optimizer_core.infrastructure.cache.analysis_cache import (
     AnalysisCache,
     _finding_from_dict,
@@ -22,22 +21,7 @@ from robot_optimizer_core.infrastructure.cache.analysis_cache import (
 # ---------------------------------------------------------------------------
 
 
-def _make_pattern() -> Pattern:
-    return Pattern(
-        type=PatternType.SLEEP_IN_TEST,
-        name="sleep_in_test",
-        description="A sleep was found in a test",
-        recommendation="Replace sleep with an explicit wait",
-    )
-
-
-def _make_finding(file_path: Path, line: int = 10) -> Finding:
-    return Finding.create(
-        pattern=_make_pattern(),
-        severity=Severity.WARNING,
-        location=Location(file_path=file_path, line=line),
-        message="Sleep detected",
-    )
+from unit.helpers import _SIMPLE_ROBOT, make_finding as _make_finding, make_pattern as _make_pattern
 
 
 # ---------------------------------------------------------------------------
@@ -322,7 +306,7 @@ class TestCacheEviction:
         """An invalid cache entry (bad data) is treated as a miss."""
         cache = AnalysisCache(cache_dir=tmp_path / "cache")
         fp = tmp_path / "f.robot"
-        fp.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+        fp.write_bytes(_SIMPLE_ROBOT)
 
         h = AnalysisCache.file_hash(fp)
         # Write a correctly-keyed but unparseable entry

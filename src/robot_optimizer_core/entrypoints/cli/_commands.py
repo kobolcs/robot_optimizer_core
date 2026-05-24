@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import signal
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -31,9 +32,27 @@ _EXIT_PARTIAL = 3
 
 _PLACEHOLDER_COMING_SOON = "coming soon"
 
+_FEATURES: list[tuple[str, bool, bool | str]] = [
+    ("Dead code detection", True, True),
+    ("Sleep pattern analysis", True, True),
+    ("Flakiness detection", True, True),
+    ("Naming convention checks", True, True),
+    ("Hardcoded value detection", True, True),
+    ("Custom analyzer plugins", True, True),
+    ("SARIF output format", True, True),
+    ("Basic HTML report", True, True),
+    ("Auto-fix workflows", False, _PLACEHOLDER_COMING_SOON),
+    ("Advanced branded HTML reports", False, _PLACEHOLDER_COMING_SOON),
+    ("PDF export", False, _PLACEHOLDER_COMING_SOON),
+    ("Baseline diffing", False, _PLACEHOLDER_COMING_SOON),
+    ("Historical trend reports", False, _PLACEHOLDER_COMING_SOON),
+    ("Dashboards", False, _PLACEHOLDER_COMING_SOON),
+    ("Priority support", False, _PLACEHOLDER_COMING_SOON),
+]
+
 
 def _parse_analyzers(args: argparse.Namespace) -> list[str | BaseAnalyzer] | None:
-    if hasattr(args, "analyzers") and args.analyzers:
+    if args.analyzers:
         return [a.strip() for a in args.analyzers.split(",") if a.strip()]
     return None
 
@@ -41,11 +60,7 @@ def _parse_analyzers(args: argparse.Namespace) -> list[str | BaseAnalyzer] | Non
 def _parse_severity(args: argparse.Namespace) -> Severity | None:
     if not args.min_severity:
         return None
-    try:
-        return Severity.from_string(args.min_severity)
-    except ValueError as exc:
-        print(f"error: invalid --min-severity value: {exc}", file=sys.stderr)
-        return None
+    return Severity.from_string(args.min_severity)
 
 
 def _load_config(args: argparse.Namespace) -> Settings | None:
@@ -198,6 +213,10 @@ class _FileChangeHandler(_FileSystemEventHandler):
 
     Encapsulates per-file state and analysis callbacks so it can be constructed
     and tested independently of the observer loop.
+
+    Debouncing is done with per-path ``threading.Timer`` objects so the watchdog
+    observer thread is never blocked — rapid save+format sequences are coalesced
+    into a single analysis run per file.
     """
 
     def __init__(
@@ -212,6 +231,8 @@ class _FileChangeHandler(_FileSystemEventHandler):
         self._analyzer_names = analyzer_names
         self._settings = settings
         self._severity_filter = severity_filter
+        self._pending: dict[Path, threading.Timer] = {}
+        self._lock = threading.Lock()
 
     @staticmethod
     def _decode_path(raw: str | bytes) -> Path:
@@ -219,24 +240,40 @@ class _FileChangeHandler(_FileSystemEventHandler):
             return Path(raw.decode("utf-8"))
         return Path(raw)
 
-    def on_modified(self, event: object) -> None:
-        if getattr(event, "is_directory", False):
-            return
-        file_path = self._decode_path(event.src_path)  # type: ignore[union-attr]
-        if file_path.suffix not in _WATCHED_EXTENSIONS:
-            return
+    def _schedule_modified(self, file_path: Path) -> None:
+        """Cancel any in-flight timer for *file_path* and start a fresh one."""
+        with self._lock:
+            existing = self._pending.pop(file_path, None)
+            if existing is not None:
+                existing.cancel()
+            timer = threading.Timer(
+                _WATCH_DEBOUNCE_SECONDS, self._run_modified, [file_path]
+            )
+            self._pending[file_path] = timer
+        timer.start()
 
-        time.sleep(_WATCH_DEBOUNCE_SECONDS)
-
+    def _run_modified(self, file_path: Path) -> None:
+        with self._lock:
+            self._pending.pop(file_path, None)
         print(f"\n[*] File changed: {file_path}", file=sys.stderr)
         prev_flat = _flatten_state(self._state)
-        findings, _ = _analyze_path(file_path, self._analyzer_names, self._settings, self._severity_filter, use_cache=False)
+        findings, _ = _analyze_path(
+            file_path, self._analyzer_names, self._settings, self._severity_filter, use_cache=False
+        )
         if findings is None:
             return
         self._state[file_path] = findings
         curr_flat = _flatten_state(self._state)
         new_f, resolved_f = _compute_finding_diff(prev_flat, curr_flat)
         _print_watch_diff(new_f, resolved_f)
+
+    def on_modified(self, event: object) -> None:
+        if getattr(event, "is_directory", False):
+            return
+        file_path = self._decode_path(event.src_path)  # type: ignore[union-attr]
+        if file_path.suffix not in _WATCHED_EXTENSIONS:
+            return
+        self._schedule_modified(file_path)
 
     def on_deleted(self, event: object) -> None:
         if getattr(event, "is_directory", False):
@@ -359,22 +396,20 @@ def _run_analyze(args: argparse.Namespace) -> int:
     analyzer_names = _parse_analyzers(args)
 
     severity_filter = _parse_severity(args)
-    if severity_filter is None and args.min_severity:
-        return _EXIT_ERROR
 
     settings = _load_config(args)
     if settings is None and getattr(args, "config", None):
         return _EXIT_ERROR
 
-    if getattr(args, "clear_cache", False):
+    if args.clear_cache:
         from ...composition.context import get_analysis_service
         get_analysis_service().clear_cache()
 
     # Handle watch mode
-    if getattr(args, "watch", False):
+    if args.watch:
         return _run_watch_mode(path, analyzer_names, settings, severity_filter, args)
 
-    use_cache = not getattr(args, "no_cache", False)
+    use_cache = not args.no_cache
     all_findings, partial_failure = _analyze_path(
         path, analyzer_names, settings, severity_filter, use_cache=use_cache
     )
@@ -382,8 +417,8 @@ def _run_analyze(args: argparse.Namespace) -> int:
         return _EXIT_ERROR
 
     # --baseline / --update-baseline handling
-    baseline_path = getattr(args, "baseline", None)
-    update_baseline = getattr(args, "update_baseline", False)
+    baseline_path = args.baseline
+    update_baseline = args.update_baseline
     if baseline_path is not None:
         baseline_file = Path(baseline_path)
         return _run_with_baseline(
@@ -411,13 +446,14 @@ def _run_with_baseline(
 ) -> int:
     """Apply baseline logic: write, update, or filter findings."""
     # First run or forced update: write baseline and exit clean.
-    if not baseline_file.exists() or update_baseline:
+    was_new = not baseline_file.exists()
+    if was_new or update_baseline:
         try:
             save_baseline(all_findings, baseline_file)
         except OSError as exc:
             print(f"error: could not write baseline '{baseline_file}': {exc}", file=sys.stderr)
             return _EXIT_ERROR
-        action = "Updated" if baseline_file.exists() and update_baseline else "Created"
+        action = "Created" if was_new else "Updated"
         print(
             f"Baseline {action.lower()}: {baseline_file} ({len(all_findings)} finding(s))",
             file=sys.stderr,
@@ -479,24 +515,7 @@ def _run_upgrade(_args: argparse.Namespace) -> int:
     print()
     print(f"{'Feature':<38} {'Free':<10} {'Pro'}")
     print("-" * 55)
-    features = [
-        ("Dead code detection", True, True),
-        ("Sleep pattern analysis", True, True),
-        ("Flakiness detection", True, True),
-        ("Naming convention checks", True, True),
-        ("Hardcoded value detection", True, True),
-        ("Custom analyzer plugins", True, True),
-        ("SARIF output format", True, True),
-        ("Basic HTML report", True, True),
-        ("Auto-fix workflows", False, _PLACEHOLDER_COMING_SOON),
-        ("Advanced branded HTML reports", False, _PLACEHOLDER_COMING_SOON),
-        ("PDF export", False, _PLACEHOLDER_COMING_SOON),
-        ("Baseline diffing", False, _PLACEHOLDER_COMING_SOON),
-        ("Historical trend reports", False, _PLACEHOLDER_COMING_SOON),
-        ("Dashboards", False, _PLACEHOLDER_COMING_SOON),
-        ("Priority support", False, _PLACEHOLDER_COMING_SOON),
-    ]
-    for name, free, pro in features:
+    for name, free, pro in _FEATURES:
         free_mark = "✓" if free else "—"
         if isinstance(pro, str):
             pro_mark = pro

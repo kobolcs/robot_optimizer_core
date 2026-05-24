@@ -6,7 +6,7 @@ from __future__ import annotations
 import threading
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -382,6 +382,52 @@ def get_analysis_service() -> Any:
         registry=container.resolve("analyzer_registry"),
         cache=container.resolve("analysis_cache"),
     )
+
+
+# ---------------------------------------------------------------------------
+# Typed DI accessors — thin wrappers that recover static types from resolve()
+# ---------------------------------------------------------------------------
+
+
+def get_settings() -> Settings:
+    """Return the globally-registered Settings instance."""
+    from .container import get_container
+
+    return cast(Settings, get_container().resolve("settings"))
+
+
+def get_metrics() -> MetricsCollector:
+    """Return the globally-registered MetricsCollector instance."""
+    from .container import get_container
+
+    return cast(MetricsCollector, get_container().resolve("metrics"))
+
+
+def get_file_discovery() -> FileDiscoveryService:
+    """Return the globally-registered FileDiscoveryService instance."""
+    from .container import get_container
+
+    return cast(FileDiscoveryService, get_container().resolve("file_discovery"))
+
+
+def get_parser() -> Any:
+    """Return the globally-registered IParser instance.
+
+    Returns Any because IParser lives in a port that cannot be imported at
+    module level without creating circular imports.  Call sites should annotate
+    the result: ``parser: IParser = get_parser()``.
+    """
+    from .container import get_container
+
+    return get_container().resolve("parser")
+
+
+def get_analyzer_registry() -> AnalyzerRegistry:
+    """Return the globally-registered AnalyzerRegistry instance."""
+    from ..application.analyzers.registry import AnalyzerRegistry
+    from .container import get_container
+
+    return cast(AnalyzerRegistry, get_container().resolve("analyzer_registry"))
 
 
 # Factory functions (no globals!)

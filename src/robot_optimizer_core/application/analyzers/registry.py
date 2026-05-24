@@ -263,7 +263,7 @@ def get_analyzer_registry() -> AnalyzerRegistry:
     """
     from robot_optimizer_core.composition.container import get_container
 
-    return get_container().resolve("analyzer_registry")  # type: ignore[no-any-return]
+    return cast(AnalyzerRegistry, get_container().resolve("analyzer_registry"))
 
 
 def reset_registry() -> None:

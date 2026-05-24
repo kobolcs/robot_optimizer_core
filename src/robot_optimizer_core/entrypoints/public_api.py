@@ -42,7 +42,7 @@ from typing import (
 
 from ..application.analyzers import BaseAnalyzer, SuiteAwareAnalyzer
 from ..application.services.analysis_service import AnalysisService, DirectoryResults
-from ..composition.container import get_container
+from ..composition.context import get_file_discovery, get_metrics, get_parser, get_settings
 from ..domain.entities import TestFile
 from ..domain.value_objects.results import AnalysisMeta, FileAnalysisResult
 from ..exceptions import AnalysisError, RobotFileNotFoundError
@@ -184,18 +184,12 @@ def analyze_file(
         raise RobotFileNotFoundError(path)
 
     service = _get_or_build_service()
-    resolved_settings = settings or service.settings
     t0 = time.time()
-    findings = service._run_file_analysis(
-        path, analyzers, resolved_settings, min_severity, pattern_filter, metrics
+    findings, analyzer_names = service.analyze_file_with_meta(
+        path, analyzers, settings, min_severity, pattern_filter, metrics
     )
     duration_ms = (time.time() - t0) * 1000
-
-    analyzer_instances = service._get_analyzer_instances(analyzers, resolved_settings)
-    meta = AnalysisMeta(
-        duration_ms=duration_ms,
-        analyzer_names=tuple(a.name for a in analyzer_instances),
-    )
+    meta = AnalysisMeta(duration_ms=duration_ms, analyzer_names=analyzer_names)
     return FileAnalysisResult(file_path=path, findings=findings, meta=meta)
 
 
@@ -266,23 +260,18 @@ def analyze_directory(
         >>> for file_path, findings in result.findings.items():
         ...     print(f"{file_path}: {len(findings)} findings")
     """
-    _dir = Path(directory_path)
-    if not _dir.exists():
-        raise RobotFileNotFoundError(_dir)
-    if not _dir.is_dir():
-        raise AnalysisError("Path is not a directory", file_path=_dir)
-    path = _dir
-    container = get_container()
+    path = Path(directory_path)
     if settings is None:
-        settings = container.resolve("settings")
+        settings = get_settings()
     if metrics is None:
-        metrics = container.resolve("metrics")
+        metrics = get_metrics()
 
     import functools
-    # min_severity is intentionally omitted here so that analyze_fn always
-    # returns the full finding set.  run_directory_analysis applies the filter
-    # after cache writes, ensuring the cache stores unfiltered results and the
-    # same cache entry is valid for any severity threshold.
+    from ..application.services.analysis_service import DirectoryAnalysisOptions
+
+    # min_severity is intentionally omitted from analyze_fn so that the cache
+    # stores full unfiltered results.  run_directory_analysis applies the filter
+    # after cache writes so the same cache entry is valid for any severity threshold.
     analyze_fn = functools.partial(
         _analyze_one_file,
         analyzers=analyzers,
@@ -290,23 +279,24 @@ def analyze_directory(
         min_severity=None,
         pattern_filter=pattern_filter,
     )
-
+    opts = DirectoryAnalysisOptions(
+        patterns=patterns,
+        exclude_patterns=exclude_patterns,
+        recursive=recursive,
+        error_handling=error_handling,
+        max_workers=max_workers,
+        use_cache=use_cache,
+        min_severity=min_severity,
+        analyzer_names=_str_analyzer_names(analyzers),
+    )
     return cast(
         "DirectoryResults",
         _get_or_build_service().run_directory_analysis(
             directory_path=path,
             analyze_fn=analyze_fn,
-            patterns=patterns,
-            exclude_patterns=exclude_patterns,
-            recursive=recursive,
+            options=opts,
             settings=settings,
-            fail_fast=False,
-            error_handling=error_handling,
-            max_workers=max_workers,
             metrics=metrics,
-            use_cache=use_cache,
-            min_severity=min_severity,
-            analyzer_names=_str_analyzer_names(analyzers),
         ),
     )
 
@@ -353,9 +343,24 @@ def _gather_suite_structure(
     return suite_info, failed_paths
 
 
+def _partition_analyzers(
+    instances: list[BaseAnalyzer],
+) -> tuple[list[SuiteAwareAnalyzer], list[BaseAnalyzer]]:
+    """Split analyzer instances into suite-aware and per-file groups."""
+    suite_aware: list[SuiteAwareAnalyzer] = []
+    per_file: list[BaseAnalyzer] = []
+    for a in instances:
+        if isinstance(a, SuiteAwareAnalyzer):
+            suite_aware.append(a)
+        else:
+            per_file.append(a)
+    return suite_aware, per_file
+
+
 def _analyze_with_other_analyzers(
     test_files: list[TestFile],
     other_analyzers: list[BaseAnalyzer],
+    pattern_filter: list[str] | None = None,
 ) -> tuple[list[Finding], dict[Path, list[Finding]], list[tuple[Path, Exception]]]:
     """Run non-suite-aware analyzers on each file."""
     all_findings: list[Finding] = []
@@ -364,6 +369,8 @@ def _analyze_with_other_analyzers(
 
     for tf in test_files:
         for analyzer in other_analyzers:
+            if pattern_filter is not None and analyzer.name not in pattern_filter:
+                continue
             try:
                 findings = analyzer.safe_analyze(tf)
                 all_findings.extend(findings)
@@ -424,6 +431,7 @@ def analyze_suite(
     analyzers: list[str | BaseAnalyzer] | None = None,
     settings: Settings | None = None,
     min_severity: Severity | None = None,
+    pattern_filter: list[str] | None = None,
 ) -> SuiteAnalysisResult:
     """Analyze a Robot Framework test suite with AST parsing.
 
@@ -439,6 +447,7 @@ def analyze_suite(
         analyzers: List of analyzer names or instances.
         settings: Configuration settings.
         min_severity: Only return findings at or above this severity.
+        pattern_filter: When given, only run analyzers whose name is in this list.
 
     Returns:
         SuiteAnalysisResult with findings, suite info, and statistics.
@@ -449,15 +458,14 @@ def analyze_suite(
         >>> print(f"Keywords: {len(results.suite_info.keywords)}")
     """
     path = Path(suite_path)
-    container = get_container()
 
     if path.is_file():
         files: list[Path] = [path]
     else:
-        discovery: IFileDiscovery = container.resolve("file_discovery")
+        discovery: IFileDiscovery = get_file_discovery()
         files = discovery.find_files(path)
 
-    parser: IParser = container.resolve("parser")
+    parser: IParser = get_parser()
     test_files, load_errors = _load_test_files(files)
     suite_info, parse_failed_paths = _gather_suite_structure(test_files, parser)
 
@@ -465,20 +473,14 @@ def analyze_suite(
     test_files_for_suite = [tf for tf in test_files if tf.path not in failed_set] if failed_set else test_files
 
     if settings is None:
-        settings = container.resolve("settings")
+        settings = get_settings()
     service = _get_or_build_service()
-    analyzer_instances = service._get_analyzer_instances(analyzers, settings)
+    analyzer_instances = service.resolve_analyzer_instances(analyzers, settings)
 
-    suite_aware_analyzers: list[SuiteAwareAnalyzer] = []
-    other_analyzers: list[BaseAnalyzer] = []
-    for a in analyzer_instances:
-        if isinstance(a, SuiteAwareAnalyzer):
-            suite_aware_analyzers.append(a)
-        else:
-            other_analyzers.append(a)
+    suite_aware_analyzers, other_analyzers = _partition_analyzers(analyzer_instances)
 
     all_findings, file_findings, analyze_errors = _analyze_with_other_analyzers(
-        test_files, other_analyzers
+        test_files, other_analyzers, pattern_filter=pattern_filter
     )
     for _suite_analyzer in suite_aware_analyzers:
         _run_suite_analysis(_suite_analyzer, test_files_for_suite, all_findings, file_findings)

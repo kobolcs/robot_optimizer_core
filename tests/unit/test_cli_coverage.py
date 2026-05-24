@@ -45,6 +45,7 @@ class TestClearCacheFlag:
         robot_file.write_text("*** Test Cases ***\nT\n    Log    hi\n")
         mock_service = MagicMock()
         mock_service.clear_cache = MagicMock()
+        mock_service.analyze_file_with_meta.return_value = ([], ())
         with patch(
             "robot_optimizer_core.composition.context.get_analysis_service",
             return_value=mock_service,

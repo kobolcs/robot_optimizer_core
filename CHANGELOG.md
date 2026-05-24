@@ -9,6 +9,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `refactor`: 21-issue source maintainability pass + 5-issue test-suite cleanup:
+
+  **Source fixes (21 issues)**
+
+  - `sleep_detector.py`: removed ~130 lines of orphaned regex detection path
+    (`_compile_sleep_patterns`, `_detect_sleep`, `_detect_evaluate_sleep`,
+    `_detect_pattern_sleep`, `_EVALUATE_SLEEP_RE`); replaced `sleep_info` dict
+    with typed `_SleepDetection` dataclass; extracted `_resolve_sleep_threshold`
+    (logs WARNING on fallback); removed trivial boilerplate docstrings from
+    property overrides.
+  - `dead_code.py`: replaced `assert` guard with explicit `AnalysisError` raise
+    (safe under `-O`); moved `Iterable` import to module level as `_Iterable`;
+    extracted `_unused_keyword_pattern(display_name, *, suite_level)` factory to
+    deduplicate two identical `Pattern(PatternType.UNUSED_KEYWORD, …)` constructions.
+  - `base.py`: simplified `safe_analyze` `try/except/else` — moved `return` into
+    `try` body, removed the redundant `else` clause.
+  - `_commands.py`: fixed unreachable `"Created"` branch in `_run_with_baseline`
+    (capture `was_new` before `save_baseline`); extracted `_FEATURES` feature-matrix
+    constant from `_run_upgrade`; replaced defensive `getattr(args, …)` calls with
+    direct attribute access (argparse always sets these); replaced
+    `hasattr(args, "analyzers")` guard in `_parse_analyzers` with unconditional access.
+  - `_parser.py`: `--min-severity` now uses `choices=["INFO","WARNING","ERROR"]` so
+    argparse rejects invalid values at parse time; `_parse_severity` simplified to a
+    single-`None` return path.
+  - `analysis_service.py`: `_run_file_analysis` now returns
+    `tuple[list[Finding], tuple[str, …]]` — `analyze_file_with_meta` unpacks both in
+    one call, eliminating the double `_get_analyzer_instances` per-file call;
+    introduced `DirectoryAnalysisOptions` dataclass to reduce `run_directory_analysis`
+    from 14 positional params to 5; added public `analyze_file_with_meta` and
+    `resolve_analyzer_instances` wrappers so `public_api` no longer calls private
+    methods directly.
+  - `public_api.py`: added `pattern_filter` parameter to `analyze_suite` (API parity
+    with `analyze_file`); extracted `_partition_analyzers` helper replacing an inline
+    6-line loop; replaced all `container.resolve("…")` calls with typed accessor
+    functions from `context.py`; removed `get_container` import.
+  - `context.py`: added typed DI accessor functions `get_settings()`,
+    `get_metrics()`, `get_file_discovery()`, `get_parser()`,
+    `get_analyzer_registry()` — replace untyped `resolve()` returns at call sites.
+  - `plugins/manager.py`, `analyzers/registry.py`: replaced
+    `# type: ignore[no-any-return]` on untyped `resolve()` returns with explicit
+    `cast(PluginRegistry, …)` / `cast(AnalyzerRegistry, …)`.
+
+  **Test-suite fixes (5 issues)**
+
+  - Consolidated four divergent `_make_finding()` / `_make_pattern()` factory
+    functions into `tests/unit/helpers.py`; added `pythonpath = ["tests"]` to
+    `pyproject.toml` so `from unit.helpers import …` resolves cleanly.
+  - Extracted `_SIMPLE_ROBOT` constant (34 inline repetitions of
+    `b"*** Test Cases ***\nT\n    Log    ok\n"`) to `tests/unit/helpers.py`;
+    updated all four test files.
+  - Deleted 6 unused fixtures and helper classes from `tests/conftest.py`
+    (`empty_robot_file`, `flaky_test_stats`, `di_container`, `test_results`,
+    `PerformanceTimer`, `TestData`, `MockFactory`).
+  - Moved `large_robot_file` fixture from `tests/conftest.py` to
+    `tests/integration/conftest.py` where it is actually used.
+  - Added module docstring to `tests/unit/test_cli.py` documenting the
+    mocked-analysis scope boundary (contrast with `test_cli_direct.py`'s full
+    end-to-end pipeline).
+
 - `refactor`: 25-issue maintainability pass across core domain, service layer, and CLI:
   - `Location`: removed custom `__init__` (all callers use keyword args); collapsed two
     `field_validator` validators into a single `model_validator(mode="after")`; rewrote

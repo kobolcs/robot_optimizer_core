@@ -9,11 +9,7 @@ from pathlib import Path
 import pytest
 
 from robot_optimizer_core.domain.value_objects import (
-    Finding,
-    Location,
-    Pattern,
     PatternType,
-    Severity,
 )
 from robot_optimizer_core.entrypoints.cli._baseline import (
     BaselineKey,
@@ -27,25 +23,7 @@ from robot_optimizer_core.entrypoints.cli._baseline import (
 # ---------------------------------------------------------------------------
 
 
-def _make_finding(
-    file_path: Path = Path("suite.robot"),
-    line: int = 10,
-    pattern_type: PatternType = PatternType.SLEEP_IN_TEST,
-    severity: Severity = Severity.WARNING,
-    message: str = "Use explicit wait",
-) -> Finding:
-    pattern = Pattern(
-        type=pattern_type,
-        name="Test Pattern",
-        description="A pattern",
-        recommendation="Fix it",
-    )
-    return Finding.create(
-        pattern=pattern,
-        severity=severity,
-        location=Location(file_path=file_path, line=line),
-        message=message,
-    )
+from unit.helpers import make_finding as _make_finding
 
 
 # ---------------------------------------------------------------------------

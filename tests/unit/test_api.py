@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from unit.helpers import _SIMPLE_ROBOT
+
 import robot_optimizer_core.entrypoints.public_api as _api_module
 from robot_optimizer_core.application.services.analysis_service import (
     _execute_directory_analysis,
@@ -139,12 +141,9 @@ def test_analyze_file_uses_safe_analyze(
     class _FakeService:
         settings = None
 
-        def _run_file_analysis(self, *args, **kwargs):
+        def analyze_file_with_meta(self, *args, **kwargs):
             calls.append("safe")
-            return []
-
-        def _get_analyzer_instances(self, analyzers, settings):
-            return [_FakeAnalyzer()]
+            return [], ("hooked",)
 
     monkeypatch.setattr(
         "robot_optimizer_core.entrypoints.public_api._get_or_build_service",
@@ -196,7 +195,7 @@ def test_error_handling_raise_collects_all_errors_then_raises(
     """error_handling='raise' processes all files then raises an ExceptionGroup."""
     for i in range(3):
         (tmp_path / f"test_{i}.robot").write_bytes(
-            b"*** Test Cases ***\nT\n    Log    ok\n"
+            _SIMPLE_ROBOT
         )
 
     call_count = 0
@@ -221,7 +220,7 @@ def test_error_handling_warn_processes_all_files_and_collects_errors(
     """error_handling='warn' continues through all files and surfaces errors on the result."""
     for i in range(3):
         (tmp_path / f"test_{i}.robot").write_bytes(
-            b"*** Test Cases ***\nT\n    Log    ok\n"
+            _SIMPLE_ROBOT
         )
 
     call_count = 0
@@ -247,14 +246,14 @@ def test_error_handling_warn_processes_all_files_and_collects_errors(
 class TestAnalyzeOneFile:
     def test_returns_path_and_findings(self, tmp_path: Path) -> None:
         rf = tmp_path / "t.robot"
-        rf.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+        rf.write_bytes(_SIMPLE_ROBOT)
         path, findings = _analyze_one_file(rf, ["dead_code"], Settings(), None, None)
         assert path == rf
         assert isinstance(findings, list)
 
     def test_propagates_exception(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         rf = tmp_path / "t.robot"
-        rf.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+        rf.write_bytes(_SIMPLE_ROBOT)
 
         def raise_analysis_error(*a, **kw):
             raise AnalysisError("boom")
@@ -333,7 +332,7 @@ def test_analyze_file_wraps_load_exception(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     robot_file = tmp_path / "t.robot"
-    robot_file.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+    robot_file.write_bytes(_SIMPLE_ROBOT)
 
     def boom(*a, **kw):
         raise ValueError("parse kaboom")
@@ -351,16 +350,13 @@ def test_analyze_file_analyzer_failure_raises_analysis_error(
     from robot_optimizer_core.exceptions import AnalysisError as _AE
 
     robot_file = tmp_path / "t.robot"
-    robot_file.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+    robot_file.write_bytes(_SIMPLE_ROBOT)
 
     class _ExplodingService:
         settings = None
 
-        def _run_file_analysis(self, *args, **kwargs):
+        def analyze_file_with_meta(self, *args, **kwargs):
             raise _AE("Analysis failed: analyzer boom", file_path=robot_file)
-
-        def _get_analyzer_instances(self, *args, **kwargs):
-            return []
 
     monkeypatch.setattr(
         "robot_optimizer_core.entrypoints.public_api._get_or_build_service",
@@ -479,7 +475,7 @@ def test_analyze_suite_single_file(tmp_path: Path) -> None:
     from robot_optimizer_core.entrypoints.public_api import analyze_suite
 
     f = tmp_path / "suite.robot"
-    f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+    f.write_bytes(_SIMPLE_ROBOT)
     result = analyze_suite(f)
     assert isinstance(result.findings, list)
     assert hasattr(result, "suite_info")
@@ -490,7 +486,7 @@ def test_analyze_suite_single_file(tmp_path: Path) -> None:
 def test_analyze_suite_directory(tmp_path: Path) -> None:
     from robot_optimizer_core.entrypoints.public_api import analyze_suite
 
-    (tmp_path / "a.robot").write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+    (tmp_path / "a.robot").write_bytes(_SIMPLE_ROBOT)
     result = analyze_suite(tmp_path)
     assert isinstance(result.findings, list)
 
@@ -546,7 +542,7 @@ def test_analyze_directory_with_metrics_passed(tmp_path: Path) -> None:
     from robot_optimizer_core.infrastructure.metrics.collector import MetricsCollector
 
     f = tmp_path / "t.robot"
-    f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+    f.write_bytes(_SIMPLE_ROBOT)
     m = MetricsCollector(enabled=True)
     try:
         analyze_directory(tmp_path, metrics=m)
@@ -562,7 +558,7 @@ def test_analyze_file_with_both_settings_and_metrics_skips_container(
     from robot_optimizer_core.infrastructure.metrics.collector import MetricsCollector
 
     rf = tmp_path / "t.robot"
-    rf.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+    rf.write_bytes(_SIMPLE_ROBOT)
     m = MetricsCollector(enabled=False)
     try:
         result = analyze_file(rf, settings=Settings(), metrics=m)
@@ -578,7 +574,7 @@ def test_analyze_file_with_only_settings_resolves_metrics_from_container(
     from robot_optimizer_core.infrastructure.config import Settings
 
     rf = tmp_path / "t.robot"
-    rf.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+    rf.write_bytes(_SIMPLE_ROBOT)
     result = analyze_file(rf, settings=Settings())
     assert isinstance(result, FileAnalysisResult)
 
@@ -592,7 +588,7 @@ def test_analyze_one_file_with_metrics_reraises_analysis_error(
     from robot_optimizer_core.infrastructure.metrics.collector import MetricsCollector
 
     rf = tmp_path / "t.robot"
-    rf.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+    rf.write_bytes(_SIMPLE_ROBOT)
 
     def boom(*a, **kw):
         raise AnalysisError("forced")
@@ -613,7 +609,7 @@ def test_analyze_directory_with_settings_skips_settings_resolution(
     from robot_optimizer_core.infrastructure.config import Settings
 
     f = tmp_path / "t.robot"
-    f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+    f.write_bytes(_SIMPLE_ROBOT)
     result = analyze_directory(tmp_path, settings=Settings())
     assert result is not None
 
@@ -626,7 +622,7 @@ def test_gather_suite_structure_handles_parse_failure(tmp_path: Path) -> None:
     from robot_optimizer_core.entrypoints.public_api import _gather_suite_structure
 
     rf = tmp_path / "t.robot"
-    rf.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+    rf.write_bytes(_SIMPLE_ROBOT)
     tf = TestFile.from_path(rf)
 
     parser = MagicMock()
@@ -643,7 +639,7 @@ def test_analyze_with_other_analyzers_exception_path(tmp_path: Path) -> None:
     from robot_optimizer_core.entrypoints.public_api import _analyze_with_other_analyzers
 
     rf = tmp_path / "t.robot"
-    rf.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+    rf.write_bytes(_SIMPLE_ROBOT)
     tf = TestFile.from_path(rf)
 
     class BoomAnalyzer:
@@ -681,7 +677,7 @@ def test_analyze_suite_with_explicit_settings(tmp_path: Path) -> None:
     from robot_optimizer_core.infrastructure.config import Settings
 
     f = tmp_path / "suite.robot"
-    f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+    f.write_bytes(_SIMPLE_ROBOT)
     result = analyze_suite(f, settings=Settings())
     assert isinstance(result.findings, list)
 
@@ -694,7 +690,7 @@ def test_analyze_suite_with_parse_failure_excludes_failed_file(
     from robot_optimizer_core.entrypoints.public_api import analyze_suite
 
     f = tmp_path / "suite.robot"
-    f.write_bytes(b"*** Test Cases ***\nT\n    Log    ok\n")
+    f.write_bytes(_SIMPLE_ROBOT)
 
     original = _api_mod._gather_suite_structure
 

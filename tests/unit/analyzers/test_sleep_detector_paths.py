@@ -8,7 +8,6 @@ sleep via check_custom, and the evaluate/pattern internal detectors.
 from __future__ import annotations
 
 from datetime import datetime
-from decimal import Decimal
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -89,9 +88,9 @@ class TestVariableSleepViaCheckCustom:
         call = self._mock_call("Sleep", ["${TIMEOUT}"])
         result = detector._detect_sleep_from_call(call)
         assert result is not None
-        assert result["type"] == "variable"
-        assert result["variable"] == "TIMEOUT"
-        assert result["duration"] is None
+        assert result.sleep_type == "variable"
+        assert result.variable == "TIMEOUT"
+        assert result.duration is None
 
     def test_variable_arg_with_check_custom_false_falls_through(self) -> None:
         detector = SleepDetector(config={"check_custom_sleep": False})
@@ -101,72 +100,3 @@ class TestVariableSleepViaCheckCustom:
         result = detector._detect_sleep_from_call(call)
         assert result is None
 
-
-@pytest.mark.unit
-class TestDetectEvaluateSleep:
-    """_detect_evaluate_sleep covers the Evaluate time.sleep(N) line pattern."""
-
-    def setup_method(self) -> None:
-        self.detector = SleepDetector()
-
-    def test_valid_evaluate_sleep_returns_dict(self) -> None:
-        result = self.detector._detect_evaluate_sleep("Evaluate    time.sleep(2.5)")
-        assert result is not None
-        assert result["type"] == "evaluate_sleep"
-        assert result["duration"] == Decimal("2.5")
-        assert result["unit"] == "s"
-
-    def test_non_matching_line_returns_none(self) -> None:
-        result = self.detector._detect_evaluate_sleep("Log    hello")
-        assert result is None
-
-    def test_integer_duration_parsed(self) -> None:
-        result = self.detector._detect_evaluate_sleep("Evaluate    time.sleep(3)")
-        assert result is not None
-        assert result["duration"] == Decimal("3")
-
-
-@pytest.mark.unit
-class TestDetectPatternSleep:
-    """_detect_pattern_sleep converts regex matches to sleep info dicts."""
-
-    def setup_method(self) -> None:
-        self.detector = SleepDetector()
-
-    def test_variable_type_returns_variable_dict(self) -> None:
-        import re
-        pattern = re.compile(r"Sleep\s+(\$\{(\w+)\})")
-        m = pattern.match("Sleep    ${TIMEOUT}")
-        if m:
-            result = self.detector._detect_pattern_sleep(m, "variable")
-            assert result is not None
-            assert result["type"] == "variable"
-            assert result["duration"] is None
-
-    def test_numeric_type_returns_duration_dict(self) -> None:
-        import re
-        # Match Sleep  2s
-        pattern = re.compile(r"Sleep\s+([\d.]+)\s*([a-z]*)")
-        m = pattern.match("Sleep    2s")
-        if m:
-            result = self.detector._detect_pattern_sleep(m, "builtin")
-            assert result is not None
-            assert result["type"] == "builtin"
-            assert result["duration"] == Decimal("2")
-
-
-@pytest.mark.unit
-class TestDetectSleep:
-    """_detect_sleep dispatches between evaluate and pattern detectors."""
-
-    def setup_method(self) -> None:
-        self.detector = SleepDetector()
-
-    def test_evaluate_sleep_line_detected(self) -> None:
-        result = self.detector._detect_sleep("Evaluate    time.sleep(1)")
-        assert result is not None
-        assert result["type"] == "evaluate_sleep"
-
-    def test_no_match_returns_none(self) -> None:
-        result = self.detector._detect_sleep("Log    hello world")
-        assert result is None

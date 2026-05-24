@@ -8,7 +8,7 @@ import builtins as _builtins_module
 import hashlib
 import os
 import sys
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -536,7 +536,7 @@ def get_plugin_registry() -> PluginRegistry:
     """
     from robot_optimizer_core.composition.container import get_container
 
-    return get_container().resolve("plugin_registry")  # type: ignore[no-any-return]
+    return cast(PluginRegistry, get_container().resolve("plugin_registry"))
 
 
 def reset_plugin_registry() -> None:

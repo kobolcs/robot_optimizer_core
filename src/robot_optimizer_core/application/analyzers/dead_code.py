@@ -25,8 +25,22 @@ if TYPE_CHECKING:
 
     from ...domain.entities import TestFile
 
+from collections.abc import Iterable as _Iterable
+
 from ...domain.value_objects import Finding, Location, Pattern, PatternType, Severity
 from .base import BaseAnalyzer, ConfigValue
+
+
+def _unused_keyword_pattern(display_name: str, *, suite_level: bool = False) -> Pattern:
+    scope = "the suite" if suite_level else "this file"
+    return Pattern(
+        pattern_type=PatternType.UNUSED_KEYWORD,
+        name="Unused Keyword",
+        description=f"Keyword '{display_name}' is never called in {scope}",
+        recommendation="Remove this keyword or use it in your tests",
+        documentation_url=None,
+        auto_fixable=True,
+    )
 
 __all__ = ["DeadCodeAnalyzer"]
 
@@ -180,11 +194,9 @@ class _ASTDeadCodeStrategy:
 
     def _walk_body(self, items: object, calls: list[str]) -> None:
         """Walk an iterable body, collecting keyword call names into *calls*."""
-        if not hasattr(items, "__iter__"):
+        if not isinstance(items, _Iterable):
             return
-        from collections.abc import Iterable
-
-        for item in items if isinstance(items, Iterable) else []:
+        for item in items:
             self._collect_item_calls(item, calls)
 
     def _collect_item_calls(self, item: object, calls: list[str]) -> None:
@@ -503,18 +515,10 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                 continue
             if any(p.match(display_name) for p in self._ignore_patterns):
                 continue
-            pattern = Pattern(
-                pattern_type=PatternType.UNUSED_KEYWORD,
-                name="Unused Keyword",
-                description=f"Keyword '{display_name}' is never called in the suite",
-                recommendation="Remove this keyword or use it in your tests",
-                documentation_url=None,
-                auto_fixable=True,
-            )
             test_file, line_num = locations[0]
             findings.append(
                 Finding.create(
-                    pattern=pattern,
+                    pattern=_unused_keyword_pattern(display_name, suite_level=True),
                     severity=Severity.WARNING,
                     location=Location(file_path=test_file.path, line=line_num),
                     message=f"Keyword '{display_name}' is defined but never used in the suite",
@@ -580,17 +584,8 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                 ):
                     continue
 
-                pattern = Pattern(
-                    pattern_type=PatternType.UNUSED_KEYWORD,
-                    name="Unused Keyword",
-                    description=f"Keyword '{display_name}' is never called",
-                    recommendation="Remove this keyword or use it in your tests",
-                    documentation_url=None,
-                    auto_fixable=True,
-                )
-
                 finding = Finding.create(
-                    pattern=pattern,
+                    pattern=_unused_keyword_pattern(display_name),
                     severity=Severity.WARNING,
                     location=Location(file_path=test_file.path, line=line_numbers[0]),
                     message=f"Keyword '{display_name}' is defined but never used",
@@ -686,7 +681,12 @@ class DeadCodeAnalyzer(BaseAnalyzer):
                 state.found_return = True
             return
         if state.found_return:
-            assert state.current_keyword is not None
+            if state.current_keyword is None:
+                raise AnalysisError(
+                    "Unreachable invariant: found_return=True but no current_keyword",
+                    file_path=test_file.path,
+                    analyzer=self.name,
+                )
             findings.append(
                 self._make_unreachable_finding(test_file, line_num, state.current_keyword)
             )

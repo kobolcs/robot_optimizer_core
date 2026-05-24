@@ -43,6 +43,7 @@ if TYPE_CHECKING:
 __all__ = [
     "AnalysisResult",
     "AnalysisService",
+    "DirectoryAnalysisOptions",
     "DirectoryAnalysisResult",
     "DirectoryResults",
 ]
@@ -50,6 +51,26 @@ __all__ = [
 ErrorHandling = Literal["raise", "skip", "warn"]
 
 logger = get_logger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Directory analysis options
+# ---------------------------------------------------------------------------
+
+
+@dataclasses.dataclass
+class DirectoryAnalysisOptions:
+    """Options for directory analysis, replacing the 14-parameter method signature."""
+
+    patterns: list[str] | None = None
+    exclude_patterns: list[str] | None = None
+    recursive: bool = True
+    fail_fast: bool = False
+    error_handling: ErrorHandling = "warn"
+    max_workers: int | None = None
+    use_cache: bool = True
+    min_severity: Severity | None = None
+    analyzer_names: list[str] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -404,7 +425,7 @@ class AnalysisService:
         min_severity: Severity | None,
         pattern_filter: list[str] | None,
         metrics: IMetrics | None = None,
-    ) -> list[Finding]:
+    ) -> tuple[list[Finding], tuple[str, ...]]:
         """Core per-file analysis logic.
 
         Args:
@@ -416,7 +437,8 @@ class AnalysisService:
             metrics: Metrics sink; falls back to self._metrics when None.
 
         Returns:
-            List of findings (filtered by severity and pattern).
+            (findings, analyzer_names) — findings filtered by severity and pattern;
+            analyzer_names is the tuple of names that actually ran.
 
         Raises:
             AnalysisError: On file-load or per-analyzer failure.
@@ -440,12 +462,15 @@ class AnalysisService:
 
         analyzer_instances = self._get_analyzer_instances(analyzers, resolved_settings)
         all_findings: list[Finding] = []
+        ran_names: list[str] = []
 
         for analyzer in analyzer_instances:
             analyzer_name = analyzer.name
 
             if pattern_filter is not None and analyzer_name not in pattern_filter:
                 continue
+
+            ran_names.append(analyzer_name)
 
             log_analysis_start(file_path, analyzer_name, logger)
             start_time = time.time()
@@ -477,7 +502,35 @@ class AnalysisService:
         if min_severity is not None:
             all_findings = [f for f in all_findings if f.severity <= min_severity]
 
-        return all_findings
+        return all_findings, tuple(ran_names)
+
+    def resolve_analyzer_instances(
+        self,
+        analyzers: list[str | BaseAnalyzer] | None,
+        settings: Settings | None = None,
+    ) -> list[BaseAnalyzer]:
+        """Public wrapper around _get_analyzer_instances for use by entrypoints."""
+        return self._get_analyzer_instances(analyzers, settings or self.settings)
+
+    def analyze_file_with_meta(
+        self,
+        file_path: Path,
+        analyzers: list[str | BaseAnalyzer] | None,
+        settings: Settings | None,
+        min_severity: Severity | None,
+        pattern_filter: list[str] | None,
+        metrics: IMetrics | None = None,
+    ) -> tuple[list[Finding], tuple[str, ...]]:
+        """Analyze a file and return (findings, analyzer_names_used).
+
+        Public surface for the public API layer — avoids exposing ``_run_file_analysis``
+        and ``_get_analyzer_instances`` directly.
+        """
+        resolved_settings = settings or self.settings
+        findings, names = self._run_file_analysis(
+            file_path, analyzers, resolved_settings, min_severity, pattern_filter, metrics
+        )
+        return findings, names
 
     def analyze_file(
         self,
@@ -499,7 +552,7 @@ class AnalysisService:
         try:
             if not file_path.exists():
                 raise RobotFileNotFoundError(file_path)
-            findings = self._run_file_analysis(
+            findings, _ = self._run_file_analysis(
                 file_path,
                 analyzers=analyzers,
                 settings=None,
@@ -520,26 +573,19 @@ class AnalysisService:
         self,
         directory_path: Path,
         analyze_fn: Callable[[Path], tuple[Path, list[Finding]]],
-        patterns: list[str] | None,
-        exclude_patterns: list[str] | None,
-        recursive: bool,
+        options: DirectoryAnalysisOptions,
         settings: Settings,
-        fail_fast: bool,
-        error_handling: ErrorHandling,
-        max_workers: int | None,
         metrics: IMetrics,
-        use_cache: bool,
-        min_severity: Severity | None = None,
-        analyzer_names: list[str] | None = None,
     ) -> DirectoryResults:
         """Execute directory analysis: discovery, cache, thread pool, metrics, errors."""
-        resolved_patterns = patterns or settings.file_patterns
-        resolved_excludes = exclude_patterns or settings.exclude_patterns
+        _validate_directory_path(directory_path)
+        resolved_patterns = options.patterns or settings.file_patterns
+        resolved_excludes = options.exclude_patterns or settings.exclude_patterns
         files = self._file_discovery.find_files(
             root_path=directory_path,
             patterns=resolved_patterns,
             exclude_patterns=resolved_excludes,
-            recursive=recursive,
+            recursive=options.recursive,
         )
 
         logger.info(
@@ -547,7 +593,7 @@ class AnalysisService:
             extra={
                 "directory": str(directory_path),
                 "file_count": len(files),
-                "recursive": recursive,
+                "recursive": options.recursive,
             },
         )
 
@@ -556,10 +602,10 @@ class AnalysisService:
         file_hashes: dict[Path, str] = {}
         files_to_analyze = files
 
-        if use_cache and self._cache is not None:
+        if options.use_cache and self._cache is not None:
             active_cache = self._cache
             files_to_analyze, cache_hits, file_hashes = _resolve_cache(
-                files, active_cache, analyzer_names
+                files, active_cache, options.analyzer_names
             )
             hit_count = len(cache_hits)
             miss_count = len(files_to_analyze)
@@ -571,10 +617,10 @@ class AnalysisService:
                     metrics.gauge("cache.hit_rate", hit_count / len(files))
 
         _default_workers = min(4, (os.cpu_count() or 1))
-        effective_workers = max_workers if max_workers is not None else _default_workers
+        effective_workers = options.max_workers if options.max_workers is not None else _default_workers
         dir_results: DirectoryResults
         dir_results, file_errors = _execute_directory_analysis(
-            files_to_analyze, analyze_fn, effective_workers, fail_fast
+            files_to_analyze, analyze_fn, effective_workers, options.fail_fast
         )
 
         for fp, cached_findings in cache_hits.items():
@@ -587,10 +633,10 @@ class AnalysisService:
 
         # Apply severity filter to all findings (cache hits and fresh) after
         # persistence so the cache always stores the full unfiltered set.
-        if min_severity is not None:
+        if options.min_severity is not None:
             for fp in dir_results.findings:
                 dir_results.findings[fp] = [
-                    f for f in dir_results.findings[fp] if f.severity <= min_severity
+                    f for f in dir_results.findings[fp] if f.severity <= options.min_severity
                 ]
 
         total_findings = sum(len(f) for f in dir_results.findings.values())
@@ -608,7 +654,9 @@ class AnalysisService:
         metrics.gauge("batch.files_failed", len(file_errors))
         metrics.gauge("batch.total_findings", total_findings)
 
-        _handle_directory_analysis_errors(file_errors, error_handling, fail_fast, dir_results)
+        _handle_directory_analysis_errors(
+            file_errors, options.error_handling, options.fail_fast, dir_results
+        )
 
         return dir_results
 
@@ -642,7 +690,7 @@ class AnalysisService:
         # cache stores full unfiltered results.  run_directory_analysis applies
         # the filter after cache writes.
         def _analyze_one(fp: Path) -> tuple[Path, list[Finding]]:
-            findings = self._run_file_analysis(
+            findings, _ = self._run_file_analysis(
                 fp,
                 analyzers=analyzers,
                 settings=None,
@@ -653,20 +701,20 @@ class AnalysisService:
 
         str_names = [a for a in analyzers if isinstance(a, str)] if analyzers else []
         str_analyzers = str_names or None
-        dir_results = self.run_directory_analysis(
-            directory_path=directory_path,
-            analyze_fn=_analyze_one,
+        opts = DirectoryAnalysisOptions(
             patterns=patterns,
             exclude_patterns=exclude_patterns,
             recursive=recursive,
-            settings=self.settings,
-            fail_fast=False,
             error_handling=error_handling,
-            max_workers=None,
-            metrics=self._metrics,
-            use_cache=True,
             min_severity=min_severity,
             analyzer_names=str_analyzers,
+        )
+        dir_results = self.run_directory_analysis(
+            directory_path=directory_path,
+            analyze_fn=_analyze_one,
+            options=opts,
+            settings=self.settings,
+            metrics=self._metrics,
         )
 
         return DirectoryAnalysisResult(

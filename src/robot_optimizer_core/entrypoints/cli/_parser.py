@@ -69,7 +69,7 @@ def _build_parser() -> argparse.ArgumentParser:
     # --min-severity flag
     analyze_cmd.add_argument(
         "--min-severity",
-        metavar="LEVEL",
+        choices=["INFO", "WARNING", "ERROR"],
         default=None,
         help=(
             "Only report findings at or above this severity "

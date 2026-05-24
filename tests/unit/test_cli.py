@@ -1,5 +1,13 @@
 # tests/unit/test_cli.py
-"""Tests for the robot-optimizer CLI."""
+"""Unit tests for the robot-optimizer CLI entry-point and formatter helpers.
+
+Scope: ``analyze_file`` and ``analyze_directory`` are patched at the
+``_commands`` import boundary, so these tests cover CLI argument handling,
+exit-code logic, output formatting (JSON, SARIF, HTML, JUnit), and formatter
+helper functions in isolation — without running the real analysis pipeline.
+
+For tests that exercise the full pipeline end-to-end, see ``test_cli_direct.py``.
+"""
 
 from __future__ import annotations
 
@@ -36,24 +44,7 @@ from robot_optimizer_core.entrypoints.cli._html import (
 # ---------------------------------------------------------------------------
 
 
-def _make_finding(
-    file_path: Path = Path("suite.robot"),
-    line: int = 10,
-    severity: Severity = Severity.WARNING,
-    message: str = "Use explicit wait",
-) -> Finding:
-    pattern = Pattern(
-        type=PatternType.SLEEP_IN_TEST,
-        name="Sleep in Test Case",
-        description="Sleep detected",
-        recommendation="Use explicit wait",
-    )
-    return Finding.create(
-        pattern=pattern,
-        severity=severity,
-        location=Location(file_path=file_path, line=line),
-        message=message,
-    )
+from unit.helpers import make_finding as _make_finding
 
 
 # ---------------------------------------------------------------------------

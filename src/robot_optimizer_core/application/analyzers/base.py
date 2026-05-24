@@ -278,8 +278,7 @@ class BaseAnalyzer(ABC):
                 analyzer=self.name,
             ) from e
 
-        else:
-            return final_findings
+        return final_findings
 
     def _validate_findings(
         self, findings: list[Finding], test_file: TestFile

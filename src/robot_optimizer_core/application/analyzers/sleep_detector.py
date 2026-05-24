@@ -26,7 +26,7 @@ import dataclasses
 import re
 import sys
 from decimal import Decimal, InvalidOperation
-from typing import TYPE_CHECKING, ClassVar, cast
+from typing import TYPE_CHECKING, ClassVar, Literal, cast
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -51,8 +51,6 @@ from .base import BaseAnalyzer, ConfigValue
 
 __all__ = ["SleepDetector", "SleepDetectorAnalyzer", "get_settings"]
 
-# A regex group-count of at least this many means the match captured a unit token.
-_MIN_GROUPS_WITH_UNIT: int = 2
 # Duration (seconds) below which a sleep suggestion uses the short message form.
 _LONG_SLEEP_THRESHOLD_SECONDS: float = 5.0
 
@@ -61,6 +59,27 @@ def get_settings() -> object:
     """Resolve settings via DI container. Defined at module scope for test monkeypatching."""
     from ...composition.container import get_container
     return get_container().resolve("settings")
+
+
+def _resolve_sleep_threshold(config: dict[str, object]) -> float:
+    """Resolve the max-acceptable-sleep threshold from config, DI, or default.
+
+    Priority: explicit 'max_acceptable_sleep_seconds' key → global Settings → 1.0s default.
+    Logs a WARNING when falling back to the default so the fallback is visible.
+    """
+    import logging as _logging
+    _log = _logging.getLogger(__name__)
+
+    if "max_acceptable_sleep_seconds" in config:
+        return float(config["max_acceptable_sleep_seconds"])  # type: ignore[arg-type]
+    try:
+        settings = get_settings()
+        return float(settings.max_acceptable_sleep_seconds)  # type: ignore[union-attr]
+    except Exception as exc:
+        _log.warning(
+            "Could not resolve sleep threshold from settings (%s); using default 1.0s", exc
+        )
+        return 1.0
 
 
 # ---------------------------------------------------------------------------
@@ -115,6 +134,22 @@ def _normalise_unit(raw: str | None) -> str:
     return _UNIT_MAP.get(lower, "s")
 
 
+_SleepType = Literal[
+    "builtin", "builtin_qualified", "custom", "variable", "evaluate_sleep"
+]
+
+
+@dataclasses.dataclass(slots=True)
+class _SleepDetection:
+    """Typed result from detecting a sleep in an AST keyword call."""
+
+    sleep_type: _SleepType
+    duration: Decimal | None
+    unit: str | None
+    duration_str: str | None = None
+    variable: str | None = None
+
+
 @dataclasses.dataclass(slots=True)
 class _AnalyzeCtx:
     """Per-analyze() call state; avoids instance mutation and is thread-safe."""
@@ -147,20 +182,7 @@ class SleepDetectorAnalyzer(BaseAnalyzer):
         super().__init__(config)
 
         if "severity_thresholds" not in self.config:
-            # Resolve the max-acceptable-sleep threshold from the config dict
-            # (explicit key), falling back to the global Settings singleton only
-            # when neither explicit config nor the DI container provides a value.
-            # This keeps the analyzer testable without touching global state.
-            max_acceptable: float = cast(
-                "float",
-                self.config.get("max_acceptable_sleep_seconds", None),
-            )
-            if max_acceptable is None:
-                try:
-                    settings = get_settings()
-                    max_acceptable = settings.max_acceptable_sleep_seconds
-                except Exception:
-                    max_acceptable = 1.0  # library default
+            max_acceptable = _resolve_sleep_threshold(self.config)
             self._severity_thresholds: dict[str, float] = {
                 "info": max_acceptable,
                 "warning": max_acceptable * 5,
@@ -174,48 +196,26 @@ class SleepDetectorAnalyzer(BaseAnalyzer):
         self._check_builtin = self.get_config_value("check_builtin_sleep", True)
         self._check_custom = self.get_config_value("check_custom_sleep", True)
 
-        # Compile patterns
-        self._sleep_patterns = self._compile_sleep_patterns()
         self.validate_config()
 
     @property
     @override
     def name(self) -> str:
-        """Get analyzer name.
-
-        Returns:
-            Analyzer name.
-        """
         return "sleep_detector"
 
     @property
     @override
     def description(self) -> str:
-        """Get analyzer description.
-
-        Returns:
-            Analyzer description.
-        """
         return "Finds Sleep keyword usage that makes tests slow and fragile"
 
     @property
     @override
     def tags(self) -> list[str]:
-        """Get analyzer tags.
-
-        Returns:
-            List of tags.
-        """
         return ["performance", "stability", "wait-conditions"]
 
     @property
     @override
     def supports_auto_fix(self) -> bool:
-        """Check if analyzer supports auto-fixing.
-
-        Returns:
-            True (sleep can be replaced with waits).
-        """
         return True
 
     # Regex to parse a numeric duration from a single keyword argument value.
@@ -228,9 +228,7 @@ class SleepDetectorAnalyzer(BaseAnalyzer):
         r"time\.sleep\s*\(\s*(\d+(?:\.\d+)?)\s*\)"
     )
 
-    def _detect_sleep_from_call(
-        self, call: KeywordCall
-    ) -> dict[str, str | Decimal | None] | None:
+    def _detect_sleep_from_call(self, call: KeywordCall) -> _SleepDetection | None:
         """Detect a sleep pattern from an AST keyword call."""
         name_lower = call.keyword_name.lower()
 
@@ -240,12 +238,12 @@ class SleepDetectorAnalyzer(BaseAnalyzer):
             m = self._TIME_SLEEP_ARG_RE.search(arg)
             if m:
                 try:
-                    return {
-                        "type": "evaluate_sleep",
-                        "duration": Decimal(m.group(1)),
-                        "unit": "s",
-                        "duration_str": m.group(1),
-                    }
+                    return _SleepDetection(
+                        sleep_type="evaluate_sleep",
+                        duration=Decimal(m.group(1)),
+                        unit="s",
+                        duration_str=m.group(1),
+                    )
                 except (ValueError, InvalidOperation):
                     pass
             return None
@@ -263,12 +261,12 @@ class SleepDetectorAnalyzer(BaseAnalyzer):
         if self._check_custom and name_lower == "sleep":
             var_m = self._VAR_ARG_RE.match(arg)
             if var_m:
-                return {
-                    "type": "variable",
-                    "variable": var_m.group(1),
-                    "duration": None,
-                    "unit": None,
-                }
+                return _SleepDetection(
+                    sleep_type="variable",
+                    duration=None,
+                    unit=None,
+                    variable=var_m.group(1),
+                )
 
         # Numeric duration
         dur_m = self._DURATION_ARG_RE.match(arg)
@@ -278,17 +276,17 @@ class SleepDetectorAnalyzer(BaseAnalyzer):
             try:
                 duration = Decimal(duration_str)
                 if name_lower == "builtin.sleep":
-                    sleep_type = "builtin_qualified"
+                    sleep_type: _SleepType = "builtin_qualified"
                 elif is_custom:
                     sleep_type = "custom"
                 else:
                     sleep_type = "builtin"
-                return {
-                    "type": sleep_type,
-                    "duration": duration,
-                    "unit": unit,
-                    "duration_str": duration_str,
-                }
+                return _SleepDetection(
+                    sleep_type=sleep_type,
+                    duration=duration,
+                    unit=unit,
+                    duration_str=duration_str,
+                )
             except (ValueError, InvalidOperation):
                 self._logger.warning(
                     f"Invalid sleep duration: {duration_str}",
@@ -327,201 +325,38 @@ class SleepDetectorAnalyzer(BaseAnalyzer):
 
         return findings
 
-    def _compile_sleep_patterns(self) -> list[tuple[re.Pattern[str], str]]:
-        """Compile regex patterns for sleep detection.
-
-        Supports ``Sleep  2 minutes``, ``Sleep  500ms``, ``Sleep  1.5s``
-        and all Robot Framework time-string formats with a space between number
-        and unit.
-
-        Returns:
-            List of (pattern, type) tuples.
-        """
-        patterns = []
-
-        if self._check_builtin:
-            # Standard Sleep keyword — number and unit with optional space
-            patterns.append(
-                (
-                    re.compile(
-                        r"^\s*Sleep\s+(\d+(?:\.\d+)?)\s*"
-                        r"(s|seconds?|m|minutes?|ms|milliseconds?|h|hours?|d|days?|min)?",
-                        re.IGNORECASE,
-                    ),
-                    "builtin",
-                )
-            )
-
-            # BuiltIn.Sleep format
-            patterns.append(
-                (
-                    re.compile(
-                        r"^\s*BuiltIn\.Sleep\s+(\d+(?:\.\d+)?)\s*"
-                        r"(s|seconds?|m|minutes?|ms|milliseconds?|h|hours?|d|days?|min)?",
-                        re.IGNORECASE,
-                    ),
-                    "builtin_qualified",
-                )
-            )
-
-        if self._check_custom:
-            # Custom sleep patterns (common variations)
-            patterns.append(
-                (
-                    re.compile(
-                        r"^\s*(?:Wait|Pause|Delay)\s+(\d+(?:\.\d+)?)\s*"
-                        r"(s|seconds?|m|minutes?|ms|milliseconds?|h|hours?|min)?",
-                        re.IGNORECASE,
-                    ),
-                    "custom",
-                )
-            )
-
-            # Sleep with variable
-            patterns.append(
-                (re.compile(r"^\s*Sleep\s+\$\{([^}]+)\}", re.IGNORECASE), "variable")
-            )
-
-        return patterns
-
-    # Regex for detecting time.sleep() inside Evaluate calls
-    _EVALUATE_SLEEP_RE: re.Pattern[str] = re.compile(
-        r"^\s*(?:Evaluate|Run Keyword)\s+.*time\.sleep\s*\(\s*(\d+(?:\.\d+)?)\s*\)",
-        re.IGNORECASE,
-    )
-
-    def _detect_evaluate_sleep(self, line: str) -> dict[str, str | Decimal | None] | None:
-        """Detect ``Evaluate  time.sleep(N)`` on *line*.
-
-        Returns:
-            Sleep information dict, or ``None`` if not matched.
-        """
-        m = self._EVALUATE_SLEEP_RE.match(line)
-        if not m:
-            return None
-        duration_str = m.group(1)
-        try:
-            duration = Decimal(duration_str)
-            return {
-                "type": "evaluate_sleep",
-                "duration": duration,
-                "unit": "s",
-                "duration_str": duration_str,
-            }
-        except (ValueError, InvalidOperation):
-            return None
-
-    def _detect_pattern_sleep(
-        self, match: re.Match[str], sleep_type: str
-    ) -> dict[str, str | Decimal | None] | None:
-        """Build a sleep-info dict from a compiled-pattern match result.
-
-        Args:
-            match: Regex match object from one of ``_sleep_patterns``.
-            sleep_type: Pattern category label (e.g. ``"builtin"``, ``"variable"``).
-
-        Returns:
-            Sleep information dict, or ``None`` when the duration is unparseable.
-        """
-        if sleep_type == "variable":
-            return {
-                "type": sleep_type,
-                "variable": match.group(1),
-                "duration": None,
-                "unit": None,
-            }
-
-        # Numeric sleep
-        duration_str = match.group(1)
-        raw_unit = (
-            match.group(2)
-            if match.lastindex is not None and match.lastindex >= _MIN_GROUPS_WITH_UNIT
-            else None
-        )
-        unit = _normalise_unit(raw_unit)
-        try:
-            duration = Decimal(duration_str)
-            return {
-                "type": sleep_type,
-                "duration": duration,
-                "unit": unit,
-                "duration_str": duration_str,
-            }
-        except (ValueError, InvalidOperation):
-            self._logger.warning(
-                f"Invalid sleep duration: {duration_str}",
-                extra={"line": match.string},
-            )
-            return None
-
-    def _detect_sleep(self, line: str) -> dict[str, str | Decimal | None] | None:
-        """Detect sleep pattern in a line.
-
-        Normalises duration using Robot Framework's own ``timestring_to_secs``
-        utility when available, falling back to built-in unit multipliers.
-        Also detects ``Evaluate  time.sleep(N)`` calls.
-
-        Args:
-            line: Line to check.
-
-        Returns:
-            Sleep information dict or None.
-        """
-        if self._check_builtin:
-            if result := self._detect_evaluate_sleep(line):
-                return result
-
-        for pattern, sleep_type in self._sleep_patterns:
-            if match := pattern.match(line):
-                return self._detect_pattern_sleep(match, sleep_type)
-
-        return None
-
     def _create_finding(
         self,
-        sleep_info: dict[str, str | Decimal | None],
+        detection: _SleepDetection,
         test_file: TestFile,
         line_num: int,
         original_text: str,
         ctx: _AnalyzeCtx | None = None,
     ) -> Finding | None:
-        """Create a finding from sleep information.
-
-        Args:
-            sleep_info: Sleep detection information.
-            test_file: The test file.
-            line_num: Line number.
-            original_text: Original line text.
-
-        Returns:
-            Finding object or None.
-        """
-        # Handle variable sleep
-        if sleep_info["duration"] is None:
+        """Create a finding from a typed sleep detection result."""
+        if detection.duration is None:
             pattern = Pattern(
                 pattern_type=PatternType.SLEEP_IN_TEST,
                 name="Variable Sleep",
-                description=f"Sleep with variable duration: ${{{sleep_info['variable']}}}",
+                description=f"Sleep with variable duration: ${{{detection.variable}}}",
                 recommendation="Replace with explicit wait condition",
                 documentation_url=None,
-                auto_fixable=False,  # Can't auto-fix without knowing duration
+                auto_fixable=False,
             )
-
             return Finding.create(
                 pattern=pattern,
                 severity=Severity.WARNING,
                 location=Location(file_path=test_file.path, line=line_num),
                 message="Sleep with variable duration makes tests unpredictable",
-                sleep_type=sleep_info["type"],
-                variable_name=sleep_info["variable"],
+                sleep_type=detection.sleep_type,
+                variable_name=detection.variable,
                 original_text=original_text,
             )
 
-        # Create sleep pattern value object
         try:
             sleep_pattern = SleepPattern(
-                duration=cast("Decimal", sleep_info["duration"]),
-                unit=cast("str", sleep_info["unit"]),
+                duration=detection.duration,
+                unit=cast("str", detection.unit),
                 line_number=line_num,
                 original_text=original_text,
             )
@@ -529,21 +364,12 @@ class SleepDetectorAnalyzer(BaseAnalyzer):
             self._logger.error(f"Invalid sleep pattern: {e}")
             return None
 
-        # Determine severity based on duration
         severity = self._determine_severity(sleep_pattern.duration_in_seconds)
-
-        # Create pattern with duration
-        pattern = Pattern.sleep_in_test(
-            f"{sleep_info['duration']} {sleep_info['unit']}"
-        )
-
-        # Build message with suggestion
-        message = f"Sleep {sleep_info['duration']} {sleep_info['unit']} makes tests slow and fragile"
+        pattern = Pattern.sleep_in_test(f"{detection.duration} {detection.unit}")
+        message = f"Sleep {detection.duration} {detection.unit} makes tests slow and fragile"
 
         if self._suggest_alternatives:
-            if suggestion := self._suggest_alternative(
-                sleep_pattern, test_file, line_num, ctx
-            ):
+            if suggestion := self._suggest_alternative(sleep_pattern, test_file, line_num, ctx):
                 message += f". {suggestion}"
 
         return Finding.create(
@@ -551,10 +377,10 @@ class SleepDetectorAnalyzer(BaseAnalyzer):
             severity=severity,
             location=Location(file_path=test_file.path, line=line_num),
             message=message,
-            duration=str(sleep_info["duration"]),
-            unit=sleep_info["unit"],
+            duration=str(detection.duration),
+            unit=detection.unit,
             duration_seconds=sleep_pattern.duration_in_seconds,
-            sleep_type=sleep_info["type"],
+            sleep_type=detection.sleep_type,
             original_text=original_text,
             auto_fixable=True,
         )
