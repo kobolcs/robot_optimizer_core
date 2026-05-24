@@ -196,9 +196,12 @@ class TestFlakinessListenerResolveRepository:
         from robot_optimizer_core.composition.container import reset_container
 
         reset_container()
-        results_path = tmp_path / "results.json"
-        listener = FlakinessListener(results_path=str(results_path))
-        assert listener.repository is not None
+        try:
+            results_path = tmp_path / "results.json"
+            listener = FlakinessListener(results_path=str(results_path))
+            assert listener.repository is not None
+        finally:
+            reset_container()
 
     def test_uses_di_container_repo_when_registered(self, tmp_path: Path) -> None:
         from robot_optimizer_core.composition.container import (

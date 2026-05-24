@@ -439,9 +439,12 @@ Very Flaky Test
         from robot_optimizer_core.composition.container import reset_container
 
         reset_container()
-        analyzer = FlakinessAnalyzer()
-        findings = analyzer.analyze(test_file)
-        assert findings == []
+        try:
+            analyzer = FlakinessAnalyzer()
+            findings = analyzer.analyze(test_file)
+            assert findings == []
+        finally:
+            reset_container()
 
     def test_repository_error_raises_gracefully(
         self, mock_repository: Mock, test_file: TestFile
