@@ -29,11 +29,17 @@ except Exception:
 
 import tempfile
 from collections.abc import Generator
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock
 
 import pytest
+
+# Stable sentinel datetime used by all test fixtures that construct domain objects
+# requiring a last_modified_utc field. Using a fixed value instead of datetime.now()
+# makes fixtures deterministic and eliminates ordering-dependent behaviour across runs.
+FIXED_UTC_NOW = datetime(2026, 1, 15, 12, 0, 0, tzinfo=UTC)
 
 from robot_optimizer_core import (
     Settings,
@@ -47,11 +53,6 @@ from robot_optimizer_core.domain.repositories import TestResultRepository
 # Configure logging for tests
 configure_logging(level="WARNING", format_json=False)
 configure_metrics(enabled=False)  # Disable metrics in tests
-
-
-def pytest_collection_modifyitems(config, items):
-    """Modify test collection to skip certain patterns."""
-    pass  # Keep for future use
 
 
 def pytest_ignore_collect(collection_path, config):
@@ -159,6 +160,17 @@ def mock_test_result_repository() -> Mock:
     return mock_repo
 
 
+@pytest.fixture
+def fixed_utc_now() -> datetime:
+    """Return the stable sentinel datetime for fixture construction.
+
+    Use this instead of datetime.now() whenever building domain objects in tests.
+    Using a fixed value prevents ordering-dependent behaviour and eliminates
+    false flakiness in tests that compare timestamps.
+    """
+    return FIXED_UTC_NOW
+
+
 # Markers
 def pytest_configure(config: Any) -> None:
     """Configure custom pytest markers."""
@@ -171,6 +183,32 @@ def pytest_configure(config: Any) -> None:
     )
     config.addinivalue_line("markers", "slow: Slow tests that should be run separately")
     config.addinivalue_line("markers", "performance: Performance tests")
+    config.addinivalue_line(
+        "markers", "contract: Contract tests - API/plugin/schema stability"
+    )
+    config.addinivalue_line(
+        "markers",
+        "quarantine: Flaky tests under active investigation - excluded from PR gates",
+    )
+
+
+def pytest_collection_modifyitems(config: Any, items: list[pytest.Item]) -> None:
+    """Skip quarantined tests unless explicitly selected."""
+    run_quarantine = config.getoption("--run-quarantine", default=False)
+    if not run_quarantine:
+        skip_quarantine = pytest.mark.skip(reason="quarantined - run with --run-quarantine")
+        for item in items:
+            if item.get_closest_marker("quarantine"):
+                item.add_marker(skip_quarantine)
+
+
+def pytest_addoption(parser: Any) -> None:
+    parser.addoption(
+        "--run-quarantine",
+        action="store_true",
+        default=False,
+        help="Include quarantined tests (normally skipped in PR gates)",
+    )
 
 
 # Utilities for cross-platform file handling

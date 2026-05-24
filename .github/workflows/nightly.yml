@@ -1,0 +1,94 @@
+name: Nightly Deep Lane
+
+# Runs nightly at 02:00 UTC and on demand.
+# Budget: up to 90 minutes.
+#
+# What this workflow covers that no other workflow covers:
+#   - Quarantine suite (tests excluded from PR gates — run here to deflake)
+#   - Performance regression baseline (long-running, nightly frequency is enough)
+#   - Schema drift validation (pinned schema artifacts vs. current output)
+#
+# Intentionally NOT duplicated here:
+#   - Mutation testing  → mutation.yml runs this on analyzer-path changes
+#   - Compat matrix     → ci.yml runs 3.11-3.14 on every PR
+#
+# Failures here are non-blocking (alert only) unless schema-drift job fails,
+# which is always a hard block even in nightly.
+
+on:
+  schedule:
+    - cron: "0 2 * * *"  # 02:00 UTC daily
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quarantine:
+    name: Quarantined test suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Run quarantined tests (failures are expected here)
+        run: |
+          python -m pytest tests/ --run-quarantine -m quarantine \
+            --no-cov -q --tb=short --timeout=60
+        continue-on-error: true
+      - name: Check quarantine age (flag tests >14 days old)
+        run: python ci/check_quarantine_age.py tests/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quarantine-report
+          path: quarantine-report.txt
+          retention-days: 7
+
+  performance:
+    name: Performance regression baseline
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Run performance tests
+        run: |
+          python -m pytest tests/ -m performance \
+            --no-cov -q --tb=short --timeout=120
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: performance-results
+          path: "*.json"
+          retention-days: 30
+
+  schema-drift:
+    name: Schema drift detection (hard block)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Run contract tests
+        run: |
+          python -m pytest tests/contracts/ -m contract \
+            --no-cov -q --tb=long --timeout=30
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: schema-drift-report
+          path: "*.json"
+          retention-days: 7

@@ -184,6 +184,8 @@ markers = [
     "functional: Black-box functional tests against the installed CLI",
     "slow: Tests that take significant time",
     "performance: Performance benchmarks",
+    "contract: Contract tests - API/plugin/schema stability (always run)",
+    "quarantine: Flaky tests under investigation - excluded from PR gates",
 ]
 filterwarnings = [
     "error",

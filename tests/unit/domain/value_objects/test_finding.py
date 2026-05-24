@@ -8,7 +8,7 @@ factory methods, and all properties to ensure mutation testing resilience.
 from __future__ import annotations
 
 from pathlib import Path
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import pytest
 from hypothesis import given, settings
@@ -67,16 +67,15 @@ class TestFinding:
         self, sample_pattern: Pattern, sample_location: Location
     ) -> None:
         """Test creating a finding with all required fields."""
-        finding_id = uuid4()
         finding = Finding(
-            id=finding_id,
             pattern=sample_pattern,
             severity=Severity.WARNING,
             location=sample_location,
             message="Using Sleep makes tests slow and fragile",
         )
 
-        assert finding.id == finding_id
+        assert finding.id is not None
+        assert isinstance(finding.id, UUID)
         assert finding.pattern == sample_pattern
         assert finding.severity == Severity.WARNING
         assert finding.location == sample_location
@@ -317,9 +316,7 @@ class TestFinding:
         pattern = Pattern.sleep_in_test("1s")
         location = Location(file_path=Path("test.robot"), line=10)
 
-        id1 = uuid4()
         finding1 = Finding(
-            id=id1,
             pattern=pattern,
             severity=Severity.WARNING,
             location=location,
@@ -327,29 +324,16 @@ class TestFinding:
         )
 
         finding2 = Finding(
-            id=id1,
             pattern=pattern,
             severity=Severity.WARNING,
             location=location,
             message="Test",
         )
 
-        finding3 = Finding(
-            id=uuid4(),  # Different ID
-            pattern=pattern,
-            severity=Severity.WARNING,
-            location=location,
-            message="Test",
-        )
-
-        # Same content (id is excluded from equality — two findings with the same
-        # pattern/location/severity/message are semantically identical duplicates)
+        # Same content → equal, same hash, same deterministic ID
         assert finding1 == finding2
         assert hash(finding1) == hash(finding2)
-
-        # Different ID but same content → still equal (content-based equality)
-        assert finding1 == finding3
-        assert hash(finding1) == hash(finding3)
+        assert finding1.id == finding2.id  # ID is now deterministic from content
 
         # Different type
         assert finding1 != "finding"

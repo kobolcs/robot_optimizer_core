@@ -9,7 +9,7 @@ These tests assert structural invariants that must hold for any valid input:
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -63,7 +63,7 @@ def _make_file(content: str) -> TestFile:
         path=Path("generated.robot"),
         content=content,
         size_bytes=len(content),
-        last_modified_utc=datetime.now(),
+        last_modified_utc=datetime.now(UTC),
     )
 
 

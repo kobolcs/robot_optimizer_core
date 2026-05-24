@@ -67,6 +67,17 @@ repos:
           - --comment-style
           - "#"
 
+  # Test determinism guard — flags naive datetime.now() and time.sleep() in tests
+  - repo: local
+    hooks:
+      - id: check-test-determinism
+        name: Test determinism check
+        language: python
+        entry: python ci/check_test_determinism.py
+        files: ^tests/.*test_.*\.py$
+        pass_filenames: true
+        additional_dependencies: []
+
 # Configuration for specific hooks
 exclude: |
   (?x)^(

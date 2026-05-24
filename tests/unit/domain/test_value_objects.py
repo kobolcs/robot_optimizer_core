@@ -1,6 +1,6 @@
 # tests/domain/test_value_objects.py
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID
 
 import pytest
 from pydantic import ValidationError
@@ -361,16 +361,15 @@ class TestFinding:
 
     def test_create_finding(self, sample_pattern, sample_location):
         """Test creating a finding."""
-        finding_id = uuid4()
         finding = Finding(
-            id=finding_id,
             pattern=sample_pattern,
             severity=Severity.WARNING,
             location=sample_location,
             message="Using Sleep makes tests fragile",
         )
 
-        assert finding.id == finding_id
+        assert finding.id is not None
+        assert isinstance(finding.id, UUID)
         assert finding.pattern == sample_pattern
         assert finding.severity == Severity.WARNING
         assert finding.location == sample_location

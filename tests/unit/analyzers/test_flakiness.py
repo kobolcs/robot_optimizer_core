@@ -7,7 +7,7 @@ with the test result repository.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -58,7 +58,7 @@ Very Flaky Test
             path=Path("tests/flaky.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified_utc=datetime.now(),
+            last_modified_utc=datetime.now(UTC),
         )
 
     def test_create_analyzer_with_repository(self, mock_repository: Mock) -> None:
@@ -121,7 +121,7 @@ Very Flaky Test
         self, mock_repository: Mock, test_file: TestFile
     ) -> None:
         """Test analysis with flaky tests."""
-        now = datetime.now()
+        now = datetime.now(UTC)
 
         mock_repository.get_flakiness_stats.return_value = [
             # Flaky test (15% failure rate)
@@ -421,7 +421,7 @@ Very Flaky Test
                 file_path=test_file.path,
                 total_runs=100,
                 failures=10,
-                last_failure=datetime.now(),
+                last_failure=datetime.now(UTC),
             )
         ]
 
@@ -470,7 +470,7 @@ Very Flaky Test
                 older_runs=10,
                 recent_failures=8,
                 older_failures=1,
-                last_failure=datetime.now(),
+                last_failure=datetime.now(UTC),
             )
         ]
         analyzer = FlakinessAnalyzer(test_result_repository=mock_repository)
@@ -490,7 +490,7 @@ Very Flaky Test
             path=Path("kw.robot"),
             content=content,
             size_bytes=len(content),
-            last_modified_utc=datetime.now(),
+            last_modified_utc=datetime.now(UTC),
         )
         analyzer = FlakinessAnalyzer(test_result_repository=mock_repository)
         # "Keyword Helper" appears after *** Keywords ***, not in test cases

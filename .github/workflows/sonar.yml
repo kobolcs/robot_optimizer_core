@@ -1,16 +1,34 @@
 name: SonarCloud
 
+# Triggers after ci.yml completes so we can reuse the coverage.xml it already
+# produced, instead of running the full test suite again (avoids a ~70s duplicate
+# test run on every push).
+#
+# The workflow_run trigger requires ci.yml to upload coverage.xml as an artifact.
+# If ci.yml fails, this workflow still runs — Sonar analysis without coverage is
+# still useful for code-quality scanning; it just won't report coverage metrics.
+
 on:
-  push:
-    branches: [ master, main ]
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [master, main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   sonar:
+    name: SonarCloud scan
     runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'pull_request' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'skipped')
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,12 +39,25 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
 
-      - name: Install dependencies and run tests with coverage
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Download coverage artifact from CI workflow (if available)
+        uses: dawidd6/action-download-artifact@v6
+        continue-on-error: true
+        with:
+          workflow: ci.yml
+          name: coverage-xml
+          path: .
+          if_no_artifact_found: warn
+
+      - name: Generate fresh coverage if artifact not available
+        if: ${{ hashFiles('coverage.xml') == '' }}
         run: |
-          python -m pip install --upgrade pip  # NOSONAR
-          pip install -e ".[dev]"  # NOSONAR
-          pytest --cov=robot_optimizer_core --cov-report=xml --cov-fail-under=0 -q
+          pytest --cov=robot_optimizer_core --cov-report=xml --cov-fail-under=0 -q \
+            --ignore=tests/functional
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master

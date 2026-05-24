@@ -1,0 +1,9 @@
+{
+  "_comment": "Pinned SARIF 2.1.0 structural keys. Do not edit to fix a test — this is a compatibility contract.",
+  "required_top_level_keys": ["$schema", "version", "runs"],
+  "sarif_version": "2.1.0",
+  "required_run_keys": ["tool", "results"],
+  "required_result_keys": ["ruleId", "level", "message", "locations", "properties"],
+  "required_rule_keys": ["id", "name", "shortDescription"],
+  "required_tool_keys": ["driver"]
+}

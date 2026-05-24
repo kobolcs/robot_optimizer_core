@@ -204,7 +204,7 @@ class TestFlakinessStats:
 
     def test_flakiness_stats_equality(self) -> None:
         """Test flakiness stats equality."""
-        last_failure = datetime.now()
+        last_failure = datetime.now(UTC)
 
         s1 = FlakinessStats(
             test_name="Test",

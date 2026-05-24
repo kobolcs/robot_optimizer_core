@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -28,7 +28,7 @@ def _make_file(content: str, name: str = "test.robot") -> TestFile:
         path=Path(name),
         content=content,
         size_bytes=len(content),
-        last_modified_utc=datetime.now(),
+        last_modified_utc=datetime.now(UTC),
     )
 
 

@@ -9,9 +9,15 @@ from __future__ import annotations
 import hashlib
 import re as _re
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import UUID, uuid5, NAMESPACE_URL
 
 from pydantic import ConfigDict, Field, computed_field, field_validator
+
+# Stable namespace for all finding IDs.  UUID5(namespace, fingerprint) produces
+# a deterministic ID — the same finding content always maps to the same UUID,
+# which satisfies the "stable external referencing" requirement stated in the
+# identity hierarchy comment below.
+_FINDING_NS = uuid5(NAMESPACE_URL, "https://robot-optimizer-core/finding/v1")
 
 from ..base import ValueObject
 from .location import Location
@@ -50,9 +56,7 @@ class Finding(ValueObject):
     #    message so that a finding whose wording changes is still suppressed.
     #    If you change this contract, update _baseline.py and the baseline docs.
     #
-    # id is kept only for stable external referencing (SARIF result IDs) and
-    # must not participate in any of the three equality / identity checks above.
-    id: UUID = Field(default_factory=uuid4, description="Unique finding ID")
+    # id is derived from fingerprint (see computed_field below) — no stored field.
     pattern: Pattern = Field(..., description="The pattern that was matched")
     severity: Severity = Field(..., description="Severity level")
     location: Location = Field(..., description="Location in the file")
@@ -200,6 +204,18 @@ class Finding(ValueObject):
             self.message[:120],
         ])
         return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def id(self) -> UUID:
+        """Deterministic UUID5 derived from fingerprint.
+
+        UUID5(namespace, fingerprint) guarantees the same finding content always
+        produces the same ID across runs, making JSON and SARIF output deterministic.
+        Replaces the previous uuid4() which was non-deterministic and violated the
+        "stable external referencing" contract stated in the identity hierarchy.
+        """
+        return uuid5(_FINDING_NS, self.fingerprint)
 
     def format_for_console(self) -> str:
         """Format the finding for console output.

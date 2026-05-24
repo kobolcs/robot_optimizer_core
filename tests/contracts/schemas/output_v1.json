@@ -1,0 +1,28 @@
+{
+  "_comment": "Pinned JSON output schema for robot-optimizer-core v1. Do not edit to fix a test — bump schema_version and add a new entry instead.",
+  "schema_version": "1",
+  "required_top_level_keys": ["schema_version", "findings"],
+  "required_finding_keys": [
+    "schema_version",
+    "id",
+    "fingerprint",
+    "file",
+    "file_path",
+    "line",
+    "line_number",
+    "column",
+    "location",
+    "severity",
+    "message",
+    "confidence",
+    "tags",
+    "pattern",
+    "pattern_type",
+    "pattern_name",
+    "recommendation",
+    "is_auto_fixable",
+    "remediation",
+    "context"
+  ],
+  "required_location_keys": ["file_path", "line", "column", "end_line", "end_column"]
+}

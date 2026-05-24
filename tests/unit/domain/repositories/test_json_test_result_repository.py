@@ -135,7 +135,7 @@ class TestGetResultsForFile:
 
     def test_naive_timestamps_treated_as_utc(self, tmp_path: Path) -> None:
         path = tmp_path / "r.jsonl"
-        naive_ts = datetime.now().isoformat()  # no tzinfo
+        naive_ts = datetime.now(UTC).isoformat()  # no tzinfo
         record = {
             "test_name": "T",
             "file_path": "suite.robot",

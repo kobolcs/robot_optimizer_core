@@ -261,7 +261,7 @@ class TestTestResultCoverage:
 
     def test_test_result_skip_status(self):
         """Test SKIP status handling."""
-        from datetime import datetime
+        from datetime import UTC, datetime
 
         from robot_optimizer_core.domain.value_objects.test_result import TestResult
 
@@ -270,7 +270,7 @@ class TestTestResultCoverage:
             file_path=Path("test.robot"),
             status="SKIP",
             execution_time=0.0,
-            timestamp=datetime.now()
+            timestamp=datetime.now(UTC)
         )
 
         assert not result.is_failure
@@ -282,6 +282,6 @@ class TestTestResultCoverage:
             status="SKIP",
             execution_time=0.0,
             error_message="Skipped due to condition",
-            timestamp=datetime.now()
+            timestamp=datetime.now(UTC)
         )
         assert result_with_msg.error_message == "Skipped due to condition"

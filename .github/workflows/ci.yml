@@ -1,8 +1,25 @@
 name: CI
+
 on:
   push:
-    branches: [ master, main ]
+    branches: [master, main]
+    paths-ignore:
+      - "docs/**"
+      - "*.md"
+      - "mkdocs.yml"
+      - "CHANGELOG.md"
+      - "CONTRIBUTING.md"
+      - "CODE_OF_CONDUCT.md"
+      - "SECURITY.md"
   pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "*.md"
+      - "mkdocs.yml"
+      - "CHANGELOG.md"
+      - "CONTRIBUTING.md"
+      - "CODE_OF_CONDUCT.md"
+      - "SECURITY.md"
   workflow_dispatch:
 
 permissions:
@@ -14,78 +31,54 @@ concurrency:
 
 jobs:
   test:
+    # Skip the expensive 12-runner matrix on draft PRs.
+    # pr_fast.yml gives quick feedback on every draft push instead.
+    if: ${{ github.event.pull_request.draft != true }}
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.experimental == true }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - python-version: "3.11"
-            tox-env: "py311"
-            os: ubuntu-latest
-          - python-version: "3.12"
-            tox-env: "py312"
-            os: ubuntu-latest
-          - python-version: "3.13"
-            tox-env: "py313"
-            os: ubuntu-latest
-          - python-version: "3.14"
-            tox-env: "py314"
-            os: ubuntu-latest
-            experimental: true
-          - python-version: "3.11"
-            tox-env: "py311"
-            os: windows-latest
-          - python-version: "3.12"
-            tox-env: "py312"
-            os: windows-latest
-          - python-version: "3.13"
-            tox-env: "py313"
-            os: windows-latest
-          - python-version: "3.14"
-            tox-env: "py314"
-            os: windows-latest
-            experimental: true
-          - python-version: "3.11"
-            tox-env: "py311"
-            os: macos-latest
-          - python-version: "3.12"
-            tox-env: "py312"
-            os: macos-latest
-          - python-version: "3.13"
-            tox-env: "py313"
-            os: macos-latest
-          - python-version: "3.14"
-            tox-env: "py314"
-            os: macos-latest
-            experimental: true
+          - {python-version: "3.11", tox-env: py311, os: ubuntu-latest}
+          - {python-version: "3.12", tox-env: py312, os: ubuntu-latest}
+          - {python-version: "3.13", tox-env: py313, os: ubuntu-latest}
+          - {python-version: "3.14", tox-env: py314, os: ubuntu-latest, experimental: true}
+          - {python-version: "3.11", tox-env: py311, os: windows-latest}
+          - {python-version: "3.12", tox-env: py312, os: windows-latest}
+          - {python-version: "3.13", tox-env: py313, os: windows-latest}
+          - {python-version: "3.14", tox-env: py314, os: windows-latest, experimental: true}
+          - {python-version: "3.11", tox-env: py311, os: macos-latest}
+          - {python-version: "3.12", tox-env: py312, os: macos-latest}
+          - {python-version: "3.13", tox-env: py313, os: macos-latest}
+          - {python-version: "3.14", tox-env: py314, os: macos-latest, experimental: true}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: ${{ matrix.python-version == '3.14' }}
-          cache: 'pip'
+          cache: pip
 
       - name: Cache tox environments
         uses: actions/cache@v4
         with:
           path: .tox
-          key: tox-${{ matrix.os }}-${{ matrix.python-version }}-${{ hashFiles('tox.ini', 'pyproject.toml') }}
-          restore-keys: |
-            tox-${{ matrix.os }}-${{ matrix.python-version }}-
+          # uv.lock added so lock-file changes bust the tox cache correctly.
+          key: tox-${{ matrix.os }}-${{ matrix.python-version }}-${{ hashFiles('tox.ini', 'pyproject.toml', 'uv.lock') }}
+          restore-keys: tox-${{ matrix.os }}-${{ matrix.python-version }}-
 
       - name: Install tox
-        run: python -m pip install --upgrade pip tox  # NOSONAR
+        # pip is already up-to-date on GHA runners; skipping --upgrade pip saves ~5s.
+        run: pip install tox  # NOSONAR
 
-      - name: Run test matrix through tox
+      - name: Run tests
         run: tox -e ${{ matrix.tox-env }}
 
       - name: Upload coverage to Codecov
+        if: ${{ always() }}
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -93,34 +86,49 @@ jobs:
           flags: ${{ matrix.os }}-py${{ matrix.python-version }}
           fail_ci_if_error: false
 
+      - name: Upload coverage artifact (consumed by sonar.yml)
+        # Only upload once — from the canonical ubuntu/3.12 run.
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          retention-days: 1
+
   quality:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: 'pip'
+          cache: pip
 
       - name: Cache tox environments
         uses: actions/cache@v4
         with:
           path: .tox
-          key: tox-quality-${{ hashFiles('tox.ini', 'pyproject.toml') }}
-          restore-keys: |
-            tox-quality-
+          key: tox-quality-${{ hashFiles('tox.ini', 'pyproject.toml', 'uv.lock') }}
+          restore-keys: tox-quality-
 
-      - name: Install tox
-        run: python -m pip install --upgrade pip tox  # NOSONAR
+      - name: Install dependencies
+        # Single install pass: tox for quality envs, pip-audit for dep scanning,
+        # .[test] for contract tests + determinism check (avoids installing docs/mutmut/etc.).
+        run: |
+          pip install tox pip-audit  # NOSONAR
+          pip install -e ".[test]"   # NOSONAR
 
-      - name: Run lint / type / packaging / docs checks
-        run: tox -e lint,type,build,docs
+      - name: Lint, type-check, build, docs (parallel)
+        # -p 4 runs the four environments concurrently; each is isolated by tox.
+        # build writes to dist/ in the repo root — only one build env exists, no conflict.
+        run: tox -p 4 -e lint,type,build,docs
 
       - name: Audit dependencies
-        run: |
-          pip install --only-binary :all: pip-audit
-          pip install -e .  # NOSONAR - local editable install, not a remote download
-          pip-audit
+        run: pip-audit
+
+      - name: Contract tests (API / plugin / schema stability gate)
+        run: python -m pytest tests/contracts/ -m contract --no-cov -q --tb=short
+
+      - name: Determinism check
+        run: python ci/check_test_determinism.py tests/

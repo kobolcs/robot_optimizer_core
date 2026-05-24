@@ -12,8 +12,11 @@ from robot_optimizer_core.domain.value_objects.pattern import Pattern, PatternTy
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     for item in items:
-        if str(item.fspath).replace("\\", "/").split("/tests/")[1].startswith("unit/"):
+        rel = str(item.fspath).replace("\\", "/").split("/tests/")[1]
+        if rel.startswith("unit/"):
             item.add_marker(pytest.mark.unit)
+        elif rel.startswith("contracts/"):
+            item.add_marker(pytest.mark.contract)
 
 
 # ---------------------------------------------------------------------------

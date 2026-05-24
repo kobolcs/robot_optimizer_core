@@ -62,13 +62,13 @@ class TestTestResult:
                 file_path=Path("test.robot"),
                 status="PASS",
                 execution_time=1.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(UTC),
             )
         assert "at least 1 character" in str(exc_info.value)
 
     def test_status_validation(self) -> None:
         """Test status validation."""
-        timestamp = datetime.now()
+        timestamp = datetime.now(UTC)
 
         # Valid statuses
         for status in ["PASS", "FAIL", "SKIP"]:
@@ -101,7 +101,7 @@ class TestTestResult:
                 file_path=Path("test.robot"),
                 status="PASS",
                 execution_time=-1.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(UTC),
             )
         assert "greater than or equal to 0" in str(exc_info.value)
 
@@ -111,13 +111,13 @@ class TestTestResult:
             file_path=Path("test.robot"),
             status="SKIP",
             execution_time=0.0,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(UTC),
         )
         assert result.execution_time == pytest.approx(0.0)
 
     def test_is_failure_property(self) -> None:
         """Test is_failure property."""
-        timestamp = datetime.now()
+        timestamp = datetime.now(UTC)
 
         fail_result = TestResult(
             test_name="Test",
@@ -156,7 +156,7 @@ class TestTestResult:
             file_path="tests/suite/test.robot",  # String
             status="PASS",
             execution_time=1.0,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(UTC),
         )
 
         assert isinstance(result.file_path, Path)
@@ -164,7 +164,7 @@ class TestTestResult:
 
     def test_test_result_equality(self) -> None:
         """Test test result equality."""
-        timestamp = datetime.now()
+        timestamp = datetime.now(UTC)
 
         r1 = TestResult(
             test_name="Test",
@@ -201,7 +201,7 @@ class TestTestResult:
             file_path=Path("test.robot"),
             status="PASS",
             execution_time=1.0,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(UTC),
         )
 
         with pytest.raises(ValidationError):

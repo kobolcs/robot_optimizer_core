@@ -1,0 +1,45 @@
+name: PR Fast Lane
+
+# Fast feedback on every push to a PR branch. Target: <3 minutes.
+# Intentionally does NOT duplicate lint/type checks — those run in ci.yml quality job.
+# Contents: determinism guard + contract tests (schema/API/plugin stability) + smoke unit tests.
+# A failure here is a hard merge block.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-fast-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fast:
+    name: Fast lane — contracts + smoke (~3 min)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Determinism check
+        run: python ci/check_test_determinism.py tests/
+
+      - name: Contract tests (API/plugin/schema stability — always run)
+        run: |
+          python -m pytest tests/contracts/ -m contract \
+            --no-cov -q --tb=short --timeout=30
+
+      - name: Smoke tests (unit layer, no coverage overhead)
+        run: |
+          python -m pytest tests/unit/ tests/integration/ \
+            --no-cov -q --tb=short --timeout=30

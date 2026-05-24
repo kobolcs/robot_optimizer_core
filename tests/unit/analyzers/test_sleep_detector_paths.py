@@ -7,7 +7,7 @@ sleep via check_custom, and the evaluate/pattern internal detectors.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -22,7 +22,7 @@ def _make(content: str, path: str = "test.robot") -> TestFile:
         path=Path(path),
         content=content,
         size_bytes=len(content),
-        last_modified_utc=datetime.now(),
+        last_modified_utc=datetime.now(UTC),
     )
 
 

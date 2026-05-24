@@ -4,12 +4,14 @@ on:
   push:
     branches: [ master, main ]
     paths:
-      - 'src/robot_optimizer_core/analyzers/**'
+      - 'src/robot_optimizer_core/application/analyzers/**'
+      - 'src/robot_optimizer_core/domain/**'
       - 'tests/unit/analyzers/**'
       - 'mutmut_config.py'
   pull_request:
     paths:
-      - 'src/robot_optimizer_core/analyzers/**'
+      - 'src/robot_optimizer_core/application/analyzers/**'
+      - 'src/robot_optimizer_core/domain/**'
       - 'tests/unit/analyzers/**'
       - 'mutmut_config.py'
   workflow_dispatch:

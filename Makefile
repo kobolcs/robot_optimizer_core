@@ -4,7 +4,7 @@ PYTEST        := uv run pytest
 MYPY          := uv run mypy
 RUFF          := uv run ruff
 
-.PHONY: help install test test-fast test-unit test-integration lint lint-full type format clean coverage coverage-check coverage-unit coverage-integration docs docs-serve build check publish-test publish-test-upload publish release-check release-check-testpypi
+.PHONY: help install test test-fast test-unit test-integration test-contracts test-smoke test-nightly lint lint-full type format clean coverage coverage-check coverage-unit coverage-integration docs docs-serve build check check-determinism check-quarantine publish-test publish-test-upload publish release-check release-check-testpypi
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -24,6 +24,23 @@ test-unit: ## Run unit tests only
 
 test-integration: ## Run integration tests only
 	$(PYTEST) tests/integration/ --no-cov -q
+
+test-contracts: ## Run contract tests (API/plugin/schema stability)
+	$(PYTEST) tests/contracts/ -m contract --no-cov -q --tb=short
+
+test-smoke: ## PR fast lane: contract + unit tests, no coverage
+	$(PYTEST) tests/contracts/ tests/unit/ -m "contract or unit" \
+	  --no-cov -q --tb=short --ignore=tests/functional --ignore=tests/component
+
+test-nightly: ## Nightly deep lane: full suite + quarantined + performance
+	$(PYTEST) tests/ --run-quarantine -m "not slow" --no-cov -q --tb=short
+	$(PYTEST) tests/ -m performance --no-cov -q --tb=short || true
+
+check-determinism: ## Scan test files for determinism anti-patterns
+	$(PYTHON) ci/check_test_determinism.py tests/
+
+check-quarantine: ## Report quarantined tests and flag overdue ones
+	$(PYTHON) ci/check_quarantine_age.py tests/
 
 lint: ## Lint with ruff using CI rule-set (F,E9,W,E,I,B,UP) — matches CI
 	$(RUFF) check src tests --select F,E9,W,E,I,B,UP --ignore E501 --fix
