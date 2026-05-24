@@ -100,6 +100,7 @@ def _cli(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str
         text=True,
         encoding="utf-8",
         errors="replace",
+        timeout=20,
         cwd=cwd,
         env=env,
     )
@@ -364,6 +365,7 @@ class TestListAnalyzers:
 
 @pytest.mark.functional
 @pytest.mark.slow
+@pytest.mark.timeout(120)
 class TestInstalledWheel:
     """Build the wheel, install it into an isolated venv, and run the CLI.
 
@@ -380,7 +382,9 @@ class TestInstalledWheel:
             cmd = [uv_exe, "build", "--wheel", "--out-dir", str(dist_dir)]
         else:
             cmd = [sys.executable, "-m", "build", "--wheel", "--outdir", str(dist_dir)]
-        build = subprocess.run(cmd, capture_output=True, text=True, cwd=str(REPO_ROOT))
+        build = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=90, cwd=str(REPO_ROOT)
+        )
         assert build.returncode == 0, f"build failed:\n{build.stderr}"
 
         wheels = list(dist_dir.glob("*.whl"))
@@ -397,6 +401,7 @@ class TestInstalledWheel:
             [str(venv_python), "-m", "pip", "install", str(wheel), "--quiet"],
             capture_output=True,
             text=True,
+            timeout=60,
         )
         assert install.returncode == 0, f"pip install failed:\n{install.stderr}"
 
@@ -407,6 +412,7 @@ class TestInstalledWheel:
             capture_output=True,
             text=True,
             encoding="utf-8",
+            timeout=20,
         )
         assert result.returncode == 0, f"CLI failed:\n{result.stderr}"
         data = json.loads(result.stdout)

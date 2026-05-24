@@ -163,6 +163,10 @@ exclude = [
 minversion = "9.0"
 testpaths = ["tests"]
 pythonpath = ["src", "tests"]
+# Global safety net: a test that hangs (e.g. a subprocess with no timeout= kwarg)
+# raises TimeoutExpired rather than blocking the CI runner indefinitely.
+# The slow TestInstalledWheel test overrides this with @pytest.mark.timeout(120).
+timeout = 30
 addopts = [
     "--strict-markers",
     "--tb=short",
