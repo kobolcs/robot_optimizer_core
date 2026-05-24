@@ -2,17 +2,7 @@ from pathlib import Path
 
 import pytest
 
-import sys
-from pathlib import Path as _Path
-
-sys.path.insert(0, str(_Path(__file__).parent.parent))
-from conftest import write_robot_file  # noqa: E402
-
-
-def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
-    for item in items:
-        if str(item.fspath).replace("\\", "/").split("/tests/")[1].startswith("integration/"):
-            item.add_marker(pytest.mark.integration)
+from conftest import write_robot_file
 
 
 @pytest.fixture
