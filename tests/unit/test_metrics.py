@@ -95,12 +95,15 @@ class TestMetricsCollector:
         assert data["gauges"] == {}
 
     def test_get_metrics_singleton(self) -> None:
+        from robot_optimizer_core.infrastructure.metrics.collector import reset_metrics
+
         m1 = get_metrics()
         try:
             m2 = get_metrics()
             assert m1 is m2
         finally:
             m1.stop()
+            reset_metrics()
 
     def test_tags_create_separate_keys(self, collector: MetricsCollector) -> None:
         collector.increment("hits", tags={"env": "prod"})
